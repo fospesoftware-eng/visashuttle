@@ -3,14 +3,62 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ThemeProvider } from "@/lib/theme";
+
 import NotFound from "@/pages/not-found";
+import LandingPage from "@/pages/landing";
+import LoginPage from "@/pages/login";
+import SignupPage from "@/pages/signup";
+
+import AgencyDashboard from "@/pages/agency/dashboard";
+import LeadsPage from "@/pages/agency/leads";
+import CasesPage from "@/pages/agency/cases";
+import CaseDetailPage from "@/pages/agency/case-detail";
+import DocumentsPage from "@/pages/agency/documents";
+import ReportsPage from "@/pages/agency/reports";
+import AgencySettingsPage from "@/pages/agency/settings";
+
+import CustomerDashboard from "@/pages/customer/dashboard";
+import CustomerCasePage from "@/pages/customer/case";
+import CustomerUploadPage from "@/pages/customer/upload";
+import CustomerMessagesPage from "@/pages/customer/messages";
+import CustomerProfilePage from "@/pages/customer/profile";
+
+import AdminDashboard from "@/pages/admin/dashboard";
+import AdminTenantsPage from "@/pages/admin/tenants";
+import AdminVKBPage from "@/pages/admin/vkb";
+import AdminAIPage from "@/pages/admin/ai";
+import AdminAuditPage from "@/pages/admin/audit";
+import AdminSettingsPage from "@/pages/admin/settings";
 
 function Router() {
   return (
     <Switch>
-      {/* Add pages below */}
-      {/* <Route path="/" component={Home}/> */}
-      {/* Fallback to 404 */}
+      <Route path="/" component={LandingPage} />
+      <Route path="/login" component={LoginPage} />
+      <Route path="/signup" component={SignupPage} />
+      
+      <Route path="/app" component={AgencyDashboard} />
+      <Route path="/app/leads" component={LeadsPage} />
+      <Route path="/app/cases" component={CasesPage} />
+      <Route path="/app/cases/:id" component={CaseDetailPage} />
+      <Route path="/app/documents" component={DocumentsPage} />
+      <Route path="/app/reports" component={ReportsPage} />
+      <Route path="/app/settings" component={AgencySettingsPage} />
+      
+      <Route path="/customer" component={CustomerDashboard} />
+      <Route path="/customer/case" component={CustomerCasePage} />
+      <Route path="/customer/upload" component={CustomerUploadPage} />
+      <Route path="/customer/messages" component={CustomerMessagesPage} />
+      <Route path="/customer/profile" component={CustomerProfilePage} />
+      
+      <Route path="/admin" component={AdminDashboard} />
+      <Route path="/admin/tenants" component={AdminTenantsPage} />
+      <Route path="/admin/vkb" component={AdminVKBPage} />
+      <Route path="/admin/ai" component={AdminAIPage} />
+      <Route path="/admin/audit" component={AdminAuditPage} />
+      <Route path="/admin/settings" component={AdminSettingsPage} />
+      
       <Route component={NotFound} />
     </Switch>
   );
@@ -18,12 +66,14 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Router />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 
