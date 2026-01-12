@@ -9,7 +9,7 @@ VisaShuttle is a multi-tenant SaaS platform for travel agencies to manage visa a
 3. **Agency Dashboard** - CRM, case management, document center, reporting
 4. **Customer Portal** - Self-service application tracking and document uploads
 
-The application uses a monorepo structure with a React frontend and Express backend, connected to PostgreSQL for data persistence.
+The application uses a monorepo structure with a React frontend and Express backend. Currently using in-memory storage with seed data for development (PostgreSQL-ready when needed).
 
 ## User Preferences
 
@@ -33,10 +33,15 @@ Preferred communication style: Simple, everyday language.
 - **Production**: Static file serving from built assets
 
 ### Database Layer
-- **Database**: PostgreSQL
-- **ORM**: Drizzle ORM with drizzle-kit for migrations
-- **Schema Location**: `shared/schema.ts` contains all table definitions
-- **Validation**: Zod schemas generated from Drizzle schemas using drizzle-zod
+- **Current**: In-memory storage with MemStorage class (see `server/storage.ts`)
+- **Schema Location**: `shared/schema.ts` contains all type definitions
+- **Seed Data**: Demo tenant, admin user, agency owner, customer, sample cases and documents
+- **Production**: Ready to switch to PostgreSQL with Drizzle ORM
+
+### Demo Credentials
+- **SaaS Admin**: admin@visashuttle.com / Admin@12345
+- **Agency Owner**: owner@demoagency.com / Demo@12345
+- **Customer**: customer@demo.com / Demo@12345
 
 ### Multi-Tenancy Design
 - Tenant isolation enforced via `tenantId` foreign key on all tenant-scoped records
