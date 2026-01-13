@@ -27,6 +27,15 @@ export const tenants = pgTable("tenants", {
   logoUrl: text("logo_url"),
   plan: text("plan").notNull().default("starter"), // starter, professional, enterprise
   status: text("status").notNull().default("active"), // active, suspended, pending
+  // White-label branding
+  primaryColor: text("primary_color").default("#00B4D8"),
+  secondaryColor: text("secondary_color").default("#E056A0"),
+  accentColor: text("accent_color").default("#0096C7"),
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone"),
+  whatsappNumber: text("whatsapp_number"),
+  showPoweredBy: boolean("show_powered_by").default(true),
+  authMethod: text("auth_method").default("otp"), // otp, magic_link
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -58,8 +67,12 @@ export type Lead = typeof leads.$inferSelect;
 export const cases = pgTable("cases", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull(),
-  customerId: varchar("customer_id").notNull(),
+  customerId: varchar("customer_id"), // Can be null initially for agency-created cases
+  customerAccountId: varchar("customer_account_id"), // Link to white-label customer
   caseNumber: text("case_number").notNull(),
+  referenceId: text("reference_id").notNull(), // For customer claim flow
+  applicantName: text("applicant_name"), // For claim verification
+  applicantDob: text("applicant_dob"), // For claim verification (stored as string for simplicity)
   visaType: text("visa_type").notNull(),
   destinationCountry: text("destination_country").notNull(),
   status: text("status").notNull().default("pending"), // pending, in_progress, documents_required, under_review, approved, rejected
@@ -145,3 +158,47 @@ export const activityLogs = pgTable("activity_logs", {
 export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({ id: true, createdAt: true });
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
 export type ActivityLog = typeof activityLogs.$inferSelect;
+
+// Customer Accounts table (White-label portal customers)
+export const customerAccounts = pgTable("customer_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull().unique(),
+  phone: text("phone"),
+  name: text("name"),
+  avatarUrl: text("avatar_url"),
+  isVerified: boolean("is_verified").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCustomerAccountSchema = createInsertSchema(customerAccounts).omit({ id: true, createdAt: true });
+export type InsertCustomerAccount = z.infer<typeof insertCustomerAccountSchema>;
+export type CustomerAccount = typeof customerAccounts.$inferSelect;
+
+// Customer-Tenant Link table (allows customers to have cases with multiple agencies)
+export const customerTenantLinks = pgTable("customer_tenant_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerAccountId: varchar("customer_account_id").notNull(),
+  tenantId: varchar("tenant_id").notNull(),
+  role: text("role").default("customer"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCustomerTenantLinkSchema = createInsertSchema(customerTenantLinks).omit({ id: true, createdAt: true });
+export type InsertCustomerTenantLink = z.infer<typeof insertCustomerTenantLinkSchema>;
+export type CustomerTenantLink = typeof customerTenantLinks.$inferSelect;
+
+// OTP Codes table
+export const otpCodes = pgTable("otp_codes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull(),
+  code: text("code").notNull(),
+  tenantId: varchar("tenant_id").notNull(),
+  attempts: integer("attempts").default(0),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertOTPCodeSchema = createInsertSchema(otpCodes).omit({ id: true, createdAt: true });
+export type InsertOTPCode = z.infer<typeof insertOTPCodeSchema>;
+export type OTPCode = typeof otpCodes.$inferSelect;

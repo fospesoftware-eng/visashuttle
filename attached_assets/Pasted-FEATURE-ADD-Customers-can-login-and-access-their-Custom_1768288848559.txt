@@ -1,0 +1,116 @@
+FEATURE ADD: Customers can login and access their Customer Dashboard via the Travel Agency White-Label application.
+
+A) WHITE-LABEL CUSTOMER AUTH (TENANT-AWARE)
+Goal: A customer visiting an agency’s white-label site (e.g., /w/[agencySlug]) can:
+1) Sign up / Login (OTP or magic link)
+2) Be automatically associated with that tenant (agency)
+3) Access their Customer Dashboard with the agency branding applied
+4) View their cases and upload documents
+5) Track status via reference ID OR by logging in
+
+B) ROUTES (PUBLIC -> AUTH -> CUSTOMER)
+Add these public routes under /w/[agencySlug]:
+- /w/[agencySlug]/login
+- /w/[agencySlug]/signup (optional; can be combined)
+- /w/[agencySlug]/verify (OTP verification screen)
+- /w/[agencySlug]/portal (customer landing after auth, lists their cases)
+- /w/[agencySlug]/portal/case/[id]
+- /w/[agencySlug]/portal/profile
+- /w/[agencySlug]/portal/uploads
+- /w/[agencySlug]/portal/messages
+- /w/[agencySlug]/portal/downloads
+Keep existing generic customer routes (/c/...) but ensure white-label routes use the same underlying pages/components with tenant theme.
+
+C) AUTH METHOD (IMPLEMENT BOTH, DEFAULT TO OTP)
+1) Email OTP (default)
+- User enters email (and phone optional)
+- System sends 6-digit OTP via email (use console/email dev provider in dev)
+- Verify OTP creates session (NextAuth)
+2) Magic link (optional toggle per tenant)
+- Send login link to email with short expiry
+
+D) DATA MODEL UPDATES (Prisma)
+Add:
+- CustomerAccount:
+  - id
+  - tenantId
+  - email (unique per tenant OR global unique + tenant mapping)
+  - phone (optional)
+  - createdAt
+- CustomerSession handled by NextAuth (or custom session table)
+- CustomerTenantLink:
+  - customerId
+  - tenantId
+  - role="CUSTOMER"
+  - unique(customerId, tenantId)
+
+Important rules:
+- Same email can belong to multiple tenants (if needed):
+  - Implement either:
+    a) global Customer identity + CustomerTenantLink (recommended), OR
+    b) unique per tenant and allow duplicates across tenants.
+- For MVP, implement global Customer + link table so customer can have cases with multiple agencies (future-proof).
+
+E) CUSTOMER ONBOARDING FLOWS
+1) From white-label lead form -> convert to customer:
+- When a Lead is created via /w/[agencySlug]/apply, show confirmation:
+  - “Create an account to upload documents and track progress”
+- If they sign up, link that lead/case to their customer account.
+
+2) Reference ID claim:
+- On /w/[agencySlug]/portal, allow “Claim a case with Reference ID”
+- User enters Reference ID + last name or DOB for verification (light security)
+- If match: link case to that customer account.
+
+3) Agency-invited customer:
+- Agency can click “Invite Customer” inside a case:
+  - Sends email invite link to /w/[agencySlug]/login with pre-filled email
+  - Once customer logs in, they see that case
+
+F) TENANT-AWARE THEMING & BRANDING
+- The entire /w/[agencySlug]/portal experience must use:
+  - tenant’s logo
+  - tenant’s gradient palette
+  - tenant contact/WhatsApp CTA
+- Show subtle “Powered by VisaShuttle” in footer (configurable per plan)
+
+G) SECURITY REQUIREMENTS
+- Tenant isolation: customer can only see cases belonging to tenantId unless explicitly linked via CustomerTenantLink.
+- Rate limit OTP requests and reference ID claims by IP and email.
+- OTP expiry (10 mins), max attempts (e.g., 5).
+- Audit log:
+  - OTP requested
+  - OTP verified
+  - Reference ID claimed
+  - Document uploaded
+  - Case downloaded
+
+H) UX REQUIREMENTS (WHITE-LABEL CUSTOMER PORTAL)
+- /w/[agencySlug]/login:
+  - Beautiful gradient hero + logo + minimal form
+  - “Continue with Email OTP” primary
+  - Optional magic link toggle
+- After login:
+  - Customer Home shows:
+    - active cases cards
+    - progress timeline
+    - missing documents alerts
+    - quick upload button
+    - chat button
+- Upload page:
+  - drag & drop + mobile camera upload
+  - real-time AI feedback if AI enabled; else deterministic mock
+- Messages:
+  - simple threaded chat with agency staff
+
+I) SEED DATA
+- Seed demo tenant white-label config
+- Create a demo customer account linked to demo tenant
+- Ensure demo customer can log in from /w/demoagency/login and see their case
+
+J) README UPDATES
+- Explain white-label customer login flow
+- Demo credentials and/or how to test OTP in dev (console output ok)
+- How to configure email provider later
+
+IMPLEMENT NOW without removing existing functionality. Ensure all routes work and compile.
