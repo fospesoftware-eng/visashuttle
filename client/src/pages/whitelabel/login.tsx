@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Mail, ArrowRight, Loader2 } from "lucide-react";
+import { Mail, ArrowRight, Loader2, Plane, Shield, Clock, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,7 +57,7 @@ export default function WhiteLabelLoginPage() {
 
   if (tenantLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
@@ -65,7 +65,7 @@ export default function WhiteLabelLoginPage() {
 
   if (tenantError || !tenant) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
         <Card className="max-w-md w-full">
           <CardHeader className="text-center">
             <CardTitle>Agency Not Found</CardTitle>
@@ -76,102 +76,206 @@ export default function WhiteLabelLoginPage() {
     );
   }
 
-  const brandStyle = {
-    "--brand-primary": tenant.primaryColor || "#00B4D8",
-    "--brand-secondary": tenant.secondaryColor || "#E056A0",
-  } as React.CSSProperties;
+  const primaryColor = tenant.primaryColor || "#00B4D8";
+  const secondaryColor = tenant.secondaryColor || "#E056A0";
 
   return (
-    <div 
-      className="min-h-screen flex flex-col"
-      style={brandStyle}
-    >
+    <div className="min-h-screen flex flex-col lg:flex-row">
       <div 
-        className="flex-1 flex items-center justify-center p-4"
+        className="hidden lg:flex lg:w-1/2 relative overflow-hidden"
         style={{
-          background: `linear-gradient(135deg, ${tenant.primaryColor || "#00B4D8"}20, ${tenant.secondaryColor || "#E056A0"}20)`
+          background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`
         }}
       >
-        <Card className="max-w-md w-full">
-          <CardHeader className="text-center space-y-4">
-            {tenant.logoUrl ? (
-              <img src={tenant.logoUrl} alt={tenant.name} className="h-12 mx-auto" />
-            ) : (
-              <h1 
-                className="text-2xl font-bold"
-                style={{ color: tenant.primaryColor || "#00B4D8" }}
-              >
-                {tenant.name}
-              </h1>
-            )}
-            <div>
-              <CardTitle className="text-xl">Welcome</CardTitle>
-              <CardDescription>Sign in to track your visa application</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  data-testid="input-email"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="name">Full Name (optional)</Label>
-                <Input
-                  id="name"
-                  type="text"
-                  placeholder="John Smith"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  data-testid="input-name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone (optional)</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="+1 234 567 8900"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  data-testid="input-phone"
-                />
-              </div>
-              <Button 
-                type="submit" 
-                className="w-full gap-2"
-                disabled={requestOTPMutation.isPending}
-                style={{ backgroundColor: tenant.primaryColor || undefined }}
-                data-testid="button-continue"
-              >
-                {requestOTPMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Mail className="w-4 h-4" />
-                )}
-                Continue with Email
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-            </form>
-            <p className="text-xs text-muted-foreground text-center mt-4">
-              We'll send you a one-time code to verify your email
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-      {tenant.showPoweredBy && (
-        <div className="py-4 text-center text-sm text-muted-foreground">
-          Powered by <span className="font-medium gradient-text">Visa Shuttle</span>
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-20 left-10 w-64 h-64 rounded-full bg-white/20 blur-3xl" />
+          <div className="absolute bottom-20 right-10 w-80 h-80 rounded-full bg-white/20 blur-3xl" />
+          <div className="absolute top-1/2 left-1/3 w-48 h-48 rounded-full bg-white/10 blur-2xl" />
         </div>
-      )}
+        
+        <div className="relative z-10 flex flex-col justify-center p-12 text-white">
+          <div className="mb-12">
+            {tenant.logoUrl ? (
+              <img src={tenant.logoUrl} alt={tenant.name} className="h-16 brightness-0 invert" />
+            ) : (
+              <h1 className="text-4xl font-bold">{tenant.name}</h1>
+            )}
+          </div>
+          
+          <h2 className="text-3xl font-bold mb-4">
+            Your Visa Journey<br />Starts Here
+          </h2>
+          <p className="text-lg text-white/80 mb-12">
+            Track your application, upload documents, and stay updated on your visa status in real-time.
+          </p>
+          
+          <div className="space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
+                <Clock className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-semibold">Real-time Updates</h3>
+                <p className="text-sm text-white/70">Get instant notifications on your application status</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
+                <Shield className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-semibold">Secure & Private</h3>
+                <p className="text-sm text-white/70">Your documents are encrypted and protected</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
+                <Globe className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-semibold">Expert Support</h3>
+                <p className="text-sm text-white/70">Our team is here to guide you every step</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="absolute bottom-8 left-12 right-12 flex items-center justify-between text-white/60 text-sm">
+          {tenant.contactEmail && (
+            <span>{tenant.contactEmail}</span>
+          )}
+          {tenant.contactPhone && (
+            <span>{tenant.contactPhone}</span>
+          )}
+        </div>
+      </div>
+
+      <div className="flex-1 flex flex-col min-h-screen lg:min-h-0">
+        <div 
+          className="lg:hidden p-6 text-white"
+          style={{
+            background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`
+          }}
+        >
+          <div className="flex items-center gap-3 mb-4">
+            {tenant.logoUrl ? (
+              <img src={tenant.logoUrl} alt={tenant.name} className="h-10 brightness-0 invert" />
+            ) : (
+              <h1 className="text-xl font-bold">{tenant.name}</h1>
+            )}
+          </div>
+          <div className="flex items-center gap-2 text-white/80">
+            <Plane className="w-4 h-4" />
+            <span className="text-sm">Your Visa Journey Starts Here</span>
+          </div>
+        </div>
+
+        <div className="flex-1 flex items-center justify-center p-6 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
+          <div className="w-full max-w-md">
+            <div className="text-center mb-8 lg:mb-10">
+              <div 
+                className="hidden lg:flex w-16 h-16 rounded-2xl mx-auto mb-6 items-center justify-center"
+                style={{ backgroundColor: `${primaryColor}15` }}
+              >
+                <Mail className="w-8 h-8" style={{ color: primaryColor }} />
+              </div>
+              <h2 className="text-2xl lg:text-3xl font-bold text-foreground mb-2">Welcome Back</h2>
+              <p className="text-muted-foreground">Sign in to track your visa application</p>
+            </div>
+
+            <Card className="border-0 shadow-xl">
+              <CardContent className="p-6 lg:p-8">
+                <form onSubmit={handleSubmit} className="space-y-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-sm font-medium">Email Address</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="you@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      className="h-12"
+                      data-testid="input-email"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="name" className="text-sm font-medium">
+                      Full Name <span className="text-muted-foreground">(optional)</span>
+                    </Label>
+                    <Input
+                      id="name"
+                      type="text"
+                      placeholder="John Smith"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="h-12"
+                      data-testid="input-name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone" className="text-sm font-medium">
+                      Phone <span className="text-muted-foreground">(optional)</span>
+                    </Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="+1 234 567 8900"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="h-12"
+                      data-testid="input-phone"
+                    />
+                  </div>
+                  <Button 
+                    type="submit" 
+                    className="w-full h-12 text-base font-medium gap-2"
+                    disabled={requestOTPMutation.isPending}
+                    style={{ backgroundColor: primaryColor }}
+                    data-testid="button-continue"
+                  >
+                    {requestOTPMutation.isPending ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <>
+                        Continue with Email
+                        <ArrowRight className="w-5 h-5" />
+                      </>
+                    )}
+                  </Button>
+                </form>
+                <p className="text-xs text-muted-foreground text-center mt-6">
+                  We'll send you a one-time code to verify your email. No password required.
+                </p>
+              </CardContent>
+            </Card>
+
+            {(tenant.contactEmail || tenant.contactPhone) && (
+              <div className="mt-8 text-center lg:hidden">
+                <p className="text-sm text-muted-foreground mb-2">Need help?</p>
+                <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
+                  {tenant.contactEmail && (
+                    <a href={`mailto:${tenant.contactEmail}`} className="hover:underline" style={{ color: primaryColor }}>
+                      {tenant.contactEmail}
+                    </a>
+                  )}
+                  {tenant.contactPhone && (
+                    <a href={`tel:${tenant.contactPhone}`} className="hover:underline" style={{ color: primaryColor }}>
+                      {tenant.contactPhone}
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {tenant.showPoweredBy && (
+          <div className="py-4 text-center text-sm text-muted-foreground bg-slate-50 dark:bg-slate-950">
+            Powered by <span className="font-semibold gradient-text">Visa Shuttle</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

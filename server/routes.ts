@@ -457,6 +457,37 @@ export async function registerRoutes(
     res.json(tenant);
   });
 
+  // Get tenant by slug (for agency dashboard)
+  app.get("/api/tenants/by-slug/:slug", async (req, res) => {
+    const tenant = await storage.getTenantBySlug(req.params.slug);
+    if (!tenant) {
+      return res.status(404).json({ error: "Tenant not found" });
+    }
+    res.json(tenant);
+  });
+
+  // Update tenant branding (for agency owners)
+  app.patch("/api/tenants/:id/branding", async (req, res) => {
+    const { name, logoUrl, primaryColor, secondaryColor, accentColor, contactEmail, contactPhone, whatsappNumber, showPoweredBy } = req.body;
+    
+    const tenant = await storage.updateTenant(req.params.id, {
+      name,
+      logoUrl: logoUrl || null,
+      primaryColor,
+      secondaryColor,
+      accentColor,
+      contactEmail,
+      contactPhone,
+      whatsappNumber,
+      showPoweredBy
+    });
+    
+    if (!tenant) {
+      return res.status(404).json({ error: "Tenant not found" });
+    }
+    res.json(tenant);
+  });
+
   // === Lead Routes ===
   app.get("/api/tenants/:tenantId/leads", async (req, res) => {
     const leads = await storage.getLeadsByTenantId(req.params.tenantId);
