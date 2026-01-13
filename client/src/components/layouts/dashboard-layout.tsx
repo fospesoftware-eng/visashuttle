@@ -42,7 +42,7 @@ const adminNavItems: NavItem[] = [
 const agencyNavItems: NavItem[] = [
   { icon: Home, label: "Dashboard", href: "/app" },
   { icon: Users, label: "Leads", href: "/app/leads" },
-  { icon: Briefcase, label: "Cases", href: "/app/cases" },
+  { icon: Briefcase, label: "Applications", href: "/app/cases" },
   { icon: FileText, label: "Documents", href: "/app/documents" },
   { icon: BarChart3, label: "Reports", href: "/app/reports" },
   { icon: Settings, label: "Settings", href: "/app/settings" },

@@ -12,7 +12,7 @@ import { Timeline } from "@/components/timeline";
 import { ProgressRing } from "@/components/progress-ring";
 
 const stats = [
-  { title: "Active Cases", value: "24", change: "+12% from last month", changeType: "positive" as const, icon: Briefcase },
+  { title: "Active Applications", value: "24", change: "+12% from last month", changeType: "positive" as const, icon: Briefcase },
   { title: "Pending Documents", value: "8", change: "3 urgent", changeType: "negative" as const, icon: FileText },
   { title: "New Leads", value: "15", change: "+5 this week", changeType: "positive" as const, icon: Users },
   { title: "Success Rate", value: "94%", change: "+2% improvement", changeType: "positive" as const, icon: TrendingUp },
@@ -50,7 +50,7 @@ export default function AgencyDashboard() {
           <Link href="/app/cases/new">
             <Button className="gap-2" data-testid="button-new-case">
               <Plus className="w-4 h-4" />
-              New Case
+              New Application
             </Button>
           </Link>
         </div>
@@ -72,7 +72,7 @@ export default function AgencyDashboard() {
           <div className="lg:col-span-2 space-y-6">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-4">
-                <CardTitle className="text-lg">Recent Cases</CardTitle>
+                <CardTitle className="text-lg">Recent Applications</CardTitle>
                 <Link href="/app/cases">
                   <Button variant="ghost" size="sm" className="gap-1" data-testid="button-view-all-cases">
                     View All

@@ -55,13 +55,13 @@ export default function CasesPage() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold" data-testid="text-page-title">Cases</h1>
+            <h1 className="text-2xl font-bold" data-testid="text-page-title">Applications</h1>
             <p className="text-muted-foreground">Manage all visa applications and their progress.</p>
           </div>
           <Link href="/app/cases/new">
             <Button className="gap-2" data-testid="button-new-case">
               <Plus className="w-4 h-4" />
-              New Case
+              New Application
             </Button>
           </Link>
         </div>
@@ -70,7 +70,7 @@ export default function CasesPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Search by name, case ID, or email..."
+              placeholder="Search by name, application ID, or email..."
               className="pl-9"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}

@@ -89,7 +89,7 @@ export default function WhiteLabelCasePage() {
         <Card className="max-w-md w-full text-center">
           <CardContent className="py-8">
             <AlertCircle className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-            <h2 className="font-semibold text-lg mb-2">Case Not Found</h2>
+            <h2 className="font-semibold text-lg mb-2">Application Not Found</h2>
             <Button variant="outline" onClick={() => setLocation(`/w/${slug}/portal`)}>
               Back to Portal
             </Button>
@@ -114,7 +114,7 @@ export default function WhiteLabelCasePage() {
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <div>
-          <h1 className="font-semibold">Case Details</h1>
+          <h1 className="font-semibold">Application Details</h1>
           <p className="text-sm text-muted-foreground font-mono">{caseData.referenceId}</p>
         </div>
       </header>

@@ -90,7 +90,7 @@ export default function WhiteLabelPortalPage() {
         referenceId,
         lastName
       });
-      toast({ title: "Success", description: "Case linked to your account!" });
+      toast({ title: "Success", description: "Application linked to your account!" });
       setClaimDialogOpen(false);
       setReferenceId("");
       setLastName("");
@@ -98,7 +98,7 @@ export default function WhiteLabelPortalPage() {
     } catch (error: any) {
       toast({ 
         title: "Error", 
-        description: error.message || "Could not claim case", 
+        description: error.message || "Could not link application", 
         variant: "destructive" 
       });
     }
@@ -169,14 +169,14 @@ export default function WhiteLabelPortalPage() {
                     data-testid="button-claim-case"
                   >
                     <Plus className="w-4 h-4" />
-                    Link New Case
+                    Link Application
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Link Your Case</DialogTitle>
+                    <DialogTitle>Link Your Application</DialogTitle>
                     <DialogDescription>
-                      Enter your reference ID to link an existing case to your account
+                      Enter your reference ID to link an existing application to your account
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 mt-4">
@@ -207,7 +207,7 @@ export default function WhiteLabelPortalPage() {
                       style={{ backgroundColor: primaryColor }}
                       data-testid="button-submit-claim"
                     >
-                      Link Case
+                      Link Application
                     </Button>
                   </div>
                 </DialogContent>
@@ -232,7 +232,7 @@ export default function WhiteLabelPortalPage() {
                 </div>
                 <h3 className="font-bold text-xl mb-2">No Applications Yet</h3>
                 <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
-                  You don't have any visa applications linked to your account. Link an existing case or contact your travel agent.
+                  You don't have any visa applications linked to your account. Link an existing application or contact your travel agent.
                 </p>
                 <Button 
                   size="lg"
@@ -240,7 +240,7 @@ export default function WhiteLabelPortalPage() {
                   style={{ backgroundColor: primaryColor }}
                 >
                   <Plus className="w-4 h-4 mr-2" />
-                  Link an Existing Case
+                  Link an Existing Application
                 </Button>
               </CardContent>
             </Card>
