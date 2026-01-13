@@ -104,7 +104,7 @@ export class MemStorage implements IStorage {
       id: "tenant-1",
       name: "Demo Travel Agency",
       slug: "demo-agency",
-      logoUrl: null,
+      logoUrl: "https://api.dicebear.com/7.x/initials/svg?seed=DTA&backgroundColor=00B4D8&textColor=ffffff",
       plan: "professional",
       status: "active",
       primaryColor: "#00B4D8",
