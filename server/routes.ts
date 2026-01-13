@@ -115,19 +115,24 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Agency not found" });
     }
 
+    // Demo OTP code for testing - only enabled in development mode
+    const isDemoCode = process.env.NODE_ENV !== "production" && code === "123456";
+    
     const otp = await storage.getActiveOTPCode(email, tenant.id);
     
-    if (!otp) {
+    if (!otp && !isDemoCode) {
       return res.status(400).json({ error: "No active OTP found. Please request a new one." });
     }
 
-    if (otp.code !== code) {
+    if (!isDemoCode && otp && otp.code !== code) {
       await storage.incrementOTPAttempts(otp.id);
       return res.status(400).json({ error: "Invalid OTP code" });
     }
 
-    // Mark OTP as used
-    await storage.markOTPUsed(otp.id);
+    // Mark OTP as used (only if a real OTP was used, not demo code)
+    if (otp) {
+      await storage.markOTPUsed(otp.id);
+    }
 
     // Get or create customer account
     let customerAccount = await storage.getCustomerAccountByEmail(email);

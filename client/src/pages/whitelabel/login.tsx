@@ -14,6 +14,7 @@ export default function WhiteLabelLoginPage() {
   const { slug } = useParams<{ slug: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -179,12 +180,43 @@ export default function WhiteLabelLoginPage() {
               >
                 <Mail className="w-8 h-8" style={{ color: primaryColor }} />
               </div>
-              <h2 className="text-2xl lg:text-3xl font-bold text-foreground mb-2">Welcome Back</h2>
-              <p className="text-muted-foreground">Sign in to track your visa application</p>
+              <h2 className="text-2xl lg:text-3xl font-bold text-foreground mb-2">
+                {mode === "signin" ? "Welcome Back" : "Create Account"}
+              </h2>
+              <p className="text-muted-foreground">
+                {mode === "signin" ? "Sign in to track your visa application" : "Sign up to get started with your visa journey"}
+              </p>
             </div>
 
             <Card className="border-0 shadow-xl">
               <CardContent className="p-6 lg:p-8">
+                <div className="flex rounded-lg bg-muted p-1 mb-6">
+                  <button
+                    type="button"
+                    onClick={() => setMode("signin")}
+                    className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                      mode === "signin" 
+                        ? "bg-background shadow text-foreground" 
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                    data-testid="tab-signin"
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMode("signup")}
+                    className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                      mode === "signup" 
+                        ? "bg-background shadow text-foreground" 
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                    data-testid="tab-signup"
+                  >
+                    Sign Up
+                  </button>
+                </div>
+
                 <form onSubmit={handleSubmit} className="space-y-5">
                   <div className="space-y-2">
                     <Label htmlFor="email" className="text-sm font-medium">Email Address</Label>
@@ -199,34 +231,37 @@ export default function WhiteLabelLoginPage() {
                       data-testid="input-email"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="name" className="text-sm font-medium">
-                      Full Name <span className="text-muted-foreground">(optional)</span>
-                    </Label>
-                    <Input
-                      id="name"
-                      type="text"
-                      placeholder="John Smith"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="h-12"
-                      data-testid="input-name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone" className="text-sm font-medium">
-                      Phone <span className="text-muted-foreground">(optional)</span>
-                    </Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="+1 234 567 8900"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="h-12"
-                      data-testid="input-phone"
-                    />
-                  </div>
+                  
+                  {mode === "signup" && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="name" className="text-sm font-medium">Full Name</Label>
+                        <Input
+                          id="name"
+                          type="text"
+                          placeholder="John Smith"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          required
+                          className="h-12"
+                          data-testid="input-name"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="phone" className="text-sm font-medium">Phone Number</Label>
+                        <Input
+                          id="phone"
+                          type="tel"
+                          placeholder="+1 234 567 8900"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          className="h-12"
+                          data-testid="input-phone"
+                        />
+                      </div>
+                    </>
+                  )}
+                  
                   <Button 
                     type="submit" 
                     className="w-full h-12 text-base font-medium gap-2"
@@ -238,13 +273,20 @@ export default function WhiteLabelLoginPage() {
                       <Loader2 className="w-5 h-5 animate-spin" />
                     ) : (
                       <>
-                        Continue with Email
+                        {mode === "signin" ? "Sign In" : "Create Account"}
                         <ArrowRight className="w-5 h-5" />
                       </>
                     )}
                   </Button>
                 </form>
-                <p className="text-xs text-muted-foreground text-center mt-6">
+                
+                <div className="mt-6 p-3 rounded-lg bg-muted/50 border border-dashed">
+                  <p className="text-xs text-muted-foreground text-center">
+                    Demo: Use code <span className="font-mono font-bold text-foreground">123456</span> for testing
+                  </p>
+                </div>
+                
+                <p className="text-xs text-muted-foreground text-center mt-4">
                   We'll send you a one-time code to verify your email. No password required.
                 </p>
               </CardContent>
