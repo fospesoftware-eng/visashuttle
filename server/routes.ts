@@ -2,11 +2,25 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 
+function generateOTP(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+function generateReferenceId(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let result = 'REF-';
+  for (let i = 0; i < 6; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
   
+  // === Auth Routes ===
   app.post("/api/auth/login", async (req, res) => {
     const { email, password } = req.body;
     const user = await storage.getUserByEmail(email);
@@ -17,6 +31,297 @@ export async function registerRoutes(
     res.json({ user: userWithoutPassword });
   });
 
+  // === White-Label Auth Routes ===
+  
+  // Get tenant by slug (for white-label pages)
+  app.get("/api/w/:slug/tenant", async (req, res) => {
+    const tenant = await storage.getTenantBySlug(req.params.slug);
+    if (!tenant) {
+      return res.status(404).json({ error: "Agency not found" });
+    }
+    res.json(tenant);
+  });
+
+  // Request OTP
+  app.post("/api/w/:slug/auth/request-otp", async (req, res) => {
+    const { email, phone, name } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    const tenant = await storage.getTenantBySlug(req.params.slug);
+    if (!tenant) {
+      return res.status(404).json({ error: "Agency not found" });
+    }
+
+    // Generate OTP
+    const code = generateOTP();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    await storage.createOTPCode({
+      email,
+      code,
+      tenantId: tenant.id,
+      attempts: 0,
+      expiresAt,
+      usedAt: null
+    });
+
+    // Log the OTP request
+    await storage.createActivityLog({
+      tenantId: tenant.id,
+      userId: null,
+      action: "otp.requested",
+      entityType: "auth",
+      entityId: email,
+      details: { email, phone }
+    });
+
+    // In development, log OTP to console
+    console.log(`[OTP] Code for ${email} at ${tenant.slug}: ${code}`);
+
+    res.json({ message: "OTP sent successfully", email });
+  });
+
+  // Verify OTP
+  app.post("/api/w/:slug/auth/verify-otp", async (req, res) => {
+    const { email, code, name, phone } = req.body;
+
+    if (!email || !code) {
+      return res.status(400).json({ error: "Email and code are required" });
+    }
+
+    const tenant = await storage.getTenantBySlug(req.params.slug);
+    if (!tenant) {
+      return res.status(404).json({ error: "Agency not found" });
+    }
+
+    const otp = await storage.getActiveOTPCode(email, tenant.id);
+    
+    if (!otp) {
+      return res.status(400).json({ error: "No active OTP found. Please request a new one." });
+    }
+
+    if (otp.code !== code) {
+      await storage.incrementOTPAttempts(otp.id);
+      return res.status(400).json({ error: "Invalid OTP code" });
+    }
+
+    // Mark OTP as used
+    await storage.markOTPUsed(otp.id);
+
+    // Get or create customer account
+    let customerAccount = await storage.getCustomerAccountByEmail(email);
+    
+    if (!customerAccount) {
+      customerAccount = await storage.createCustomerAccount({
+        email,
+        phone: phone || null,
+        name: name || null,
+        avatarUrl: null,
+        isVerified: true
+      });
+    } else if (!customerAccount.isVerified) {
+      await storage.updateCustomerAccount(customerAccount.id, { isVerified: true });
+    }
+
+    // Ensure customer-tenant link exists
+    let link = await storage.getCustomerTenantLink(customerAccount.id, tenant.id);
+    if (!link) {
+      link = await storage.createCustomerTenantLink({
+        customerAccountId: customerAccount.id,
+        tenantId: tenant.id,
+        role: "customer"
+      });
+    }
+
+    // Log successful verification
+    await storage.createActivityLog({
+      tenantId: tenant.id,
+      userId: customerAccount.id,
+      action: "otp.verified",
+      entityType: "auth",
+      entityId: customerAccount.id,
+      details: { email }
+    });
+
+    res.json({ 
+      success: true,
+      customerAccount: {
+        id: customerAccount.id,
+        email: customerAccount.email,
+        name: customerAccount.name,
+        phone: customerAccount.phone
+      },
+      tenantId: tenant.id
+    });
+  });
+
+  // Get customer cases for white-label portal
+  app.get("/api/w/:slug/portal/cases", async (req, res) => {
+    const { customerAccountId } = req.query;
+    
+    if (!customerAccountId) {
+      return res.status(400).json({ error: "Customer account ID required" });
+    }
+
+    const tenant = await storage.getTenantBySlug(req.params.slug);
+    if (!tenant) {
+      return res.status(404).json({ error: "Agency not found" });
+    }
+
+    const cases = await storage.getCasesByCustomerAccountId(customerAccountId as string, tenant.id);
+    res.json(cases);
+  });
+
+  // Claim case by reference ID
+  app.post("/api/w/:slug/portal/claim-case", async (req, res) => {
+    const { referenceId, lastName, dob, customerAccountId } = req.body;
+
+    if (!referenceId || !customerAccountId) {
+      return res.status(400).json({ error: "Reference ID and customer account ID required" });
+    }
+
+    const tenant = await storage.getTenantBySlug(req.params.slug);
+    if (!tenant) {
+      return res.status(404).json({ error: "Agency not found" });
+    }
+
+    const caseData = await storage.getCaseByReferenceId(referenceId, tenant.id);
+    
+    if (!caseData) {
+      return res.status(404).json({ error: "Case not found with this reference ID" });
+    }
+
+    // Verify applicant details (light security)
+    if (lastName && caseData.applicantName) {
+      const caseLastName = caseData.applicantName.split(' ').pop()?.toLowerCase();
+      if (caseLastName !== lastName.toLowerCase()) {
+        return res.status(400).json({ error: "Verification failed. Please check your details." });
+      }
+    }
+
+    // Link case to customer account
+    await storage.updateCase(caseData.id, { customerAccountId });
+
+    // Log the claim
+    await storage.createActivityLog({
+      tenantId: tenant.id,
+      userId: customerAccountId,
+      action: "case.claimed",
+      entityType: "case",
+      entityId: caseData.id,
+      details: { referenceId }
+    });
+
+    res.json({ success: true, case: caseData });
+  });
+
+  // Get single case for white-label portal
+  app.get("/api/w/:slug/portal/cases/:caseId", async (req, res) => {
+    const { customerAccountId } = req.query;
+    
+    const tenant = await storage.getTenantBySlug(req.params.slug);
+    if (!tenant) {
+      return res.status(404).json({ error: "Agency not found" });
+    }
+
+    const caseData = await storage.getCase(req.params.caseId);
+    if (!caseData || caseData.tenantId !== tenant.id) {
+      return res.status(404).json({ error: "Case not found" });
+    }
+
+    // Verify customer has access
+    if (customerAccountId && caseData.customerAccountId !== customerAccountId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    res.json(caseData);
+  });
+
+  // Get documents for white-label portal case
+  app.get("/api/w/:slug/portal/cases/:caseId/documents", async (req, res) => {
+    const tenant = await storage.getTenantBySlug(req.params.slug);
+    if (!tenant) {
+      return res.status(404).json({ error: "Agency not found" });
+    }
+
+    const caseData = await storage.getCase(req.params.caseId);
+    if (!caseData || caseData.tenantId !== tenant.id) {
+      return res.status(404).json({ error: "Case not found" });
+    }
+
+    const documents = await storage.getDocumentsByCaseId(req.params.caseId);
+    res.json(documents);
+  });
+
+  // Get messages for white-label portal case
+  app.get("/api/w/:slug/portal/cases/:caseId/messages", async (req, res) => {
+    const tenant = await storage.getTenantBySlug(req.params.slug);
+    if (!tenant) {
+      return res.status(404).json({ error: "Agency not found" });
+    }
+
+    const messages = await storage.getMessagesByCaseId(req.params.caseId);
+    res.json(messages);
+  });
+
+  // Send message from white-label portal
+  app.post("/api/w/:slug/portal/cases/:caseId/messages", async (req, res) => {
+    const { content, customerAccountId } = req.body;
+
+    const tenant = await storage.getTenantBySlug(req.params.slug);
+    if (!tenant) {
+      return res.status(404).json({ error: "Agency not found" });
+    }
+
+    const message = await storage.createMessage({
+      caseId: req.params.caseId,
+      senderId: customerAccountId,
+      senderRole: "customer",
+      content,
+      isRead: false
+    });
+
+    res.status(201).json(message);
+  });
+
+  // Upload document from white-label portal
+  app.post("/api/w/:slug/portal/cases/:caseId/documents", async (req, res) => {
+    const { name, type, customerAccountId } = req.body;
+
+    const tenant = await storage.getTenantBySlug(req.params.slug);
+    if (!tenant) {
+      return res.status(404).json({ error: "Agency not found" });
+    }
+
+    const document = await storage.createDocument({
+      caseId: req.params.caseId,
+      tenantId: tenant.id,
+      name,
+      type,
+      status: "pending",
+      fileUrl: null,
+      qualityScore: null,
+      extractedData: null,
+      notes: null
+    });
+
+    // Log the upload
+    await storage.createActivityLog({
+      tenantId: tenant.id,
+      userId: customerAccountId,
+      action: "document.uploaded",
+      entityType: "document",
+      entityId: document.id,
+      details: { name, type }
+    });
+
+    res.status(201).json(document);
+  });
+
+  // === Tenant Routes ===
   app.get("/api/tenants", async (req, res) => {
     const tenants = await storage.getAllTenants();
     res.json(tenants);
@@ -43,6 +348,7 @@ export async function registerRoutes(
     res.json(tenant);
   });
 
+  // === Lead Routes ===
   app.get("/api/tenants/:tenantId/leads", async (req, res) => {
     const leads = await storage.getLeadsByTenantId(req.params.tenantId);
     res.json(leads);
@@ -80,6 +386,7 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  // === Case Routes ===
   app.get("/api/tenants/:tenantId/cases", async (req, res) => {
     const cases = await storage.getCasesByTenantId(req.params.tenantId);
     res.json(cases);
@@ -88,7 +395,8 @@ export async function registerRoutes(
   app.post("/api/tenants/:tenantId/cases", async (req, res) => {
     const caseData = await storage.createCase({
       ...req.body,
-      tenantId: req.params.tenantId
+      tenantId: req.params.tenantId,
+      referenceId: req.body.referenceId || generateReferenceId()
     });
     res.status(201).json(caseData);
   });
@@ -114,6 +422,7 @@ export async function registerRoutes(
     res.json(cases);
   });
 
+  // === Document Routes ===
   app.get("/api/cases/:caseId/documents", async (req, res) => {
     const documents = await storage.getDocumentsByCaseId(req.params.caseId);
     res.json(documents);
@@ -148,6 +457,7 @@ export async function registerRoutes(
     res.json(document);
   });
 
+  // === Message Routes ===
   app.get("/api/cases/:caseId/messages", async (req, res) => {
     const messages = await storage.getMessagesByCaseId(req.params.caseId);
     res.json(messages);
@@ -161,6 +471,7 @@ export async function registerRoutes(
     res.status(201).json(message);
   });
 
+  // === Visa Template Routes ===
   app.get("/api/visa-templates", async (req, res) => {
     const templates = await storage.getAllVisaTemplates();
     res.json(templates);
@@ -179,6 +490,7 @@ export async function registerRoutes(
     res.status(201).json(template);
   });
 
+  // === Activity Log Routes ===
   app.get("/api/tenants/:tenantId/activity-logs", async (req, res) => {
     const logs = await storage.getActivityLogsByTenantId(req.params.tenantId);
     res.json(logs);

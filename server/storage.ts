@@ -6,7 +6,10 @@ import {
   type Document, type InsertDocument,
   type Message, type InsertMessage,
   type VisaTemplate, type InsertVisaTemplate,
-  type ActivityLog, type InsertActivityLog
+  type ActivityLog, type InsertActivityLog,
+  type CustomerAccount, type InsertCustomerAccount,
+  type CustomerTenantLink, type InsertCustomerTenantLink,
+  type OTPCode, type InsertOTPCode
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -30,6 +33,8 @@ export interface IStorage {
   
   getCasesByTenantId(tenantId: string): Promise<Case[]>;
   getCasesByCustomerId(customerId: string): Promise<Case[]>;
+  getCasesByCustomerAccountId(customerAccountId: string, tenantId: string): Promise<Case[]>;
+  getCaseByReferenceId(referenceId: string, tenantId: string): Promise<Case | undefined>;
   getCase(id: string): Promise<Case | undefined>;
   createCase(caseData: InsertCase): Promise<Case>;
   updateCase(id: string, data: Partial<InsertCase>): Promise<Case | undefined>;
@@ -49,6 +54,20 @@ export interface IStorage {
   
   getActivityLogsByTenantId(tenantId: string): Promise<ActivityLog[]>;
   createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
+
+  getCustomerAccount(id: string): Promise<CustomerAccount | undefined>;
+  getCustomerAccountByEmail(email: string): Promise<CustomerAccount | undefined>;
+  createCustomerAccount(account: InsertCustomerAccount): Promise<CustomerAccount>;
+  updateCustomerAccount(id: string, data: Partial<InsertCustomerAccount>): Promise<CustomerAccount | undefined>;
+
+  getCustomerTenantLink(customerAccountId: string, tenantId: string): Promise<CustomerTenantLink | undefined>;
+  createCustomerTenantLink(link: InsertCustomerTenantLink): Promise<CustomerTenantLink>;
+  getCustomerTenantLinks(customerAccountId: string): Promise<CustomerTenantLink[]>;
+
+  createOTPCode(otp: InsertOTPCode): Promise<OTPCode>;
+  getActiveOTPCode(email: string, tenantId: string): Promise<OTPCode | undefined>;
+  markOTPUsed(id: string): Promise<void>;
+  incrementOTPAttempts(id: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -60,6 +79,9 @@ export class MemStorage implements IStorage {
   private messages: Map<string, Message>;
   private visaTemplates: Map<string, VisaTemplate>;
   private activityLogs: Map<string, ActivityLog>;
+  private customerAccounts: Map<string, CustomerAccount>;
+  private customerTenantLinks: Map<string, CustomerTenantLink>;
+  private otpCodes: Map<string, OTPCode>;
 
   constructor() {
     this.users = new Map();
@@ -70,6 +92,9 @@ export class MemStorage implements IStorage {
     this.messages = new Map();
     this.visaTemplates = new Map();
     this.activityLogs = new Map();
+    this.customerAccounts = new Map();
+    this.customerTenantLinks = new Map();
+    this.otpCodes = new Map();
     
     this.seedData();
   }
@@ -82,6 +107,14 @@ export class MemStorage implements IStorage {
       logoUrl: null,
       plan: "professional",
       status: "active",
+      primaryColor: "#00B4D8",
+      secondaryColor: "#E056A0",
+      accentColor: "#0096C7",
+      contactEmail: "info@demoagency.com",
+      contactPhone: "+1 234 567 8900",
+      whatsappNumber: "+1 234 567 8900",
+      showPoweredBy: true,
+      authMethod: "otp",
       createdAt: new Date()
     };
     this.tenants.set(tenant1.id, tenant1);
@@ -122,6 +155,26 @@ export class MemStorage implements IStorage {
     };
     this.users.set(customer.id, customer);
 
+    const demoCustomerAccount: CustomerAccount = {
+      id: "customer-account-1",
+      email: "john@example.com",
+      phone: "+1 555 123 4567",
+      name: "John Smith",
+      avatarUrl: null,
+      isVerified: true,
+      createdAt: new Date()
+    };
+    this.customerAccounts.set(demoCustomerAccount.id, demoCustomerAccount);
+
+    const customerTenantLink: CustomerTenantLink = {
+      id: "link-1",
+      customerAccountId: "customer-account-1",
+      tenantId: "tenant-1",
+      role: "customer",
+      createdAt: new Date()
+    };
+    this.customerTenantLinks.set(customerTenantLink.id, customerTenantLink);
+
     const leads: Lead[] = [
       { id: "lead-1", tenantId: "tenant-1", name: "Alice Cooper", email: "alice@example.com", phone: "+1 234 567 8901", source: "Website", stage: "new", value: 2500, notes: null, assignedTo: "user-owner", createdAt: new Date(), updatedAt: new Date() },
       { id: "lead-2", tenantId: "tenant-1", name: "Bob Wilson", email: "bob@example.com", phone: "+1 234 567 8902", source: "Referral", stage: "contacted", value: 3200, notes: null, assignedTo: "user-owner", createdAt: new Date(), updatedAt: new Date() },
@@ -130,8 +183,46 @@ export class MemStorage implements IStorage {
     leads.forEach(lead => this.leads.set(lead.id, lead));
 
     const cases: Case[] = [
-      { id: "case-1", tenantId: "tenant-1", customerId: "user-customer", caseNumber: "VS-2024-001", visaType: "Schengen Tourist", destinationCountry: "France", status: "in_progress", priority: "normal", assignedTo: "user-owner", travelDate: new Date("2024-03-15"), notes: null, readinessScore: 75, createdAt: new Date(), updatedAt: new Date() },
-      { id: "case-2", tenantId: "tenant-1", customerId: "user-customer", caseNumber: "VS-2024-002", visaType: "UK Visitor", destinationCountry: "United Kingdom", status: "documents_required", priority: "high", assignedTo: "user-owner", travelDate: new Date("2024-04-20"), notes: null, readinessScore: 45, createdAt: new Date(), updatedAt: new Date() },
+      { 
+        id: "case-1", 
+        tenantId: "tenant-1", 
+        customerId: "user-customer", 
+        customerAccountId: "customer-account-1",
+        caseNumber: "VS-2024-001", 
+        referenceId: "REF-ABC123",
+        applicantName: "John Smith",
+        applicantDob: "1990-05-15",
+        visaType: "Schengen Tourist", 
+        destinationCountry: "France", 
+        status: "in_progress", 
+        priority: "normal", 
+        assignedTo: "user-owner", 
+        travelDate: new Date("2024-03-15"), 
+        notes: null, 
+        readinessScore: 75, 
+        createdAt: new Date(), 
+        updatedAt: new Date() 
+      },
+      { 
+        id: "case-2", 
+        tenantId: "tenant-1", 
+        customerId: "user-customer", 
+        customerAccountId: "customer-account-1",
+        caseNumber: "VS-2024-002", 
+        referenceId: "REF-DEF456",
+        applicantName: "John Smith",
+        applicantDob: "1990-05-15",
+        visaType: "UK Visitor", 
+        destinationCountry: "United Kingdom", 
+        status: "documents_required", 
+        priority: "high", 
+        assignedTo: "user-owner", 
+        travelDate: new Date("2024-04-20"), 
+        notes: null, 
+        readinessScore: 45, 
+        createdAt: new Date(), 
+        updatedAt: new Date() 
+      },
     ];
     cases.forEach(c => this.cases.set(c.id, c));
 
@@ -172,7 +263,16 @@ export class MemStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
-    const user: User = { ...insertUser, id, createdAt: new Date() };
+    const user: User = { 
+      id, 
+      email: insertUser.email,
+      password: insertUser.password,
+      name: insertUser.name,
+      role: insertUser.role ?? "customer",
+      tenantId: insertUser.tenantId ?? null,
+      avatarUrl: insertUser.avatarUrl ?? null,
+      createdAt: new Date() 
+    };
     this.users.set(id, user);
     return user;
   }
@@ -191,7 +291,23 @@ export class MemStorage implements IStorage {
 
   async createTenant(insertTenant: InsertTenant): Promise<Tenant> {
     const id = randomUUID();
-    const tenant: Tenant = { ...insertTenant, id, createdAt: new Date() };
+    const tenant: Tenant = { 
+      id, 
+      name: insertTenant.name,
+      slug: insertTenant.slug,
+      logoUrl: insertTenant.logoUrl ?? null,
+      plan: insertTenant.plan ?? "starter",
+      status: insertTenant.status ?? "active",
+      primaryColor: insertTenant.primaryColor ?? "#00B4D8",
+      secondaryColor: insertTenant.secondaryColor ?? "#E056A0",
+      accentColor: insertTenant.accentColor ?? "#0096C7",
+      contactEmail: insertTenant.contactEmail ?? null,
+      contactPhone: insertTenant.contactPhone ?? null,
+      whatsappNumber: insertTenant.whatsappNumber ?? null,
+      showPoweredBy: insertTenant.showPoweredBy ?? true,
+      authMethod: insertTenant.authMethod ?? "otp",
+      createdAt: new Date() 
+    };
     this.tenants.set(id, tenant);
     return tenant;
   }
@@ -214,7 +330,20 @@ export class MemStorage implements IStorage {
 
   async createLead(insertLead: InsertLead): Promise<Lead> {
     const id = randomUUID();
-    const lead: Lead = { ...insertLead, id, createdAt: new Date(), updatedAt: new Date() };
+    const lead: Lead = { 
+      id, 
+      tenantId: insertLead.tenantId,
+      name: insertLead.name,
+      email: insertLead.email,
+      phone: insertLead.phone ?? null,
+      source: insertLead.source ?? null,
+      stage: insertLead.stage ?? "new",
+      value: insertLead.value ?? null,
+      notes: insertLead.notes ?? null,
+      assignedTo: insertLead.assignedTo ?? null,
+      createdAt: new Date(), 
+      updatedAt: new Date() 
+    };
     this.leads.set(id, lead);
     return lead;
   }
@@ -239,13 +368,44 @@ export class MemStorage implements IStorage {
     return Array.from(this.cases.values()).filter(c => c.customerId === customerId);
   }
 
+  async getCasesByCustomerAccountId(customerAccountId: string, tenantId: string): Promise<Case[]> {
+    return Array.from(this.cases.values()).filter(
+      c => c.customerAccountId === customerAccountId && c.tenantId === tenantId
+    );
+  }
+
+  async getCaseByReferenceId(referenceId: string, tenantId: string): Promise<Case | undefined> {
+    return Array.from(this.cases.values()).find(
+      c => c.referenceId === referenceId && c.tenantId === tenantId
+    );
+  }
+
   async getCase(id: string): Promise<Case | undefined> {
     return this.cases.get(id);
   }
 
   async createCase(insertCase: InsertCase): Promise<Case> {
     const id = randomUUID();
-    const caseData: Case = { ...insertCase, id, createdAt: new Date(), updatedAt: new Date() };
+    const caseData: Case = { 
+      id, 
+      tenantId: insertCase.tenantId,
+      customerId: insertCase.customerId ?? null,
+      customerAccountId: insertCase.customerAccountId ?? null,
+      caseNumber: insertCase.caseNumber,
+      referenceId: insertCase.referenceId,
+      applicantName: insertCase.applicantName ?? null,
+      applicantDob: insertCase.applicantDob ?? null,
+      visaType: insertCase.visaType,
+      destinationCountry: insertCase.destinationCountry,
+      status: insertCase.status ?? "pending",
+      priority: insertCase.priority ?? "normal",
+      assignedTo: insertCase.assignedTo ?? null,
+      travelDate: insertCase.travelDate ?? null,
+      notes: insertCase.notes ?? null,
+      readinessScore: insertCase.readinessScore ?? null,
+      createdAt: new Date(), 
+      updatedAt: new Date() 
+    };
     this.cases.set(id, caseData);
     return caseData;
   }
@@ -272,7 +432,20 @@ export class MemStorage implements IStorage {
 
   async createDocument(insertDoc: InsertDocument): Promise<Document> {
     const id = randomUUID();
-    const doc: Document = { ...insertDoc, id, uploadedAt: new Date(), reviewedAt: null };
+    const doc: Document = { 
+      id, 
+      caseId: insertDoc.caseId,
+      tenantId: insertDoc.tenantId,
+      name: insertDoc.name,
+      type: insertDoc.type,
+      status: insertDoc.status ?? "pending",
+      fileUrl: insertDoc.fileUrl ?? null,
+      qualityScore: insertDoc.qualityScore ?? null,
+      extractedData: insertDoc.extractedData ?? null,
+      notes: insertDoc.notes ?? null,
+      uploadedAt: new Date(), 
+      reviewedAt: null 
+    };
     this.documents.set(id, doc);
     return doc;
   }
@@ -293,7 +466,15 @@ export class MemStorage implements IStorage {
 
   async createMessage(insertMsg: InsertMessage): Promise<Message> {
     const id = randomUUID();
-    const msg: Message = { ...insertMsg, id, createdAt: new Date() };
+    const msg: Message = { 
+      id, 
+      caseId: insertMsg.caseId,
+      senderId: insertMsg.senderId,
+      senderRole: insertMsg.senderRole,
+      content: insertMsg.content,
+      isRead: insertMsg.isRead ?? false,
+      createdAt: new Date() 
+    };
     this.messages.set(id, msg);
     return msg;
   }
@@ -308,7 +489,19 @@ export class MemStorage implements IStorage {
 
   async createVisaTemplate(insertTemplate: InsertVisaTemplate): Promise<VisaTemplate> {
     const id = randomUUID();
-    const template: VisaTemplate = { ...insertTemplate, id, createdAt: new Date(), updatedAt: new Date() };
+    const template: VisaTemplate = { 
+      id, 
+      country: insertTemplate.country,
+      visaType: insertTemplate.visaType,
+      requirements: insertTemplate.requirements,
+      processingTime: insertTemplate.processingTime ?? null,
+      fees: insertTemplate.fees ?? null,
+      notes: insertTemplate.notes ?? null,
+      version: insertTemplate.version ?? 1,
+      isActive: insertTemplate.isActive ?? true,
+      createdAt: new Date(), 
+      updatedAt: new Date() 
+    };
     this.visaTemplates.set(id, template);
     return template;
   }
@@ -319,9 +512,117 @@ export class MemStorage implements IStorage {
 
   async createActivityLog(insertLog: InsertActivityLog): Promise<ActivityLog> {
     const id = randomUUID();
-    const log: ActivityLog = { ...insertLog, id, createdAt: new Date() };
+    const log: ActivityLog = { 
+      id, 
+      tenantId: insertLog.tenantId ?? null,
+      userId: insertLog.userId ?? null,
+      action: insertLog.action,
+      entityType: insertLog.entityType ?? null,
+      entityId: insertLog.entityId ?? null,
+      details: insertLog.details ?? null,
+      createdAt: new Date() 
+    };
     this.activityLogs.set(id, log);
     return log;
+  }
+
+  async getCustomerAccount(id: string): Promise<CustomerAccount | undefined> {
+    return this.customerAccounts.get(id);
+  }
+
+  async getCustomerAccountByEmail(email: string): Promise<CustomerAccount | undefined> {
+    return Array.from(this.customerAccounts.values()).find(a => a.email.toLowerCase() === email.toLowerCase());
+  }
+
+  async createCustomerAccount(insertAccount: InsertCustomerAccount): Promise<CustomerAccount> {
+    const id = randomUUID();
+    const account: CustomerAccount = { 
+      id, 
+      email: insertAccount.email,
+      phone: insertAccount.phone ?? null,
+      name: insertAccount.name ?? null,
+      avatarUrl: insertAccount.avatarUrl ?? null,
+      isVerified: insertAccount.isVerified ?? false,
+      createdAt: new Date() 
+    };
+    this.customerAccounts.set(id, account);
+    return account;
+  }
+
+  async updateCustomerAccount(id: string, data: Partial<InsertCustomerAccount>): Promise<CustomerAccount | undefined> {
+    const account = this.customerAccounts.get(id);
+    if (!account) return undefined;
+    const updated = { ...account, ...data };
+    this.customerAccounts.set(id, updated);
+    return updated;
+  }
+
+  async getCustomerTenantLink(customerAccountId: string, tenantId: string): Promise<CustomerTenantLink | undefined> {
+    return Array.from(this.customerTenantLinks.values()).find(
+      link => link.customerAccountId === customerAccountId && link.tenantId === tenantId
+    );
+  }
+
+  async createCustomerTenantLink(insertLink: InsertCustomerTenantLink): Promise<CustomerTenantLink> {
+    const id = randomUUID();
+    const link: CustomerTenantLink = { 
+      id, 
+      customerAccountId: insertLink.customerAccountId,
+      tenantId: insertLink.tenantId,
+      role: insertLink.role ?? "customer",
+      createdAt: new Date() 
+    };
+    this.customerTenantLinks.set(id, link);
+    return link;
+  }
+
+  async getCustomerTenantLinks(customerAccountId: string): Promise<CustomerTenantLink[]> {
+    return Array.from(this.customerTenantLinks.values()).filter(
+      link => link.customerAccountId === customerAccountId
+    );
+  }
+
+  async createOTPCode(insertOTP: InsertOTPCode): Promise<OTPCode> {
+    const id = randomUUID();
+    const otp: OTPCode = { 
+      id, 
+      email: insertOTP.email,
+      code: insertOTP.code,
+      tenantId: insertOTP.tenantId,
+      attempts: insertOTP.attempts ?? 0,
+      expiresAt: insertOTP.expiresAt,
+      usedAt: insertOTP.usedAt ?? null,
+      createdAt: new Date() 
+    };
+    this.otpCodes.set(id, otp);
+    return otp;
+  }
+
+  async getActiveOTPCode(email: string, tenantId: string): Promise<OTPCode | undefined> {
+    const now = new Date();
+    return Array.from(this.otpCodes.values()).find(
+      otp => otp.email.toLowerCase() === email.toLowerCase() && 
+             otp.tenantId === tenantId && 
+             otp.expiresAt > now && 
+             !otp.usedAt &&
+             (otp.attempts || 0) < 5
+    );
+  }
+
+  async markOTPUsed(id: string): Promise<void> {
+    const otp = this.otpCodes.get(id);
+    if (otp) {
+      otp.usedAt = new Date();
+      this.otpCodes.set(id, otp);
+    }
+  }
+
+  async incrementOTPAttempts(id: string): Promise<void> {
+    const otp = this.otpCodes.get(id);
+    if (otp) {
+      otp.attempts = (otp.attempts || 0) + 1;
+      this.otpCodes.set(id, otp);
+    }
   }
 }
 

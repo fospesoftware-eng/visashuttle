@@ -31,6 +31,15 @@ import AdminAIPage from "@/pages/admin/ai";
 import AdminAuditPage from "@/pages/admin/audit";
 import AdminSettingsPage from "@/pages/admin/settings";
 
+import WhiteLabelLoginPage from "@/pages/whitelabel/login";
+import WhiteLabelVerifyPage from "@/pages/whitelabel/verify";
+import WhiteLabelPortalPage from "@/pages/whitelabel/portal";
+import WhiteLabelCasePage from "@/pages/whitelabel/case";
+import WhiteLabelUploadsPage from "@/pages/whitelabel/uploads";
+import WhiteLabelMessagesPage from "@/pages/whitelabel/messages";
+import WhiteLabelProfilePage from "@/pages/whitelabel/profile";
+import WhiteLabelDownloadsPage from "@/pages/whitelabel/downloads";
+
 function Router() {
   return (
     <Switch>
@@ -58,6 +67,15 @@ function Router() {
       <Route path="/admin/ai" component={AdminAIPage} />
       <Route path="/admin/audit" component={AdminAuditPage} />
       <Route path="/admin/settings" component={AdminSettingsPage} />
+
+      <Route path="/w/:slug/login" component={WhiteLabelLoginPage} />
+      <Route path="/w/:slug/verify" component={WhiteLabelVerifyPage} />
+      <Route path="/w/:slug/portal" component={WhiteLabelPortalPage} />
+      <Route path="/w/:slug/portal/case/:caseId" component={WhiteLabelCasePage} />
+      <Route path="/w/:slug/portal/uploads" component={WhiteLabelUploadsPage} />
+      <Route path="/w/:slug/portal/messages" component={WhiteLabelMessagesPage} />
+      <Route path="/w/:slug/portal/profile" component={WhiteLabelProfilePage} />
+      <Route path="/w/:slug/portal/downloads" component={WhiteLabelDownloadsPage} />
       
       <Route component={NotFound} />
     </Switch>
