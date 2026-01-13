@@ -1,24 +1,13 @@
-import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Download, FileText, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import type { Tenant, Case, Document } from "@shared/schema";
+import type { Tenant, Case } from "@shared/schema";
 
 export default function WhiteLabelDownloadsPage() {
   const { slug } = useParams<{ slug: string }>();
   const [, setLocation] = useLocation();
-  const [customerId, setCustomerId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const storedId = sessionStorage.getItem("wl_customer_id");
-    if (!storedId) {
-      setLocation(`/w/${slug}/login`);
-      return;
-    }
-    setCustomerId(storedId);
-  }, [slug, setLocation]);
 
   const { data: tenant } = useQuery<Tenant>({
     queryKey: ["/api/w", slug, "tenant"],
@@ -29,15 +18,29 @@ export default function WhiteLabelDownloadsPage() {
     }
   });
 
-  const { data: cases = [] } = useQuery<Case[]>({
-    queryKey: ["/api/w", slug, "portal/cases", customerId],
+  // Check auth status
+  const { data: authData, isLoading: authLoading } = useQuery<{ authenticated: boolean }>({
+    queryKey: ["/api/w", slug, "auth/me"],
     queryFn: async () => {
-      if (!customerId) return [];
-      const res = await fetch(`/api/w/${slug}/portal/cases?customerAccountId=${customerId}`);
-      if (!res.ok) throw new Error("Failed to load cases");
+      const res = await fetch(`/api/w/${slug}/auth/me`, { credentials: "include" });
+      if (!res.ok) return { authenticated: false };
+      return res.json();
+    }
+  });
+
+  if (!authLoading && !authData?.authenticated) {
+    setLocation(`/w/${slug}/login`);
+    return null;
+  }
+
+  const { data: cases = [] } = useQuery<Case[]>({
+    queryKey: ["/api/w", slug, "portal/cases"],
+    queryFn: async () => {
+      const res = await fetch(`/api/w/${slug}/portal/cases`, { credentials: "include" });
+      if (!res.ok) return [];
       return res.json();
     },
-    enabled: !!customerId
+    enabled: !!authData?.authenticated
   });
 
   if (!tenant) {

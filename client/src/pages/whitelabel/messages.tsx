@@ -14,23 +14,15 @@ export default function WhiteLabelMessagesPage() {
   const { slug } = useParams<{ slug: string }>();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
-  const [customerId, setCustomerId] = useState<string | null>(null);
   const [selectedCaseId, setSelectedCaseId] = useState<string>("");
   const [message, setMessage] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const storedId = sessionStorage.getItem("wl_customer_id");
-    if (!storedId) {
-      setLocation(`/w/${slug}/login`);
-      return;
-    }
-    setCustomerId(storedId);
-
     const params = new URLSearchParams(window.location.search);
     const caseIdParam = params.get("caseId");
     if (caseIdParam) setSelectedCaseId(caseIdParam);
-  }, [slug, setLocation]);
+  }, []);
 
   const { data: tenant } = useQuery<Tenant>({
     queryKey: ["/api/w", slug, "tenant"],
@@ -41,15 +33,29 @@ export default function WhiteLabelMessagesPage() {
     }
   });
 
-  const { data: cases = [] } = useQuery<Case[]>({
-    queryKey: ["/api/w", slug, "portal/cases", customerId],
+  // Check auth status
+  const { data: authData, isLoading: authLoading } = useQuery<{ authenticated: boolean }>({
+    queryKey: ["/api/w", slug, "auth/me"],
     queryFn: async () => {
-      if (!customerId) return [];
-      const res = await fetch(`/api/w/${slug}/portal/cases?customerAccountId=${customerId}`);
-      if (!res.ok) throw new Error("Failed to load cases");
+      const res = await fetch(`/api/w/${slug}/auth/me`, { credentials: "include" });
+      if (!res.ok) return { authenticated: false };
+      return res.json();
+    }
+  });
+
+  if (!authLoading && !authData?.authenticated) {
+    setLocation(`/w/${slug}/login`);
+    return null;
+  }
+
+  const { data: cases = [] } = useQuery<Case[]>({
+    queryKey: ["/api/w", slug, "portal/cases"],
+    queryFn: async () => {
+      const res = await fetch(`/api/w/${slug}/portal/cases`, { credentials: "include" });
+      if (!res.ok) return [];
       return res.json();
     },
-    enabled: !!customerId
+    enabled: !!authData?.authenticated
   });
 
   useEffect(() => {
@@ -61,11 +67,11 @@ export default function WhiteLabelMessagesPage() {
   const { data: messages = [], isLoading: messagesLoading } = useQuery<Message[]>({
     queryKey: ["/api/w", slug, "portal/cases", selectedCaseId, "messages"],
     queryFn: async () => {
-      const res = await fetch(`/api/w/${slug}/portal/cases/${selectedCaseId}/messages`);
+      const res = await fetch(`/api/w/${slug}/portal/cases/${selectedCaseId}/messages`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load messages");
       return res.json();
     },
-    enabled: !!selectedCaseId,
+    enabled: !!selectedCaseId && !!authData?.authenticated,
     refetchInterval: 10000 // Poll every 10 seconds
   });
 
@@ -78,8 +84,7 @@ export default function WhiteLabelMessagesPage() {
   const sendMutation = useMutation({
     mutationFn: async (content: string) => {
       return apiRequest("POST", `/api/w/${slug}/portal/cases/${selectedCaseId}/messages`, {
-        content,
-        customerAccountId: customerId
+        content
       });
     },
     onSuccess: () => {

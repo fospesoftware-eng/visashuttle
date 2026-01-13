@@ -1,12 +1,11 @@
-import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { 
   ArrowLeft, Upload, CheckCircle2, Clock, AlertCircle, 
-  FileText, Camera, Loader2, Download
+  FileText, Camera, Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import type { Tenant, Case, Document } from "@shared/schema";
@@ -31,16 +30,6 @@ const docTypeIcons: Record<string, any> = {
 export default function WhiteLabelCasePage() {
   const { slug, caseId } = useParams<{ slug: string; caseId: string }>();
   const [, setLocation] = useLocation();
-  const [customerId, setCustomerId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const storedId = sessionStorage.getItem("wl_customer_id");
-    if (!storedId) {
-      setLocation(`/w/${slug}/login`);
-      return;
-    }
-    setCustomerId(storedId);
-  }, [slug, setLocation]);
 
   const { data: tenant } = useQuery<Tenant>({
     queryKey: ["/api/w", slug, "tenant"],
@@ -51,27 +40,42 @@ export default function WhiteLabelCasePage() {
     }
   });
 
+  // Check auth status
+  const { data: authData, isLoading: authLoading } = useQuery<{ authenticated: boolean }>({
+    queryKey: ["/api/w", slug, "auth/me"],
+    queryFn: async () => {
+      const res = await fetch(`/api/w/${slug}/auth/me`, { credentials: "include" });
+      if (!res.ok) return { authenticated: false };
+      return res.json();
+    }
+  });
+
+  if (!authLoading && !authData?.authenticated) {
+    setLocation(`/w/${slug}/login`);
+    return null;
+  }
+
   const { data: caseData, isLoading: caseLoading } = useQuery<Case>({
     queryKey: ["/api/w", slug, "portal/cases", caseId],
     queryFn: async () => {
-      const res = await fetch(`/api/w/${slug}/portal/cases/${caseId}?customerAccountId=${customerId}`);
+      const res = await fetch(`/api/w/${slug}/portal/cases/${caseId}`, { credentials: "include" });
       if (!res.ok) throw new Error("Case not found");
       return res.json();
     },
-    enabled: !!customerId && !!caseId
+    enabled: !!authData?.authenticated && !!caseId
   });
 
   const { data: documents = [] } = useQuery<Document[]>({
     queryKey: ["/api/w", slug, "portal/cases", caseId, "documents"],
     queryFn: async () => {
-      const res = await fetch(`/api/w/${slug}/portal/cases/${caseId}/documents`);
+      const res = await fetch(`/api/w/${slug}/portal/cases/${caseId}/documents`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load documents");
       return res.json();
     },
-    enabled: !!caseId
+    enabled: !!authData?.authenticated && !!caseId
   });
 
-  if (!tenant || caseLoading) {
+  if (!tenant || caseLoading || authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />

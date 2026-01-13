@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Upload, Camera, FileText, CheckCircle2, Loader2, X } from "lucide-react";
+import { ArrowLeft, Upload, Camera, FileText, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -32,26 +32,18 @@ export default function WhiteLabelUploadsPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [customerId, setCustomerId] = useState<string | null>(null);
   const [selectedCaseId, setSelectedCaseId] = useState<string>("");
   const [docType, setDocType] = useState<string>("");
   const [dragActive, setDragActive] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
 
   useEffect(() => {
-    const storedId = sessionStorage.getItem("wl_customer_id");
-    if (!storedId) {
-      setLocation(`/w/${slug}/login`);
-      return;
-    }
-    setCustomerId(storedId);
-
     const params = new URLSearchParams(window.location.search);
     const caseIdParam = params.get("caseId");
     const docTypeParam = params.get("docType");
     if (caseIdParam) setSelectedCaseId(caseIdParam);
     if (docTypeParam) setDocType(docTypeParam);
-  }, [slug, setLocation]);
+  }, []);
 
   const { data: tenant } = useQuery<Tenant>({
     queryKey: ["/api/w", slug, "tenant"],
@@ -62,15 +54,29 @@ export default function WhiteLabelUploadsPage() {
     }
   });
 
-  const { data: cases = [] } = useQuery<Case[]>({
-    queryKey: ["/api/w", slug, "portal/cases", customerId],
+  // Check auth status
+  const { data: authData, isLoading: authLoading } = useQuery<{ authenticated: boolean }>({
+    queryKey: ["/api/w", slug, "auth/me"],
     queryFn: async () => {
-      if (!customerId) return [];
-      const res = await fetch(`/api/w/${slug}/portal/cases?customerAccountId=${customerId}`);
-      if (!res.ok) throw new Error("Failed to load cases");
+      const res = await fetch(`/api/w/${slug}/auth/me`, { credentials: "include" });
+      if (!res.ok) return { authenticated: false };
+      return res.json();
+    }
+  });
+
+  if (!authLoading && !authData?.authenticated) {
+    setLocation(`/w/${slug}/login`);
+    return null;
+  }
+
+  const { data: cases = [] } = useQuery<Case[]>({
+    queryKey: ["/api/w", slug, "portal/cases"],
+    queryFn: async () => {
+      const res = await fetch(`/api/w/${slug}/portal/cases`, { credentials: "include" });
+      if (!res.ok) return [];
       return res.json();
     },
-    enabled: !!customerId
+    enabled: !!authData?.authenticated
   });
 
   const uploadMutation = useMutation({
@@ -80,8 +86,7 @@ export default function WhiteLabelUploadsPage() {
       }
       return apiRequest("POST", `/api/w/${slug}/portal/cases/${selectedCaseId}/documents`, {
         name: uploadedFile.name,
-        type: docType,
-        customerAccountId: customerId
+        type: docType
       });
     },
     onSuccess: () => {

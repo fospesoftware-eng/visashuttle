@@ -40,9 +40,7 @@ export default function WhiteLabelVerifyPage() {
       const res = await apiRequest("POST", `/api/w/${slug}/auth/verify-otp`, data);
       return res.json();
     },
-    onSuccess: (data) => {
-      sessionStorage.setItem("wl_customer_id", data.customerAccount.id);
-      sessionStorage.setItem("wl_tenant_id", data.tenantId);
+    onSuccess: () => {
       sessionStorage.removeItem("wl_email");
       sessionStorage.removeItem("wl_name");
       sessionStorage.removeItem("wl_phone");

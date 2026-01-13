@@ -1,12 +1,12 @@
-import { useState, useEffect } from "react";
-import { useParams, useLocation, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useParams, useLocation } from "wouter";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { 
-  Home, FileText, Upload, MessageSquare, User, LogOut, Plus,
+  Home, FileText, MessageSquare, User, LogOut, Plus,
   Clock, CheckCircle2, AlertCircle, Loader2, ChevronRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,19 +35,10 @@ export default function WhiteLabelPortalPage() {
   const { slug } = useParams<{ slug: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [customerId, setCustomerId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [claimDialogOpen, setClaimDialogOpen] = useState(false);
   const [referenceId, setReferenceId] = useState("");
   const [lastName, setLastName] = useState("");
-
-  useEffect(() => {
-    const storedId = sessionStorage.getItem("wl_customer_id");
-    if (!storedId) {
-      setLocation(`/w/${slug}/login`);
-      return;
-    }
-    setCustomerId(storedId);
-  }, [slug, setLocation]);
 
   const { data: tenant } = useQuery<Tenant>({
     queryKey: ["/api/w", slug, "tenant"],
@@ -58,30 +49,47 @@ export default function WhiteLabelPortalPage() {
     }
   });
 
-  const { data: cases = [], isLoading: casesLoading, refetch: refetchCases } = useQuery<Case[]>({
-    queryKey: ["/api/w", slug, "portal/cases", customerId],
+  // Check authentication status
+  const { data: authData, isLoading: authLoading } = useQuery<{ authenticated: boolean; customer?: any }>({
+    queryKey: ["/api/w", slug, "auth/me"],
     queryFn: async () => {
-      if (!customerId) return [];
-      const res = await fetch(`/api/w/${slug}/portal/cases?customerAccountId=${customerId}`);
-      if (!res.ok) throw new Error("Failed to load cases");
+      const res = await fetch(`/api/w/${slug}/auth/me`, { credentials: "include" });
+      if (!res.ok) return { authenticated: false };
       return res.json();
-    },
-    enabled: !!customerId
+    }
   });
 
-  const handleLogout = () => {
-    sessionStorage.removeItem("wl_customer_id");
-    sessionStorage.removeItem("wl_tenant_id");
+  // Redirect if not authenticated
+  if (!authLoading && !authData?.authenticated) {
+    setLocation(`/w/${slug}/login`);
+    return null;
+  }
+
+  const { data: cases = [], isLoading: casesLoading, refetch: refetchCases } = useQuery<Case[]>({
+    queryKey: ["/api/w", slug, "portal/cases"],
+    queryFn: async () => {
+      const res = await fetch(`/api/w/${slug}/portal/cases`, { credentials: "include" });
+      if (!res.ok) {
+        if (res.status === 401) return [];
+        throw new Error("Failed to load cases");
+      }
+      return res.json();
+    },
+    enabled: !!authData?.authenticated
+  });
+
+  const handleLogout = async () => {
+    await apiRequest("POST", `/api/w/${slug}/auth/logout`, {});
+    queryClient.invalidateQueries({ queryKey: ["/api/w", slug] });
     setLocation(`/w/${slug}/login`);
   };
 
   const handleClaimCase = async () => {
-    if (!referenceId || !customerId) return;
+    if (!referenceId) return;
     try {
       await apiRequest("POST", `/api/w/${slug}/portal/claim-case`, {
         referenceId,
-        lastName,
-        customerAccountId: customerId
+        lastName
       });
       toast({ title: "Success", description: "Case linked to your account!" });
       setClaimDialogOpen(false);
@@ -97,7 +105,7 @@ export default function WhiteLabelPortalPage() {
     }
   };
 
-  if (!tenant || !customerId) {
+  if (!tenant || authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />

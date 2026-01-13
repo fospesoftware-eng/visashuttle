@@ -1,6 +1,24 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+
+// Extend Express Session with white-label customer data
+declare module "express-session" {
+  interface SessionData {
+    wlCustomerId?: string;
+    wlTenantId?: string;
+    wlEmail?: string;
+    wlName?: string;
+  }
+}
+
+// Middleware to require white-label authentication
+function requireWLAuth(req: Request, res: Response, next: NextFunction) {
+  if (!req.session?.wlCustomerId || !req.session?.wlTenantId) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+  next();
+}
 
 function generateOTP(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -146,6 +164,12 @@ export async function registerRoutes(
       details: { email }
     });
 
+    // Store authenticated customer in session
+    req.session.wlCustomerId = customerAccount.id;
+    req.session.wlTenantId = tenant.id;
+    req.session.wlEmail = customerAccount.email;
+    req.session.wlName = customerAccount.name || undefined;
+
     res.json({ 
       success: true,
       customerAccount: {
@@ -158,34 +182,93 @@ export async function registerRoutes(
     });
   });
 
-  // Get customer cases for white-label portal
-  app.get("/api/w/:slug/portal/cases", async (req, res) => {
-    const { customerAccountId } = req.query;
-    
-    if (!customerAccountId) {
-      return res.status(400).json({ error: "Customer account ID required" });
+  // Logout from white-label portal
+  app.post("/api/w/:slug/auth/logout", (req, res) => {
+    req.session.wlCustomerId = undefined;
+    req.session.wlTenantId = undefined;
+    req.session.wlEmail = undefined;
+    req.session.wlName = undefined;
+    res.json({ success: true });
+  });
+
+  // Check authentication status
+  app.get("/api/w/:slug/auth/me", async (req, res) => {
+    if (!req.session?.wlCustomerId || !req.session?.wlTenantId) {
+      return res.status(401).json({ authenticated: false });
     }
 
     const tenant = await storage.getTenantBySlug(req.params.slug);
-    if (!tenant) {
-      return res.status(404).json({ error: "Agency not found" });
+    if (!tenant || tenant.id !== req.session.wlTenantId) {
+      return res.status(401).json({ authenticated: false });
     }
 
-    const cases = await storage.getCasesByCustomerAccountId(customerAccountId as string, tenant.id);
+    const customer = await storage.getCustomerAccount(req.session.wlCustomerId);
+    if (!customer) {
+      return res.status(401).json({ authenticated: false });
+    }
+
+    res.json({
+      authenticated: true,
+      customer: {
+        id: customer.id,
+        email: customer.email,
+        name: customer.name,
+        phone: customer.phone
+      },
+      tenantId: tenant.id
+    });
+  });
+
+  // Get customer profile for white-label portal
+  app.get("/api/w/:slug/portal/profile", requireWLAuth, async (req, res) => {
+    const customerId = req.session.wlCustomerId!;
+    const tenantId = req.session.wlTenantId!;
+
+    const tenant = await storage.getTenantBySlug(req.params.slug);
+    if (!tenant || tenant.id !== tenantId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    const customer = await storage.getCustomerAccount(customerId);
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    res.json({
+      id: customer.id,
+      email: customer.email,
+      name: customer.name,
+      phone: customer.phone
+    });
+  });
+
+  // Get customer cases for white-label portal
+  app.get("/api/w/:slug/portal/cases", requireWLAuth, async (req, res) => {
+    const customerId = req.session.wlCustomerId!;
+    const tenantId = req.session.wlTenantId!;
+
+    const tenant = await storage.getTenantBySlug(req.params.slug);
+    if (!tenant || tenant.id !== tenantId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    const cases = await storage.getCasesByCustomerAccountId(customerId, tenant.id);
     res.json(cases);
   });
 
   // Claim case by reference ID
-  app.post("/api/w/:slug/portal/claim-case", async (req, res) => {
-    const { referenceId, lastName, dob, customerAccountId } = req.body;
+  app.post("/api/w/:slug/portal/claim-case", requireWLAuth, async (req, res) => {
+    const { referenceId, lastName } = req.body;
+    const customerId = req.session.wlCustomerId!;
+    const tenantId = req.session.wlTenantId!;
 
-    if (!referenceId || !customerAccountId) {
-      return res.status(400).json({ error: "Reference ID and customer account ID required" });
+    if (!referenceId) {
+      return res.status(400).json({ error: "Reference ID required" });
     }
 
     const tenant = await storage.getTenantBySlug(req.params.slug);
-    if (!tenant) {
-      return res.status(404).json({ error: "Agency not found" });
+    if (!tenant || tenant.id !== tenantId) {
+      return res.status(403).json({ error: "Access denied" });
     }
 
     const caseData = await storage.getCaseByReferenceId(referenceId, tenant.id);
@@ -203,12 +286,12 @@ export async function registerRoutes(
     }
 
     // Link case to customer account
-    await storage.updateCase(caseData.id, { customerAccountId });
+    await storage.updateCase(caseData.id, { customerAccountId: customerId });
 
     // Log the claim
     await storage.createActivityLog({
       tenantId: tenant.id,
-      userId: customerAccountId,
+      userId: customerId,
       action: "case.claimed",
       entityType: "case",
       entityId: caseData.id,
@@ -219,12 +302,13 @@ export async function registerRoutes(
   });
 
   // Get single case for white-label portal
-  app.get("/api/w/:slug/portal/cases/:caseId", async (req, res) => {
-    const { customerAccountId } = req.query;
+  app.get("/api/w/:slug/portal/cases/:caseId", requireWLAuth, async (req, res) => {
+    const customerId = req.session.wlCustomerId!;
+    const tenantId = req.session.wlTenantId!;
     
     const tenant = await storage.getTenantBySlug(req.params.slug);
-    if (!tenant) {
-      return res.status(404).json({ error: "Agency not found" });
+    if (!tenant || tenant.id !== tenantId) {
+      return res.status(403).json({ error: "Access denied" });
     }
 
     const caseData = await storage.getCase(req.params.caseId);
@@ -232,8 +316,8 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Case not found" });
     }
 
-    // Verify customer has access
-    if (customerAccountId && caseData.customerAccountId !== customerAccountId) {
+    // Verify customer owns this case
+    if (caseData.customerAccountId !== customerId) {
       return res.status(403).json({ error: "Access denied" });
     }
 
@@ -241,15 +325,18 @@ export async function registerRoutes(
   });
 
   // Get documents for white-label portal case
-  app.get("/api/w/:slug/portal/cases/:caseId/documents", async (req, res) => {
+  app.get("/api/w/:slug/portal/cases/:caseId/documents", requireWLAuth, async (req, res) => {
+    const customerId = req.session.wlCustomerId!;
+    const tenantId = req.session.wlTenantId!;
+
     const tenant = await storage.getTenantBySlug(req.params.slug);
-    if (!tenant) {
-      return res.status(404).json({ error: "Agency not found" });
+    if (!tenant || tenant.id !== tenantId) {
+      return res.status(403).json({ error: "Access denied" });
     }
 
     const caseData = await storage.getCase(req.params.caseId);
-    if (!caseData || caseData.tenantId !== tenant.id) {
-      return res.status(404).json({ error: "Case not found" });
+    if (!caseData || caseData.tenantId !== tenant.id || caseData.customerAccountId !== customerId) {
+      return res.status(403).json({ error: "Access denied" });
     }
 
     const documents = await storage.getDocumentsByCaseId(req.params.caseId);
@@ -257,10 +344,18 @@ export async function registerRoutes(
   });
 
   // Get messages for white-label portal case
-  app.get("/api/w/:slug/portal/cases/:caseId/messages", async (req, res) => {
+  app.get("/api/w/:slug/portal/cases/:caseId/messages", requireWLAuth, async (req, res) => {
+    const customerId = req.session.wlCustomerId!;
+    const tenantId = req.session.wlTenantId!;
+
     const tenant = await storage.getTenantBySlug(req.params.slug);
-    if (!tenant) {
-      return res.status(404).json({ error: "Agency not found" });
+    if (!tenant || tenant.id !== tenantId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    const caseData = await storage.getCase(req.params.caseId);
+    if (!caseData || caseData.tenantId !== tenant.id || caseData.customerAccountId !== customerId) {
+      return res.status(403).json({ error: "Access denied" });
     }
 
     const messages = await storage.getMessagesByCaseId(req.params.caseId);
@@ -268,17 +363,24 @@ export async function registerRoutes(
   });
 
   // Send message from white-label portal
-  app.post("/api/w/:slug/portal/cases/:caseId/messages", async (req, res) => {
-    const { content, customerAccountId } = req.body;
+  app.post("/api/w/:slug/portal/cases/:caseId/messages", requireWLAuth, async (req, res) => {
+    const { content } = req.body;
+    const customerId = req.session.wlCustomerId!;
+    const tenantId = req.session.wlTenantId!;
 
     const tenant = await storage.getTenantBySlug(req.params.slug);
-    if (!tenant) {
-      return res.status(404).json({ error: "Agency not found" });
+    if (!tenant || tenant.id !== tenantId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    const caseData = await storage.getCase(req.params.caseId);
+    if (!caseData || caseData.tenantId !== tenant.id || caseData.customerAccountId !== customerId) {
+      return res.status(403).json({ error: "Access denied" });
     }
 
     const message = await storage.createMessage({
       caseId: req.params.caseId,
-      senderId: customerAccountId,
+      senderId: customerId,
       senderRole: "customer",
       content,
       isRead: false
@@ -288,12 +390,19 @@ export async function registerRoutes(
   });
 
   // Upload document from white-label portal
-  app.post("/api/w/:slug/portal/cases/:caseId/documents", async (req, res) => {
-    const { name, type, customerAccountId } = req.body;
+  app.post("/api/w/:slug/portal/cases/:caseId/documents", requireWLAuth, async (req, res) => {
+    const { name, type } = req.body;
+    const customerId = req.session.wlCustomerId!;
+    const tenantId = req.session.wlTenantId!;
 
     const tenant = await storage.getTenantBySlug(req.params.slug);
-    if (!tenant) {
-      return res.status(404).json({ error: "Agency not found" });
+    if (!tenant || tenant.id !== tenantId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    const caseData = await storage.getCase(req.params.caseId);
+    if (!caseData || caseData.tenantId !== tenant.id || caseData.customerAccountId !== customerId) {
+      return res.status(403).json({ error: "Access denied" });
     }
 
     const document = await storage.createDocument({
@@ -311,7 +420,7 @@ export async function registerRoutes(
     // Log the upload
     await storage.createActivityLog({
       tenantId: tenant.id,
-      userId: customerAccountId,
+      userId: customerId,
       action: "document.uploaded",
       entityType: "document",
       entityId: document.id,

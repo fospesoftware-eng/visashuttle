@@ -1,27 +1,23 @@
-import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, User, Mail, Phone, LogOut, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import type { Tenant, CustomerAccount } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
+import type { Tenant } from "@shared/schema";
+
+interface ProfileData {
+  id: string;
+  email: string;
+  name: string | null;
+  phone: string | null;
+}
 
 export default function WhiteLabelProfilePage() {
   const { slug } = useParams<{ slug: string }>();
   const [, setLocation] = useLocation();
-  const [customerId, setCustomerId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const storedId = sessionStorage.getItem("wl_customer_id");
-    if (!storedId) {
-      setLocation(`/w/${slug}/login`);
-      return;
-    }
-    setCustomerId(storedId);
-  }, [slug, setLocation]);
+  const queryClient = useQueryClient();
 
   const { data: tenant } = useQuery<Tenant>({
     queryKey: ["/api/w", slug, "tenant"],
@@ -32,20 +28,39 @@ export default function WhiteLabelProfilePage() {
     }
   });
 
-  // For now we'll get basic info from session storage
-  const storedEmail = sessionStorage.getItem("wl_email") || "john@example.com";
-  const storedName = sessionStorage.getItem("wl_name") || "Customer";
+  // Check auth status
+  const { data: authData, isLoading: authLoading } = useQuery<{ authenticated: boolean }>({
+    queryKey: ["/api/w", slug, "auth/me"],
+    queryFn: async () => {
+      const res = await fetch(`/api/w/${slug}/auth/me`, { credentials: "include" });
+      if (!res.ok) return { authenticated: false };
+      return res.json();
+    }
+  });
 
-  const handleLogout = () => {
-    sessionStorage.removeItem("wl_customer_id");
-    sessionStorage.removeItem("wl_tenant_id");
-    sessionStorage.removeItem("wl_email");
-    sessionStorage.removeItem("wl_name");
-    sessionStorage.removeItem("wl_phone");
+  if (!authLoading && !authData?.authenticated) {
+    setLocation(`/w/${slug}/login`);
+    return null;
+  }
+
+  // Fetch profile data from server
+  const { data: profile, isLoading: profileLoading } = useQuery<ProfileData>({
+    queryKey: ["/api/w", slug, "portal/profile"],
+    queryFn: async () => {
+      const res = await fetch(`/api/w/${slug}/portal/profile`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load profile");
+      return res.json();
+    },
+    enabled: !!authData?.authenticated
+  });
+
+  const handleLogout = async () => {
+    await apiRequest("POST", `/api/w/${slug}/auth/logout`, {});
+    queryClient.invalidateQueries({ queryKey: ["/api/w", slug] });
     setLocation(`/w/${slug}/login`);
   };
 
-  if (!tenant) {
+  if (!tenant || authLoading || profileLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -74,11 +89,11 @@ export default function WhiteLabelProfilePage() {
               className="text-2xl"
               style={{ backgroundColor: tenant.primaryColor ? `${tenant.primaryColor}20` : undefined, color: tenant.primaryColor || undefined }}
             >
-              {storedName?.charAt(0).toUpperCase() || "C"}
+              {profile?.name?.charAt(0).toUpperCase() || profile?.email?.charAt(0).toUpperCase() || "C"}
             </AvatarFallback>
           </Avatar>
-          <h2 className="text-xl font-semibold">{storedName || "Customer"}</h2>
-          <p className="text-muted-foreground">{storedEmail}</p>
+          <h2 className="text-xl font-semibold">{profile?.name || "Customer"}</h2>
+          <p className="text-muted-foreground">{profile?.email}</p>
         </div>
 
         <Card>
@@ -90,16 +105,25 @@ export default function WhiteLabelProfilePage() {
               <Mail className="w-5 h-5 text-muted-foreground" />
               <div>
                 <p className="text-sm text-muted-foreground">Email</p>
-                <p className="font-medium">{storedEmail}</p>
+                <p className="font-medium">{profile?.email}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
               <User className="w-5 h-5 text-muted-foreground" />
               <div>
                 <p className="text-sm text-muted-foreground">Name</p>
-                <p className="font-medium">{storedName || "Not provided"}</p>
+                <p className="font-medium">{profile?.name || "Not provided"}</p>
               </div>
             </div>
+            {profile?.phone && (
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                <Phone className="w-5 h-5 text-muted-foreground" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Phone</p>
+                  <p className="font-medium">{profile.phone}</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
