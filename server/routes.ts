@@ -2,6 +2,9 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 
+// Site-wide password for protecting the entire application
+const SITE_PASSWORD = process.env.SITE_PASSWORD;
+
 // Extend Express Session with white-label customer data
 declare module "express-session" {
   interface SessionData {
@@ -9,6 +12,7 @@ declare module "express-session" {
     wlTenantId?: string;
     wlEmail?: string;
     wlName?: string;
+    siteAuthenticated?: boolean;
   }
 }
 
@@ -38,6 +42,29 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   
+  // === Site Password Protection ===
+  app.post("/api/site-auth/verify", (req, res) => {
+    const { password } = req.body;
+    if (!SITE_PASSWORD) {
+      // No password set - allow access
+      req.session.siteAuthenticated = true;
+      return res.json({ success: true });
+    }
+    if (password === SITE_PASSWORD) {
+      req.session.siteAuthenticated = true;
+      return res.json({ success: true });
+    }
+    return res.status(401).json({ error: "Invalid password" });
+  });
+
+  app.get("/api/site-auth/status", (req, res) => {
+    // If no password is configured, automatically grant access
+    if (!SITE_PASSWORD) {
+      return res.json({ authenticated: true });
+    }
+    res.json({ authenticated: !!req.session.siteAuthenticated });
+  });
+
   // === Auth Routes ===
   app.post("/api/auth/login", async (req, res) => {
     const { email, password } = req.body;

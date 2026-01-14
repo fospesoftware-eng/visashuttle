@@ -15,6 +15,12 @@ declare module "http" {
   }
 }
 
+declare module "express-session" {
+  interface SessionData {
+    siteAuthenticated?: boolean;
+  }
+}
+
 app.use(
   express.json({
     verify: (req, _res, buf) => {
@@ -42,6 +48,41 @@ app.use(
     },
   })
 );
+
+// Site-wide password protection middleware
+const SITE_PASSWORD = process.env.SITE_PASSWORD;
+app.use((req, res, next) => {
+  // Skip protection for site-auth endpoints (needed to authenticate)
+  if (req.path.startsWith("/api/site-auth")) {
+    return next();
+  }
+  
+  // If no password is configured, allow all access
+  if (!SITE_PASSWORD) {
+    return next();
+  }
+  
+  // Allow static assets needed for the password page (Vite assets, etc)
+  if (req.path.startsWith("/@") || req.path.startsWith("/node_modules") || 
+      req.path.startsWith("/src") || req.path.endsWith(".ico") ||
+      req.path.endsWith(".svg") || req.path.endsWith(".png") ||
+      req.path.endsWith(".jpg") || req.path.endsWith(".woff2") ||
+      req.path.endsWith(".woff") || req.path.endsWith(".ttf")) {
+    return next();
+  }
+  
+  // Check if user is authenticated
+  if (!req.session?.siteAuthenticated) {
+    // For API routes, return 401
+    if (req.path.startsWith("/api")) {
+      return res.status(401).json({ error: "Site authentication required" });
+    }
+    // For all other routes, allow them through so the SPA can load and show the password gate
+    // The frontend PasswordGate component will handle showing the password form
+  }
+  
+  next();
+});
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {

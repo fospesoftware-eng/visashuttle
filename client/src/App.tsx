@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/lib/theme";
+import { PasswordGate } from "@/components/password-gate";
 
 import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
@@ -87,8 +88,10 @@ function App() {
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <Toaster />
-          <Router />
+          <PasswordGate>
+            <Toaster />
+            <Router />
+          </PasswordGate>
         </TooltipProvider>
       </QueryClientProvider>
     </ThemeProvider>
