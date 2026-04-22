@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Building2, Users, Bell, Shield, CreditCard, Save, Palette, Upload, Eye, Loader2, Check, ExternalLink } from "lucide-react";
+import { Building2, Users, Bell, Shield, CreditCard, Save, Palette, Upload, Eye, Loader2, Check, ExternalLink, Copy, Globe, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -91,6 +91,16 @@ export default function AgencySettingsPage() {
   };
 
   const portalUrl = tenant?.slug ? `/w/${tenant.slug}/login` : "";
+  const agencyHomeUrl = tenant?.slug ? `/w/${tenant.slug}` : "";
+  const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
+
+  const copyUrl = (url: string, label: string) => {
+    const full = `${window.location.origin}${url}`;
+    navigator.clipboard.writeText(full);
+    setCopiedUrl(label);
+    toast({ title: "Copied!", description: `${label} copied to clipboard.` });
+    setTimeout(() => setCopiedUrl(null), 2000);
+  };
 
   return (
     <DashboardLayout type="agency">
@@ -105,6 +115,10 @@ export default function AgencySettingsPage() {
             <TabsTrigger value="branding" data-testid="tab-branding">
               <Palette className="w-4 h-4 mr-2" />
               Branding
+            </TabsTrigger>
+            <TabsTrigger value="portal" data-testid="tab-portal">
+              <Globe className="w-4 h-4 mr-2" />
+              Portal & Links
             </TabsTrigger>
             <TabsTrigger value="general" data-testid="tab-general">General</TabsTrigger>
             <TabsTrigger value="notifications" data-testid="tab-notifications">Notifications</TabsTrigger>
@@ -152,20 +166,26 @@ export default function AgencySettingsPage() {
                     </div>
                   </div>
                 </div>
-                {portalUrl && (
-                  <div className="mt-4 flex items-center gap-2 text-sm">
-                    <span className="text-muted-foreground">Customer Portal URL:</span>
-                    <code className="px-2 py-1 rounded bg-muted font-mono text-xs">{portalUrl}</code>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="gap-1"
-                      onClick={() => window.open(portalUrl, "_blank")}
-                      data-testid="button-open-portal"
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                      Open
-                    </Button>
+                {tenant?.slug && (
+                  <div className="mt-4 space-y-2 border-t pt-4">
+                    <p className="text-sm font-medium text-foreground mb-3">Shareable Links</p>
+                    {[
+                      { label: "Agency Landing Page", url: agencyHomeUrl, desc: "Public marketing page for your agency" },
+                      { label: "Customer Login", url: portalUrl, desc: "Direct link to sign in / sign up" },
+                    ].map(({ label, url, desc }) => (
+                      <div key={label} className="flex items-center gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-muted-foreground">{label}</p>
+                          <code className="text-xs font-mono text-foreground truncate block">{window.location.origin}{url}</code>
+                        </div>
+                        <Button variant="outline" size="sm" className="h-7 px-2 shrink-0" onClick={() => copyUrl(url, label)} data-testid={`button-copy-${label.replace(/\s/g, "-").toLowerCase()}`}>
+                          {copiedUrl === label ? <Check className="w-3 h-3 text-green-600" /> : <Copy className="w-3 h-3" />}
+                        </Button>
+                        <Button variant="outline" size="sm" className="h-7 px-2 shrink-0" onClick={() => window.open(url, "_blank")} data-testid={`button-open-${label.replace(/\s/g, "-").toLowerCase()}`}>
+                          <ExternalLink className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    ))}
                   </div>
                 )}
               </CardContent>
@@ -336,6 +356,142 @@ export default function AgencySettingsPage() {
                 Save Branding
               </Button>
             </div>
+          </TabsContent>
+
+          <TabsContent value="portal" className="space-y-6">
+            {/* Shareable URLs */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Link2 className="w-4 h-4" />
+                  Your Agency Portal URLs
+                </CardTitle>
+                <CardDescription>
+                  Share these links with customers so they can access your branded portal, track applications, and upload documents.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {tenant?.slug ? (
+                  <>
+                    {[
+                      {
+                        label: "Agency Landing Page",
+                        url: `${window.location.origin}/w/${tenant.slug}`,
+                        desc: "Public-facing page showcasing your services. Share this with potential customers.",
+                        badge: "Public",
+                        badgeColor: "bg-green-100 text-green-700"
+                      },
+                      {
+                        label: "Customer Login / Sign Up",
+                        url: `${window.location.origin}/w/${tenant.slug}/login`,
+                        desc: "Direct link to the sign-in page. Customers can create an account or log in here.",
+                        badge: "Auth",
+                        badgeColor: "bg-blue-100 text-blue-700"
+                      },
+                    ].map(({ label, url, desc, badge, badgeColor }) => (
+                      <div key={label} className="rounded-xl border p-4 space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold text-sm">{label}</h3>
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badgeColor}`}>{badge}</span>
+                          </div>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="outline" size="sm" className="h-7 px-2"
+                              onClick={() => copyUrl(`/w/${tenant.slug}${label.includes("Login") ? "/login" : ""}`, label)}
+                              data-testid={`button-copy-url-${label.replace(/\s/g, "-").toLowerCase()}`}
+                            >
+                              {copiedUrl === label ? <Check className="w-3 h-3 text-green-600" /> : <Copy className="w-3 h-3" />}
+                            </Button>
+                            <Button
+                              variant="outline" size="sm" className="h-7 px-2"
+                              onClick={() => window.open(url, "_blank")}
+                              data-testid={`button-open-url-${label.replace(/\s/g, "-").toLowerCase()}`}
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+                        <code className="block text-xs font-mono bg-muted px-3 py-2 rounded-lg text-muted-foreground break-all">{url}</code>
+                        <p className="text-xs text-muted-foreground">{desc}</p>
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Loading your portal URLs…</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Subdomain Setup Guide */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Globe className="w-4 h-4" />
+                  Custom Subdomain Setup
+                </CardTitle>
+                <CardDescription>
+                  Give your customers a fully branded experience at your own domain.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="rounded-xl bg-muted/50 border p-4">
+                  <p className="text-sm font-medium text-foreground mb-1">Your subdomain would look like:</p>
+                  <code className="text-sm font-mono text-primary">
+                    {tenant?.slug || "your-agency"}.yourdomain.com
+                  </code>
+                </div>
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold">How to set it up:</h4>
+                  {[
+                    { step: "1", title: "Create a CNAME record", desc: `In your DNS provider, add a CNAME record: ${tenant?.slug || "your-agency"}.yourdomain.com → pointing to this app's domain.` },
+                    { step: "2", title: "Wait for DNS propagation", desc: "DNS changes can take up to 24–48 hours to fully propagate worldwide." },
+                    { step: "3", title: "Verify it works", desc: "Once propagated, visiting your subdomain will automatically load your branded agency portal." },
+                  ].map(({ step, title, desc }) => (
+                    <div key={step} className="flex gap-3">
+                      <div className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                        {step}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{title}</p>
+                        <p className="text-xs text-muted-foreground">{desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 p-3">
+                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                    <strong>Note:</strong> Custom subdomain support requires a Pro or Enterprise plan. Contact support to enable this feature for your account.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Application Link Guide */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Sharing Application Links
+                </CardTitle>
+                <CardDescription>
+                  Send customers a direct link to their specific application — no hunting for reference IDs.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  From the <strong>Applications</strong> page, open any application's action menu and choose <strong>"Copy Customer Link"</strong>. The link includes the reference ID, so when customers open it, the application is pre-linked to their account automatically after they sign in.
+                </p>
+                <div className="rounded-lg bg-muted px-4 py-3">
+                  <p className="text-xs font-mono text-muted-foreground break-all">
+                    {window.location.origin}/w/{tenant?.slug || "your-agency"}/login?ref=REF-XXXXXX
+                  </p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  You can share this via email, WhatsApp, or any messaging platform. Customers click the link, sign in with their email OTP, and the application is instantly linked to their account.
+                </p>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="general" className="space-y-4">

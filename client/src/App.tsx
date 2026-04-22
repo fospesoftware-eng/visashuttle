@@ -1,4 +1,5 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
+import { useEffect } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -32,6 +33,7 @@ import AdminAIPage from "@/pages/admin/ai";
 import AdminAuditPage from "@/pages/admin/audit";
 import AdminSettingsPage from "@/pages/admin/settings";
 
+import AgencyHomePage from "@/pages/whitelabel/agency-home";
 import WhiteLabelLoginPage from "@/pages/whitelabel/login";
 import WhiteLabelVerifyPage from "@/pages/whitelabel/verify";
 import WhiteLabelPortalPage from "@/pages/whitelabel/portal";
@@ -41,13 +43,31 @@ import WhiteLabelMessagesPage from "@/pages/whitelabel/messages";
 import WhiteLabelProfilePage from "@/pages/whitelabel/profile";
 import WhiteLabelDownloadsPage from "@/pages/whitelabel/downloads";
 
+// Detects agency subdomains (e.g., demo-agency.yourdomain.com)
+// and redirects to /w/:slug so the branded landing page loads
+function SubdomainRedirect() {
+  const [location, setLocation] = useLocation();
+  useEffect(() => {
+    const hostname = window.location.hostname;
+    const parts = hostname.split(".");
+    if (parts.length >= 3 && !location.startsWith("/w/") && location === "/") {
+      const subdomain = parts[0];
+      const ignored = ["www", "app", "api", "mail", "admin"];
+      if (!ignored.includes(subdomain) && !/^\d+$/.test(subdomain)) {
+        setLocation(`/w/${subdomain}`);
+      }
+    }
+  }, [location, setLocation]);
+  return null;
+}
+
 function Router() {
   return (
     <Switch>
       <Route path="/" component={LandingPage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/signup" component={SignupPage} />
-      
+
       <Route path="/app" component={AgencyDashboard} />
       <Route path="/app/leads" component={LeadsPage} />
       <Route path="/app/cases" component={CasesPage} />
@@ -55,13 +75,13 @@ function Router() {
       <Route path="/app/documents" component={DocumentsPage} />
       <Route path="/app/reports" component={ReportsPage} />
       <Route path="/app/settings" component={AgencySettingsPage} />
-      
+
       <Route path="/customer" component={CustomerDashboard} />
       <Route path="/customer/case" component={CustomerCasePage} />
       <Route path="/customer/upload" component={CustomerUploadPage} />
       <Route path="/customer/messages" component={CustomerMessagesPage} />
       <Route path="/customer/profile" component={CustomerProfilePage} />
-      
+
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/admin/tenants" component={AdminTenantsPage} />
       <Route path="/admin/vkb" component={AdminVKBPage} />
@@ -69,6 +89,7 @@ function Router() {
       <Route path="/admin/audit" component={AdminAuditPage} />
       <Route path="/admin/settings" component={AdminSettingsPage} />
 
+      <Route path="/w/:slug" component={AgencyHomePage} />
       <Route path="/w/:slug/login" component={WhiteLabelLoginPage} />
       <Route path="/w/:slug/verify" component={WhiteLabelVerifyPage} />
       <Route path="/w/:slug/portal" component={WhiteLabelPortalPage} />
@@ -77,7 +98,7 @@ function Router() {
       <Route path="/w/:slug/portal/messages" component={WhiteLabelMessagesPage} />
       <Route path="/w/:slug/portal/profile" component={WhiteLabelProfilePage} />
       <Route path="/w/:slug/portal/downloads" component={WhiteLabelDownloadsPage} />
-      
+
       <Route component={NotFound} />
     </Switch>
   );
@@ -90,6 +111,7 @@ function App() {
         <TooltipProvider>
           <PasswordGate>
             <Toaster />
+            <SubdomainRedirect />
             <Router />
           </PasswordGate>
         </TooltipProvider>
