@@ -3,7 +3,7 @@ import { useParams, Link } from "wouter";
 import { 
   ArrowLeft, User, Mail, Phone, MapPin, Calendar, FileText, 
   CheckCircle, AlertCircle, Clock, Send, Paperclip, Download,
-  Brain, Lightbulb, RefreshCw
+  Brain, Lightbulb, RefreshCw, Copy, Check, ExternalLink, Share2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,9 +16,14 @@ import { StatusBadge } from "@/components/status-badge";
 import { ProgressRing } from "@/components/progress-ring";
 import { Timeline } from "@/components/timeline";
 import { UploadDropzone } from "@/components/upload-dropzone";
+import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
+
+const AGENCY_SLUG = localStorage.getItem("agency_tenant_slug") || "demo-agency";
 
 const caseData = {
   id: "VS-2024-001",
+  referenceId: "REF-JNS001",
   applicant: {
     name: "John Smith",
     email: "john@email.com",
@@ -71,9 +76,20 @@ const aiRecommendations = [
 export default function CaseDetailPage() {
   const { id } = useParams();
   const [message, setMessage] = useState("");
+  const [linkCopied, setLinkCopied] = useState(false);
+  const { toast } = useToast();
 
   const completedItems = checklist.filter(item => item.completed).length;
   const checklistProgress = (completedItems / checklist.length) * 100;
+
+  const customerPortalLink = `${window.location.origin}/w/${AGENCY_SLUG}/login?ref=${caseData.referenceId}`;
+
+  const copyPortalLink = () => {
+    navigator.clipboard.writeText(customerPortalLink);
+    setLinkCopied(true);
+    toast({ title: "Link copied!", description: "Share this link with your customer so they can track their application." });
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
 
   return (
     <DashboardLayout type="agency">
@@ -174,6 +190,64 @@ export default function CaseDetailPage() {
                     <p className="text-xs text-muted-foreground">{rec.reason}</p>
                   </div>
                 ))}
+              </CardContent>
+            </Card>
+
+            <Card className="border-primary/20 bg-primary/5">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Share2 className="w-4 h-4 text-primary" />
+                  Customer Self-Service
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Share this link with <span className="font-medium text-foreground">{caseData.applicant.name}</span> so they can upload documents and track their application.
+                </p>
+                <div className="flex gap-1.5">
+                  <Input
+                    readOnly
+                    value={customerPortalLink}
+                    className="text-xs font-mono h-8 bg-background"
+                    data-testid="input-customer-portal-link"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 px-2 shrink-0"
+                    onClick={copyPortalLink}
+                    data-testid="button-copy-portal-link"
+                  >
+                    {linkCopied ? (
+                      <Check className="w-3.5 h-3.5 text-green-600" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                  </Button>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    className="flex-1 h-8 text-xs gap-1.5"
+                    onClick={copyPortalLink}
+                    data-testid="button-copy-portal-link-full"
+                  >
+                    {linkCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                    {linkCopied ? "Copied!" : "Copy Link"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 px-2"
+                    onClick={() => window.open(customerPortalLink, "_blank")}
+                    data-testid="button-open-portal-link"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground font-mono">
+                  Ref: <span className="text-foreground font-semibold">{caseData.referenceId}</span>
+                </p>
               </CardContent>
             </Card>
           </div>

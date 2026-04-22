@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { 
@@ -40,6 +40,19 @@ export default function WhiteLabelPortalPage() {
   const [claimDialogOpen, setClaimDialogOpen] = useState(false);
   const [referenceId, setReferenceId] = useState("");
   const [lastName, setLastName] = useState("");
+
+  // Auto-open claim dialog if ?ref= param is present
+  useEffect(() => {
+    const ref = new URLSearchParams(window.location.search).get("ref")
+      || sessionStorage.getItem("wl_ref");
+    if (ref) {
+      setReferenceId(ref.toUpperCase());
+      setClaimDialogOpen(true);
+      sessionStorage.removeItem("wl_ref");
+      // Clean URL without reload
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
 
   const { data: tenant } = useQuery<Tenant>({
     queryKey: ["/api/w", slug, "tenant"],

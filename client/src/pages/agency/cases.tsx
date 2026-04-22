@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { Plus, Search, Filter, MoreVertical, ArrowUpDown, Eye } from "lucide-react";
+import { Plus, Search, MoreVertical, ArrowUpDown, Eye, Copy, Check, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,19 +28,35 @@ import {
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { StatusBadge } from "@/components/status-badge";
 import { ProgressRing } from "@/components/progress-ring";
+import { useToast } from "@/hooks/use-toast";
+
+const AGENCY_SLUG = localStorage.getItem("agency_tenant_slug") || "demo-agency";
 
 const cases = [
-  { id: "VS-2024-001", applicant: "John Smith", email: "john@email.com", visaType: "Schengen Tourist", country: "France", status: "in_progress", readiness: 75, createdAt: "2024-01-15" },
-  { id: "VS-2024-002", applicant: "Sarah Johnson", email: "sarah@email.com", visaType: "UK Visitor", country: "United Kingdom", status: "documents_required", readiness: 45, createdAt: "2024-01-14" },
-  { id: "VS-2024-003", applicant: "Michael Brown", email: "michael@email.com", visaType: "UAE Tourist", country: "UAE", status: "under_review", readiness: 90, createdAt: "2024-01-13" },
-  { id: "VS-2024-004", applicant: "Emily Davis", email: "emily@email.com", visaType: "US B1/B2", country: "United States", status: "pending", readiness: 20, createdAt: "2024-01-12" },
-  { id: "VS-2024-005", applicant: "James Wilson", email: "james@email.com", visaType: "Canada Visitor", country: "Canada", status: "approved", readiness: 100, createdAt: "2024-01-10" },
-  { id: "VS-2024-006", applicant: "Lisa Anderson", email: "lisa@email.com", visaType: "Australia ETA", country: "Australia", status: "in_progress", readiness: 60, createdAt: "2024-01-08" },
+  { id: "VS-2024-001", referenceId: "REF-JNS001", applicant: "John Smith", email: "john@email.com", visaType: "Schengen Tourist", country: "France", status: "in_progress", readiness: 75, createdAt: "2024-01-15" },
+  { id: "VS-2024-002", referenceId: "REF-SJN002", applicant: "Sarah Johnson", email: "sarah@email.com", visaType: "UK Visitor", country: "United Kingdom", status: "documents_required", readiness: 45, createdAt: "2024-01-14" },
+  { id: "VS-2024-003", referenceId: "REF-MBR003", applicant: "Michael Brown", email: "michael@email.com", visaType: "UAE Tourist", country: "UAE", status: "under_review", readiness: 90, createdAt: "2024-01-13" },
+  { id: "VS-2024-004", referenceId: "REF-EDA004", applicant: "Emily Davis", email: "emily@email.com", visaType: "US B1/B2", country: "United States", status: "pending", readiness: 20, createdAt: "2024-01-12" },
+  { id: "VS-2024-005", referenceId: "REF-JWL005", applicant: "James Wilson", email: "james@email.com", visaType: "Canada Visitor", country: "Canada", status: "approved", readiness: 100, createdAt: "2024-01-10" },
+  { id: "VS-2024-006", referenceId: "REF-LAN006", applicant: "Lisa Anderson", email: "lisa@email.com", visaType: "Australia ETA", country: "Australia", status: "in_progress", readiness: 60, createdAt: "2024-01-08" },
 ];
 
 export default function CasesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const getCustomerLink = (referenceId: string) => {
+    return `${window.location.origin}/w/${AGENCY_SLUG}/login?ref=${referenceId}`;
+  };
+
+  const copyCustomerLink = (referenceId: string, caseId: string) => {
+    navigator.clipboard.writeText(getCustomerLink(referenceId));
+    setCopiedId(caseId);
+    toast({ title: "Link copied!", description: "Customer portal link copied to clipboard." });
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   const filteredCases = cases.filter(c => {
     const matchesSearch = c.applicant.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -152,7 +168,24 @@ export default function CasesPage() {
                               View Details
                             </DropdownMenuItem>
                           </Link>
-                          <DropdownMenuItem>Edit Case</DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => copyCustomerLink(caseItem.referenceId, caseItem.id)}
+                            data-testid={`button-copy-link-${caseItem.id}`}
+                          >
+                            {copiedId === caseItem.id ? (
+                              <Check className="w-4 h-4 mr-2 text-green-600" />
+                            ) : (
+                              <Copy className="w-4 h-4 mr-2" />
+                            )}
+                            Copy Customer Link
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => window.open(getCustomerLink(caseItem.referenceId), "_blank")}
+                            data-testid={`button-open-portal-${caseItem.id}`}
+                          >
+                            <ExternalLink className="w-4 h-4 mr-2" />
+                            Open Customer Portal
+                          </DropdownMenuItem>
                           <DropdownMenuItem>Send Reminder</DropdownMenuItem>
                           <DropdownMenuItem className="text-destructive">Cancel Case</DropdownMenuItem>
                         </DropdownMenuContent>

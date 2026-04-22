@@ -43,11 +43,16 @@ export default function WhiteLabelVerifyPage() {
       sessionStorage.removeItem("wl_email");
       sessionStorage.removeItem("wl_name");
       sessionStorage.removeItem("wl_phone");
+      const ref = sessionStorage.getItem("wl_ref");
       toast({
         title: "Welcome!",
         description: "You've been signed in successfully"
       });
-      setLocation(`/w/${slug}/portal`);
+      if (ref) {
+        setLocation(`/w/${slug}/portal?ref=${ref}`);
+      } else {
+        setLocation(`/w/${slug}/portal`);
+      }
     },
     onError: (error: Error) => {
       toast({

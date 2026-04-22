@@ -19,6 +19,12 @@ export default function WhiteLabelLoginPage() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
 
+  // Read ref param from URL and save it for after login
+  const refParam = new URLSearchParams(window.location.search).get("ref");
+  if (refParam) {
+    sessionStorage.setItem("wl_ref", refParam);
+  }
+
   const { data: tenant, isLoading: tenantLoading, error: tenantError } = useQuery<Tenant>({
     queryKey: ["/api/w", slug, "tenant"],
     queryFn: async () => {
