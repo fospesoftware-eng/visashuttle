@@ -182,14 +182,14 @@ export default function WhiteLabelPortalPage() {
                     data-testid="button-claim-case"
                   >
                     <Plus className="w-4 h-4" />
-                    Link Application
+                    New Application
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Link Your Application</DialogTitle>
+                    <DialogTitle>Track Your Application</DialogTitle>
                     <DialogDescription>
-                      Enter your reference ID to link an existing application to your account
+                      Enter the reference ID your travel agent shared with you to track your visa application.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 mt-4">
@@ -220,7 +220,7 @@ export default function WhiteLabelPortalPage() {
                       style={{ backgroundColor: primaryColor }}
                       data-testid="button-submit-claim"
                     >
-                      Link Application
+                      Track Application
                     </Button>
                   </div>
                 </DialogContent>
@@ -245,7 +245,7 @@ export default function WhiteLabelPortalPage() {
                 </div>
                 <h3 className="font-bold text-xl mb-2">No Applications Yet</h3>
                 <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
-                  You don't have any visa applications linked to your account. Link an existing application or contact your travel agent.
+                  You don't have any visa applications yet. Use the reference ID your travel agent shared with you to get started.
                 </p>
                 <Button 
                   size="lg"
@@ -253,7 +253,7 @@ export default function WhiteLabelPortalPage() {
                   style={{ backgroundColor: primaryColor }}
                 >
                   <Plus className="w-4 h-4 mr-2" />
-                  Link an Existing Application
+                  New Application
                 </Button>
               </CardContent>
             </Card>
