@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
-  ArrowLeft, User, Mail, Phone, MapPin, Calendar, FileText, 
+  ArrowLeft, User, Calendar, FileText, 
   CheckCircle, AlertCircle, Clock, Send, Paperclip, Download,
-  Brain, Lightbulb, RefreshCw, Copy, Check, ExternalLink, Share2
+  Brain, Lightbulb, RefreshCw, Copy, Check, ExternalLink, Share2,
+  Loader2, MessageSquare, Flag
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +13,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { StatusBadge } from "@/components/status-badge";
 import { ProgressRing } from "@/components/progress-ring";
@@ -18,82 +21,200 @@ import { Timeline } from "@/components/timeline";
 import { UploadDropzone } from "@/components/upload-dropzone";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import type { Case, Document, Message, ActivityLog } from "@shared/schema";
 
-const AGENCY_SLUG = localStorage.getItem("agency_tenant_slug") || "demo-agency";
+function computeReadiness(c: Case): number {
+  if (c.status === "approved") return 100;
+  if (c.status === "submitted" || c.status === "under_review") return 85;
+  if (c.status === "in_progress") return 60;
+  if (c.status === "documents_required") return 40;
+  return 20;
+}
 
-const caseData = {
-  id: "VS-2024-001",
-  referenceId: "REF-JNS001",
-  applicant: {
-    name: "John Smith",
-    email: "john@email.com",
-    phone: "+1 234 567 8901",
-    nationality: "United States",
-    passportNumber: "AB1234567",
-    dateOfBirth: "1990-05-15"
-  },
-  visaType: "Schengen Tourist",
-  destinationCountry: "France",
-  travelDate: "2024-03-15",
-  status: "in_progress",
-  readinessScore: 75,
-  createdAt: "2024-01-15",
-  assignedTo: "Agent Sarah"
+const docStatusConfig: Record<string, { label: string; color: string; icon: any }> = {
+  pending: { label: "Pending Review", color: "text-amber-600", icon: Clock },
+  approved: { label: "Approved", color: "text-emerald-600", icon: CheckCircle },
+  rejected: { label: "Rejected", color: "text-red-600", icon: AlertCircle },
+  needs_reupload: { label: "Needs Reupload", color: "text-orange-600", icon: AlertCircle },
 };
 
-const documents = [
-  { id: "1", name: "Passport Scan", type: "passport", status: "approved", qualityScore: 95 },
-  { id: "2", name: "Photo", type: "photo", status: "approved", qualityScore: 88 },
-  { id: "3", name: "Bank Statement", type: "bank_statement", status: "pending", qualityScore: null },
-  { id: "4", name: "Flight Itinerary", type: "itinerary", status: "needs_reupload", qualityScore: 30 },
-  { id: "5", name: "Hotel Booking", type: "accommodation", status: "pending", qualityScore: null },
-];
-
-const checklist = [
-  { id: "1", item: "Valid Passport", completed: true },
-  { id: "2", item: "Passport Photo (35x45mm)", completed: true },
-  { id: "3", item: "Bank Statement (3 months)", completed: false },
-  { id: "4", item: "Flight Reservation", completed: false },
-  { id: "5", item: "Hotel Booking", completed: false },
-  { id: "6", item: "Travel Insurance", completed: false },
-  { id: "7", item: "Employment Letter", completed: false },
-];
-
-const activity = [
-  { id: "1", action: "Passport scan approved", description: "Document passed all quality checks", user: { name: "AI System" }, timestamp: new Date(Date.now() - 1000 * 60 * 30), type: "success" as const },
-  { id: "2", action: "Photo approved", description: "Meets biometric requirements", user: { name: "Agent Sarah" }, timestamp: new Date(Date.now() - 1000 * 60 * 60), type: "success" as const },
-  { id: "3", action: "Flight itinerary rejected", description: "Document is blurry, please re-upload", user: { name: "AI System" }, timestamp: new Date(Date.now() - 1000 * 60 * 120), type: "error" as const },
-  { id: "4", action: "Case created", description: "Schengen Tourist Visa application started", user: { name: "Agent Sarah" }, timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), type: "default" as const },
-];
-
-const aiRecommendations = [
-  { id: "1", priority: "high", action: "Request bank statement", reason: "Required for financial proof" },
-  { id: "2", priority: "high", action: "Re-upload flight itinerary", reason: "Current document is not readable" },
-  { id: "3", priority: "medium", action: "Add travel insurance", reason: "Mandatory for Schengen visa" },
-  { id: "4", priority: "low", action: "Verify hotel dates", reason: "Should match flight itinerary" },
-];
+function timeAgo(date: string | Date) {
+  const d = typeof date === "string" ? new Date(date) : date;
+  const diff = Date.now() - d.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return d.toLocaleDateString();
+}
 
 export default function CaseDetailPage() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
+  const [, setLocation] = useLocation();
   const [message, setMessage] = useState("");
   const [linkCopied, setLinkCopied] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const completedItems = checklist.filter(item => item.completed).length;
-  const checklistProgress = (completedItems / checklist.length) * 100;
+  const { data: authData } = useCurrentUser();
+  const agencySlug = authData?.tenantSlug || localStorage.getItem("agency_tenant_slug") || "demo-agency";
 
-  const customerPortalLink = `${window.location.origin}/w/${AGENCY_SLUG}/login?ref=${caseData.referenceId}`;
+  const { data: caseData, isLoading: caseLoading } = useQuery<Case>({
+    queryKey: ["/api/cases", id],
+    queryFn: async () => {
+      const res = await fetch(`/api/cases/${id}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Case not found");
+      return res.json();
+    },
+    enabled: !!id,
+  });
+
+  const { data: documents = [], isLoading: docsLoading } = useQuery<Document[]>({
+    queryKey: ["/api/cases", id, "documents"],
+    queryFn: async () => {
+      const res = await fetch(`/api/cases/${id}/documents`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!id,
+  });
+
+  const { data: messages = [], isLoading: msgsLoading } = useQuery<Message[]>({
+    queryKey: ["/api/cases", id, "messages"],
+    queryFn: async () => {
+      const res = await fetch(`/api/cases/${id}/messages`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!id,
+  });
+
+  const { data: activityLogs = [] } = useQuery<ActivityLog[]>({
+    queryKey: ["/api/tenants", caseData?.tenantId, "activity-logs"],
+    queryFn: async () => {
+      if (!caseData?.tenantId) return [];
+      const res = await fetch(`/api/tenants/${caseData.tenantId}/activity-logs`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!caseData?.tenantId,
+  });
+
+  const sendMessageMutation = useMutation({
+    mutationFn: async (content: string) => {
+      const res = await fetch(`/api/cases/${id}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ content, senderRole: "agent", senderId: authData?.user?.id }),
+      });
+      if (!res.ok) throw new Error("Failed to send message");
+      return res.json();
+    },
+    onSuccess: () => {
+      setMessage("");
+      queryClient.invalidateQueries({ queryKey: ["/api/cases", id, "messages"] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to send message", variant: "destructive" });
+    },
+  });
+
+  const updateCaseStatusMutation = useMutation({
+    mutationFn: async (status: string) => {
+      const res = await fetch(`/api/cases/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error("Failed to update");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cases", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tenants"] });
+      toast({ title: "Status updated" });
+    },
+  });
+
+  const updateDocStatusMutation = useMutation({
+    mutationFn: async ({ docId, status }: { docId: string; status: string }) => {
+      const res = await fetch(`/api/documents/${docId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error("Failed to update");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cases", id, "documents"] });
+      toast({ title: "Document status updated" });
+    },
+  });
+
+  if (caseLoading) {
+    return (
+      <DashboardLayout type="agency">
+        <div className="flex items-center justify-center py-32">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!caseData) {
+    return (
+      <DashboardLayout type="agency">
+        <div className="text-center py-32">
+          <AlertCircle className="w-12 h-12 mx-auto text-muted-foreground/40 mb-4" />
+          <p className="text-muted-foreground font-medium">Case not found</p>
+          <Link href="/app/cases">
+            <Button className="mt-4" variant="outline">Back to Applications</Button>
+          </Link>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const readiness = computeReadiness(caseData);
+  const customerPortalLink = caseData.referenceId
+    ? `${window.location.origin}/w/${agencySlug}/login?ref=${caseData.referenceId}`
+    : `${window.location.origin}/w/${agencySlug}/login`;
 
   const copyPortalLink = () => {
     navigator.clipboard.writeText(customerPortalLink);
     setLinkCopied(true);
-    toast({ title: "Link copied!", description: "Share this link with your customer so they can track their application." });
+    toast({ title: "Link copied!", description: "Share this link with your customer." });
     setTimeout(() => setLinkCopied(false), 2000);
   };
+
+  const activityItems = activityLogs
+    .filter(log => log.entityId === id || log.entityType === "case")
+    .slice(-8).reverse()
+    .map(log => ({
+      id: log.id,
+      action: log.action.replace(".", " ").replace(/\b\w/g, c => c.toUpperCase()),
+      description: typeof log.details === "object" && log.details !== null
+        ? Object.values(log.details).join(", ")
+        : "",
+      user: { name: "System" },
+      timestamp: new Date(log.createdAt),
+      type: log.action.includes("approved") ? "success" as const
+        : log.action.includes("rejected") ? "error" as const
+        : "default" as const,
+    }));
+
+  const initials = caseData.applicantName.split(" ").map(n => n[0]).join("").toUpperCase();
 
   return (
     <DashboardLayout type="agency">
       <div className="space-y-6">
+        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-4">
             <Link href="/app/cases">
@@ -102,107 +223,144 @@ export default function CaseDetailPage() {
               </Button>
             </Link>
             <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold" data-testid="text-case-id">{caseData.id}</h1>
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="text-xl font-bold font-mono" data-testid="text-case-id">{caseData.caseNumber}</h1>
                 <StatusBadge status={caseData.status} />
+                {caseData.priority === "urgent" && (
+                  <Badge variant="destructive" className="gap-1">
+                    <Flag className="w-3 h-3" /> Urgent
+                  </Badge>
+                )}
               </div>
-              <p className="text-muted-foreground">{caseData.visaType} - {caseData.destinationCountry}</p>
+              <p className="text-muted-foreground text-sm">{caseData.visaType}{caseData.destinationCountry ? ` — ${caseData.destinationCountry}` : ""}</p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" data-testid="button-send-reminder">
-              <Send className="w-4 h-4 mr-2" />
-              Send Reminder
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => updateCaseStatusMutation.mutate("under_review")}
+              disabled={updateCaseStatusMutation.isPending}
+              data-testid="button-mark-review"
+            >
+              <Clock className="w-4 h-4 mr-2" />
+              Mark Under Review
             </Button>
-            <Button data-testid="button-submit-application">
+            <Button
+              size="sm"
+              onClick={() => updateCaseStatusMutation.mutate("submitted")}
+              disabled={updateCaseStatusMutation.isPending}
+              data-testid="button-submit-application"
+            >
+              <Send className="w-4 h-4 mr-2" />
               Submit Application
             </Button>
           </div>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-4">
-          <div className="space-y-6">
+          {/* Left sidebar */}
+          <div className="space-y-4">
+            {/* Applicant info */}
             <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Applicant</CardTitle>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <User className="w-4 h-4" /> Applicant
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center gap-3">
                   <Avatar className="w-12 h-12">
-                    <AvatarFallback className="bg-primary/10 text-primary">
-                      {caseData.applicant.name.split(' ').map(n => n[0]).join('')}
+                    <AvatarFallback className="bg-primary/10 text-primary font-bold">
+                      {initials}
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="font-medium">{caseData.applicant.name}</p>
-                    <p className="text-sm text-muted-foreground">{caseData.applicant.nationality}</p>
+                    <p className="font-semibold">{caseData.applicantName}</p>
+                    <p className="text-xs text-muted-foreground">{caseData.visaType}</p>
                   </div>
                 </div>
                 <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Mail className="w-4 h-4" />
-                    <span>{caseData.applicant.email}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Phone className="w-4 h-4" />
-                    <span>{caseData.applicant.phone}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Calendar className="w-4 h-4" />
-                    <span>Travel: {caseData.travelDate}</span>
-                  </div>
+                  {caseData.applicantDob && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Calendar className="w-3.5 h-3.5 shrink-0" />
+                      <span>DOB: {caseData.applicantDob}</span>
+                    </div>
+                  )}
+                  {caseData.travelDate && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Calendar className="w-3.5 h-3.5 shrink-0" />
+                      <span>Travel: {caseData.travelDate}</span>
+                    </div>
+                  )}
+                  {caseData.referenceId && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <FileText className="w-3.5 h-3.5 shrink-0" />
+                      <span className="font-mono text-xs">{caseData.referenceId}</span>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
 
+            {/* Readiness score */}
             <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2">
                   <Brain className="w-4 h-4 text-primary" />
-                  AI Readiness Score
+                  Readiness Score
                 </CardTitle>
               </CardHeader>
-              <CardContent className="flex flex-col items-center gap-4">
-                <ProgressRing value={caseData.readinessScore} size={100} strokeWidth={8} />
+              <CardContent className="flex flex-col items-center gap-3">
+                <ProgressRing value={readiness} size={90} strokeWidth={8} />
                 <div className="text-center">
-                  <p className="text-sm font-medium">
-                    {caseData.readinessScore >= 80 ? "Ready to Submit" : 
-                     caseData.readinessScore >= 50 ? "More Documents Needed" : "Just Getting Started"}
+                  <p className="text-sm font-semibold">
+                    {readiness >= 85 ? "Ready to Submit" : readiness >= 60 ? "Getting There" : "Needs Attention"}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {completedItems} of {checklist.length} items complete
+                    {documents.filter(d => d.status === "approved").length} / {documents.length} docs approved
                   </p>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Lightbulb className="w-4 h-4 text-amber-500" />
-                  Recommendations
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {aiRecommendations.map((rec) => (
-                  <div key={rec.id} className="p-2 rounded-lg bg-muted/50 text-sm">
-                    <p className="font-medium">{rec.action}</p>
-                    <p className="text-xs text-muted-foreground">{rec.reason}</p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
+            {/* AI Recommendations */}
+            {documents.some(d => ["rejected", "needs_reupload", "pending"].includes(d.status)) && (
+              <Card className="border-amber-200 dark:border-amber-800">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Lightbulb className="w-4 h-4 text-amber-500" />
+                    Action Required
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {documents.filter(d => ["rejected", "needs_reupload"].includes(d.status)).map(doc => (
+                    <div key={doc.id} className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 text-xs">
+                      <p className="font-medium text-amber-800 dark:text-amber-300">{doc.name}</p>
+                      <p className="text-amber-600 dark:text-amber-400">Needs replacement</p>
+                    </div>
+                  ))}
+                  {documents.filter(d => d.status === "pending").map(doc => (
+                    <div key={doc.id} className="p-2 rounded-lg bg-muted/50 text-xs">
+                      <p className="font-medium">{doc.name}</p>
+                      <p className="text-muted-foreground">Awaiting review</p>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
 
+            {/* Customer Self-Service link */}
             <Card className="border-primary/20 bg-primary/5">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
+                <CardTitle className="text-sm flex items-center gap-2">
                   <Share2 className="w-4 h-4 text-primary" />
-                  Customer Self-Service
+                  Customer Portal Link
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-xs text-muted-foreground">
-                  Share this link with <span className="font-medium text-foreground">{caseData.applicant.name}</span> so they can upload documents and track their application.
+                  Share with <span className="font-medium text-foreground">{caseData.applicantName}</span> to let them upload docs and track progress.
                 </p>
                 <div className="flex gap-1.5">
                   <Input
@@ -218,49 +376,43 @@ export default function CaseDetailPage() {
                     onClick={copyPortalLink}
                     data-testid="button-copy-portal-link"
                   >
-                    {linkCopied ? (
-                      <Check className="w-3.5 h-3.5 text-green-600" />
-                    ) : (
-                      <Copy className="w-3.5 h-3.5" />
-                    )}
+                    {linkCopied ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
                   </Button>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    className="flex-1 h-8 text-xs gap-1.5"
-                    onClick={copyPortalLink}
-                    data-testid="button-copy-portal-link-full"
-                  >
-                    {linkCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                    {linkCopied ? "Copied!" : "Copy Link"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-8 px-2"
-                    onClick={() => window.open(customerPortalLink, "_blank")}
-                    data-testid="button-open-portal-link"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground font-mono">
-                  Ref: <span className="text-foreground font-semibold">{caseData.referenceId}</span>
-                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full h-8 text-xs gap-1.5"
+                  onClick={() => window.open(customerPortalLink, "_blank")}
+                  data-testid="button-open-portal-link"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  Open Portal
+                </Button>
               </CardContent>
             </Card>
           </div>
 
+          {/* Main content — tabs */}
           <div className="lg:col-span-3">
             <Tabs defaultValue="documents" className="space-y-4">
               <TabsList>
-                <TabsTrigger value="documents" data-testid="tab-documents">Documents</TabsTrigger>
-                <TabsTrigger value="checklist" data-testid="tab-checklist">Checklist</TabsTrigger>
-                <TabsTrigger value="messages" data-testid="tab-messages">Messages</TabsTrigger>
+                <TabsTrigger value="documents" data-testid="tab-documents">
+                  Documents
+                  {documents.length > 0 && (
+                    <span className="ml-1.5 text-xs bg-muted rounded-full px-1.5">{documents.length}</span>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="messages" data-testid="tab-messages">
+                  Messages
+                  {messages.length > 0 && (
+                    <span className="ml-1.5 text-xs bg-muted rounded-full px-1.5">{messages.length}</span>
+                  )}
+                </TabsTrigger>
                 <TabsTrigger value="activity" data-testid="tab-activity">Activity</TabsTrigger>
               </TabsList>
 
+              {/* Documents tab */}
               <TabsContent value="documents" className="space-y-4">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between gap-4">
@@ -270,142 +422,203 @@ export default function CaseDetailPage() {
                     </Button>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <UploadDropzone onUpload={(files) => console.log(files)} />
-                    
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                      {documents.map((doc) => (
-                        <div 
-                          key={doc.id}
-                          className="p-4 rounded-lg border bg-card hover-elevate"
-                          data-testid={`document-${doc.id}`}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <FileText className="w-5 h-5 text-muted-foreground" />
-                              <div>
-                                <p className="text-sm font-medium">{doc.name}</p>
-                                <p className="text-xs text-muted-foreground capitalize">{doc.type.replace('_', ' ')}</p>
+                    <UploadDropzone onUpload={(files) => console.log("Upload:", files)} />
+
+                    {docsLoading ? (
+                      <div className="flex justify-center py-8">
+                        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : documents.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <FileText className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                        <p className="text-sm">No documents uploaded yet</p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {documents.map((doc) => {
+                          const cfg = docStatusConfig[doc.status] || docStatusConfig.pending;
+                          const Icon = cfg.icon;
+                          return (
+                            <div
+                              key={doc.id}
+                              className="p-4 rounded-xl border bg-card hover-elevate transition-all"
+                              data-testid={`document-${doc.id}`}
+                            >
+                              <div className="flex items-start justify-between gap-2 mb-3">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
+                                    <FileText className="w-4 h-4 text-muted-foreground" />
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-semibold leading-tight">{doc.name}</p>
+                                    <p className="text-xs text-muted-foreground capitalize">{(doc.type || "").replace(/_/g, " ")}</p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className={`flex items-center gap-1.5 text-xs font-medium ${cfg.color} mb-3`}>
+                                <Icon className="w-3.5 h-3.5" />
+                                {cfg.label}
+                              </div>
+
+                              {doc.qualityScore !== null && doc.qualityScore !== undefined && (
+                                <div className="space-y-1 mb-3">
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="text-muted-foreground">Quality</span>
+                                    <span className="font-semibold">{doc.qualityScore}%</span>
+                                  </div>
+                                  <Progress value={doc.qualityScore} className="h-1.5" />
+                                </div>
+                              )}
+
+                              <div className="flex gap-2">
+                                {doc.status === "pending" && (
+                                  <>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="flex-1 text-xs h-7 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                      onClick={() => updateDocStatusMutation.mutate({ docId: doc.id, status: "approved" })}
+                                      data-testid={`button-approve-doc-${doc.id}`}
+                                    >
+                                      <CheckCircle className="w-3 h-3 mr-1" /> Approve
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="flex-1 text-xs h-7 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                      onClick={() => updateDocStatusMutation.mutate({ docId: doc.id, status: "needs_reupload" })}
+                                      data-testid={`button-reject-doc-${doc.id}`}
+                                    >
+                                      <AlertCircle className="w-3 h-3 mr-1" /> Reject
+                                    </Button>
+                                  </>
+                                )}
+                                {doc.status === "approved" && (
+                                  <Button variant="ghost" size="sm" className="flex-1 text-xs h-7">
+                                    <Download className="w-3 h-3 mr-1" /> Download
+                                  </Button>
+                                )}
+                                {doc.status === "needs_reupload" && (
+                                  <Button variant="outline" size="sm" className="flex-1 text-xs h-7">
+                                    <RefreshCw className="w-3 h-3 mr-1" /> Request Again
+                                  </Button>
+                                )}
                               </div>
                             </div>
-                            <StatusBadge status={doc.status} />
-                          </div>
-                          {doc.qualityScore !== null && (
-                            <div className="mt-3 space-y-1">
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="text-muted-foreground">Quality</span>
-                                <span className="font-medium">{doc.qualityScore}%</span>
-                              </div>
-                              <Progress value={doc.qualityScore} className="h-1.5" />
-                            </div>
-                          )}
-                          <div className="mt-3 flex gap-2">
-                            <Button variant="ghost" size="sm" className="flex-1">
-                              <Download className="w-3 h-3 mr-1" />
-                              View
-                            </Button>
-                            {doc.status === "needs_reupload" && (
-                              <Button variant="outline" size="sm" className="flex-1">
-                                <RefreshCw className="w-3 h-3 mr-1" />
-                                Replace
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
 
-              <TabsContent value="checklist">
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center justify-between gap-4">
-                      <CardTitle className="text-base">Application Checklist</CardTitle>
-                      <span className="text-sm text-muted-foreground">
-                        {completedItems} / {checklist.length} complete
-                      </span>
-                    </div>
-                    <Progress value={checklistProgress} className="h-2" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {checklist.map((item) => (
-                        <div 
-                          key={item.id}
-                          className={`flex items-center gap-3 p-3 rounded-lg ${
-                            item.completed ? "bg-emerald-50 dark:bg-emerald-950/20" : "bg-muted/50"
-                          }`}
-                          data-testid={`checklist-item-${item.id}`}
-                        >
-                          {item.completed ? (
-                            <CheckCircle className="w-5 h-5 text-emerald-500" />
-                          ) : (
-                            <div className="w-5 h-5 rounded-full border-2 border-muted-foreground/30" />
-                          )}
-                          <span className={item.completed ? "line-through text-muted-foreground" : ""}>
-                            {item.item}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
+              {/* Messages tab */}
               <TabsContent value="messages">
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base">Messages</CardTitle>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4" />
+                      Conversation with {caseData.applicantName}
+                    </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="h-64 overflow-y-auto space-y-3 p-4 rounded-lg bg-muted/30">
-                      <div className="flex gap-3">
-                        <Avatar className="w-8 h-8">
-                          <AvatarFallback className="text-xs">SA</AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                          <div className="bg-card p-3 rounded-lg rounded-tl-none max-w-[80%]">
-                            <p className="text-sm">Hi John, please upload your bank statement for the last 3 months.</p>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1">Agent Sarah • 2 hours ago</p>
+                    <div className="h-72 overflow-y-auto space-y-3 p-4 rounded-xl bg-muted/30">
+                      {msgsLoading ? (
+                        <div className="flex justify-center py-8">
+                          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                         </div>
-                      </div>
-                      <div className="flex gap-3 justify-end">
-                        <div className="flex-1 flex flex-col items-end">
-                          <div className="bg-primary text-primary-foreground p-3 rounded-lg rounded-tr-none max-w-[80%]">
-                            <p className="text-sm">Sure, I'll upload it today. Do you need anything else?</p>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1">John Smith • 1 hour ago</p>
+                      ) : messages.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                          <MessageSquare className="w-10 h-10 mb-2 opacity-30" />
+                          <p className="text-sm">No messages yet. Start the conversation.</p>
                         </div>
-                      </div>
+                      ) : (
+                        messages.map((msg) => {
+                          const isAgent = msg.senderRole === "agent" || msg.senderRole === "agency_owner" || msg.senderRole === "agency_staff";
+                          return (
+                            <div key={msg.id} className={`flex gap-3 ${isAgent ? "justify-end" : ""}`}>
+                              {!isAgent && (
+                                <Avatar className="w-8 h-8 shrink-0">
+                                  <AvatarFallback className="text-xs bg-muted">{initials}</AvatarFallback>
+                                </Avatar>
+                              )}
+                              <div className={`max-w-[75%] ${isAgent ? "items-end" : ""} flex flex-col`}>
+                                <div className={`p-3 rounded-xl text-sm ${
+                                  isAgent
+                                    ? "bg-primary text-primary-foreground rounded-tr-none"
+                                    : "bg-card border rounded-tl-none"
+                                }`}>
+                                  {msg.content}
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1 px-1">
+                                  {isAgent ? "You" : caseData.applicantName} · {timeAgo(msg.createdAt)}
+                                </p>
+                              </div>
+                              {isAgent && (
+                                <Avatar className="w-8 h-8 shrink-0">
+                                  <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                                    {(authData?.user?.name || "AG").split(" ").map(n => n[0]).join("").slice(0, 2)}
+                                  </AvatarFallback>
+                                </Avatar>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon" className="shrink-0">
                         <Paperclip className="w-4 h-4" />
                       </Button>
-                      <Textarea 
-                        placeholder="Type a message..." 
+                      <Textarea
+                        placeholder="Type a message to the applicant…"
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
-                        className="min-h-[44px] max-h-32"
+                        className="min-h-[44px] max-h-32 resize-none"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey && message.trim()) {
+                            e.preventDefault();
+                            sendMessageMutation.mutate(message.trim());
+                          }
+                        }}
                         data-testid="input-message"
                       />
-                      <Button size="icon" data-testid="button-send-message">
-                        <Send className="w-4 h-4" />
+                      <Button
+                        size="icon"
+                        className="shrink-0"
+                        disabled={!message.trim() || sendMessageMutation.isPending}
+                        onClick={() => sendMessageMutation.mutate(message.trim())}
+                        data-testid="button-send-message"
+                      >
+                        {sendMessageMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Send className="w-4 h-4" />
+                        )}
                       </Button>
                     </div>
+                    <p className="text-xs text-muted-foreground">Press Enter to send · Shift+Enter for new line</p>
                   </CardContent>
                 </Card>
               </TabsContent>
 
+              {/* Activity tab */}
               <TabsContent value="activity">
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base">Activity Timeline</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <Timeline items={activity} />
+                    {activityItems.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Clock className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                        <p className="text-sm">No activity logged yet</p>
+                      </div>
+                    ) : (
+                      <Timeline items={activityItems} />
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>

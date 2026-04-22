@@ -43,6 +43,14 @@ Preferred communication style: Simple, everyday language.
 - **SaaS Admin**: admin@visashuttle.com / Admin@12345
 - **Agency Owner**: owner@demoagency.com / Demo@12345
 - **Customer**: customer@demo.com / Demo@12345
+- **Site-Wide Password**: Fospe@7561 (stored as SITE_PASSWORD env var)
+- **Customer OTP (dev only)**: 123456
+
+### Authentication Architecture
+Three distinct auth systems coexist:
+1. **Site Password Gate** — `SITE_PASSWORD` env var protects the entire app; stored in `req.session.siteAuthenticated`
+2. **Agency/Admin Session Auth** — `POST /api/auth/login` validates email+password, sets `req.session.userId/userRole/userTenantId`; `GET /api/auth/me` returns current user; `POST /api/auth/logout` clears session
+3. **Customer OTP Auth (White-label)** — `POST /api/w/:slug/auth/request-otp` → `POST /api/w/:slug/auth/verify-otp` → `req.session.wlCustomerId/wlTenantId`
 
 ### Multi-Tenancy Design
 - Tenant isolation enforced via `tenantId` foreign key on all tenant-scoped records

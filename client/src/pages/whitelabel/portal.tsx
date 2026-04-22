@@ -298,19 +298,27 @@ export default function WhiteLabelPortalPage() {
                             </span>
                           </div>
                           <div className="mt-4">
-                            <div className="flex items-center justify-between text-sm mb-2">
-                              <span className="text-muted-foreground">Application Progress</span>
-                              <span className="font-semibold" style={{ color: primaryColor }}>{caseItem.readinessScore || 0}%</span>
-                            </div>
-                            <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                              <div 
-                                className="h-full rounded-full transition-all duration-500"
-                                style={{ 
-                                  width: `${caseItem.readinessScore || 0}%`,
-                                  backgroundColor: primaryColor
-                                }}
-                              />
-                            </div>
+                            {(() => {
+                              const score = caseItem.readinessScore ??
+                                (caseItem.status === "approved" ? 100 :
+                                 caseItem.status === "under_review" || caseItem.status === "submitted" ? 85 :
+                                 caseItem.status === "in_progress" ? 60 :
+                                 caseItem.status === "documents_required" ? 40 : 20);
+                              return (
+                                <>
+                                  <div className="flex items-center justify-between text-sm mb-2">
+                                    <span className="text-muted-foreground">Application Progress</span>
+                                    <span className="font-semibold" style={{ color: primaryColor }}>{score}%</span>
+                                  </div>
+                                  <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full rounded-full transition-all duration-500"
+                                      style={{ width: `${score}%`, backgroundColor: primaryColor }}
+                                    />
+                                  </div>
+                                </>
+                              );
+                            })()}
                           </div>
                         </div>
                         <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-4" />

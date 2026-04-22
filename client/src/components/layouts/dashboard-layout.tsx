@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Logo, LogoMark } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { queryClient } from "@/lib/queryClient";
 
 interface NavItem {
   icon: React.ElementType;
@@ -49,11 +51,23 @@ const agencyNavItems: NavItem[] = [
 ];
 
 export function DashboardLayout({ children, type }: DashboardLayoutProps) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { data: authData } = useCurrentUser();
 
   const navItems = type === "admin" ? adminNavItems : agencyNavItems;
+
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    localStorage.removeItem("agency_tenant_slug");
+    setLocation("/login");
+  };
+
+  const userName = authData?.user?.name || authData?.user?.email || "User";
+  const userEmail = authData?.user?.email || "";
+  const userInitials = (authData?.user?.name || "U").split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
 
   return (
     <div className="min-h-screen bg-background">
@@ -117,30 +131,39 @@ export function DashboardLayout({ children, type }: DashboardLayoutProps) {
                 >
                   <Avatar className="w-8 h-8">
                     <AvatarImage src="" />
-                    <AvatarFallback className="bg-primary/10 text-primary text-xs">VS</AvatarFallback>
+                    <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">{userInitials}</AvatarFallback>
                   </Avatar>
                   {!collapsed && (
-                    <div className="text-left">
-                      <p className="text-sm font-medium">Demo User</p>
-                      <p className="text-xs text-muted-foreground">demo@agency.com</p>
+                    <div className="text-left min-w-0">
+                      <p className="text-sm font-medium truncate">{userName}</p>
+                      <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
                     </div>
                   )}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium">{userName}</p>
+                    <p className="text-xs text-muted-foreground truncate">{userEmail}</p>
+                  </div>
+                </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem data-testid="menu-profile">
-                  <Settings className="w-4 h-4 mr-2" />
-                  Profile Settings
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <Link href="/">
-                  <DropdownMenuItem data-testid="menu-logout">
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Sign Out
+                <Link href={type === "agency" ? "/app/settings" : "/admin/settings"}>
+                  <DropdownMenuItem data-testid="menu-profile">
+                    <Settings className="w-4 h-4 mr-2" />
+                    Settings
                   </DropdownMenuItem>
                 </Link>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-red-600 dark:text-red-400 focus:text-red-600"
+                  onClick={handleLogout}
+                  data-testid="menu-logout"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign Out
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

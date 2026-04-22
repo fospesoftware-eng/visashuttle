@@ -5,15 +5,29 @@ import { storage } from "./storage";
 // Site-wide password for protecting the entire application
 const SITE_PASSWORD = process.env.SITE_PASSWORD;
 
-// Extend Express Session with white-label customer data
+// Extend Express Session with white-label customer data AND agency/admin user data
 declare module "express-session" {
   interface SessionData {
+    // White-label customer portal
     wlCustomerId?: string;
     wlTenantId?: string;
     wlEmail?: string;
     wlName?: string;
+    // Agency / Admin dashboard
+    userId?: string;
+    userRole?: string;
+    userTenantId?: string;
+    // Site password gate
     siteAuthenticated?: boolean;
   }
+}
+
+// Middleware to require agency/admin authentication
+function requireAgencyAuth(req: Request, res: Response, next: NextFunction) {
+  if (!req.session?.userId) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+  next();
 }
 
 // Middleware to require white-label authentication
@@ -70,10 +84,49 @@ export async function registerRoutes(
     const { email, password } = req.body;
     const user = await storage.getUserByEmail(email);
     if (!user || user.password !== password) {
-      return res.status(401).json({ error: "Invalid credentials" });
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
+    // Set session
+    req.session.userId = user.id;
+    req.session.userRole = user.role;
+    req.session.userTenantId = user.tenantId || undefined;
+
+    // Get tenant slug if agency user
+    let tenantSlug: string | null = null;
+    if (user.tenantId) {
+      const tenant = await storage.getTenant(user.tenantId);
+      tenantSlug = tenant?.slug || null;
+    }
+
+    const { password: _, ...userWithoutPassword } = user;
+    res.json({ user: userWithoutPassword, tenantSlug });
+  });
+
+  // Get current logged-in agency/admin user
+  app.get("/api/auth/me", async (req, res) => {
+    if (!req.session?.userId) {
+      return res.status(401).json({ authenticated: false });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user) {
+      return res.status(401).json({ authenticated: false });
+    }
+    let tenantSlug: string | null = null;
+    let tenant = null;
+    if (user.tenantId) {
+      tenant = await storage.getTenant(user.tenantId);
+      tenantSlug = tenant?.slug || null;
     }
     const { password: _, ...userWithoutPassword } = user;
-    res.json({ user: userWithoutPassword });
+    res.json({ authenticated: true, user: userWithoutPassword, tenantSlug, tenant });
+  });
+
+  // Logout agency/admin user
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.userId = undefined;
+    req.session.userRole = undefined;
+    req.session.userTenantId = undefined;
+    res.json({ success: true });
   });
 
   // === White-Label Auth Routes ===

@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { Plus, Search, MoreVertical, ArrowUpDown, Eye, Copy, Check, ExternalLink } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Plus, Search, MoreVertical, ArrowUpDown, Eye, Copy, Check, ExternalLink, Loader2, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -29,17 +30,16 @@ import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { StatusBadge } from "@/components/status-badge";
 import { ProgressRing } from "@/components/progress-ring";
 import { useToast } from "@/hooks/use-toast";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import type { Case } from "@shared/schema";
 
-const AGENCY_SLUG = localStorage.getItem("agency_tenant_slug") || "demo-agency";
-
-const cases = [
-  { id: "VS-2024-001", referenceId: "REF-JNS001", applicant: "John Smith", email: "john@email.com", visaType: "Schengen Tourist", country: "France", status: "in_progress", readiness: 75, createdAt: "2024-01-15" },
-  { id: "VS-2024-002", referenceId: "REF-SJN002", applicant: "Sarah Johnson", email: "sarah@email.com", visaType: "UK Visitor", country: "United Kingdom", status: "documents_required", readiness: 45, createdAt: "2024-01-14" },
-  { id: "VS-2024-003", referenceId: "REF-MBR003", applicant: "Michael Brown", email: "michael@email.com", visaType: "UAE Tourist", country: "UAE", status: "under_review", readiness: 90, createdAt: "2024-01-13" },
-  { id: "VS-2024-004", referenceId: "REF-EDA004", applicant: "Emily Davis", email: "emily@email.com", visaType: "US B1/B2", country: "United States", status: "pending", readiness: 20, createdAt: "2024-01-12" },
-  { id: "VS-2024-005", referenceId: "REF-JWL005", applicant: "James Wilson", email: "james@email.com", visaType: "Canada Visitor", country: "Canada", status: "approved", readiness: 100, createdAt: "2024-01-10" },
-  { id: "VS-2024-006", referenceId: "REF-LAN006", applicant: "Lisa Anderson", email: "lisa@email.com", visaType: "Australia ETA", country: "Australia", status: "in_progress", readiness: 60, createdAt: "2024-01-08" },
-];
+function computeReadiness(c: Case): number {
+  if (c.status === "approved") return 100;
+  if (c.status === "submitted" || c.status === "under_review") return 85;
+  if (c.status === "in_progress") return 60;
+  if (c.status === "documents_required") return 40;
+  return 20;
+}
 
 export default function CasesPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -47,9 +47,22 @@ export default function CasesPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const getCustomerLink = (referenceId: string) => {
-    return `${window.location.origin}/w/${AGENCY_SLUG}/login?ref=${referenceId}`;
-  };
+  const { data: authData } = useCurrentUser();
+  const tenantId = authData?.user?.tenantId;
+  const agencySlug = authData?.tenantSlug || localStorage.getItem("agency_tenant_slug") || "demo-agency";
+
+  const { data: cases = [], isLoading } = useQuery<Case[]>({
+    queryKey: ["/api/tenants", tenantId, "cases"],
+    queryFn: async () => {
+      const res = await fetch(`/api/tenants/${tenantId}/cases`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!tenantId,
+  });
+
+  const getCustomerLink = (referenceId: string) =>
+    `${window.location.origin}/w/${agencySlug}/login?ref=${referenceId}`;
 
   const copyCustomerLink = (referenceId: string, caseId: string) => {
     navigator.clipboard.writeText(getCustomerLink(referenceId));
@@ -59,9 +72,12 @@ export default function CasesPage() {
   };
 
   const filteredCases = cases.filter(c => {
-    const matchesSearch = c.applicant.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const term = searchTerm.toLowerCase();
+    const matchesSearch =
+      c.applicantName.toLowerCase().includes(term) ||
+      c.caseNumber.toLowerCase().includes(term) ||
+      (c.referenceId || "").toLowerCase().includes(term) ||
+      c.visaType.toLowerCase().includes(term);
     const matchesStatus = statusFilter === "all" || c.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -72,7 +88,9 @@ export default function CasesPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold" data-testid="text-page-title">Applications</h1>
-            <p className="text-muted-foreground">Manage all visa applications and their progress.</p>
+            <p className="text-muted-foreground">
+              {cases.length} total application{cases.length !== 1 ? "s" : ""} · manage progress and share customer links.
+            </p>
           </div>
           <Link href="/app/cases/new">
             <Button className="gap-2" data-testid="button-new-case">
@@ -86,7 +104,7 @@ export default function CasesPage() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Search by name, application ID, or email..."
+              placeholder="Search by name, case number, reference ID, or visa type…"
               className="pl-9"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -103,110 +121,136 @@ export default function CasesPage() {
               <SelectItem value="in_progress">In Progress</SelectItem>
               <SelectItem value="documents_required">Documents Required</SelectItem>
               <SelectItem value="under_review">Under Review</SelectItem>
+              <SelectItem value="submitted">Submitted</SelectItem>
               <SelectItem value="approved">Approved</SelectItem>
               <SelectItem value="rejected">Rejected</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[120px]">
-                    <Button variant="ghost" size="sm" className="gap-1 -ml-3">
-                      Case ID
-                      <ArrowUpDown className="w-3 h-3" />
-                    </Button>
-                  </TableHead>
-                  <TableHead>Applicant</TableHead>
-                  <TableHead>Visa Type</TableHead>
-                  <TableHead>Country</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-center">Readiness</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredCases.map((caseItem) => (
-                  <TableRow key={caseItem.id} data-testid={`case-row-${caseItem.id}`}>
-                    <TableCell className="font-medium">
-                      <Link href={`/app/cases/${caseItem.id}`}>
-                        <a className="text-primary hover:underline">{caseItem.id}</a>
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{caseItem.applicant}</p>
-                        <p className="text-sm text-muted-foreground">{caseItem.email}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>{caseItem.visaType}</TableCell>
-                    <TableCell>{caseItem.country}</TableCell>
-                    <TableCell>
-                      <StatusBadge status={caseItem.status} />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-center">
-                        <ProgressRing value={caseItem.readiness} size={40} strokeWidth={3} />
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{caseItem.createdAt}</TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" data-testid={`button-case-actions-${caseItem.id}`}>
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <Link href={`/app/cases/${caseItem.id}`}>
-                            <DropdownMenuItem>
-                              <Eye className="w-4 h-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
-                          </Link>
-                          <DropdownMenuItem
-                            onClick={() => copyCustomerLink(caseItem.referenceId, caseItem.id)}
-                            data-testid={`button-copy-link-${caseItem.id}`}
-                          >
-                            {copiedId === caseItem.id ? (
-                              <Check className="w-4 h-4 mr-2 text-green-600" />
-                            ) : (
-                              <Copy className="w-4 h-4 mr-2" />
-                            )}
-                            Copy Customer Link
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => window.open(getCustomerLink(caseItem.referenceId), "_blank")}
-                            data-testid={`button-open-portal-${caseItem.id}`}
-                          >
-                            <ExternalLink className="w-4 h-4 mr-2" />
-                            Open Customer Portal
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>Send Reminder</DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">Cancel Case</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Showing {filteredCases.length} of {cases.length} cases
-          </p>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled>Previous</Button>
-            <Button variant="outline" size="sm">Next</Button>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
           </div>
-        </div>
+        ) : filteredCases.length === 0 ? (
+          <div className="text-center py-20">
+            <Briefcase className="w-12 h-12 mx-auto text-muted-foreground/40 mb-4" />
+            <p className="text-muted-foreground font-medium">
+              {cases.length === 0 ? "No applications yet." : "No applications match your filters."}
+            </p>
+            {cases.length === 0 && (
+              <Link href="/app/cases/new">
+                <Button className="mt-4 gap-2">
+                  <Plus className="w-4 h-4" /> Create First Application
+                </Button>
+              </Link>
+            )}
+          </div>
+        ) : (
+          <>
+            <Card>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[140px]">
+                        <Button variant="ghost" size="sm" className="gap-1 -ml-3">
+                          Case #
+                          <ArrowUpDown className="w-3 h-3" />
+                        </Button>
+                      </TableHead>
+                      <TableHead>Applicant</TableHead>
+                      <TableHead>Visa Type</TableHead>
+                      <TableHead>Destination</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-center">Readiness</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredCases.map((c) => (
+                      <TableRow key={c.id} data-testid={`case-row-${c.id}`}>
+                        <TableCell className="font-mono text-xs">
+                          <Link href={`/app/cases/${c.id}`}>
+                            <a className="text-primary hover:underline font-medium">{c.caseNumber}</a>
+                          </Link>
+                          {c.referenceId && (
+                            <p className="text-muted-foreground text-xs mt-0.5">{c.referenceId}</p>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{c.applicantName}</p>
+                            {c.applicantDob && (
+                              <p className="text-xs text-muted-foreground">DOB: {c.applicantDob}</p>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>{c.visaType}</TableCell>
+                        <TableCell>{c.destinationCountry || "—"}</TableCell>
+                        <TableCell>
+                          <StatusBadge status={c.status} />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex justify-center">
+                            <ProgressRing value={computeReadiness(c)} size={40} strokeWidth={3} />
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-xs">
+                          {new Date(c.createdAt).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" data-testid={`button-case-actions-${c.id}`}>
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <Link href={`/app/cases/${c.id}`}>
+                                <DropdownMenuItem>
+                                  <Eye className="w-4 h-4 mr-2" />
+                                  View Details
+                                </DropdownMenuItem>
+                              </Link>
+                              {c.referenceId && (
+                                <>
+                                  <DropdownMenuItem
+                                    onClick={() => copyCustomerLink(c.referenceId!, c.id)}
+                                    data-testid={`button-copy-link-${c.id}`}
+                                  >
+                                    {copiedId === c.id ? (
+                                      <Check className="w-4 h-4 mr-2 text-green-600" />
+                                    ) : (
+                                      <Copy className="w-4 h-4 mr-2" />
+                                    )}
+                                    Copy Customer Link
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => window.open(getCustomerLink(c.referenceId!), "_blank")}
+                                    data-testid={`button-open-portal-${c.id}`}
+                                  >
+                                    <ExternalLink className="w-4 h-4 mr-2" />
+                                    Open Customer Portal
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <p>Showing {filteredCases.length} of {cases.length} application{cases.length !== 1 ? "s" : ""}</p>
+            </div>
+          </>
+        )}
       </div>
     </DashboardLayout>
   );
