@@ -49,6 +49,9 @@ function SubdomainRedirect() {
   const [location, setLocation] = useLocation();
   useEffect(() => {
     const hostname = window.location.hostname;
+    // Skip subdomain detection for Replit development/deployment domains
+    const isReplitDomain = hostname.includes("replit.dev") || hostname.includes("repl.co") || hostname.includes("replit.app") || hostname === "localhost";
+    if (isReplitDomain) return;
     const parts = hostname.split(".");
     if (parts.length >= 3 && !location.startsWith("/w/") && location === "/") {
       const subdomain = parts[0];
