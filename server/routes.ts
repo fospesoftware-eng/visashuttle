@@ -1,6 +1,8 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { runVisaCheck } from "./ai";
+import bcrypt from "bcryptjs";
 
 // Site-wide password for protecting the entire application
 const SITE_PASSWORD = process.env.SITE_PASSWORD;
@@ -19,6 +21,8 @@ declare module "express-session" {
     userTenantId?: string;
     // Site password gate
     siteAuthenticated?: boolean;
+    // B2C visa checker users
+    b2cUserId?: string;
   }
 }
 
@@ -724,6 +728,150 @@ export async function registerRoutes(
   app.post("/api/activity-logs", async (req, res) => {
     const log = await storage.createActivityLog(req.body);
     res.status(201).json(log);
+  });
+
+  // === B2C Auth Routes ===
+
+  function requireB2cAuth(req: Request, res: Response, next: NextFunction) {
+    if (!req.session?.b2cUserId) {
+      return res.status(401).json({ error: "Sign in required" });
+    }
+    next();
+  }
+
+  // Register
+  app.post("/api/b2c/auth/register", async (req, res) => {
+    const { email, password, fullName } = req.body;
+    if (!email || !password || !fullName) {
+      return res.status(400).json({ error: "Name, email and password are required" });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ error: "Password must be at least 8 characters" });
+    }
+    const existing = await storage.getB2cUserByEmail(email);
+    if (existing) {
+      return res.status(409).json({ error: "An account with this email already exists" });
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await storage.createB2cUser({
+      email: email.toLowerCase().trim(),
+      password: hashedPassword,
+      fullName: fullName.trim(),
+      freeChecksUsed: 0,
+      subscriptionPlan: "free",
+      checkLimit: 1,
+      deepCheckAccess: false,
+      stripeCustomerId: null,
+    });
+    req.session.b2cUserId = user.id;
+    const { password: _, ...safeUser } = user;
+    res.status(201).json({ user: safeUser });
+  });
+
+  // Login
+  app.post("/api/b2c/auth/login", async (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password are required" });
+    }
+    const user = await storage.getB2cUserByEmail(email);
+    if (!user) {
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) {
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
+    req.session.b2cUserId = user.id;
+    const { password: _, ...safeUser } = user;
+    res.json({ user: safeUser });
+  });
+
+  // Logout
+  app.post("/api/b2c/auth/logout", (req, res) => {
+    req.session.b2cUserId = undefined;
+    res.json({ success: true });
+  });
+
+  // Get current user
+  app.get("/api/b2c/auth/me", async (req, res) => {
+    if (!req.session?.b2cUserId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    const user = await storage.getB2cUser(req.session.b2cUserId);
+    if (!user) {
+      req.session.b2cUserId = undefined;
+      return res.status(401).json({ error: "User not found" });
+    }
+    const { password: _, ...safeUser } = user;
+    res.json({ user: safeUser });
+  });
+
+  // === B2C Visa Check Routes ===
+
+  app.post("/api/b2c/check", requireB2cAuth, async (req, res) => {
+    const userId = req.session.b2cUserId!;
+    const user = await storage.getB2cUser(userId);
+    if (!user) return res.status(401).json({ error: "User not found" });
+
+    const checkType = req.body.checkType || "basic";
+
+    // Enforce limits
+    if (checkType === "deep" && !user.deepCheckAccess) {
+      return res.status(403).json({ error: "Deep Check requires a Pro plan", upgrade: true });
+    }
+    if (checkType === "basic") {
+      const checksUsed = user.freeChecksUsed || 0;
+      if (checksUsed >= user.checkLimit) {
+        return res.status(403).json({ error: "Check limit reached. Please upgrade your plan.", upgrade: true });
+      }
+    }
+
+    const formData = req.body.formData;
+    if (!formData || !formData.nationality || !formData.destinationCountry || !formData.visaType) {
+      return res.status(400).json({ error: "Required fields missing: nationality, destinationCountry, visaType" });
+    }
+
+    try {
+      const { result, provider } = await runVisaCheck(formData);
+
+      const visaCheck = await storage.createVisaCheck({
+        userId,
+        checkType,
+        formData,
+        aiProvider: provider,
+        approvalChance: result.approvalChance,
+        statusLabel: result.statusLabel,
+        aiResponse: result as any,
+      });
+
+      // Increment checks used
+      await storage.updateB2cUser(userId, {
+        freeChecksUsed: (user.freeChecksUsed || 0) + 1,
+      });
+
+      res.json({ check: visaCheck, result });
+    } catch (err) {
+      console.error("[B2C Check] Error:", err);
+      res.status(500).json({ error: "Failed to run visa check. Please try again." });
+    }
+  });
+
+  // Get user's check history
+  app.get("/api/b2c/checks", requireB2cAuth, async (req, res) => {
+    const userId = req.session.b2cUserId!;
+    const checks = await storage.getVisaChecksByUserId(userId);
+    res.json(checks);
+  });
+
+  // Get single check
+  app.get("/api/b2c/checks/:id", requireB2cAuth, async (req, res) => {
+    const userId = req.session.b2cUserId!;
+    const check = await storage.getVisaCheck(req.params.id);
+    if (!check || check.userId !== userId) {
+      return res.status(404).json({ error: "Check not found" });
+    }
+    res.json(check);
   });
 
   return httpServer;

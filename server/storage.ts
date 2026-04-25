@@ -9,7 +9,9 @@ import {
   type ActivityLog, type InsertActivityLog,
   type CustomerAccount, type InsertCustomerAccount,
   type CustomerTenantLink, type InsertCustomerTenantLink,
-  type OTPCode, type InsertOTPCode
+  type OTPCode, type InsertOTPCode,
+  type B2cUser, type InsertB2cUser,
+  type VisaCheck, type InsertVisaCheck,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -68,6 +70,17 @@ export interface IStorage {
   getActiveOTPCode(email: string, tenantId: string): Promise<OTPCode | undefined>;
   markOTPUsed(id: string): Promise<void>;
   incrementOTPAttempts(id: string): Promise<void>;
+
+  // B2C Users
+  getB2cUser(id: string): Promise<B2cUser | undefined>;
+  getB2cUserByEmail(email: string): Promise<B2cUser | undefined>;
+  createB2cUser(user: InsertB2cUser): Promise<B2cUser>;
+  updateB2cUser(id: string, data: Partial<Omit<B2cUser, 'id' | 'createdAt'>>): Promise<B2cUser | undefined>;
+
+  // Visa Checks
+  createVisaCheck(check: InsertVisaCheck): Promise<VisaCheck>;
+  getVisaChecksByUserId(userId: string): Promise<VisaCheck[]>;
+  getVisaCheck(id: string): Promise<VisaCheck | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -82,6 +95,8 @@ export class MemStorage implements IStorage {
   private customerAccounts: Map<string, CustomerAccount>;
   private customerTenantLinks: Map<string, CustomerTenantLink>;
   private otpCodes: Map<string, OTPCode>;
+  private b2cUsersMap: Map<string, B2cUser>;
+  private visaChecksMap: Map<string, VisaCheck>;
 
   constructor() {
     this.users = new Map();
@@ -95,6 +110,8 @@ export class MemStorage implements IStorage {
     this.customerAccounts = new Map();
     this.customerTenantLinks = new Map();
     this.otpCodes = new Map();
+    this.b2cUsersMap = new Map();
+    this.visaChecksMap = new Map();
     
     this.seedData();
   }
@@ -623,6 +640,68 @@ export class MemStorage implements IStorage {
       otp.attempts = (otp.attempts || 0) + 1;
       this.otpCodes.set(id, otp);
     }
+  }
+
+  // B2C Users
+  async getB2cUser(id: string): Promise<B2cUser | undefined> {
+    return this.b2cUsersMap.get(id);
+  }
+
+  async getB2cUserByEmail(email: string): Promise<B2cUser | undefined> {
+    return Array.from(this.b2cUsersMap.values()).find(
+      u => u.email.toLowerCase() === email.toLowerCase()
+    );
+  }
+
+  async createB2cUser(user: InsertB2cUser): Promise<B2cUser> {
+    const id = randomUUID();
+    const newUser: B2cUser = {
+      ...user,
+      id,
+      freeChecksUsed: user.freeChecksUsed ?? 0,
+      subscriptionPlan: user.subscriptionPlan ?? "free",
+      checkLimit: user.checkLimit ?? 1,
+      deepCheckAccess: user.deepCheckAccess ?? false,
+      stripeCustomerId: user.stripeCustomerId ?? null,
+      createdAt: new Date(),
+    };
+    this.b2cUsersMap.set(id, newUser);
+    return newUser;
+  }
+
+  async updateB2cUser(id: string, data: Partial<Omit<B2cUser, 'id' | 'createdAt'>>): Promise<B2cUser | undefined> {
+    const user = this.b2cUsersMap.get(id);
+    if (!user) return undefined;
+    const updated = { ...user, ...data };
+    this.b2cUsersMap.set(id, updated);
+    return updated;
+  }
+
+  // Visa Checks
+  async createVisaCheck(check: InsertVisaCheck): Promise<VisaCheck> {
+    const id = randomUUID();
+    const newCheck: VisaCheck = {
+      ...check,
+      id,
+      checkType: check.checkType ?? "basic",
+      aiProvider: check.aiProvider ?? "mock",
+      approvalChance: check.approvalChance ?? null,
+      statusLabel: check.statusLabel ?? null,
+      aiResponse: check.aiResponse ?? null,
+      createdAt: new Date(),
+    };
+    this.visaChecksMap.set(id, newCheck);
+    return newCheck;
+  }
+
+  async getVisaChecksByUserId(userId: string): Promise<VisaCheck[]> {
+    return Array.from(this.visaChecksMap.values())
+      .filter(c => c.userId === userId)
+      .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+  }
+
+  async getVisaCheck(id: string): Promise<VisaCheck | undefined> {
+    return this.visaChecksMap.get(id);
   }
 }
 

@@ -103,8 +103,39 @@ Three distinct auth systems coexist:
 - **esbuild**: Server bundling for production
 - **TypeScript**: Type checking across the codebase
 
+### B2C Visa Checker (Implemented)
+
+The platform now includes a full B2C visa approval checker with:
+
+**Routes:**
+- `/` — Public homepage with visa checker hero and live sample scores
+- `/join` — B2C user signup (email/password, free account)
+- `/sign-in` — B2C user login
+- `/check` — 14-field AI visa check form (auth-gated, inline result display)
+- `/account` — User dashboard with check history and plan info
+- `/pricing` — Free / Starter ($9/mo) / Pro ($29/mo) plan comparison
+
+**Backend:**
+- `server/ai.ts` — AI scoring service (OpenAI GPT → Claude → mock fallback)
+- B2C auth routes: `/api/b2c/auth/register`, `/api/b2c/auth/login`, `/api/b2c/auth/logout`, `/api/b2c/auth/me`
+- Check routes: `POST /api/b2c/check`, `GET /api/b2c/checks`
+- AI returns: `{ approvalChance, statusLabel, summary, strengths[], riskFactors[], missingDocuments[], recommendations[], disclaimer }`
+
+**Plans:**
+- Free: 1 check (checkLimit=1)
+- Starter: 5 checks/month
+- Pro: 20 checks/month + deepCheckAccess
+
+**Schema (shared/schema.ts):**
+- `b2cUsers` table: id, email, password (hashed), fullName, freeChecksUsed, subscriptionPlan, checkLimit, deepCheckAccess, stripeCustomerId
+- `visaChecks` table: id, userId, checkType, formData (JSON), aiProvider, approvalChance, statusLabel, aiResponse (JSON)
+
+**Auth:**
+- Session key: `req.session.b2cUserId` (separate from agency `userId`)
+- Passwords hashed with bcryptjs
+
 ### Planned Integrations (not yet implemented)
-- **AI Provider**: Pluggable interface supporting OpenAI-compatible APIs via `AI_BASE_URL` and `AI_API_KEY`
+- **AI Provider**: Pluggable interface supporting OpenAI-compatible APIs via `AI_BASE_URL` and `AI_API_KEY` (mock fallback active)
 - **File Storage**: Abstraction for S3-compatible storage with signed URLs
 - **Email**: Nodemailer for transactional emails
-- **Payments**: Stripe integration for billing
+- **Payments**: Stripe integration for billing (Starter/Pro plan upgrade)

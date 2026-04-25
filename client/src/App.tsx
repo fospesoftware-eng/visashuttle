@@ -12,6 +12,11 @@ import HomePage from "@/pages/home";
 import BusinessPage from "@/pages/business";
 import LoginPage from "@/pages/login";
 import SignupPage from "@/pages/signup";
+import JoinPage from "@/pages/join";
+import SignInPage from "@/pages/sign-in";
+import CheckPage from "@/pages/check";
+import AccountPage from "@/pages/account";
+import PricingPage from "@/pages/pricing";
 
 import AgencyDashboard from "@/pages/agency/dashboard";
 import LeadsPage from "@/pages/agency/leads";
@@ -70,6 +75,11 @@ function Router() {
     <Switch>
       <Route path="/" component={HomePage} />
       <Route path="/business" component={BusinessPage} />
+      <Route path="/join" component={JoinPage} />
+      <Route path="/sign-in" component={SignInPage} />
+      <Route path="/check" component={CheckPage} />
+      <Route path="/account" component={AccountPage} />
+      <Route path="/pricing" component={PricingPage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/signup" component={SignupPage} />
 

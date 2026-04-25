@@ -187,6 +187,41 @@ export const insertCustomerTenantLinkSchema = createInsertSchema(customerTenantL
 export type InsertCustomerTenantLink = z.infer<typeof insertCustomerTenantLinkSchema>;
 export type CustomerTenantLink = typeof customerTenantLinks.$inferSelect;
 
+// B2C User Profiles (Visa Checker users — separate from agency users)
+export const b2cUsers = pgTable("b2c_users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull().unique(),
+  password: text("password").notNull(),
+  fullName: text("full_name").notNull(),
+  freeChecksUsed: integer("free_checks_used").notNull().default(0),
+  subscriptionPlan: text("subscription_plan").notNull().default("free"), // free, starter, pro
+  checkLimit: integer("check_limit").notNull().default(1),
+  deepCheckAccess: boolean("deep_check_access").notNull().default(false),
+  stripeCustomerId: text("stripe_customer_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertB2cUserSchema = createInsertSchema(b2cUsers).omit({ id: true, createdAt: true });
+export type InsertB2cUser = z.infer<typeof insertB2cUserSchema>;
+export type B2cUser = typeof b2cUsers.$inferSelect;
+
+// Visa Checks table (B2C AI check results)
+export const visaChecks = pgTable("visa_checks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  checkType: text("check_type").notNull().default("basic"), // basic, deep
+  formData: jsonb("form_data").notNull(),
+  aiProvider: text("ai_provider").notNull().default("mock"),
+  approvalChance: integer("approval_chance"),
+  statusLabel: text("status_label"),
+  aiResponse: jsonb("ai_response"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertVisaCheckSchema = createInsertSchema(visaChecks).omit({ id: true, createdAt: true });
+export type InsertVisaCheck = z.infer<typeof insertVisaCheckSchema>;
+export type VisaCheck = typeof visaChecks.$inferSelect;
+
 // OTP Codes table
 export const otpCodes = pgTable("otp_codes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

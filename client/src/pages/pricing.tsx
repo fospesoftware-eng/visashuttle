@@ -1,0 +1,231 @@
+import { Link } from "wouter";
+import { CheckCircle, Sparkles, Zap, Crown, ArrowRight, Info } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Logo } from "@/components/logo";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { useB2cAuth } from "@/hooks/use-b2c-auth";
+
+const plans = [
+  {
+    name: "Free",
+    icon: Sparkles,
+    price: "$0",
+    period: "",
+    description: "Perfect for a one-time check",
+    badge: null,
+    color: "text-slate-600",
+    bg: "bg-slate-100 dark:bg-slate-800/40",
+    border: "border",
+    features: [
+      "1 Basic AI visa check",
+      "Approval chance percentage",
+      "Status label (High/Good/Moderate/Low)",
+      "Strengths & risk factors",
+      "Basic next steps",
+    ],
+    limitations: ["No check history", "No Deep Check", "No PDF report"],
+    cta: "Get Started Free",
+    ctaVariant: "outline" as const,
+    href: "/join",
+  },
+  {
+    name: "Starter",
+    icon: Zap,
+    price: "$9",
+    period: "/month",
+    description: "For frequent travelers",
+    badge: null,
+    color: "text-blue-600",
+    bg: "bg-blue-100 dark:bg-blue-900/30",
+    border: "border-blue-200 dark:border-blue-800",
+    features: [
+      "5 Basic AI visa checks per month",
+      "Full AI explanation & analysis",
+      "Document gap analysis",
+      "Personalized recommendations",
+      "Check history & dashboard",
+      "Priority email support",
+    ],
+    limitations: ["No Deep Check", "No PDF report"],
+    cta: "Start Starter Plan",
+    ctaVariant: "default" as const,
+    href: "/join",
+  },
+  {
+    name: "Pro",
+    icon: Crown,
+    price: "$29",
+    period: "/month",
+    description: "For serious visa applicants",
+    badge: "Most Popular",
+    color: "text-purple-600",
+    bg: "bg-purple-100 dark:bg-purple-900/30",
+    border: "border-purple-300 dark:border-purple-700",
+    features: [
+      "20 Basic AI visa checks per month",
+      "Deep Check access (detailed embassy-style analysis)",
+      "Full document gap analysis",
+      "Red flag identification",
+      "Personalized improvement plan",
+      "PDF report download",
+      "Check history & dashboard",
+      "Priority support",
+    ],
+    limitations: [],
+    cta: "Start Pro Plan",
+    ctaVariant: "default" as const,
+    href: "/join",
+  },
+];
+
+export default function PricingPage() {
+  const { user } = useB2cAuth();
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
+        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+          <Logo size="md" />
+          <nav className="hidden md:flex items-center gap-6">
+            <Link href="/" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Home</Link>
+            <Link href="/check" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Visa Check</Link>
+          </nav>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            {user ? (
+              <Link href="/account">
+                <Button size="sm" data-testid="button-account">My Account</Button>
+              </Link>
+            ) : (
+              <>
+                <Link href="/sign-in"><Button variant="ghost" size="sm">Sign In</Button></Link>
+                <Link href="/join"><Button size="sm">Get Started</Button></Link>
+              </>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <section className="py-16 md:py-24 px-4">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-14">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-sm font-medium mb-5 border border-blue-200 dark:border-blue-800">
+              <Sparkles className="w-3.5 h-3.5" />
+              Simple, transparent pricing
+            </div>
+            <h1 className="text-3xl md:text-5xl font-bold mb-4">
+              Choose Your Plan
+            </h1>
+            <p className="text-lg text-muted-foreground max-w-xl mx-auto">
+              Start free. Upgrade when you need more checks or deeper analysis. No surprises.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {plans.map((plan) => {
+              const Icon = plan.icon;
+              const isCurrentPlan = user?.subscriptionPlan === plan.name.toLowerCase();
+              return (
+                <Card
+                  key={plan.name}
+                  className={`relative ${plan.border} ${plan.badge ? "shadow-xl shadow-purple-500/10" : "shadow"}`}
+                  data-testid={`card-plan-${plan.name.toLowerCase()}`}
+                >
+                  {plan.badge && (
+                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+                      <Badge className="bg-gradient-to-r from-purple-600 to-blue-600 text-white border-0 px-4 py-1 text-xs font-semibold">
+                        {plan.badge}
+                      </Badge>
+                    </div>
+                  )}
+                  <CardContent className="p-6 md:p-7">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${plan.bg}`}>
+                      <Icon className={`w-6 h-6 ${plan.color}`} />
+                    </div>
+                    <h3 className="text-xl font-bold mb-1">{plan.name}</h3>
+                    <p className="text-muted-foreground text-sm mb-4">{plan.description}</p>
+                    <div className="mb-6">
+                      <span className="text-4xl font-black">{plan.price}</span>
+                      {plan.period && <span className="text-muted-foreground text-sm ml-1">{plan.period}</span>}
+                    </div>
+
+                    <div className="space-y-2.5 mb-6">
+                      {plan.features.map(f => (
+                        <div key={f} className="flex items-start gap-2.5 text-sm">
+                          <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                          <span>{f}</span>
+                        </div>
+                      ))}
+                      {plan.limitations.map(f => (
+                        <div key={f} className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                          <span className="w-4 h-4 flex-shrink-0 mt-0.5 text-center text-muted-foreground/50 font-bold">—</span>
+                          <span>{f}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {isCurrentPlan ? (
+                      <Button className="w-full" variant="outline" disabled>
+                        Current Plan
+                      </Button>
+                    ) : (
+                      <Link href={user ? "/account" : plan.href}>
+                        <Button
+                          className={`w-full ${plan.badge ? "bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 border-0 text-white" : ""}`}
+                          variant={plan.ctaVariant}
+                          data-testid={`button-plan-${plan.name.toLowerCase()}`}
+                        >
+                          {plan.cta}
+                          <ArrowRight className="w-4 h-4 ml-2" />
+                        </Button>
+                      </Link>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          <div className="mt-10 flex items-start gap-3 p-4 rounded-xl bg-muted/50 border text-sm text-muted-foreground max-w-2xl mx-auto">
+            <Info className="w-4 h-4 flex-shrink-0 mt-0.5 text-blue-500" />
+            <span>
+              Visa Shuttle provides AI-based estimation only and does not guarantee visa approval. Final decisions are made solely by the relevant embassy, consulate, or immigration authority.
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="py-12 px-4 bg-muted/30 border-t">
+        <div className="max-w-3xl mx-auto">
+          <h2 className="text-2xl font-bold text-center mb-8">Frequently Asked Questions</h2>
+          <div className="space-y-4">
+            {[
+              { q: "Is the free check really free?", a: "Yes — every new account gets 1 full AI visa check at no cost. No credit card required." },
+              { q: "How accurate is the AI scoring?", a: "Our AI analyzes 14 key factors used by immigration authorities and provides a probability estimate. It's a guidance tool, not a legal guarantee." },
+              { q: "What is the Deep Check?", a: "Deep Check is available on the Pro plan. It asks more detailed questions (financial profile, travel history, document checklist) and returns an embassy-style risk analysis with a PDF report." },
+              { q: "Can I cancel anytime?", a: "Yes. Paid plans can be cancelled at any time. You'll retain access until the end of your billing period." },
+            ].map(({ q, a }) => (
+              <div key={q} className="p-5 rounded-xl bg-background border">
+                <h4 className="font-semibold mb-2">{q}</h4>
+                <p className="text-muted-foreground text-sm">{a}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <footer className="py-8 border-t px-4">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+          <Logo size="sm" />
+          <p className="text-sm text-muted-foreground text-center">
+            Visa Shuttle provides AI-based estimation only and does not guarantee visa approval.
+          </p>
+          <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} Visa Shuttle</p>
+        </div>
+      </footer>
+    </div>
+  );
+}

@@ -1,0 +1,193 @@
+AI Scoring Requirement:
+Do not use fixed manual scoring logic for final approval chance.
+
+The visa approval chance must be calculated mainly by AI using OpenAI ChatGPT API or Anthropic Claude API.
+
+The platform should collect user answers, send them securely to the backend, and the backend should call the AI API to generate:
+- Approval chance percentage
+- Status label
+- Strengths
+- Risk factors
+- Missing documents
+- Suggested improvements
+- Final explanation
+
+Use AI as the main decision engine.
+
+Basic Free Check:
+Every new user gets only 1 free check.
+
+Basic check should ask:
+- Nationality
+- Destination country
+- Visa type
+- Purpose of travel
+- Age
+- Employment status
+- Monthly income
+- Approximate bank balance
+- Previous international travel history
+- Previous visa refusals
+- Trip duration
+- Return ticket status
+- Hotel booking or invitation letter
+- Who is funding the trip?
+
+AI should compare these details and estimate approval chance.
+
+Example AI behavior:
+- India to UAE Tourist Visa with strong documents may show around 85–95%
+- India to USA or Schengen Tourist Visa with average profile may show around 40–60%
+- Weak financial proof or previous refusal should reduce the chance
+- Strong travel history, stable job, good bank balance, and clear purpose should improve the chance
+
+Deep Check:
+Deep Check must be paid only.
+
+Deep Check asks more detailed questions:
+- Exact financial profile
+- Job/business details
+- Tax filing status
+- Property ownership
+- Family ties
+- Sponsor details
+- Full travel history
+- Previous approvals/refusals
+- Overstay history
+- Criminal record declaration
+- Complete itinerary
+- Document readiness checklist
+
+Deep Check AI result should include:
+- Detailed approval chance
+- Embassy-style risk analysis
+- Red flags
+- Document gap analysis
+- Personalized improvement plan
+- PDF report download
+
+AI API Implementation:
+Use backend-only API calls.
+Never expose OpenAI or Claude API keys on frontend.
+
+Environment variables:
+OPENAI_API_KEY=
+ANTHROPIC_API_KEY=
+AI_PROVIDER=openai
+
+Backend should support:
+- OpenAI by default
+- Claude as optional provider
+- Mock fallback result if no API key is available
+
+AI Prompt Requirements:
+Create a structured AI system prompt.
+
+AI must return JSON only:
+
+{
+  "approvalChance": 78,
+  "statusLabel": "Good Chance",
+  "summary": "...",
+  "strengths": ["..."],
+  "riskFactors": ["..."],
+  "missingDocuments": ["..."],
+  "recommendations": ["..."],
+  "disclaimer": "Visa Shuttle provides AI-based estimation only and does not guarantee visa approval."
+}
+
+Status labels:
+80–95: High Chance
+60–79: Good Chance
+40–59: Moderate Chance
+20–39: Low Chance
+Below 20: Very Risky
+
+Subscription Rules:
+- Free user: 1 basic check only
+- Second basic check requires paid plan
+- Deep Check always requires paid plan
+- Paid users can run checks based on plan limits
+
+Pricing:
+Free:
+- 1 basic AI visa chance check
+
+Starter:
+- 5 basic checks
+- Full AI explanation
+
+Pro:
+- 20 basic checks
+- Deep Check access
+- PDF report
+
+Remove Agency plan completely.
+
+Pages Required:
+- B2C landing page
+- Signup
+- Login
+- Forgot password
+- User dashboard
+- Basic visa check form
+- Deep Check form
+- Result page
+- Pricing page
+- Payment success page
+- Payment cancel page
+- Profile/settings page
+
+Database:
+profiles:
+- id
+- full_name
+- email
+- free_checks_used
+- subscription_plan
+- check_limit
+- deep_check_access
+- stripe_customer_id
+- created_at
+
+visa_checks:
+- id
+- user_id
+- check_type basic/deep
+- form_data jsonb
+- ai_provider
+- approval_chance
+- status_label
+- ai_response jsonb
+- created_at
+
+subscriptions:
+- id
+- user_id
+- stripe_customer_id
+- stripe_subscription_id
+- plan_name
+- status
+- current_period_end
+- created_at
+
+Security:
+- Protected routes
+- Supabase auth
+- Row Level Security
+- Users can only see their own visa checks
+- AI and Stripe calls must happen only on backend
+- Validate all form data before sending to AI
+
+Design:
+Modern B2C travel-tech SaaS.
+Premium, simple, friendly, mobile-first.
+No admin dashboard required for now.
+No B2B/agency language anywhere.
+
+Disclaimer:
+Show clearly on result page and footer:
+“Visa Shuttle provides AI-based estimation only. It does not guarantee visa approval. Final decisions are made only by the relevant embassy, consulate, or immigration authority.”
+
+Final instruction:
+Generate the full production-ready application with frontend, backend, database SQL
