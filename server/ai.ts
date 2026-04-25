@@ -3,34 +3,64 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const AI_PROVIDER = process.env.AI_PROVIDER || "openai";
 
 export interface VisaCheckFormData {
-  // Step 1 - Travel Basics
+  // Step 1 - Personal Profile
   nationality: string;
+  passportCountry?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  maritalStatus?: string;
+  countryOfResidence?: string;
+  dependentsHomeCountry?: string;
+  // Step 2 - Travel Plan
   destinationCountry: string;
   visaType: string;
   purposeOfTravel: string;
-  // Step 2 - Personal
-  age: string;
+  plannedTravelDate?: string;
+  tripDuration: string;
+  entryType?: string;
+  firstTimeVisitor?: string;
+  // Step 3 - Employment & Income
   employmentStatus: string;
   jobTitle?: string;
+  companyName?: string;
+  yearsInJob?: string;
   monthlyIncome: string;
-  tripFunding: string;
-  // Step 3 - Financial
+  sourceOfIncome?: string;
+  hasTaxReturn?: string;
+  hasSalarySlips?: string;
+  // Step 4 - Financial Strength
   bankBalance: string;
   hasBankStatement?: string;
-  hasIncomeProof?: string;
-  hasTaxReturn?: string;
-  // Step 4 - Travel History
-  previousInternationalTravel: string;
+  bankStatementDuration?: string;
+  hasLargeDeposits?: string;
+  hasCreditCard?: string;
+  hasProperty?: string;
+  tripFunding: string;
+  sponsorDetails?: string;
+  // Step 5 - Travel History
   countriesVisited?: string;
+  numberOfTrips?: string;
   previousVisaApprovals?: string;
   previousVisaRefusals: string;
-  overstayHistory?: string;
-  // Step 5 - Trip Details
-  tripDuration: string;
-  returnTicket: string;
-  accommodationProof: string;
-  invitationLetter?: string;
-  travelInsurance?: string;
+  refusalReason?: string;
+  hasOverstay?: string;
+  hasDeportation?: string;
+  // Step 6 - Documents
+  hasReturnTicket?: string;
+  hasHotelBooking?: string;
+  hasInvitationLetter?: string;
+  hasTravelInsurance?: string;
+  hasItinerary?: string;
+  hasLeaveApproval?: string;
+  hasCoverLetter?: string;
+  // Step 7 - Home Ties
+  familyInHomeCountry?: string;
+  propertyInHomeCountry?: string;
+  stableEmploymentHome?: string;
+  ongoingEducation?: string;
+  financialCommitmentsHome?: string;
+  criminalRecord?: string;
+  immigrationViolation?: string;
   [key: string]: string | undefined;
 }
 
@@ -42,8 +72,10 @@ export interface AIVisaResult {
   riskFactors: string[];
   missingDocuments: string[];
   requiredDocuments: string[];
+  countrySpecificConcerns: string[];
   improvementTips: string[];
   nextSteps: string[];
+  finalRecommendation: string;
   disclaimer: string;
 }
 
@@ -56,51 +88,36 @@ function getStatusLabel(chance: number): string {
 }
 
 function buildSystemPrompt(): string {
-  return `You are an expert immigration consultant AI for Visa Shuttle. Analyze the traveler's visa application profile and return ONLY a valid JSON object with this exact structure:
+  return `You are a senior immigration consultant AI for Visa Shuttle. Analyze the traveler's complete visa profile and return ONLY a valid JSON object with this exact structure:
 
 {
   "approvalChance": <integer 5-95>,
   "statusLabel": "<High Chance|Good Chance|Moderate Chance|Low Chance|Very Risky>",
-  "summary": "<2-3 sentence professional assessment>",
-  "strengths": ["<strength 1>", "<strength 2>", "<strength 3>"],
+  "summary": "<2-3 sentence professional assessment tailored to nationality + destination>",
+  "strengths": ["<strength 1>", "<strength 2>", "<strength 3>", "<strength 4>"],
   "riskFactors": ["<risk 1>", "<risk 2>", "<risk 3>"],
   "missingDocuments": ["<missing doc 1>", "<missing doc 2>", "<missing doc 3>"],
-  "requiredDocuments": ["<required doc 1>", "<required doc 2>", "<required doc 3>", "<required doc 4>"],
-  "improvementTips": ["<tip 1>", "<tip 2>", "<tip 3>"],
-  "nextSteps": ["<step 1>", "<step 2>", "<step 3>"],
+  "requiredDocuments": ["<required doc 1>", "<required doc 2>", "<required doc 3>", "<required doc 4>", "<required doc 5>"],
+  "countrySpecificConcerns": ["<country-specific concern 1>", "<country-specific concern 2>"],
+  "improvementTips": ["<tip 1>", "<tip 2>", "<tip 3>", "<tip 4>"],
+  "nextSteps": ["<step 1>", "<step 2>", "<step 3>", "<step 4>"],
+  "finalRecommendation": "<One concise sentence: recommend applying, postpone, or improve profile first>",
   "disclaimer": "Visa Shuttle provides AI-based estimation only and does not guarantee visa approval."
 }
 
 Scoring guidelines:
-- 80-95: High Chance — strong profile, good finances, clean travel history
+- 80-95: High Chance — strong profile, good finances, clean travel history, strong home ties
 - 60-79: Good Chance — solid profile with minor gaps
 - 40-59: Moderate Chance — average profile, some concerns
 - 20-39: Low Chance — weak finances, refusal history, unclear purpose
 - 5-19: Very Risky — multiple serious red flags
 
-Factors that RAISE score:
-- Strong/Western passport (US, UK, EU, Canada, Australia, Japan, Singapore)
-- Bank balance over $5,000 USD
-- Stable full-time employment with good income
-- Extensive clean travel history
-- No previous visa refusals or overstays
-- Hotel + return ticket confirmed
-- Short trip (7-14 days) for tourist visa
-- Bank statement + income proof + tax return available
+Factors that RAISE score: Strong/Western passport, bank balance >$5,000, stable employment, extensive clean travel history, no refusals/overstays, hotel + return ticket confirmed, short trip (7-14 days), bank statement + income proof, strong home ties (family/property), invitation letter, travel insurance, cover letter.
 
-Factors that LOWER score:
-- South Asian/African/Middle Eastern passport for US/UK/Schengen
-- Previous visa refusals (major penalty)
-- Overstay history (severe penalty)
-- Low bank balance
-- Unemployed without income proof
-- Long trip 30+ days
-- No return ticket or accommodation
-- Sponsor-funded without documents
+Factors that LOWER score: South Asian/African/Middle Eastern passport for US/UK/Schengen, previous visa refusals (major penalty), overstay history (severe), deportation history, criminal record, low bank balance, unemployment, long trip 30+ days, no return ticket or accommodation, no home ties, first-time visitor.
 
-requiredDocuments should list ALL documents needed for this visa type.
-improvementTips should give specific, actionable advice.
-nextSteps should be chronological steps to take immediately.
+countrySpecificConcerns should mention destination-specific requirements (e.g., for US: need to prove non-immigrant intent; for Schengen: need travel insurance €30,000; for UK: biometrics required).
+finalRecommendation should be actionable: "We recommend applying now with the listed documents." or "We suggest improving your bank balance before applying." etc.
 
 Return ONLY valid JSON. No markdown, no code blocks.`;
 }
@@ -108,37 +125,73 @@ Return ONLY valid JSON. No markdown, no code blocks.`;
 function buildUserPrompt(form: VisaCheckFormData): string {
   const parts: string[] = [
     "=== TRAVELER VISA PROFILE ===",
+    "",
+    "--- Personal Profile ---",
     `Nationality: ${form.nationality}`,
+    form.passportCountry ? `Passport Country: ${form.passportCountry}` : "",
+    form.gender ? `Gender: ${form.gender}` : "",
+    form.maritalStatus ? `Marital Status: ${form.maritalStatus}` : "",
+    form.countryOfResidence ? `Country of Residence: ${form.countryOfResidence}` : "",
+    form.dateOfBirth ? `Date of Birth: ${form.dateOfBirth}` : "",
+    form.dependentsHomeCountry ? `Dependents in Home Country: ${form.dependentsHomeCountry}` : "",
+    "",
+    "--- Travel Plan ---",
     `Destination: ${form.destinationCountry}`,
     `Visa Type: ${form.visaType}`,
     `Purpose: ${form.purposeOfTravel}`,
+    `Trip Duration: ${form.tripDuration}`,
+    form.entryType ? `Entry Type: ${form.entryType}` : "",
+    form.firstTimeVisitor ? `First-time Visitor: ${form.firstTimeVisitor}` : "",
+    form.plannedTravelDate ? `Planned Travel Date: ${form.plannedTravelDate}` : "",
     "",
-    "--- Personal Details ---",
-    `Age: ${form.age}`,
-    `Employment: ${form.employmentStatus}`,
+    "--- Employment & Income ---",
+    `Employment Status: ${form.employmentStatus}`,
     form.jobTitle ? `Job Title: ${form.jobTitle}` : "",
+    form.companyName ? `Company: ${form.companyName}` : "",
+    form.yearsInJob ? `Years in Current Role: ${form.yearsInJob}` : "",
     `Monthly Income: ${form.monthlyIncome}`,
-    `Trip Funding: ${form.tripFunding}`,
+    form.sourceOfIncome ? `Source of Income: ${form.sourceOfIncome}` : "",
+    `Tax Return Available: ${form.hasTaxReturn || "Not specified"}`,
+    `Salary Slips Available: ${form.hasSalarySlips || "Not specified"}`,
     "",
-    "--- Financial Profile ---",
+    "--- Financial Strength ---",
     `Bank Balance: ${form.bankBalance}`,
     `Bank Statement Available: ${form.hasBankStatement || "Not specified"}`,
-    `Income Proof Available: ${form.hasIncomeProof || "Not specified"}`,
-    `Tax Return Available: ${form.hasTaxReturn || "Not specified"}`,
+    form.bankStatementDuration ? `Bank Statement Duration: ${form.bankStatementDuration}` : "",
+    `Large Recent Deposits: ${form.hasLargeDeposits || "No"}`,
+    `Credit Card Available: ${form.hasCreditCard || "Not specified"}`,
+    `Property/Assets: ${form.hasProperty || "Not specified"}`,
+    `Trip Funding: ${form.tripFunding}`,
+    form.sponsorDetails ? `Sponsor Details: ${form.sponsorDetails}` : "",
     "",
     "--- Travel History ---",
-    `Previous International Travel: ${form.previousInternationalTravel}`,
-    form.countriesVisited ? `Countries Visited: ${form.countriesVisited}` : "",
+    form.countriesVisited ? `Countries Visited: ${form.countriesVisited}` : "Countries Visited: None specified",
+    form.numberOfTrips ? `Number of International Trips: ${form.numberOfTrips}` : "",
     `Previous Visa Approvals: ${form.previousVisaApprovals || "Not specified"}`,
     `Previous Visa Refusals: ${form.previousVisaRefusals}`,
-    `Overstay History: ${form.overstayHistory || "No"}`,
+    form.refusalReason ? `Refusal Reason: ${form.refusalReason}` : "",
+    `Overstay History: ${form.hasOverstay || "No"}`,
+    `Deportation History: ${form.hasDeportation || "No"}`,
     "",
-    "--- Trip Details ---",
-    `Trip Duration: ${form.tripDuration}`,
-    `Return Ticket: ${form.returnTicket}`,
-    `Accommodation/Hotel: ${form.accommodationProof}`,
-    `Invitation Letter: ${form.invitationLetter || "No"}`,
-    `Travel Insurance: ${form.travelInsurance || "Not specified"}`,
+    "--- Documents Available ---",
+    `Return Ticket: ${form.hasReturnTicket || "Not booked"}`,
+    `Hotel Booking: ${form.hasHotelBooking || "Not arranged"}`,
+    `Invitation Letter: ${form.hasInvitationLetter || "No"}`,
+    `Travel Insurance: ${form.hasTravelInsurance || "No"}`,
+    `Day-wise Itinerary: ${form.hasItinerary || "No"}`,
+    `Leave Approval Letter: ${form.hasLeaveApproval || "No"}`,
+    `Cover Letter: ${form.hasCoverLetter || "No"}`,
+    "",
+    "--- Home Country Ties ---",
+    `Family in Home Country: ${form.familyInHomeCountry || "Not specified"}`,
+    `Property in Home Country: ${form.propertyInHomeCountry || "Not specified"}`,
+    `Stable Employment/Business: ${form.stableEmploymentHome || "Not specified"}`,
+    `Ongoing Education: ${form.ongoingEducation || "No"}`,
+    `Financial Commitments Home: ${form.financialCommitmentsHome || "Not specified"}`,
+    "",
+    "--- Risk & Compliance ---",
+    `Criminal Record: ${form.criminalRecord || "No"}`,
+    `Immigration Violation History: ${form.immigrationViolation || "No"}`,
   ];
 
   return parts.filter(p => p !== "").join("\n");
@@ -158,7 +211,7 @@ async function callOpenAI(form: VisaCheckFormData): Promise<AIVisaResult> {
         { role: "user", content: buildUserPrompt(form) },
       ],
       temperature: 0.3,
-      max_tokens: 1200,
+      max_tokens: 1500,
       response_format: { type: "json_object" },
     }),
   });
@@ -180,7 +233,7 @@ async function callClaude(form: VisaCheckFormData): Promise<AIVisaResult> {
     },
     body: JSON.stringify({
       model: "claude-3-haiku-20240307",
-      max_tokens: 1200,
+      max_tokens: 1500,
       system: buildSystemPrompt(),
       messages: [{ role: "user", content: buildUserPrompt(form) }],
     }),
@@ -215,21 +268,30 @@ function mockResult(form: VisaCheckFormData): AIVisaResult {
 
   if (form.previousVisaRefusals?.includes("Yes") || form.previousVisaRefusals === "Yes – once") score -= 18;
   if (form.previousVisaRefusals === "Yes – multiple times") score -= 28;
-  if (form.overstayHistory === "Yes") score -= 25;
-  if (form.bankBalance?.includes("$15,000") || form.bankBalance?.includes("$30,000") || form.bankBalance?.includes("More than")) score += 10;
-  else if (form.bankBalance?.includes("$7,000") || form.bankBalance?.includes("$3,000")) score += 4;
+  if (form.hasOverstay === "Yes") score -= 25;
+  if (form.hasDeportation === "Yes") score -= 30;
+  if (form.criminalRecord === "Yes") score -= 20;
+  if (form.bankBalance?.includes("$15,000") || form.bankBalance?.includes("$30,000") || form.bankBalance?.includes("More than")) score += 12;
+  else if (form.bankBalance?.includes("$7,000") || form.bankBalance?.includes("$3,000")) score += 5;
   else if (form.bankBalance?.includes("Less than $1,000")) score -= 12;
-  if (form.employmentStatus === "Employed (Full-time)") score += 7;
+  if (form.employmentStatus === "Employed (Full-time)") score += 8;
   else if (form.employmentStatus === "Unemployed") score -= 14;
-  else if (form.employmentStatus === "Self-employed / Business Owner") score += 2;
-  if (form.previousInternationalTravel === "Extensive (10+)") score += 10;
-  else if (form.previousInternationalTravel === "5+ countries") score += 7;
-  else if (form.previousInternationalTravel === "None") score -= 6;
-  if (form.returnTicket === "Yes") score += 5;
-  if (form.accommodationProof?.includes("Yes")) score += 5;
-  if (form.hasBankStatement === "Yes") score += 4;
-  if (form.hasIncomeProof === "Yes") score += 3;
-  if (form.travelInsurance === "Yes") score += 3;
+  else if (form.employmentStatus === "Self-employed / Business Owner") score += 3;
+  if (form.yearsInJob && !["Less than 1 year","0-6 months"].some(v => form.yearsInJob === v)) score += 4;
+  if (form.numberOfTrips === "10+" || form.numberOfTrips === "6-10") score += 10;
+  else if (form.numberOfTrips === "3-5") score += 6;
+  else if (form.numberOfTrips === "None") score -= 6;
+  if (form.hasReturnTicket === "Yes") score += 6;
+  if (form.hasHotelBooking === "Yes") score += 5;
+  if (form.hasBankStatement === "Yes") score += 5;
+  if (form.hasSalarySlips === "Yes") score += 4;
+  if (form.hasTaxReturn === "Yes") score += 3;
+  if (form.hasTravelInsurance === "Yes") score += 4;
+  if (form.hasCoverLetter === "Yes") score += 3;
+  if (form.familyInHomeCountry === "Yes") score += 5;
+  if (form.propertyInHomeCountry === "Yes") score += 5;
+  if (form.firstTimeVisitor === "Yes") score -= 4;
+  if (form.entryType === "Multiple") score -= 3;
 
   score = Math.max(7, Math.min(94, score));
 
@@ -237,69 +299,109 @@ function mockResult(form: VisaCheckFormData): AIVisaResult {
   const riskFactors: string[] = [];
   const missingDocuments: string[] = [];
   const requiredDocuments: string[] = [];
+  const countrySpecificConcerns: string[] = [];
   const improvementTips: string[] = [];
   const nextSteps: string[] = [];
 
-  if (HIGH_NAT.has(form.nationality)) strengths.push(`${form.nationality} passport holders enjoy high global visa acceptance rates`);
+  if (HIGH_NAT.has(form.nationality)) strengths.push(`${form.nationality} passport holders enjoy strong global visa acceptance rates`);
   if (form.employmentStatus === "Employed (Full-time)") strengths.push("Stable full-time employment demonstrates strong ties to home country");
-  if (form.returnTicket === "Yes") strengths.push("Confirmed return ticket shows clear intention to return home");
-  if (form.accommodationProof?.includes("Yes")) strengths.push("Confirmed accommodation reflects organized and prepared travel plans");
-  if (form.previousVisaRefusals === "No") strengths.push("Clean visa history — no previous refusals on record");
-  if (form.previousInternationalTravel !== "None") strengths.push("Prior international travel demonstrates reliability as a traveler");
-  if (form.hasBankStatement === "Yes") strengths.push("Bank statement available — key financial document for visa applications");
+  if (form.hasReturnTicket === "Yes") strengths.push("Confirmed return ticket shows clear intention to return home");
+  if (form.hasHotelBooking === "Yes") strengths.push("Confirmed hotel booking reflects organized and well-prepared travel plans");
+  if (form.previousVisaRefusals === "No") strengths.push("Clean visa history — no previous refusals or overstays on record");
+  if (form.numberOfTrips && form.numberOfTrips !== "None") strengths.push(`Prior international travel history demonstrates reliability as a traveler`);
+  if (form.hasBankStatement === "Yes") strengths.push("Bank statement available — primary financial evidence for visa officers");
+  if (form.familyInHomeCountry === "Yes") strengths.push("Family in home country acts as a strong incentive to return after travel");
+  if (form.propertyInHomeCountry === "Yes") strengths.push("Property ownership in home country strengthens ties and reduces immigration risk");
+  if (form.yearsInJob && form.yearsInJob !== "Less than 1 year") strengths.push(`${form.yearsInJob} in current role shows employment stability`);
 
   if (form.previousVisaRefusals !== "No") riskFactors.push("Previous visa refusal will attract heightened scrutiny from the embassy");
-  if (form.overstayHistory === "Yes") riskFactors.push("Prior overstay is a serious red flag — must be addressed in application");
+  if (form.hasOverstay === "Yes") riskFactors.push("Prior overstay is a serious red flag that must be addressed in the cover letter");
+  if (form.hasDeportation === "Yes") riskFactors.push("Deportation history severely impacts visa eligibility and requires legal counsel");
+  if (form.criminalRecord === "Yes") riskFactors.push("Criminal record declaration will require additional documentation and review");
   if (form.employmentStatus === "Unemployed") riskFactors.push("Unemployment raises concerns about financial stability and home-country ties");
-  if (!HIGH_NAT.has(form.nationality)) riskFactors.push(`${form.destinationCountry} applies additional scrutiny to ${form.nationality} nationals`);
-  if (tough.has(form.destinationCountry)) riskFactors.push(`${form.destinationCountry} visas are among the most strictly evaluated`);
-  if (form.previousInternationalTravel === "None") riskFactors.push("No international travel history makes your profile harder to assess");
+  if (!HIGH_NAT.has(form.nationality)) riskFactors.push(`${form.destinationCountry} applies additional scrutiny to ${form.nationality} passport holders`);
+  if (tough.has(form.destinationCountry)) riskFactors.push(`${form.destinationCountry} visas are among the most strictly evaluated globally`);
+  if (form.numberOfTrips === "None" || !form.numberOfTrips) riskFactors.push("No international travel history makes profile harder for officers to assess");
+  if (form.firstTimeVisitor === "Yes") riskFactors.push("First-time visitors receive extra scrutiny — strong documentation is essential");
 
-  if (form.returnTicket !== "Yes") missingDocuments.push("Confirmed return flight ticket");
-  if (!form.accommodationProof?.includes("Yes")) missingDocuments.push("Hotel booking confirmation or host invitation letter");
-  if (form.hasBankStatement !== "Yes") missingDocuments.push("3–6 months bank statements showing regular transactions");
-  if (form.hasIncomeProof !== "Yes") missingDocuments.push("Proof of income (salary slips, payroll records, or tax returns)");
-  if (form.travelInsurance !== "Yes") missingDocuments.push("Travel insurance covering the entire trip duration");
+  if (form.hasReturnTicket !== "Yes") missingDocuments.push("Confirmed return flight ticket (even refundable)");
+  if (form.hasHotelBooking !== "Yes") missingDocuments.push("Hotel booking confirmation or host invitation letter");
+  if (form.hasBankStatement !== "Yes") missingDocuments.push("3–6 months bank statements with regular transaction history");
+  if (form.hasSalarySlips !== "Yes") missingDocuments.push("Salary slips / payroll records (last 3 months)");
+  if (form.hasTaxReturn !== "Yes") missingDocuments.push("Latest tax return as additional income evidence");
+  if (form.hasTravelInsurance !== "Yes") missingDocuments.push("Travel insurance policy (mandatory for some destinations)");
+  if (form.hasCoverLetter !== "Yes") missingDocuments.push("Cover letter explaining travel purpose and home ties");
+  if (form.hasLeaveApproval !== "Yes" && form.employmentStatus === "Employed (Full-time)") missingDocuments.push("Leave approval/NOC letter from employer");
 
-  requiredDocuments.push("Valid passport (minimum 6 months validity beyond travel dates)");
+  requiredDocuments.push("Valid passport (minimum 6 months validity beyond planned return)");
   requiredDocuments.push("Completed and signed visa application form");
-  requiredDocuments.push("Recent passport-size photographs (per embassy specifications)");
+  requiredDocuments.push("Recent passport-size photographs per embassy specification");
   requiredDocuments.push(`${form.visaType} fee payment receipt`);
-  requiredDocuments.push("Proof of financial means (bank statements, 3–6 months)");
-  requiredDocuments.push("Confirmed return flight tickets");
+  requiredDocuments.push("Bank statements (3–6 months) showing sufficient funds");
+  requiredDocuments.push("Confirmed return flight itinerary");
   requiredDocuments.push("Accommodation proof (hotel booking or invitation letter)");
-  if (form.employmentStatus !== "Unemployed") {
-    requiredDocuments.push("Employment letter confirming position, salary, and leave approval");
+  if (form.employmentStatus !== "Unemployed") requiredDocuments.push("Employment letter confirming position, salary, leave approval, and return date");
+  if (form.visaType === "Student Visa") requiredDocuments.push("Admission letter from the educational institution");
+  if (form.visaType === "Business Visa") requiredDocuments.push("Business invitation letter from the host company");
+
+  // Country-specific concerns
+  if (form.destinationCountry === "United States") {
+    countrySpecificConcerns.push("Must demonstrate strong non-immigrant intent — prove you will return home");
+    countrySpecificConcerns.push("DS-160 form must be completed online; biometrics and interview at US Embassy required");
+    countrySpecificConcerns.push("ESTA not available for most passports — visa appointment can take 2-8 weeks");
+  } else if (["Germany","France","Italy","Spain","Netherlands","Austria","Belgium","Greece","Portugal"].includes(form.destinationCountry)) {
+    countrySpecificConcerns.push("Schengen visa requires travel insurance with minimum €30,000 coverage");
+    countrySpecificConcerns.push("Apply at the embassy of the country where you'll spend the most time");
+    countrySpecificConcerns.push("Financial proof must show sufficient funds: approximately €100/day");
+  } else if (form.destinationCountry === "United Kingdom") {
+    countrySpecificConcerns.push("UK visa requires biometric enrollment at a Visa Application Centre");
+    countrySpecificConcerns.push("Online UK Visas and Immigration (UKVI) portal application — processing time 3-4 weeks standard");
+    countrySpecificConcerns.push("Must clearly demonstrate strong ties to home country and intention to return");
+  } else if (form.destinationCountry === "Canada") {
+    countrySpecificConcerns.push("eTA (electronic travel authorization) may be required before boarding, or full visitor visa");
+    countrySpecificConcerns.push("IRCC online application — biometrics required at authorized VAC");
+    countrySpecificConcerns.push("Purpose of visit and financial means must be clearly documented");
+  } else if (form.destinationCountry === "Australia") {
+    countrySpecificConcerns.push("Australian Tourist Visa (subclass 600) is online — typically processed in 2-4 weeks");
+    countrySpecificConcerns.push("Health insurance and character declaration may be required");
+    countrySpecificConcerns.push("Show clear evidence of funds and intention to depart after visit");
+  } else {
+    countrySpecificConcerns.push(`Check ${form.destinationCountry}'s official embassy website for latest requirements and processing times`);
+    countrySpecificConcerns.push("Ensure all documents are translated to the official language if required");
   }
 
-  improvementTips.push("Boost bank balance to at least $5,000–$10,000 before applying — keep it consistent for 3+ months");
-  improvementTips.push("Book return flights and hotel before submitting the application to strengthen your profile");
-  improvementTips.push("Write a clear, detailed cover letter explaining your travel purpose and ties to your home country");
-  if (form.previousVisaRefusals !== "No") {
-    improvementTips.push("Address the previous refusal explicitly — explain what has changed since then with supporting documents");
-  }
-  improvementTips.push("Apply for travel insurance before submitting — it signals preparedness to consular officers");
-  if (form.hasTaxReturn !== "Yes") {
-    improvementTips.push("Include tax returns as additional income proof — especially valuable for self-employed applicants");
-  }
+  improvementTips.push("Maintain a consistent bank balance of $5,000+ for 3+ months before applying — avoid large withdrawals");
+  improvementTips.push("Book refundable return flights and hotel before submitting — it significantly boosts your profile");
+  improvementTips.push("Write a compelling cover letter explaining your travel purpose, home ties, and intention to return");
+  if (form.previousVisaRefusals !== "No") improvementTips.push("Address the previous refusal directly in your cover letter — show what has changed");
+  if (form.familyInHomeCountry !== "Yes") improvementTips.push("Include documentation of family, property, or financial commitments in your home country to strengthen ties");
+  improvementTips.push("Apply at least 4–8 weeks before your planned travel date to allow processing time");
 
-  nextSteps.push("Gather all required documents listed above before starting your application");
-  nextSteps.push(`Book your flight and accommodation in ${form.destinationCountry} (even if refundable) before applying`);
-  nextSteps.push(`Visit the official ${form.destinationCountry} embassy or consulate website for the latest visa requirements`);
-  nextSteps.push("Submit your application at least 4–6 weeks before your intended travel date");
-  nextSteps.push("Consider consulting a licensed immigration consultant if you have a complex profile");
+  nextSteps.push("Collect all required documents listed above, starting with financial evidence");
+  nextSteps.push(`Book your flights and ${form.destinationCountry} hotel (refundable options work) before applying`);
+  nextSteps.push(`Visit the official ${form.destinationCountry} embassy/consulate website for the current application portal and fee`);
+  nextSteps.push("Get travel insurance before submitting — it's required for some visas and always strengthens your application");
+  nextSteps.push("Submit the application at least 4–8 weeks before your planned departure date");
+
+  const recommendation = score >= 70
+    ? `We recommend proceeding with your ${form.destinationCountry} ${form.visaType} application — your profile is strong with good approval prospects.`
+    : score >= 50
+    ? `You can apply, but first address the risk factors above — particularly financial documentation — to maximize your chances.`
+    : `We advise strengthening your profile (finances, documents, home ties) before applying to avoid another refusal on record.`;
 
   return {
     approvalChance: score,
     statusLabel: getStatusLabel(score),
-    summary: `Based on your profile as a ${form.nationality} national applying for a ${form.visaType} to ${form.destinationCountry}, your estimated approval chance is ${score}%. ${score >= 60 ? "Your profile shows several positive indicators — with thorough documentation, you have a solid foundation for a successful application." : "There are notable risk factors that should be addressed before submitting your application to maximize approval chances."}`,
-    strengths: strengths.slice(0, 4),
+    summary: `Based on your profile as a ${form.nationality} national applying for a ${form.visaType} to ${form.destinationCountry}, your estimated approval chance is ${score}%. ${score >= 60 ? "Your profile shows positive indicators — with thorough documentation, you have a solid foundation for a successful application." : "There are notable risk factors that should be addressed and documented before submitting to maximize approval chances."}`,
+    strengths: strengths.slice(0, 5),
     riskFactors: riskFactors.slice(0, 4),
-    missingDocuments: missingDocuments.slice(0, 5),
+    missingDocuments: missingDocuments.slice(0, 6),
     requiredDocuments: requiredDocuments.slice(0, 8),
+    countrySpecificConcerns: countrySpecificConcerns.slice(0, 3),
     improvementTips: improvementTips.slice(0, 5),
     nextSteps: nextSteps.slice(0, 5),
-    disclaimer: "Visa Shuttle provides AI-based estimation only and does not guarantee visa approval. Final decisions are made solely by the relevant embassy, consulate, or immigration authority.",
+    finalRecommendation: recommendation,
+    disclaimer: "Visa Shuttle provides AI-based estimation only and does not guarantee visa approval. Final decisions rest solely with the relevant embassy, consulate, or immigration authority.",
   };
 }
 

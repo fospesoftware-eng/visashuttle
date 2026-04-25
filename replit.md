@@ -103,7 +103,7 @@ Three distinct auth systems coexist:
 - **esbuild**: Server bundling for production
 - **TypeScript**: Type checking across the codebase
 
-### B2C Visa Checker (Implemented)
+### B2C Visa Checker (Implemented — Fully Updated)
 
 The platform now includes a full B2C visa approval checker with:
 
