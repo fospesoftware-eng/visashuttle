@@ -23,50 +23,79 @@ const COUNTRIES = ["Afghanistan","Albania","Algeria","Argentina","Australia","Au
 const OPTS = {
   gender: ["Male","Female","Non-binary","Prefer not to say"],
   maritalStatus: ["Single","Married","Divorced","Widowed","Separated"],
+  numberOfChildren: ["0","1","2","3","4","5+"],
   dependents: ["None","1","2","3","4","5+"],
-  visaType: ["Tourist Visa","Business Visa","Student Visa","Work Visa","Visit Visa","Transit Visa","Investor Visa","Spouse/Family Visa","Conference/Event Visa"],
-  purposeOfTravel: ["Tourism & Sightseeing","Business Meeting","Study","Employment","Family Visit","Medical Treatment","Conference / Event","Transit","Wedding / Event","Investment"],
+  visaType: ["Tourist Visa","Business Visa","Student Visa","Work Visa","Visit Visa","Transit Visa","Investor Visa","Spouse / Family Visa","Conference / Event Visa","Medical Visa"],
+  purposeOfTravel: ["Tourism & Sightseeing","Business Meeting","Study / Education","Employment","Family Visit","Medical Treatment","Conference / Event","Transit","Wedding / Social Event","Investment / Business Setup"],
   tripDuration: ["1–3 days","4–7 days","8–14 days","15–30 days","1–3 months","More than 3 months"],
-  entryType: ["Single Entry","Multiple Entry"],
+  entryType: ["Single Entry","Multiple Entry","Double Entry"],
   yesNo: ["Yes","No"],
   yesNoMaybe: ["Yes","No","Planning to get"],
-  employmentStatus: ["Employed (Full-time)","Employed (Part-time)","Self-employed / Business Owner","Freelancer","Student","Retired","Unemployed","Government Employee","Other"],
-  yearsInJob: ["Less than 1 year","1–2 years","2–5 years","5–10 years","More than 10 years"],
+  employmentStatus: ["Employed (Full-time)","Employed (Part-time)","Self-employed / Business Owner","Freelancer / Consultant","Student","Retired","Unemployed","Government Employee","Other"],
+  yearsInJob: ["Less than 6 months","6 months – 1 year","1–2 years","2–5 years","5–10 years","More than 10 years"],
   monthlyIncome: ["Less than $500","$500 – $1,000","$1,000 – $2,500","$2,500 – $5,000","$5,000 – $10,000","More than $10,000"],
-  sourceOfIncome: ["Employment Salary","Business Revenue","Freelance / Consultancy","Investment Returns","Rental Income","Pension / Retirement","Family Support","Government Benefits"],
+  sourceOfIncome: ["Employment Salary","Business Revenue","Freelance / Consultancy","Investment Returns","Rental Income","Pension / Retirement","Family Support","Government Benefits","Scholarship / Grant"],
   bankBalance: ["Less than $1,000","$1,000 – $3,000","$3,000 – $7,000","$7,000 – $15,000","$15,000 – $30,000","More than $30,000"],
   statementDuration: ["1 month","3 months","6 months","12 months"],
   tripFunding: ["Self-funded","Employer / Company","Family member","Sponsor / Host","Scholarship / Grant","Business funds"],
   numberOfTrips: ["None","1–2 trips","3–5 trips","6–10 trips","10+ trips"],
   visaApprovals: ["None","1–2 visas approved","Several (3–5)","Many (6+)"],
   refusals: ["No","Yes – once","Yes – multiple times"],
+  hostRelationship: ["Spouse / Partner","Parent","Child","Sibling","Other relative","Friend","Business contact","Academic institution"],
+  businessType: ["Retail / Trading","Technology / IT","Consulting / Advisory","Manufacturing","Healthcare / Medical","Hospitality / Tourism","Agriculture","Real Estate","Import / Export","Other"],
+  studyLevel: ["High School / Secondary","Undergraduate / Bachelor's","Postgraduate / Master's","PhD / Doctoral","Certificate / Diploma","Language Course","Short Course / Training"],
 };
 
 interface FormData {
+  // Step 1 - Personal Profile
   nationality: string; passportCountry: string; dateOfBirth: string; gender: string;
-  maritalStatus: string; countryOfResidence: string; dependentsHomeCountry: string;
+  maritalStatus: string; numberOfChildren: string; countryOfResidence: string; dependentsHomeCountry: string;
+  // Step 2 - Travel Plan
   destinationCountry: string; visaType: string; purposeOfTravel: string;
   plannedTravelDate: string; tripDuration: string; entryType: string; firstTimeVisitor: string;
+  // Visa-type conditional
+  institutionName: string; studyLevel: string; hasAcceptanceLetter: string;
+  hasJobOffer: string; hiringCompanyName: string;
+  invitingCompanyName: string;
+  hostRelationship: string; hostVisaStatus: string;
+  transitFinalDestination: string;
+  // Step 3 - Employment & Income
   employmentStatus: string; jobTitle: string; companyName: string; yearsInJob: string;
   monthlyIncome: string; sourceOfIncome: string; hasTaxReturn: string; hasSalarySlips: string;
+  // Employment-type conditional
+  businessType: string; hasBusinessRegistration: string;
+  scholarshipAvailable: string; hasEnrollmentLetter: string;
+  previousProfession: string; hasPensionDocs: string;
+  // Step 4 - Financial Strength
   bankBalance: string; hasBankStatement: string; bankStatementDuration: string;
   hasLargeDeposits: string; hasCreditCard: string; hasProperty: string;
   tripFunding: string; sponsorDetails: string;
+  // Step 5 - Travel History
   countriesVisited: string; numberOfTrips: string; previousVisaApprovals: string;
   previousVisaRefusals: string; refusalReason: string; hasOverstay: string; hasDeportation: string;
+  // Step 6 - Documents
   hasReturnTicket: string; hasHotelBooking: string; hasInvitationLetter: string;
   hasTravelInsurance: string; hasItinerary: string; hasLeaveApproval: string; hasCoverLetter: string;
+  // Step 7 - Home Ties & Risk
   familyInHomeCountry: string; propertyInHomeCountry: string; stableEmploymentHome: string;
   ongoingEducation: string; financialCommitmentsHome: string; criminalRecord: string; immigrationViolation: string;
 }
 
 const EMPTY: FormData = {
   nationality: "", passportCountry: "", dateOfBirth: "", gender: "",
-  maritalStatus: "", countryOfResidence: "", dependentsHomeCountry: "",
+  maritalStatus: "", numberOfChildren: "", countryOfResidence: "", dependentsHomeCountry: "",
   destinationCountry: "", visaType: "", purposeOfTravel: "",
   plannedTravelDate: "", tripDuration: "", entryType: "", firstTimeVisitor: "",
+  institutionName: "", studyLevel: "", hasAcceptanceLetter: "",
+  hasJobOffer: "", hiringCompanyName: "",
+  invitingCompanyName: "",
+  hostRelationship: "", hostVisaStatus: "",
+  transitFinalDestination: "",
   employmentStatus: "", jobTitle: "", companyName: "", yearsInJob: "",
   monthlyIncome: "", sourceOfIncome: "", hasTaxReturn: "", hasSalarySlips: "",
+  businessType: "", hasBusinessRegistration: "",
+  scholarshipAvailable: "", hasEnrollmentLetter: "",
+  previousProfession: "", hasPensionDocs: "",
   bankBalance: "", hasBankStatement: "", bankStatementDuration: "",
   hasLargeDeposits: "", hasCreditCard: "", hasProperty: "",
   tripFunding: "", sponsorDetails: "",
@@ -104,24 +133,40 @@ function getColors(score: number) {
   return { grad: "from-red-500 to-rose-400", badge: "bg-red-100 text-red-700", ring: "ring-red-100", bar: "bg-red-500", light: "bg-red-50", text: "text-red-700" };
 }
 
+// Helper predicates for conditional logic
+const isEmployedFull = (s: string) => ["Employed (Full-time)", "Employed (Part-time)", "Government Employee"].includes(s);
+const isSelfEmployed = (s: string) => ["Self-employed / Business Owner", "Freelancer / Consultant"].includes(s);
+const isStudent = (s: string) => s === "Student";
+const isRetired = (s: string) => s === "Retired";
+const isUnemployed = (s: string) => s === "Unemployed";
+const hasChildren = (ms: string) => ["Married", "Divorced", "Widowed", "Separated"].includes(ms);
+
 function Sel({ label, val, onChange, opts, required, tooltip, testId }: { label: string; val: string; onChange: (v: string) => void; opts: string[]; required?: boolean; tooltip?: string; testId?: string }) {
+  const hasValue = val !== "";
   return (
     <div>
       <div className="flex items-center gap-1.5 mb-1.5">
-        <Label className="text-sm font-medium text-slate-700">{label}{required && <span className="text-red-500 ml-0.5">*</span>}</Label>
+        <Label className="text-sm font-medium text-slate-700">
+          {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+        </Label>
         {tooltip && <span className="text-xs text-slate-400 italic">({tooltip})</span>}
       </div>
       <div className="relative">
         <select
           data-testid={testId || `select-${label.toLowerCase().replace(/\s+/g, "-")}`}
-          className="w-full h-10 pl-3 pr-8 text-sm border border-slate-200 rounded-lg bg-white appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors hover:border-slate-300"
+          className={`w-full h-10 pl-3 pr-9 text-sm border rounded-lg appearance-none cursor-pointer transition-all outline-none
+            ${hasValue
+              ? "border-[#4055FF]/40 bg-[#4055FF]/5 text-slate-800 ring-1 ring-[#4055FF]/20"
+              : "border-slate-200 bg-white text-slate-800 hover:border-slate-300"
+            }
+            focus:border-[#4055FF] focus:ring-2 focus:ring-[#4055FF]/20 focus:bg-white`}
           value={val}
           onChange={e => onChange(e.target.value)}
         >
-          <option value="">Select...</option>
+          <option value="">Choose an option…</option>
           {opts.map(o => <option key={o} value={o}>{o}</option>)}
         </select>
-        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+        <ChevronDown className={`absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none transition-colors ${hasValue ? "text-[#4055FF]" : "text-slate-400"}`} />
       </div>
     </div>
   );
@@ -602,17 +647,21 @@ export default function CheckPage() {
             {/* ===== STEP 1: Personal Profile ===== */}
             {step === 1 && (
               <div className="grid sm:grid-cols-2 gap-4">
-                <SearchableSelect label="Nationality" required value={form.nationality} onChange={set("nationality")} options={COUNTRIES} placeholder="Search nationality..." data-testid="select-nationality" />
-                <SearchableSelect label="Passport Country" value={form.passportCountry} onChange={set("passportCountry")} options={COUNTRIES} placeholder="Search country..." />
+                <SearchableSelect label="Nationality *" required value={form.nationality} onChange={set("nationality")} options={COUNTRIES} placeholder="Search nationality..." data-testid="select-nationality" />
+                <SearchableSelect label="Passport Issued By" value={form.passportCountry} onChange={set("passportCountry")} options={COUNTRIES} placeholder="Same as nationality if the same…" />
                 <div>
                   <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Date of Birth</Label>
-                  <Input type="date" value={form.dateOfBirth} onChange={e => set("dateOfBirth")(e.target.value)} className="border-slate-200 bg-slate-50 focus:bg-white" data-testid="input-dob" />
+                  <Input type="date" value={form.dateOfBirth} onChange={e => set("dateOfBirth")(e.target.value)} className="border-slate-200 bg-slate-50 focus:bg-white focus:border-[#4055FF] focus:ring-2 focus:ring-[#4055FF]/20" data-testid="input-dob" />
                 </div>
                 <Sel label="Gender" val={form.gender} onChange={set("gender")} opts={OPTS.gender} />
                 <Sel label="Marital Status" val={form.maritalStatus} onChange={set("maritalStatus")} opts={OPTS.maritalStatus} />
-                <SearchableSelect label="Country of Residence" value={form.countryOfResidence} onChange={set("countryOfResidence")} options={COUNTRIES} placeholder="Search country..." />
-                <div className="sm:col-span-2">
-                  <Sel label="Dependents in Home Country" val={form.dependentsHomeCountry} onChange={set("dependentsHomeCountry")} opts={OPTS.dependents} tooltip="spouse, children, parents" />
+                {/* Conditional: show children count only when relevant marital status */}
+                {hasChildren(form.maritalStatus) && (
+                  <Sel label="Number of Children" val={form.numberOfChildren} onChange={set("numberOfChildren")} opts={OPTS.numberOfChildren} tooltip="biological or legally adopted" />
+                )}
+                <SearchableSelect label="Country of Residence" value={form.countryOfResidence} onChange={set("countryOfResidence")} options={COUNTRIES} placeholder="Where do you live now?" />
+                <div className={hasChildren(form.maritalStatus) ? "" : "sm:col-span-2"}>
+                  <Sel label="Total Dependents in Home Country" val={form.dependentsHomeCountry} onChange={set("dependentsHomeCountry")} opts={OPTS.dependents} tooltip="spouse, children, parents, siblings" />
                 </div>
               </div>
             )}
@@ -620,40 +669,167 @@ export default function CheckPage() {
             {/* ===== STEP 2: Travel Plan ===== */}
             {step === 2 && (
               <div className="grid sm:grid-cols-2 gap-4">
-                <SearchableSelect label="Destination Country" required value={form.destinationCountry} onChange={set("destinationCountry")} options={COUNTRIES} placeholder="Search country..." data-testid="select-destination" />
-                <Sel label="Visa Type" val={form.visaType} onChange={set("visaType")} opts={OPTS.visaType} required />
-                <Sel label="Purpose of Travel" val={form.purposeOfTravel} onChange={set("purposeOfTravel")} opts={OPTS.purposeOfTravel} required />
-                <Sel label="Trip Duration" val={form.tripDuration} onChange={set("tripDuration")} opts={OPTS.tripDuration} required />
+                <SearchableSelect label="Destination Country *" required value={form.destinationCountry} onChange={set("destinationCountry")} options={COUNTRIES} placeholder="Search destination..." data-testid="select-destination" />
+                <Sel label="Visa Type *" val={form.visaType} onChange={set("visaType")} opts={OPTS.visaType} required testId="select-visa-type" />
+                <Sel label="Purpose of Travel *" val={form.purposeOfTravel} onChange={set("purposeOfTravel")} opts={OPTS.purposeOfTravel} required />
+                <Sel label="Trip Duration *" val={form.tripDuration} onChange={set("tripDuration")} opts={OPTS.tripDuration} required />
                 <div>
                   <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Planned Travel Date</Label>
-                  <Input type="date" value={form.plannedTravelDate} onChange={e => set("plannedTravelDate")(e.target.value)} className="border-slate-200 bg-slate-50" data-testid="input-travel-date" />
+                  <Input type="date" value={form.plannedTravelDate} onChange={e => set("plannedTravelDate")(e.target.value)} className="border-slate-200 bg-slate-50 focus:bg-white focus:border-[#4055FF] focus:ring-2 focus:ring-[#4055FF]/20" data-testid="input-travel-date" />
                 </div>
                 <Sel label="Entry Type" val={form.entryType} onChange={set("entryType")} opts={OPTS.entryType} />
                 <div className="sm:col-span-2">
                   <DocToggle label="First-time visitor to this destination?" val={form.firstTimeVisitor} onChange={set("firstTimeVisitor")} />
                 </div>
+
+                {/* ---- Conditional: Student Visa ---- */}
+                {form.visaType === "Student Visa" && (
+                  <div className="sm:col-span-2 border-t border-slate-100 pt-4">
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Student Visa Details</p>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Institution / University Name</Label>
+                        <Input value={form.institutionName} onChange={e => set("institutionName")(e.target.value)} placeholder="e.g. University of Toronto" className="border-slate-200 bg-slate-50 focus:bg-white focus:border-[#4055FF]" data-testid="input-institution" />
+                      </div>
+                      <Sel label="Study Level / Program Type" val={form.studyLevel} onChange={set("studyLevel")} opts={OPTS.studyLevel} />
+                      <div className="sm:col-span-2">
+                        <DocToggle label="Admission / acceptance letter received?" val={form.hasAcceptanceLetter} onChange={set("hasAcceptanceLetter")} tooltip="Official offer from the institution" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ---- Conditional: Work Visa ---- */}
+                {form.visaType === "Work Visa" && (
+                  <div className="sm:col-span-2 border-t border-slate-100 pt-4">
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Work Visa Details</p>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Hiring Company Name</Label>
+                        <Input value={form.hiringCompanyName} onChange={e => set("hiringCompanyName")(e.target.value)} placeholder="Company offering you the job" className="border-slate-200 bg-slate-50 focus:bg-white focus:border-[#4055FF]" data-testid="input-hiring-company" />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <DocToggle label="Formal job offer letter available?" val={form.hasJobOffer} onChange={set("hasJobOffer")} tooltip="Signed offer from destination employer" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ---- Conditional: Business Visa ---- */}
+                {form.visaType === "Business Visa" && (
+                  <div className="sm:col-span-2 border-t border-slate-100 pt-4">
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Business Visit Details</p>
+                    <div>
+                      <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Inviting Company / Organisation</Label>
+                      <Input value={form.invitingCompanyName} onChange={e => set("invitingCompanyName")(e.target.value)} placeholder="Name of company you're visiting" className="border-slate-200 bg-slate-50 focus:bg-white focus:border-[#4055FF]" data-testid="input-inviting-company" />
+                    </div>
+                  </div>
+                )}
+
+                {/* ---- Conditional: Spouse / Family Visa ---- */}
+                {form.visaType === "Spouse / Family Visa" && (
+                  <div className="sm:col-span-2 border-t border-slate-100 pt-4">
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Family / Spouse Visa Details</p>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <Sel label="Your relationship to the host" val={form.hostRelationship} onChange={set("hostRelationship")} opts={OPTS.hostRelationship} />
+                      <div>
+                        <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Host's visa / residency status</Label>
+                        <Input value={form.hostVisaStatus} onChange={e => set("hostVisaStatus")(e.target.value)} placeholder="e.g. Permanent Resident, Citizen, Work Visa" className="border-slate-200 bg-slate-50 focus:bg-white focus:border-[#4055FF]" data-testid="input-host-status" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ---- Conditional: Transit Visa ---- */}
+                {form.visaType === "Transit Visa" && (
+                  <div className="sm:col-span-2 border-t border-slate-100 pt-4">
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Transit Details</p>
+                    <SearchableSelect label="Final Destination Country" value={form.transitFinalDestination} onChange={set("transitFinalDestination")} options={COUNTRIES} placeholder="Where are you ultimately heading?" />
+                  </div>
+                )}
               </div>
             )}
 
             {/* ===== STEP 3: Employment & Income ===== */}
             {step === 3 && (
               <div className="grid sm:grid-cols-2 gap-4">
-                <Sel label="Employment Status" val={form.employmentStatus} onChange={set("employmentStatus")} opts={OPTS.employmentStatus} required />
-                <div>
-                  <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Job Title</Label>
-                  <Input value={form.jobTitle} onChange={e => set("jobTitle")(e.target.value)} placeholder="e.g. Software Engineer" className="border-slate-200 bg-slate-50" data-testid="input-jobtitle" />
+                {/* Always shown */}
+                <div className="sm:col-span-2">
+                  <Sel label="Employment Status *" val={form.employmentStatus} onChange={set("employmentStatus")} opts={OPTS.employmentStatus} required testId="select-employment-status" />
                 </div>
-                <div>
-                  <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Company / Employer Name</Label>
-                  <Input value={form.companyName} onChange={e => set("companyName")(e.target.value)} placeholder="e.g. Acme Corp" className="border-slate-200 bg-slate-50" data-testid="input-company" />
-                </div>
-                <Sel label="Years in Current Role / Business" val={form.yearsInJob} onChange={set("yearsInJob")} opts={OPTS.yearsInJob} />
-                <Sel label="Monthly Income (USD)" val={form.monthlyIncome} onChange={set("monthlyIncome")} opts={OPTS.monthlyIncome} required />
+
+                {/* ---- Conditional: Fully Employed / Government ---- */}
+                {isEmployedFull(form.employmentStatus) && (
+                  <>
+                    <div>
+                      <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Job Title</Label>
+                      <Input value={form.jobTitle} onChange={e => set("jobTitle")(e.target.value)} placeholder="e.g. Senior Accountant" className="border-slate-200 bg-slate-50 focus:bg-white focus:border-[#4055FF]" data-testid="input-jobtitle" />
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Company / Employer Name</Label>
+                      <Input value={form.companyName} onChange={e => set("companyName")(e.target.value)} placeholder="e.g. Emirates NBD" className="border-slate-200 bg-slate-50 focus:bg-white focus:border-[#4055FF]" data-testid="input-company" />
+                    </div>
+                    <Sel label="Years in Current Role" val={form.yearsInJob} onChange={set("yearsInJob")} opts={OPTS.yearsInJob} />
+                    <div className="sm:col-span-2 grid sm:grid-cols-2 gap-3">
+                      <DocToggle label="Salary slips available?" val={form.hasSalarySlips} onChange={set("hasSalarySlips")} tooltip="Last 3 months payslips" />
+                      <DocToggle label="Tax return / ITR available?" val={form.hasTaxReturn} onChange={set("hasTaxReturn")} tooltip="Latest financial year" />
+                    </div>
+                  </>
+                )}
+
+                {/* ---- Conditional: Self-employed / Freelancer ---- */}
+                {isSelfEmployed(form.employmentStatus) && (
+                  <>
+                    <Sel label="Type of Business / Work" val={form.businessType} onChange={set("businessType")} opts={OPTS.businessType} />
+                    <div>
+                      <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Business / Company Name</Label>
+                      <Input value={form.companyName} onChange={e => set("companyName")(e.target.value)} placeholder="e.g. My Consulting LLC" className="border-slate-200 bg-slate-50 focus:bg-white focus:border-[#4055FF]" data-testid="input-company-self" />
+                    </div>
+                    <Sel label="Years in Business / Freelancing" val={form.yearsInJob} onChange={set("yearsInJob")} opts={OPTS.yearsInJob} />
+                    <div className="sm:col-span-2 grid sm:grid-cols-2 gap-3">
+                      <DocToggle label="Business registration document available?" val={form.hasBusinessRegistration} onChange={set("hasBusinessRegistration")} tooltip="Trade license, certificate of incorporation" />
+                      <DocToggle label="Tax return / ITR available?" val={form.hasTaxReturn} onChange={set("hasTaxReturn")} tooltip="Last financial year's filing" />
+                    </div>
+                  </>
+                )}
+
+                {/* ---- Conditional: Student ---- */}
+                {isStudent(form.employmentStatus) && (
+                  <>
+                    <div>
+                      <Label className="text-sm font-medium text-slate-700 mb-1.5 block">University / School Name</Label>
+                      <Input value={form.institutionName} onChange={e => set("institutionName")(e.target.value)} placeholder="Current institution" className="border-slate-200 bg-slate-50 focus:bg-white focus:border-[#4055FF]" data-testid="input-institution-emp" />
+                    </div>
+                    <Sel label="Study Level" val={form.studyLevel} onChange={set("studyLevel")} opts={OPTS.studyLevel} />
+                    <div className="sm:col-span-2 grid sm:grid-cols-2 gap-3">
+                      <DocToggle label="Scholarship / financial aid?" val={form.scholarshipAvailable} onChange={set("scholarshipAvailable")} tooltip="Funded by institution or government" />
+                      <DocToggle label="Enrollment / student letter available?" val={form.hasEnrollmentLetter} onChange={set("hasEnrollmentLetter")} tooltip="From current institution" />
+                    </div>
+                  </>
+                )}
+
+                {/* ---- Conditional: Retired ---- */}
+                {isRetired(form.employmentStatus) && (
+                  <>
+                    <div>
+                      <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Previous Profession</Label>
+                      <Input value={form.previousProfession} onChange={e => set("previousProfession")(e.target.value)} placeholder="e.g. Former Engineer at XYZ Corp" className="border-slate-200 bg-slate-50 focus:bg-white focus:border-[#4055FF]" data-testid="input-prev-profession" />
+                    </div>
+                    <DocToggle label="Pension / retirement documents available?" val={form.hasPensionDocs} onChange={set("hasPensionDocs")} tooltip="Proof of regular pension income" />
+                  </>
+                )}
+
+                {/* Always shown: Income */}
+                <Sel label="Monthly Income (USD) *" val={form.monthlyIncome} onChange={set("monthlyIncome")} opts={OPTS.monthlyIncome} required />
                 <Sel label="Primary Source of Income" val={form.sourceOfIncome} onChange={set("sourceOfIncome")} opts={OPTS.sourceOfIncome} />
-                <div className="sm:col-span-2 grid sm:grid-cols-2 gap-3">
-                  <DocToggle label="Salary slips available?" val={form.hasSalarySlips} onChange={set("hasSalarySlips")} tooltip="Last 3 months" />
-                  <DocToggle label="Tax return available?" val={form.hasTaxReturn} onChange={set("hasTaxReturn")} tooltip="Latest year" />
-                </div>
+
+                {/* Unemployed note */}
+                {isUnemployed(form.employmentStatus) && (
+                  <div className="sm:col-span-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-start gap-2">
+                    <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                    <span>Unemployment significantly impacts visa approval chances. Be prepared to provide strong financial proof (bank statements, sponsor letter, family support) and clearly explain the reason in your cover letter.</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -720,14 +896,47 @@ export default function CheckPage() {
             {/* ===== STEP 6: Documents ===== */}
             {step === 6 && (
               <div className="space-y-3">
-                <p className="text-sm text-slate-500 mb-4">Mark which documents you currently have or can obtain for this application.</p>
-                <DocToggle label="Return ticket booked?" val={form.hasReturnTicket} onChange={set("hasReturnTicket")} tooltip="Even refundable is fine" />
-                <DocToggle label="Hotel booking / accommodation?" val={form.hasHotelBooking} onChange={set("hasHotelBooking")} tooltip="Booking.com or similar confirmation" />
-                <DocToggle label="Invitation letter from host?" val={form.hasInvitationLetter} onChange={set("hasInvitationLetter")} />
-                <DocToggle label="Travel insurance?" val={form.hasTravelInsurance} onChange={set("hasTravelInsurance")} tooltip="Mandatory for Schengen, recommended everywhere" />
-                <DocToggle label="Day-wise travel itinerary?" val={form.hasItinerary} onChange={set("hasItinerary")} tooltip="Planned daily schedule" />
-                <DocToggle label="Leave approval / NOC from employer?" val={form.hasLeaveApproval} onChange={set("hasLeaveApproval")} tooltip="Required for employed applicants" />
-                <DocToggle label="Cover letter / personal statement?" val={form.hasCoverLetter} onChange={set("hasCoverLetter")} tooltip="Explains travel purpose and home ties" />
+                <p className="text-sm text-slate-500 mb-4">Mark which supporting documents you currently have or can obtain before applying.</p>
+
+                {/* Always required */}
+                <DocToggle label="Return / onward ticket booked?" val={form.hasReturnTicket} onChange={set("hasReturnTicket")} tooltip="Even a refundable booking is accepted" />
+                <DocToggle label="Travel insurance policy?" val={form.hasTravelInsurance} onChange={set("hasTravelInsurance")} tooltip="Mandatory for Schengen (€30k min); strongly recommended everywhere" />
+                <DocToggle label="Cover letter / personal statement?" val={form.hasCoverLetter} onChange={set("hasCoverLetter")} tooltip="Explains your travel purpose, ties back home, and intention to return" />
+
+                {/* Conditional: hotel booking for tourist / visit / transit */}
+                {(["Tourist Visa","Visit Visa","Transit Visa","Conference / Event Visa","Medical Visa"].includes(form.visaType) || !form.visaType) && (
+                  <DocToggle label="Hotel / accommodation booking?" val={form.hasHotelBooking} onChange={set("hasHotelBooking")} tooltip="Booking.com or host letter confirming stay" />
+                )}
+
+                {/* Conditional: invitation letter for business, family, conferences */}
+                {(["Business Visa","Spouse / Family Visa","Visit Visa","Conference / Event Visa"].includes(form.visaType) || !form.visaType) && (
+                  <DocToggle label="Invitation letter from host / company?" val={form.hasInvitationLetter} onChange={set("hasInvitationLetter")} tooltip="Official letter from the person or company inviting you" />
+                )}
+
+                {/* Conditional: itinerary for tourist / business */}
+                {(["Tourist Visa","Business Visa","Conference / Event Visa"].includes(form.visaType) || !form.visaType) && (
+                  <DocToggle label="Day-wise travel itinerary?" val={form.hasItinerary} onChange={set("hasItinerary")} tooltip="Planned daily schedule — strengthens tourist visa applications" />
+                )}
+
+                {/* Conditional: leave approval only for employed people */}
+                {isEmployedFull(form.employmentStatus) && (
+                  <DocToggle label="Leave approval / NOC from employer?" val={form.hasLeaveApproval} onChange={set("hasLeaveApproval")} tooltip="Confirms your employer grants leave and you'll return to your job" />
+                )}
+
+                {/* Conditional: enrollment letter for students */}
+                {isStudent(form.employmentStatus) && !form.hasEnrollmentLetter && (
+                  <DocToggle label="Current enrollment / student ID letter?" val={form.hasEnrollmentLetter} onChange={set("hasEnrollmentLetter")} tooltip="From your current institution" />
+                )}
+
+                {/* Conditional: business registration for self-employed */}
+                {isSelfEmployed(form.employmentStatus) && !form.hasBusinessRegistration && (
+                  <DocToggle label="Business registration / trade license?" val={form.hasBusinessRegistration} onChange={set("hasBusinessRegistration")} tooltip="Proof you own/run a legitimate business" />
+                )}
+
+                <div className="mt-1 p-3 rounded-lg bg-[#4055FF]/5 border border-[#4055FF]/15 text-xs text-[#4055FF] flex items-start gap-2">
+                  <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                  <span>The more documents you have ready, the higher your AI assessment score. Missing critical documents significantly lowers your approval chance calculation.</span>
+                </div>
               </div>
             )}
 
@@ -759,12 +968,12 @@ export default function CheckPage() {
                 </div>
 
                 <div className="grid sm:grid-cols-2 gap-3">
-                  <ReviewSection title="Personal Profile" icon={User} items={[["Nationality", form.nationality], ["Passport Country", form.passportCountry], ["Gender", form.gender], ["Marital Status", form.maritalStatus], ["Residence", form.countryOfResidence], ["Dependents", form.dependentsHomeCountry]]} />
-                  <ReviewSection title="Travel Plan" icon={MapPin} items={[["Destination", form.destinationCountry], ["Visa Type", form.visaType], ["Purpose", form.purposeOfTravel], ["Duration", form.tripDuration], ["Entry Type", form.entryType], ["First Visit?", form.firstTimeVisitor]]} />
-                  <ReviewSection title="Employment" icon={Star} items={[["Status", form.employmentStatus], ["Job Title", form.jobTitle], ["Company", form.companyName], ["Years in Role", form.yearsInJob], ["Income", form.monthlyIncome], ["Funding", form.tripFunding]]} />
-                  <ReviewSection title="Financial" icon={CreditCard} items={[["Bank Balance", form.bankBalance], ["Bank Statement", form.hasBankStatement], ["Salary Slips", form.hasSalarySlips], ["Tax Return", form.hasTaxReturn], ["Credit Card", form.hasCreditCard], ["Property", form.hasProperty]]} />
-                  <ReviewSection title="Travel History" icon={Globe} items={[["Total Trips", form.numberOfTrips], ["Prev. Approvals", form.previousVisaApprovals], ["Refusals", form.previousVisaRefusals], ["Overstay", form.hasOverstay], ["Countries", form.countriesVisited]]} />
-                  <ReviewSection title="Home Ties" icon={Home} items={[["Family Home", form.familyInHomeCountry], ["Property Home", form.propertyInHomeCountry], ["Stable Job", form.stableEmploymentHome], ["Education", form.ongoingEducation], ["Financial Commitments", form.financialCommitmentsHome]]} />
+                  <ReviewSection title="Personal Profile" icon={User} items={[["Nationality", form.nationality], ["Passport Country", form.passportCountry], ["Gender", form.gender], ["Marital Status", form.maritalStatus], ["Children", form.numberOfChildren], ["Residence", form.countryOfResidence], ["Dependents", form.dependentsHomeCountry]]} />
+                  <ReviewSection title="Travel Plan" icon={MapPin} items={[["Destination", form.destinationCountry], ["Visa Type", form.visaType], ["Purpose", form.purposeOfTravel], ["Duration", form.tripDuration], ["Entry Type", form.entryType], ["First Visit?", form.firstTimeVisitor], ["Institution", form.institutionName], ["Study Level", form.studyLevel], ["Host Relationship", form.hostRelationship]]} />
+                  <ReviewSection title="Employment" icon={Star} items={[["Status", form.employmentStatus], ["Job Title", form.jobTitle], ["Company", form.companyName], ["Business Type", form.businessType], ["Years in Role", form.yearsInJob], ["Income", form.monthlyIncome], ["Source", form.sourceOfIncome], ["Scholarship", form.scholarshipAvailable]]} />
+                  <ReviewSection title="Financial" icon={CreditCard} items={[["Bank Balance", form.bankBalance], ["Trip Funding", form.tripFunding], ["Bank Statement", form.hasBankStatement], ["Salary Slips", form.hasSalarySlips], ["Tax Return", form.hasTaxReturn], ["Credit Card", form.hasCreditCard], ["Property", form.hasProperty]]} />
+                  <ReviewSection title="Travel History" icon={Globe} items={[["Total Trips", form.numberOfTrips], ["Prev. Approvals", form.previousVisaApprovals], ["Refusals", form.previousVisaRefusals], ["Overstay", form.hasOverstay], ["Deportation", form.hasDeportation], ["Countries Visited", form.countriesVisited]]} />
+                  <ReviewSection title="Home Ties & Risk" icon={Home} items={[["Family Home", form.familyInHomeCountry], ["Property Home", form.propertyInHomeCountry], ["Stable Job", form.stableEmploymentHome], ["Education", form.ongoingEducation], ["Financial Commitments", form.financialCommitmentsHome], ["Criminal Record", form.criminalRecord], ["Immigration Violation", form.immigrationViolation]]} />
                 </div>
 
                 <Button

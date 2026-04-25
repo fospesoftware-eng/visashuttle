@@ -75,10 +75,26 @@ Three distinct auth systems coexist:
 ```
 
 ### Design System
-- Brand colors extracted from logo: cyan primary (#00B4D8), pink secondary, blue accent
+- Brand palette: Electric Blue #4055FF (primary), Hot Pink #FF2060 (secondary), Mid-Purple #9033F5 (accent)
+- Gradient: `linear-gradient(135deg,#4055FF,#9033F5,#FF2060)` used on key CTAs and wizard submit button
 - Typography: Inter for UI, JetBrains Mono for codes/IDs
 - Component spacing follows Tailwind's 4/6/8/12/16/24 scale
 - Elevation system with subtle shadows for interactive states
+- `Sel` (custom select): brand-blue ring + tinted background when a value is selected
+
+### Visa Wizard Conditional Logic (check.tsx)
+The 8-step wizard has smart conditional fields:
+- **Step 1**: "Number of Children" shown only for Married / Divorced / Widowed / Separated marital statuses
+- **Step 2**: Visa-type specific sub-sections — Student (institution, study level, acceptance letter), Work (hiring company, job offer), Business (inviting company), Spouse/Family (host relationship + host status), Transit (final destination)
+- **Step 3**: Employment-type specific fields — Employed (job title, company, years, salary slips), Self-employed (business type, registration), Student (school, scholarship, enrollment letter), Retired (prev profession, pension docs), Unemployed (amber warning)
+- **Step 6**: Conditional documents — leave approval only for employed, hotel/itinerary for tourist/visit, invitation letter for business/family, enrollment letter for students
+
+### AI Engine (server/ai.ts)
+- Primary: OpenAI GPT-4o-mini (`OPENAI_API_KEY` env var)
+- Fallback: Claude Haiku (`ANTHROPIC_API_KEY` env var)
+- Final fallback: detailed mock scoring engine
+- All conditional fields (institution name, job offer, host status, scholarship, etc.) are included in the prompt
+- System prompt includes per-visa-type and per-employment-type scoring guidelines
 
 ## External Dependencies
 
