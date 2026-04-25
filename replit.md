@@ -43,6 +43,7 @@ Preferred communication style: Simple, everyday language.
 - **SaaS Admin**: admin@visashuttle.com / Admin@12345
 - **Agency Owner**: owner@demoagency.com / Demo@12345
 - **Customer**: customer@demo.com / Demo@12345
+- **B2C Demo User**: demo@visashuttle.com / Demo@12345 (seeded on every restart)
 - **Site-Wide Password**: Fospe@7561 (stored as SITE_PASSWORD env var)
 - **Customer OTP (dev only)**: 123456
 

@@ -15,6 +15,7 @@ import {
   type SavedProfile, type InsertSavedProfile,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
+import bcrypt from "bcryptjs";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -271,6 +272,21 @@ export class MemStorage implements IStorage {
       { id: "msg-3", caseId: "case-1", senderId: "user-owner", senderRole: "agency", content: "Great! Your passport looks good. Please upload your bank statement for the last 3 months.", isRead: true, createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2) },
     ];
     messages.forEach(msg => this.messages.set(msg.id, msg));
+
+    // Seed demo B2C user so login always works after restarts
+    const demoB2cUser: B2cUser = {
+      id: "b2c-demo",
+      email: "demo@visashuttle.com",
+      password: bcrypt.hashSync("Demo@12345", 10),
+      fullName: "Demo User",
+      freeChecksUsed: 0,
+      subscriptionPlan: "free",
+      checkLimit: 1,
+      deepCheckAccess: false,
+      stripeCustomerId: null,
+      createdAt: new Date(),
+    };
+    this.b2cUsersMap.set(demoB2cUser.id, demoB2cUser);
   }
 
   async getUser(id: string): Promise<User | undefined> {
