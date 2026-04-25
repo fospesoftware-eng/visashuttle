@@ -37,7 +37,7 @@ export default function SignInPage() {
     <div className="min-h-screen flex flex-col lg:flex-row bg-background">
       {/* Left panel */}
       <div className="hidden lg:flex lg:w-[480px] xl:w-[520px] flex-col text-white p-10 xl:p-14 justify-between flex-shrink-0" style={{background:"linear-gradient(160deg,#4055FF 0%,#9033F5 50%,#FF2060 100%)"}}>
-        <Logo size="lg" showText />
+        <Logo size="lg" showText variant="white" />
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/15 text-sm font-medium mb-8">
             <Sparkles className="w-3.5 h-3.5" />

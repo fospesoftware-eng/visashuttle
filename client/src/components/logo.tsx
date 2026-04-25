@@ -2,18 +2,21 @@ interface LogoProps {
   className?: string;
   size?: "sm" | "md" | "lg";
   showText?: boolean;
+  variant?: "default" | "white";
 }
 
-export function Logo({ className = "", size = "md", showText = true }: LogoProps) {
+export function Logo({ className = "", size = "md", showText = true, variant = "default" }: LogoProps) {
   const sizeClasses = {
     sm: "h-6",
     md: "h-8",
     lg: "h-12",
   };
 
+  const src = variant === "white" ? "/visa-shuttle-logo-white.png" : "/visa-shuttle-logo.png";
+
   return (
     <img
-      src="/visa-shuttle-logo.png"
+      src={src}
       alt="Visa Shuttle"
       className={`${sizeClasses[size]} w-auto object-contain ${className}`}
       data-testid="img-logo"
