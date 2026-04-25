@@ -222,6 +222,33 @@ export const insertVisaCheckSchema = createInsertSchema(visaChecks).omit({ id: t
 export type InsertVisaCheck = z.infer<typeof insertVisaCheckSchema>;
 export type VisaCheck = typeof visaChecks.$inferSelect;
 
+// Saved Traveler Profiles (B2C)
+export const savedProfiles = pgTable("saved_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  fullName: text("full_name"),
+  nationality: text("nationality"),
+  dateOfBirth: text("date_of_birth"),
+  passportCountry: text("passport_country"),
+  employmentStatus: text("employment_status"),
+  jobTitle: text("job_title"),
+  monthlyIncome: text("monthly_income"),
+  bankBalance: text("bank_balance"),
+  previousTravel: text("previous_travel"),
+  countriesVisited: text("countries_visited"),
+  previousVisaRefusals: text("previous_visa_refusals"),
+  hasPassport: boolean("has_passport").default(false),
+  hasBankStatement: boolean("has_bank_statement").default(false),
+  hasIncomeProof: boolean("has_income_proof").default(false),
+  hasTaxReturn: boolean("has_tax_return").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSavedProfileSchema = createInsertSchema(savedProfiles).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertSavedProfile = z.infer<typeof insertSavedProfileSchema>;
+export type SavedProfile = typeof savedProfiles.$inferSelect;
+
 // OTP Codes table
 export const otpCodes = pgTable("otp_codes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

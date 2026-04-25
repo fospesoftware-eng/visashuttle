@@ -12,6 +12,7 @@ import {
   type OTPCode, type InsertOTPCode,
   type B2cUser, type InsertB2cUser,
   type VisaCheck, type InsertVisaCheck,
+  type SavedProfile, type InsertSavedProfile,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -81,6 +82,10 @@ export interface IStorage {
   createVisaCheck(check: InsertVisaCheck): Promise<VisaCheck>;
   getVisaChecksByUserId(userId: string): Promise<VisaCheck[]>;
   getVisaCheck(id: string): Promise<VisaCheck | undefined>;
+
+  // Saved Profiles
+  getSavedProfile(userId: string): Promise<SavedProfile | undefined>;
+  upsertSavedProfile(userId: string, data: Partial<InsertSavedProfile>): Promise<SavedProfile>;
 }
 
 export class MemStorage implements IStorage {
@@ -97,6 +102,7 @@ export class MemStorage implements IStorage {
   private otpCodes: Map<string, OTPCode>;
   private b2cUsersMap: Map<string, B2cUser>;
   private visaChecksMap: Map<string, VisaCheck>;
+  private savedProfilesMap: Map<string, SavedProfile>;
 
   constructor() {
     this.users = new Map();
@@ -112,6 +118,7 @@ export class MemStorage implements IStorage {
     this.otpCodes = new Map();
     this.b2cUsersMap = new Map();
     this.visaChecksMap = new Map();
+    this.savedProfilesMap = new Map();
     
     this.seedData();
   }
@@ -702,6 +709,47 @@ export class MemStorage implements IStorage {
 
   async getVisaCheck(id: string): Promise<VisaCheck | undefined> {
     return this.visaChecksMap.get(id);
+  }
+
+  // Saved Profiles — one profile per user (keyed by userId)
+  async getSavedProfile(userId: string): Promise<SavedProfile | undefined> {
+    for (const p of this.savedProfilesMap.values()) {
+      if (p.userId === userId) return p;
+    }
+    return undefined;
+  }
+
+  async upsertSavedProfile(userId: string, data: Partial<InsertSavedProfile>): Promise<SavedProfile> {
+    const existing = await this.getSavedProfile(userId);
+    if (existing) {
+      const updated: SavedProfile = { ...existing, ...data, userId, updatedAt: new Date() };
+      this.savedProfilesMap.set(existing.id, updated);
+      return updated;
+    }
+    const id = randomUUID();
+    const newProfile: SavedProfile = {
+      id,
+      userId,
+      fullName: data.fullName ?? null,
+      nationality: data.nationality ?? null,
+      dateOfBirth: data.dateOfBirth ?? null,
+      passportCountry: data.passportCountry ?? null,
+      employmentStatus: data.employmentStatus ?? null,
+      jobTitle: data.jobTitle ?? null,
+      monthlyIncome: data.monthlyIncome ?? null,
+      bankBalance: data.bankBalance ?? null,
+      previousTravel: data.previousTravel ?? null,
+      countriesVisited: data.countriesVisited ?? null,
+      previousVisaRefusals: data.previousVisaRefusals ?? null,
+      hasPassport: data.hasPassport ?? false,
+      hasBankStatement: data.hasBankStatement ?? false,
+      hasIncomeProof: data.hasIncomeProof ?? false,
+      hasTaxReturn: data.hasTaxReturn ?? false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.savedProfilesMap.set(id, newProfile);
+    return newProfile;
   }
 }
 

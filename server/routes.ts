@@ -874,5 +874,18 @@ export async function registerRoutes(
     res.json(check);
   });
 
+  // === Saved Profile Routes ===
+  app.get("/api/b2c/profile", requireB2cAuth, async (req, res) => {
+    const userId = req.session.b2cUserId!;
+    const profile = await storage.getSavedProfile(userId);
+    res.json(profile || null);
+  });
+
+  app.put("/api/b2c/profile", requireB2cAuth, async (req, res) => {
+    const userId = req.session.b2cUserId!;
+    const profile = await storage.upsertSavedProfile(userId, { ...req.body, userId });
+    res.json(profile);
+  });
+
   return httpServer;
 }

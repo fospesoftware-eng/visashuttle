@@ -17,6 +17,10 @@ import SignInPage from "@/pages/sign-in";
 import CheckPage from "@/pages/check";
 import AccountPage from "@/pages/account";
 import PricingPage from "@/pages/pricing";
+import HistoryPage from "@/pages/history";
+import DeepCheckPage from "@/pages/deep-check";
+import SavedProfilePage from "@/pages/saved-profile";
+import SettingsPage from "@/pages/settings";
 
 import AgencyDashboard from "@/pages/agency/dashboard";
 import LeadsPage from "@/pages/agency/leads";
@@ -80,6 +84,10 @@ function Router() {
       <Route path="/check" component={CheckPage} />
       <Route path="/account" component={AccountPage} />
       <Route path="/pricing" component={PricingPage} />
+      <Route path="/history" component={HistoryPage} />
+      <Route path="/deep-check" component={DeepCheckPage} />
+      <Route path="/saved-profile" component={SavedProfilePage} />
+      <Route path="/settings" component={SettingsPage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/signup" component={SignupPage} />
 

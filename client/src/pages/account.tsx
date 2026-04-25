@@ -1,16 +1,15 @@
+import { useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
-  Sparkles, LogOut, Plus, Clock, CheckCircle, AlertCircle, BarChart3,
-  ArrowRight, Crown, Zap, TrendingUp, Brain, ChevronRight, Info
+  Sparkles, Crown, User, Clock, TrendingUp, CheckCircle, AlertCircle,
+  ArrowRight, Plus, Brain, BarChart3, Zap, FileText, Bell, ChevronRight
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
-import { Logo } from "@/components/logo";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { DashboardLayout } from "@/components/dashboard-layout";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
-import { useEffect } from "react";
 
 interface VisaCheck {
   id: string;
@@ -23,22 +22,42 @@ interface VisaCheck {
   createdAt: string;
 }
 
-function getScoreBadge(score: number | null) {
-  if (score === null) return { class: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400", label: "Pending" };
-  if (score >= 80) return { class: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300", label: `${score}% · High Chance` };
-  if (score >= 60) return { class: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300", label: `${score}% · Good Chance` };
-  if (score >= 40) return { class: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300", label: `${score}% · Moderate` };
-  return { class: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300", label: `${score}% · Low Chance` };
+interface SavedProfile {
+  fullName: string | null;
+  nationality: string | null;
+  employmentStatus: string | null;
+  monthlyIncome: string | null;
+  bankBalance: string | null;
+  hasPassport: boolean | null;
+  hasBankStatement: boolean | null;
+  hasIncomeProof: boolean | null;
+  hasTaxReturn: boolean | null;
 }
 
-function planDetails(plan: string) {
-  if (plan === "pro") return { icon: Crown, label: "Pro Plan", color: "text-purple-600", bg: "bg-purple-100 dark:bg-purple-900/30" };
-  if (plan === "starter") return { icon: Zap, label: "Starter Plan", color: "text-blue-600", bg: "bg-blue-100 dark:bg-blue-900/30" };
-  return { icon: Sparkles, label: "Free Plan", color: "text-slate-600", bg: "bg-slate-100 dark:bg-slate-800/40" };
+function profileCompletion(profile: SavedProfile | null): number {
+  if (!profile) return 0;
+  const fields = [profile.fullName, profile.nationality, profile.employmentStatus, profile.monthlyIncome, profile.bankBalance];
+  const docs = [profile.hasPassport, profile.hasBankStatement, profile.hasIncomeProof];
+  const filled = fields.filter(Boolean).length + docs.filter(Boolean).length;
+  return Math.round((filled / (fields.length + docs.length)) * 100);
+}
+
+function ScoreDisplay({ score, label }: { score: number | null; label: string | null }) {
+  if (score === null) return <Badge variant="secondary" className="text-xs">Pending</Badge>;
+  const cfg = score >= 80 ? { bg: "bg-emerald-50", text: "text-emerald-700", badge: "bg-emerald-100 text-emerald-700" }
+    : score >= 60 ? { bg: "bg-blue-50", text: "text-blue-700", badge: "bg-blue-100 text-blue-700" }
+    : score >= 40 ? { bg: "bg-amber-50", text: "text-amber-700", badge: "bg-amber-100 text-amber-700" }
+    : { bg: "bg-red-50", text: "text-red-700", badge: "bg-red-100 text-red-700" };
+  return (
+    <div className={`flex items-baseline gap-1 ${cfg.text}`}>
+      <span className="text-2xl font-black">{score}%</span>
+      <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ml-1 ${cfg.badge}`}>{label}</span>
+    </div>
+  );
 }
 
 export default function AccountPage() {
-  const { user, isLoading: authLoading, logout, checksRemaining, canCheck } = useB2cAuth();
+  const { user, isLoading: authLoading, checksRemaining, canCheck } = useB2cAuth();
   const [, setLocation] = useLocation();
 
   useEffect(() => {
@@ -50,204 +69,295 @@ export default function AccountPage() {
     enabled: !!user,
   });
 
+  const { data: profile } = useQuery<SavedProfile | null>({
+    queryKey: ["/api/b2c/profile"],
+    enabled: !!user,
+  });
+
   if (authLoading || !user) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin" />
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
     </div>
   );
 
-  const plan = planDetails(user.subscriptionPlan);
-  const PlanIcon = plan.icon;
+  const recentChecks = checks.slice(0, 3);
+  const profComp = profileCompletion(profile ?? null);
+  const lastCheck = checks[0];
+
+  const notifications = [
+    !canCheck && { type: "warn", msg: "You've used your free check. Upgrade to run more checks." },
+    profComp < 50 && { type: "info", msg: "Complete your saved profile to speed up future checks." },
+    !user.deepCheckAccess && { type: "tip", msg: "Deep Check reveals embassy-style risk analysis. Try it on Pro." },
+  ].filter(Boolean) as { type: string; msg: string }[];
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
-        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Logo size="md" />
-          <nav className="hidden md:flex items-center gap-5">
-            <Link href="/" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Home</Link>
-            <Link href="/check" className="text-sm text-muted-foreground hover:text-foreground transition-colors">New Check</Link>
-            <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</Link>
-          </nav>
-          <div className="flex items-center gap-3">
-            <ThemeToggle />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => logout()}
-              className="gap-1.5 text-muted-foreground hover:text-foreground"
-              data-testid="button-logout"
-            >
-              <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">Sign Out</span>
-            </Button>
-          </div>
-        </div>
-      </header>
+    <DashboardLayout title={`Welcome back, ${user.fullName.split(" ")[0]}`} subtitle="Your visa intelligence dashboard">
+      <div className="max-w-5xl space-y-6">
 
-      <div className="max-w-5xl mx-auto px-4 py-8 md:py-12 space-y-8">
-        {/* Welcome + Stats */}
-        <div className="grid md:grid-cols-3 gap-4">
-          <Card className="md:col-span-2 bg-gradient-to-br from-blue-600 to-cyan-500 text-white border-0 shadow-lg shadow-blue-500/20">
-            <CardContent className="p-6">
-              <p className="text-blue-100 text-sm mb-1">Welcome back</p>
-              <h1 className="text-2xl font-bold mb-1" data-testid="user-name">{user.fullName}</h1>
-              <p className="text-blue-200 text-sm mb-4">{user.email}</p>
-              <div className="flex items-center gap-2">
-                <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${plan.bg} ${plan.color}`}>
-                  <PlanIcon className="w-3.5 h-3.5" />
-                  {plan.label}
+        {/* Stats row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: "Total Checks", value: checks.length, icon: BarChart3, color: "text-blue-600", bg: "bg-blue-50" },
+            { label: "Checks Left", value: checksRemaining, icon: Zap, color: canCheck ? "text-emerald-600" : "text-amber-600", bg: canCheck ? "bg-emerald-50" : "bg-amber-50" },
+            { label: "Profile Complete", value: `${profComp}%`, icon: User, color: profComp >= 70 ? "text-emerald-600" : "text-slate-500", bg: "bg-slate-50" },
+            { label: "Plan", value: user.subscriptionPlan.charAt(0).toUpperCase() + user.subscriptionPlan.slice(1), icon: Crown, color: user.subscriptionPlan === "pro" ? "text-purple-600" : "text-slate-500", bg: user.subscriptionPlan === "pro" ? "bg-purple-50" : "bg-slate-50" },
+          ].map(({ label, value, icon: Icon, color, bg }) => (
+            <Card key={label} className="bg-white shadow-sm border-slate-100">
+              <CardContent className="p-4 md:p-5">
+                <div className={`w-9 h-9 rounded-xl ${bg} flex items-center justify-center mb-3`}>
+                  <Icon className={`w-4 h-4 ${color}`} />
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="grid grid-rows-2 gap-4">
-            <Card>
-              <CardContent className="p-5 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                  <BarChart3 className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{checks.length}</p>
-                  <p className="text-xs text-muted-foreground">Total Checks</p>
-                </div>
+                <p className="text-xl md:text-2xl font-black text-slate-900" data-testid={`stat-${label.replace(/\s/g, "-").toLowerCase()}`}>{value}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{label}</p>
               </CardContent>
             </Card>
-            <Card className={canCheck ? "" : "border-amber-200 dark:border-amber-800"}>
-              <CardContent className="p-5 flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${canCheck ? "bg-emerald-100 dark:bg-emerald-900/30" : "bg-amber-100 dark:bg-amber-900/30"}`}>
-                  <TrendingUp className={`w-5 h-5 ${canCheck ? "text-emerald-600" : "text-amber-600"}`} />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{checksRemaining}</p>
-                  <p className="text-xs text-muted-foreground">Checks Left</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          ))}
         </div>
 
-        {/* Quick actions */}
-        <div className="flex flex-wrap gap-3">
-          <Link href="/check">
-            <Button className="gap-2 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 border-0" data-testid="button-new-check">
-              <Plus className="w-4 h-4" />
-              New Visa Check
-            </Button>
-          </Link>
-          {!canCheck && (
-            <Link href="/pricing">
-              <Button variant="outline" className="gap-2 border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-300 dark:hover:bg-purple-950/30">
-                <Crown className="w-4 h-4" />
-                Upgrade Plan
-              </Button>
-            </Link>
-          )}
-        </div>
-
-        {/* Upgrade Banner */}
-        {user.subscriptionPlan === "free" && (
-          <Card className="border-purple-200 dark:border-purple-800 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30">
-            <CardContent className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-xl bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center flex-shrink-0">
-                  <Crown className="w-5 h-5 text-purple-600" />
-                </div>
-                <div>
-                  <p className="font-semibold text-sm">Unlock More Checks</p>
-                  <p className="text-muted-foreground text-sm">Starter gets 5 checks/month. Pro gets 20 checks + Deep Check + PDF reports.</p>
-                </div>
+        {/* Notifications */}
+        {notifications.length > 0 && (
+          <div className="space-y-2">
+            {notifications.map(({ type, msg }, i) => (
+              <div key={i} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm border ${
+                type === "warn" ? "bg-amber-50 border-amber-100 text-amber-800" :
+                type === "info" ? "bg-blue-50 border-blue-100 text-blue-800" :
+                "bg-slate-50 border-slate-100 text-slate-700"
+              }`}>
+                <Bell className="w-4 h-4 flex-shrink-0" />
+                <span className="flex-1">{msg}</span>
+                {type === "warn" && (
+                  <Link href="/pricing">
+                    <span className="font-semibold underline cursor-pointer ml-2">Upgrade</span>
+                  </Link>
+                )}
               </div>
-              <Link href="/pricing">
-                <Button size="sm" className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 border-0 text-white whitespace-nowrap">
-                  See Plans
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
+            ))}
+          </div>
         )}
 
-        {/* Check History */}
+        {/* Quick Actions */}
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <Clock className="w-5 h-5 text-blue-600" />
-              Check History
-            </h2>
-            {checks.length > 0 && <Badge variant="secondary">{checks.length} check{checks.length !== 1 ? "s" : ""}</Badge>}
+          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">Quick Actions</h2>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <Link href="/check">
+              <Card className="cursor-pointer hover:shadow-md hover:border-blue-200 transition-all group bg-white">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                    <Sparkles className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-slate-800 text-sm">New Visa Check</p>
+                    <p className="text-xs text-slate-500">AI approval analysis</p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-500 transition-colors" />
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link href="/deep-check">
+              <Card className={`cursor-pointer hover:shadow-md transition-all group bg-white ${user.deepCheckAccess ? "hover:border-purple-200" : "opacity-75"}`}>
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${user.deepCheckAccess ? "bg-purple-600" : "bg-slate-200"}`}>
+                    <Crown className={`w-5 h-5 ${user.deepCheckAccess ? "text-white" : "text-slate-400"}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-semibold text-slate-800 text-sm">Deep Check</p>
+                      {!user.deepCheckAccess && <Badge className="text-[10px] px-1.5 py-0 bg-amber-100 text-amber-700 border-0">Pro</Badge>}
+                    </div>
+                    <p className="text-xs text-slate-500">Embassy-style analysis</p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-purple-500 transition-colors" />
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link href="/saved-profile">
+              <Card className="cursor-pointer hover:shadow-md hover:border-emerald-200 transition-all group bg-white">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                    <User className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-slate-800 text-sm">Saved Profile</p>
+                    <p className="text-xs text-slate-500">{profComp}% complete</p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-emerald-500 transition-colors" />
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
+        </div>
+
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Recent checks */}
+          <div className="lg:col-span-2">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Recent Checks</h2>
+              {checks.length > 3 && (
+                <Link href="/history">
+                  <span className="text-xs text-blue-600 hover:underline font-medium">View all</span>
+                </Link>
+              )}
+            </div>
+
+            {checksLoading ? (
+              <div className="space-y-3">
+                {[1,2].map(i => <div key={i} className="h-20 rounded-xl bg-slate-100 animate-pulse" />)}
+              </div>
+            ) : recentChecks.length === 0 ? (
+              <Card className="border-dashed border-2 border-slate-200 bg-white">
+                <CardContent className="py-10 text-center">
+                  <Brain className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                  <p className="font-medium text-slate-600 mb-1">No checks yet</p>
+                  <p className="text-sm text-slate-400 mb-4">Your first check is free — no card needed</p>
+                  <Link href="/check">
+                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700" data-testid="button-first-check">
+                      <Sparkles className="w-3.5 h-3.5 mr-1.5" />
+                      Start Free Check
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {recentChecks.map(check => {
+                  const fd = check.formData;
+                  return (
+                    <Card key={check.id} className="bg-white border-slate-100" data-testid={`card-check-${check.id}`}>
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className="font-semibold text-sm text-slate-800">{fd.visaType}</span>
+                              <span className="text-slate-300">→</span>
+                              <span className="font-semibold text-sm text-slate-800">{fd.destinationCountry}</span>
+                            </div>
+                            <p className="text-xs text-slate-500 mb-2">{fd.nationality} • {fd.purposeOfTravel}</p>
+                            <ScoreDisplay score={check.approvalChance} label={check.statusLabel} />
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-xs text-slate-400">
+                              {new Date(check.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+                {recentChecks.length > 0 && (
+                  <Link href="/history">
+                    <div className="flex items-center justify-center gap-2 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium cursor-pointer">
+                      View Full History
+                      <ArrowRight className="w-4 h-4" />
+                    </div>
+                  </Link>
+                )}
+              </div>
+            )}
           </div>
 
-          {checksLoading ? (
-            <div className="space-y-3">
-              {[1,2].map(i => <div key={i} className="h-20 rounded-xl bg-muted animate-pulse" />)}
-            </div>
-          ) : checks.length === 0 ? (
-            <Card className="border-dashed border-2">
-              <CardContent className="py-14 text-center">
-                <div className="w-16 h-16 rounded-2xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mx-auto mb-4">
-                  <Brain className="w-8 h-8 text-blue-600" />
+          {/* Right column */}
+          <div className="space-y-4">
+            {/* Profile completion */}
+            <Card className="bg-white border-slate-100">
+              <CardContent className="p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <User className="w-4 h-4 text-blue-600" />
+                  <h3 className="text-sm font-semibold text-slate-700">Profile Completion</h3>
                 </div>
-                <h3 className="font-semibold text-lg mb-2">No checks yet</h3>
-                <p className="text-muted-foreground text-sm mb-5 max-w-xs mx-auto">Run your first AI visa check to see your approval probability with a full analysis.</p>
-                <Link href="/check">
-                  <Button className="bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 border-0" data-testid="button-first-check">
-                    <Sparkles className="w-4 h-4 mr-2" />
-                    Run Your First Check
-                  </Button>
-                </Link>
+                <div className="mb-2 flex items-baseline justify-between">
+                  <span className="text-2xl font-black text-slate-900">{profComp}%</span>
+                  <Link href="/saved-profile">
+                    <span className="text-xs text-blue-600 hover:underline">Edit profile</span>
+                  </Link>
+                </div>
+                <div className="h-2 bg-slate-100 rounded-full overflow-hidden mb-3">
+                  <div
+                    className={`h-full rounded-full transition-all ${profComp >= 70 ? "bg-emerald-500" : profComp >= 40 ? "bg-blue-500" : "bg-slate-300"}`}
+                    style={{ width: `${profComp}%` }}
+                  />
+                </div>
+                {profComp < 100 && (
+                  <p className="text-xs text-slate-500">
+                    {profComp < 30 ? "Add your nationality and employment info to get started" :
+                     profComp < 70 ? "Add financial details to speed up future checks" :
+                     "Almost there — add remaining details"}
+                  </p>
+                )}
               </CardContent>
             </Card>
-          ) : (
-            <div className="space-y-3">
-              {checks.map((check) => {
-                const badge = getScoreBadge(check.approvalChance);
-                const fd = check.formData;
-                return (
-                  <Card key={check.id} className="hover:shadow-md transition-shadow" data-testid={`card-check-${check.id}`}>
-                    <CardContent className="p-4 md:p-5">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                            <span className="font-semibold text-sm">{fd.visaType || "Visa Check"}</span>
-                            <span className="text-muted-foreground text-xs">→</span>
-                            <span className="font-medium text-sm">{fd.destinationCountry}</span>
-                          </div>
-                          <p className="text-xs text-muted-foreground mb-2">
-                            {fd.nationality} • {fd.purposeOfTravel} • {fd.tripDuration}
-                          </p>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.class}`}>
-                              {badge.label}
-                            </span>
-                            {check.aiProvider && check.aiProvider !== "mock" && (
-                              <span className="text-xs text-muted-foreground">
-                                via {check.aiProvider === "openai" ? "OpenAI" : "Claude"}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(check.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </div>
 
-        {/* Disclaimer */}
-        <div className="flex items-start gap-2 p-4 rounded-xl bg-muted/50 border text-xs text-muted-foreground">
-          <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-          <span>Visa Shuttle provides AI-based estimation only. It does not guarantee visa approval. Final decisions are made only by the relevant embassy, consulate, or immigration authority.</span>
+            {/* Smart suggestions */}
+            <Card className="bg-white border-slate-100">
+              <CardContent className="p-5">
+                <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                  <Brain className="w-4 h-4 text-blue-600" />
+                  Smart Suggestions
+                </h3>
+                <div className="space-y-2">
+                  {profComp < 60 && (
+                    <Link href="/saved-profile">
+                      <div className="flex items-center gap-2 p-2.5 rounded-lg hover:bg-slate-50 cursor-pointer group">
+                        <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+                          <User className="w-3.5 h-3.5 text-blue-600" />
+                        </div>
+                        <span className="text-xs text-slate-600 group-hover:text-slate-900">Complete your saved profile</span>
+                        <ChevronRight className="w-3 h-3 text-slate-300 ml-auto" />
+                      </div>
+                    </Link>
+                  )}
+                  {!user.deepCheckAccess && (
+                    <Link href="/deep-check">
+                      <div className="flex items-center gap-2 p-2.5 rounded-lg hover:bg-slate-50 cursor-pointer group">
+                        <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center flex-shrink-0">
+                          <Crown className="w-3.5 h-3.5 text-purple-600" />
+                        </div>
+                        <span className="text-xs text-slate-600 group-hover:text-slate-900">Try Deep Check (Pro)</span>
+                        <ChevronRight className="w-3 h-3 text-slate-300 ml-auto" />
+                      </div>
+                    </Link>
+                  )}
+                  {checks.length >= 1 && (
+                    <Link href="/check">
+                      <div className="flex items-center gap-2 p-2.5 rounded-lg hover:bg-slate-50 cursor-pointer group">
+                        <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center flex-shrink-0">
+                          <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+                        </div>
+                        <span className="text-xs text-slate-600 group-hover:text-slate-900">Compare another destination</span>
+                        <ChevronRight className="w-3 h-3 text-slate-300 ml-auto" />
+                      </div>
+                    </Link>
+                  )}
+                  {!canCheck && (
+                    <Link href="/pricing">
+                      <div className="flex items-center gap-2 p-2.5 rounded-lg hover:bg-amber-50 cursor-pointer group">
+                        <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center flex-shrink-0">
+                          <Zap className="w-3.5 h-3.5 text-amber-600" />
+                        </div>
+                        <span className="text-xs text-amber-700 group-hover:text-amber-900 font-medium">Upgrade for more checks</span>
+                        <ChevronRight className="w-3 h-3 text-amber-300 ml-auto" />
+                      </div>
+                    </Link>
+                  )}
+                  {canCheck && checks.length === 0 && (
+                    <Link href="/check">
+                      <div className="flex items-center gap-2 p-2.5 rounded-lg hover:bg-slate-50 cursor-pointer group">
+                        <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+                          <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                        </div>
+                        <span className="text-xs text-slate-600 group-hover:text-slate-900">Run your first free check</span>
+                        <ChevronRight className="w-3 h-3 text-slate-300 ml-auto" />
+                      </div>
+                    </Link>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }
