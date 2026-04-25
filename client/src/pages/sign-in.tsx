@@ -36,7 +36,7 @@ export default function SignInPage() {
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-background">
       {/* Left panel */}
-      <div className="hidden lg:flex lg:w-[480px] xl:w-[520px] flex-col bg-gradient-to-br from-blue-700 via-blue-600 to-cyan-500 text-white p-10 xl:p-14 justify-between flex-shrink-0">
+      <div className="hidden lg:flex lg:w-[480px] xl:w-[520px] flex-col text-white p-10 xl:p-14 justify-between flex-shrink-0" style={{background:"linear-gradient(160deg,#4055FF 0%,#9033F5 50%,#FF2060 100%)"}}>
         <Logo size="lg" showText />
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/15 text-sm font-medium mb-8">
@@ -46,11 +46,11 @@ export default function SignInPage() {
           <h1 className="text-3xl xl:text-4xl font-bold mb-4 leading-tight">
             Welcome back to Visa Shuttle
           </h1>
-          <p className="text-blue-100 text-lg leading-relaxed">
+          <p className="text-white/80 text-lg leading-relaxed">
             Sign in to view your visa check history, run new checks, and get personalized AI-powered insights for your travel plans.
           </p>
         </div>
-        <p className="text-blue-200 text-sm">© {new Date().getFullYear()} Visa Shuttle. All rights reserved.</p>
+        <p className="text-white/60 text-sm">© {new Date().getFullYear()} Visa Shuttle. All rights reserved.</p>
       </div>
 
       {/* Right panel */}
@@ -61,7 +61,7 @@ export default function SignInPage() {
           </div>
           <div className="hidden lg:block" />
           <Link href="/join" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-            New here? <span className="text-blue-600 font-medium">Create free account</span>
+            New here? <span className="text-[#4055FF] font-medium">Create free account</span>
           </Link>
         </header>
 
@@ -118,7 +118,8 @@ export default function SignInPage() {
 
               <Button
                 type="submit"
-                className="w-full h-11 text-base font-semibold bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 border-0"
+                className="w-full h-11 text-base font-semibold border-0 text-white hover:opacity-90"
+                  style={{background:"linear-gradient(135deg,#4055FF,#FF2060)"}}
                 disabled={isLoading}
                 data-testid="button-submit"
               >
@@ -133,7 +134,7 @@ export default function SignInPage() {
 
             <p className="text-center text-sm text-muted-foreground mt-6">
               Don't have an account?{" "}
-              <Link href="/join" className="text-blue-600 font-medium hover:underline">
+              <Link href="/join" className="text-[#4055FF] font-medium hover:underline">
                 Create one free
               </Link>
             </p>

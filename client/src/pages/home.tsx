@@ -48,7 +48,7 @@ export default function HomePage() {
             <ThemeToggle />
             {user ? (
               <Link href="/account">
-                <Button size="sm" className="gap-2 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 border-0" data-testid="button-account">
+                <Button size="sm" className="gap-2 border-0 text-white hover:opacity-90" style={{background:"linear-gradient(135deg,#4055FF,#FF2060)"}} data-testid="button-account">
                   My Account
                   <ChevronRight className="w-4 h-4" />
                 </Button>
@@ -56,7 +56,7 @@ export default function HomePage() {
             ) : (
               <>
                 <Link href="/sign-in"><Button variant="ghost" size="sm" data-testid="button-signin">Sign In</Button></Link>
-                <Link href="/join"><Button size="sm" className="bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 border-0" data-testid="button-join">Get Started Free</Button></Link>
+                <Link href="/join"><Button size="sm" className="border-0 text-white hover:opacity-90" style={{background:"linear-gradient(135deg,#4055FF,#FF2060)"}} data-testid="button-join">Get Started Free</Button></Link>
               </>
             )}
           </div>
@@ -65,21 +65,21 @@ export default function HomePage() {
 
       {/* Hero */}
       <section className="relative overflow-hidden pt-14 pb-10 md:pt-24 md:pb-20">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-cyan-50 dark:from-blue-950/30 dark:via-background dark:to-cyan-950/20" />
-        <div className="absolute top-0 right-0 w-[700px] h-[700px] bg-cyan-400/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
-        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-blue-500/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/3" />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#4055FF]/5 via-white to-[#FF2060]/5 dark:from-[#4055FF]/15 dark:via-background dark:to-[#FF2060]/10" />
+        <div className="absolute top-0 right-0 w-[700px] h-[700px] bg-[#FF2060]/8 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
+        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-[#4055FF]/8 rounded-full blur-3xl translate-y-1/2 -translate-x-1/3" />
 
         <div className="relative max-w-7xl mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             {/* Left */}
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-sm font-medium mb-6 border border-blue-200 dark:border-blue-800">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#4055FF]/10 dark:bg-[#4055FF]/20 text-[#4055FF] dark:text-[#8899FF] text-sm font-medium mb-6 border border-[#4055FF]/20">
                 <Sparkles className="w-3.5 h-3.5" />
                 AI-Powered Visa Insights — Free to Start
               </div>
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-5 leading-tight tracking-tight">
                 Check Your{" "}
-                <span className="bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent">
+                <span className="bg-clip-text text-transparent" style={{backgroundImage:"linear-gradient(135deg,#4055FF,#9033F5,#FF2060)"}}>
                   Visa Approval
                 </span>{" "}
                 Chances Before You Apply
@@ -91,7 +91,8 @@ export default function HomePage() {
               <div className="flex flex-wrap gap-3 mb-8">
                 <Button
                   size="lg"
-                  className="gap-2 text-base bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 border-0 shadow-lg shadow-blue-500/25"
+                  className="gap-2 text-base border-0 text-white shadow-lg hover:opacity-90 shadow-[#4055FF]/25"
+                  style={{background:"linear-gradient(135deg,#4055FF,#9033F5,#FF2060)"}}
                   onClick={handleCheckCTA}
                   data-testid="button-hero-cta"
                 >
@@ -122,7 +123,7 @@ export default function HomePage() {
               <div className="flex items-center gap-4 mt-8">
                 <div className="flex -space-x-2">
                   {["SM","AH","MR","JK","LW"].map((av) => (
-                    <div key={av} className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-400 border-2 border-white dark:border-background flex items-center justify-center text-white text-xs font-semibold">
+                    <div key={av} className="w-8 h-8 rounded-full border-2 border-white dark:border-background flex items-center justify-center text-white text-xs font-semibold" style={{background:"linear-gradient(135deg,#4055FF,#FF2060)"}}>
                       {av}
                     </div>
                   ))}
@@ -135,15 +136,15 @@ export default function HomePage() {
 
             {/* Right — Live sample results */}
             <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-3xl blur-xl scale-105" />
+              <div className="absolute inset-0 bg-gradient-to-br from-[#4055FF]/15 to-[#FF2060]/15 rounded-3xl blur-xl scale-105" />
               <Card className="relative shadow-2xl rounded-2xl overflow-hidden border">
                 <CardContent className="p-0">
-                  <div className="bg-gradient-to-r from-blue-600 to-cyan-500 px-6 py-4 text-white">
+                  <div className="px-6 py-4 text-white" style={{background:"linear-gradient(135deg,#4055FF,#9033F5,#FF2060)"}}>
                     <div className="flex items-center gap-2">
                       <Brain className="w-5 h-5" />
                       <span className="font-semibold">Live AI Visa Scores</span>
                     </div>
-                    <p className="text-blue-100 text-xs mt-0.5">Real-time estimates powered by AI</p>
+                    <p className="text-white/75 text-xs mt-0.5">Real-time estimates powered by AI</p>
                   </div>
                   <div className="divide-y">
                     {VISA_SAMPLES.map((s, i) => (
@@ -165,7 +166,8 @@ export default function HomePage() {
                   </div>
                   <div className="px-6 py-4 bg-muted/30 border-t">
                     <Button
-                      className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 border-0 font-semibold"
+                      className="w-full border-0 text-white font-semibold hover:opacity-90"
+                      style={{background:"linear-gradient(135deg,#4055FF,#FF2060)"}}
                       onClick={handleCheckCTA}
                       data-testid="button-card-cta"
                     >
@@ -189,7 +191,7 @@ export default function HomePage() {
       {/* 14 Factors */}
       <section className="py-14 md:py-20 px-4 bg-muted/30 border-y">
         <div className="max-w-5xl mx-auto text-center">
-          <Badge className="mb-5 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-blue-200 dark:border-blue-800 hover:bg-blue-100">
+          <Badge className="mb-5 bg-[#4055FF]/10 text-[#4055FF] dark:bg-[#4055FF]/20 dark:text-[#8899FF] border-[#4055FF]/20 hover:bg-[#4055FF]/10">
             14 Key Factors Analyzed
           </Badge>
           <h2 className="text-2xl md:text-3xl font-bold mb-3">What the AI Looks At</h2>
@@ -222,13 +224,13 @@ export default function HomePage() {
             <p className="text-muted-foreground max-w-md mx-auto">From your details to a full AI visa analysis in under 2 minutes</p>
           </div>
           <div className="grid md:grid-cols-3 gap-8 relative">
-            <div className="hidden md:block absolute top-10 left-[33%] w-[34%] h-0.5 bg-gradient-to-r from-blue-300 to-cyan-300 dark:from-blue-700 dark:to-cyan-700" />
+            <div className="hidden md:block absolute top-10 left-[33%] w-[34%] h-0.5" style={{background:"linear-gradient(90deg,#4055FF,#FF2060)"}} />
             {STEPS.map(({ step, icon: Icon, title, desc }) => (
               <div key={step} className="text-center relative">
-                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/20">
+                <div className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-[#4055FF]/20" style={{background:"linear-gradient(135deg,#4055FF,#9033F5,#FF2060)"}}>
                   <Icon className="w-9 h-9 text-white" />
                 </div>
-                <div className="absolute top-0 right-1/4 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">
+                <div className="absolute top-0 right-1/4 w-6 h-6 rounded-full text-white text-xs font-bold flex items-center justify-center" style={{background:"#4055FF"}}>
                   {step.replace("0", "")}
                 </div>
                 <h3 className="font-semibold mb-2">{title}</h3>
@@ -247,8 +249,8 @@ export default function HomePage() {
           </div>
           <div className="grid md:grid-cols-3 gap-5">
             {[
-              { icon: Brain, title: "Real AI — Not Guesswork", desc: "Our AI is trained on real visa application patterns. No fixed rules — dynamic, data-driven scoring that reflects actual approval trends.", color: "text-blue-600 bg-blue-100 dark:bg-blue-900/30" },
-              { icon: Globe, title: "Global Coverage", desc: "Supports 100+ nationalities and destinations. Whether you're applying for Schengen, US, UK, UAE, or anywhere else — we've got you.", color: "text-cyan-600 bg-cyan-100 dark:bg-cyan-900/30" },
+              { icon: Brain, title: "Real AI — Not Guesswork", desc: "Our AI is trained on real visa application patterns. No fixed rules — dynamic, data-driven scoring that reflects actual approval trends.", color: "text-[#4055FF] bg-[#4055FF]/10 dark:bg-[#4055FF]/20" },
+              { icon: Globe, title: "Global Coverage", desc: "Supports 100+ nationalities and destinations. Whether you're applying for Schengen, US, UK, UAE, or anywhere else — we've got you.", color: "text-[#9033F5] bg-[#9033F5]/10 dark:bg-[#9033F5]/20" },
               { icon: Shield, title: "Secure & Private", desc: "Your data is never sold or shared. All AI analysis happens securely on our servers. Your visa details stay with you.", color: "text-purple-600 bg-purple-100 dark:bg-purple-900/30" },
             ].map(({ icon: Icon, title, desc, color }) => (
               <Card key={title} className="hover-elevate rounded-xl">
@@ -268,7 +270,7 @@ export default function HomePage() {
       {/* CTA */}
       <section className="py-16 md:py-24 px-4">
         <div className="max-w-3xl mx-auto text-center">
-          <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-blue-600 via-blue-700 to-cyan-600 p-10 md:p-16 text-white shadow-2xl shadow-blue-500/20">
+          <div className="relative rounded-3xl overflow-hidden p-10 md:p-16 text-white shadow-2xl shadow-[#4055FF]/20" style={{background:"linear-gradient(135deg,#4055FF 0%,#9033F5 50%,#FF2060 100%)"}}>
             <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
             <div className="relative">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 text-white/90 text-sm font-medium mb-6">
@@ -276,12 +278,12 @@ export default function HomePage() {
                 Start for free today
               </div>
               <h2 className="text-3xl md:text-4xl font-bold mb-4">Planning to Apply for a Visa?</h2>
-              <p className="text-blue-100 mb-8 text-lg leading-relaxed max-w-xl mx-auto">
+              <p className="text-white/80 mb-8 text-lg leading-relaxed max-w-xl mx-auto">
                 Know your chances before you apply. Get a free AI-powered visa assessment — no credit card, no waiting.
               </p>
               <Button
                 size="lg"
-                className="bg-white text-blue-700 hover:bg-blue-50 font-semibold shadow-lg text-base"
+                className="bg-white text-[#4055FF] hover:bg-white/90 font-semibold shadow-lg text-base"
                 onClick={handleCheckCTA}
                 data-testid="button-cta-final"
               >

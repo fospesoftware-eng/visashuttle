@@ -45,7 +45,7 @@ function profileCompletion(profile: SavedProfile | null): number {
 function ScoreDisplay({ score, label }: { score: number | null; label: string | null }) {
   if (score === null) return <Badge variant="secondary" className="text-xs">Pending</Badge>;
   const cfg = score >= 80 ? { bg: "bg-emerald-50", text: "text-emerald-700", badge: "bg-emerald-100 text-emerald-700" }
-    : score >= 60 ? { bg: "bg-blue-50", text: "text-blue-700", badge: "bg-blue-100 text-blue-700" }
+    : score >= 60 ? { bg: "bg-[#4055FF]/8", text: "text-[#4055FF]", badge: "bg-[#4055FF]/10 text-[#4055FF]" }
     : score >= 40 ? { bg: "bg-amber-50", text: "text-amber-700", badge: "bg-amber-100 text-amber-700" }
     : { bg: "bg-red-50", text: "text-red-700", badge: "bg-red-100 text-red-700" };
   return (
@@ -97,7 +97,7 @@ export default function AccountPage() {
         {/* Stats row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { label: "Total Checks", value: checks.length, icon: BarChart3, color: "text-blue-600", bg: "bg-blue-50" },
+            { label: "Total Checks", value: checks.length, icon: BarChart3, color: "text-[#4055FF]", bg: "bg-[#4055FF]/10" },
             { label: "Checks Left", value: checksRemaining, icon: Zap, color: canCheck ? "text-emerald-600" : "text-amber-600", bg: canCheck ? "bg-emerald-50" : "bg-amber-50" },
             { label: "Profile Complete", value: `${profComp}%`, icon: User, color: profComp >= 70 ? "text-emerald-600" : "text-slate-500", bg: "bg-slate-50" },
             { label: "Plan", value: user.subscriptionPlan.charAt(0).toUpperCase() + user.subscriptionPlan.slice(1), icon: Crown, color: user.subscriptionPlan === "pro" ? "text-purple-600" : "text-slate-500", bg: user.subscriptionPlan === "pro" ? "bg-purple-50" : "bg-slate-50" },
@@ -120,7 +120,7 @@ export default function AccountPage() {
             {notifications.map(({ type, msg }, i) => (
               <div key={i} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm border ${
                 type === "warn" ? "bg-amber-50 border-amber-100 text-amber-800" :
-                type === "info" ? "bg-blue-50 border-blue-100 text-blue-800" :
+                type === "info" ? "bg-[#4055FF]/8 border-[#4055FF]/15 text-[#4055FF]" :
                 "bg-slate-50 border-slate-100 text-slate-700"
               }`}>
                 <Bell className="w-4 h-4 flex-shrink-0" />
@@ -142,7 +142,7 @@ export default function AccountPage() {
             <Link href="/check">
               <Card className="cursor-pointer hover:shadow-md hover:border-blue-200 transition-all group bg-white">
                 <CardContent className="p-4 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform" style={{background:"linear-gradient(135deg,#4055FF,#FF2060)"}}>
                     <Sparkles className="w-5 h-5 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -196,7 +196,7 @@ export default function AccountPage() {
               <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Recent Checks</h2>
               {checks.length > 3 && (
                 <Link href="/history">
-                  <span className="text-xs text-blue-600 hover:underline font-medium">View all</span>
+                  <span className="text-xs text-[#4055FF] hover:underline font-medium">View all</span>
                 </Link>
               )}
             </div>
@@ -212,7 +212,7 @@ export default function AccountPage() {
                   <p className="font-medium text-slate-600 mb-1">No checks yet</p>
                   <p className="text-sm text-slate-400 mb-4">Your first check is free — no card needed</p>
                   <Link href="/check">
-                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700" data-testid="button-first-check">
+                    <Button size="sm" className="border-0 text-white hover:opacity-90" style={{background:"linear-gradient(135deg,#4055FF,#FF2060)"}} data-testid="button-first-check">
                       <Sparkles className="w-3.5 h-3.5 mr-1.5" />
                       Start Free Check
                     </Button>

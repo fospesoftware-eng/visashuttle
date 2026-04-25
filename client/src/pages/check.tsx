@@ -80,13 +80,13 @@ const EMPTY: FormData = {
 
 const STEPS = [
   { n: 1, title: "Personal Profile", icon: User, color: "text-violet-600", bg: "bg-violet-50" },
-  { n: 2, title: "Travel Plan", icon: MapPin, color: "text-blue-600", bg: "bg-blue-50" },
+  { n: 2, title: "Travel Plan", icon: MapPin, color: "text-[#4055FF]", bg: "bg-[#4055FF]/8" },
   { n: 3, title: "Employment & Income", icon: Star, color: "text-emerald-600", bg: "bg-emerald-50" },
   { n: 4, title: "Financial Strength", icon: CreditCard, color: "text-amber-600", bg: "bg-amber-50" },
   { n: 5, title: "Travel History", icon: Globe, color: "text-cyan-600", bg: "bg-cyan-50" },
   { n: 6, title: "Documents", icon: FileText, color: "text-orange-600", bg: "bg-orange-50" },
   { n: 7, title: "Home Country Ties", icon: Home, color: "text-rose-600", bg: "bg-rose-50" },
-  { n: 8, title: "Review & Submit", icon: CheckCircle, color: "text-blue-600", bg: "bg-blue-50" },
+  { n: 8, title: "Review & Submit", icon: CheckCircle, color: "text-[#4055FF]", bg: "bg-[#4055FF]/8" },
 ];
 
 interface AIResult {
@@ -99,7 +99,7 @@ interface AIResult {
 
 function getColors(score: number) {
   if (score >= 80) return { grad: "from-emerald-500 to-teal-500", badge: "bg-emerald-100 text-emerald-700", ring: "ring-emerald-100", bar: "bg-emerald-500", light: "bg-emerald-50", text: "text-emerald-700" };
-  if (score >= 60) return { grad: "from-blue-500 to-cyan-500", badge: "bg-blue-100 text-blue-700", ring: "ring-blue-100", bar: "bg-blue-500", light: "bg-blue-50", text: "text-blue-700" };
+  if (score >= 60) return { grad: "from-[#4055FF] to-[#9033F5]", badge: "bg-[#4055FF]/10 text-[#4055FF]", ring: "ring-[#4055FF]/15", bar: "bg-[#4055FF]", light: "bg-[#4055FF]/8", text: "text-[#4055FF]" };
   if (score >= 40) return { grad: "from-amber-500 to-orange-400", badge: "bg-amber-100 text-amber-700", ring: "ring-amber-100", bar: "bg-amber-500", light: "bg-amber-50", text: "text-amber-700" };
   return { grad: "from-red-500 to-rose-400", badge: "bg-red-100 text-red-700", ring: "ring-red-100", bar: "bg-red-500", light: "bg-red-50", text: "text-red-700" };
 }
@@ -161,7 +161,7 @@ function ReviewSection({ title, icon: Icon, items }: { title: string; icon: any;
   return (
     <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
       <div className="flex items-center gap-2 mb-3">
-        <Icon className="w-4 h-4 text-blue-600" />
+        <Icon className="w-4 h-4 text-[#4055FF]" />
         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{title}</p>
       </div>
       <div className="space-y-1.5">
@@ -355,7 +355,7 @@ export default function CheckPage() {
             <CardContent className="p-6 bg-white">
               {/* Summary + final recommendation */}
               <div className="flex items-start gap-3 p-4 rounded-xl bg-slate-50 border border-slate-100 mb-5">
-                <Brain className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <Brain className="w-5 h-5 text-[#4055FF] flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm text-slate-700 leading-relaxed mb-2" data-testid="result-summary">{result.summary}</p>
                   {result.finalRecommendation && (
@@ -411,14 +411,14 @@ export default function CheckPage() {
               {tab === "docs" && (
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
-                    <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide flex items-center gap-1.5 mb-2.5">
+                    <p className="text-xs font-semibold text-[#4055FF] uppercase tracking-wide flex items-center gap-1.5 mb-2.5">
                       <FileText className="w-3.5 h-3.5" /> Required Documents
                     </p>
                     <div className="space-y-1.5">
                       {result.requiredDocuments?.map((d, i) => (
-                        <div key={i} className="flex gap-2 p-2.5 rounded-lg bg-blue-50 border border-blue-100 text-xs">
-                          <CheckCircle className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 mt-0.5" />
-                          <span className="text-blue-800">{d}</span>
+                        <div key={i} className="flex gap-2 p-2.5 rounded-lg bg-[#4055FF]/8 border border-[#4055FF]/15 text-xs">
+                          <CheckCircle className="w-3.5 h-3.5 text-[#4055FF] flex-shrink-0 mt-0.5" />
+                          <span className="text-[#4055FF]/90">{d}</span>
                         </div>
                       ))}
                     </div>
@@ -447,14 +447,14 @@ export default function CheckPage() {
               {tab === "tips" && (
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
-                    <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide flex items-center gap-1.5 mb-2.5">
+                    <p className="text-xs font-semibold text-[#4055FF] uppercase tracking-wide flex items-center gap-1.5 mb-2.5">
                       <Lightbulb className="w-3.5 h-3.5" /> Improvement Tips
                     </p>
                     <div className="space-y-1.5">
                       {result.improvementTips?.map((t, i) => (
-                        <div key={i} className="flex gap-2 p-2.5 rounded-lg bg-blue-50 border border-blue-100 text-xs">
-                          <Lightbulb className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 mt-0.5" />
-                          <span className="text-blue-800">{t}</span>
+                        <div key={i} className="flex gap-2 p-2.5 rounded-lg bg-[#4055FF]/8 border border-[#4055FF]/15 text-xs">
+                          <Lightbulb className="w-3.5 h-3.5 text-[#4055FF] flex-shrink-0 mt-0.5" />
+                          <span className="text-[#4055FF]/90">{t}</span>
                         </div>
                       ))}
                     </div>
@@ -497,7 +497,7 @@ export default function CheckPage() {
               </div>
 
               <div className="mt-5 flex flex-wrap gap-3">
-                <Button onClick={resetForm} className="bg-blue-600 hover:bg-blue-700 gap-2" data-testid="button-new-check">
+                <Button onClick={resetForm} className="border-0 text-white hover:opacity-90 gap-2" style={{background:"linear-gradient(135deg,#4055FF,#FF2060)"}} data-testid="button-new-check">
                   <RefreshCw className="w-4 h-4" /> New Check
                 </Button>
                 <Link href="/history">
@@ -569,7 +569,7 @@ export default function CheckPage() {
             })}
           </div>
           <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-            <div className="h-full bg-blue-600 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, background: "linear-gradient(90deg,#4055FF,#FF2060)" }} />
           </div>
         </div>
 
@@ -588,12 +588,12 @@ export default function CheckPage() {
 
             {/* Saved profile prompt (step 1 only when no auto-fill happened) */}
             {step === 1 && savedProfile?.nationality && !profileUsed && (
-              <div className="mb-5 p-3 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-between gap-3">
+              <div className="mb-5 p-3 rounded-xl bg-[#4055FF]/8 border border-[#4055FF]/20 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <User className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                  <span className="text-sm text-blue-700 font-medium">Saved profile available for <strong>{savedProfile.nationality}</strong></span>
+                  <User className="w-4 h-4 text-[#4055FF] flex-shrink-0" />
+                  <span className="text-sm text-[#4055FF] font-medium">Saved profile available for <strong>{savedProfile.nationality}</strong></span>
                 </div>
-                <Button size="sm" variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-50 text-xs flex-shrink-0" onClick={() => { applyProfile(); toast({ title: "Profile applied!", description: "Your saved details have been pre-filled." }); }}>
+                <Button size="sm" variant="outline" className="border-[#4055FF]/30 text-[#4055FF] hover:bg-[#4055FF]/5 text-xs flex-shrink-0" onClick={() => { applyProfile(); toast({ title: "Profile applied!", description: "Your saved details have been pre-filled." }); }}>
                   Use Profile
                 </Button>
               </div>
@@ -753,9 +753,9 @@ export default function CheckPage() {
             {/* ===== STEP 8: Review & Submit ===== */}
             {step === 8 && (
               <div className="space-y-4">
-                <div className="p-4 rounded-xl bg-blue-50 border border-blue-100">
-                  <p className="text-sm font-semibold text-blue-800 mb-1">Ready to generate your AI visa assessment?</p>
-                  <p className="text-sm text-blue-600">Review your answers below, then click "Generate AI Visa Chance".</p>
+                <div className="p-4 rounded-xl bg-[#4055FF]/8 border border-[#4055FF]/15">
+                  <p className="text-sm font-semibold text-[#4055FF] mb-1">Ready to generate your AI visa assessment?</p>
+                  <p className="text-sm text-[#4055FF]/80">Review your answers below, then click "Generate AI Visa Chance".</p>
                 </div>
 
                 <div className="grid sm:grid-cols-2 gap-3">
@@ -770,7 +770,8 @@ export default function CheckPage() {
                 <Button
                   onClick={handleSubmit}
                   disabled={isSubmitting || !canCheck}
-                  className="w-full h-12 text-base font-semibold bg-blue-600 hover:bg-blue-700 gap-2 mt-2"
+                  className="w-full h-12 text-base font-semibold border-0 text-white hover:opacity-90 gap-2 mt-2"
+                  style={{background:"linear-gradient(135deg,#4055FF,#9033F5,#FF2060)"}}
                   data-testid="button-submit-check"
                 >
                   {isSubmitting ? (
@@ -794,7 +795,7 @@ export default function CheckPage() {
                   <ChevronLeft className="w-4 h-4" /> Back
                 </Button>
                 <div className="text-xs text-slate-400">{step} / {STEPS.length}</div>
-                <Button onClick={next} className="bg-blue-600 hover:bg-blue-700 gap-2" data-testid="button-next">
+                <Button onClick={next} className="border-0 text-white hover:opacity-90 gap-2" style={{background:"linear-gradient(135deg,#4055FF,#FF2060)"}} data-testid="button-next">
                   Continue <ChevronRight className="w-4 h-4" />
                 </Button>
               </div>
