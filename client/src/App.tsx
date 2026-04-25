@@ -8,7 +8,8 @@ import { ThemeProvider } from "@/lib/theme";
 import { PasswordGate } from "@/components/password-gate";
 
 import NotFound from "@/pages/not-found";
-import LandingPage from "@/pages/landing";
+import HomePage from "@/pages/home";
+import BusinessPage from "@/pages/business";
 import LoginPage from "@/pages/login";
 import SignupPage from "@/pages/signup";
 
@@ -67,7 +68,8 @@ function SubdomainRedirect() {
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={LandingPage} />
+      <Route path="/" component={HomePage} />
+      <Route path="/business" component={BusinessPage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/signup" component={SignupPage} />
 
