@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Crown, Lock, Sparkles, CheckCircle, FileText, AlertCircle,
   TrendingUp, Download, Shield, ArrowRight, Zap, ChevronLeft,
   ChevronRight, Brain, User, Plane, CreditCard, Globe, Home,
   Info, RefreshCw, Flag, Star, AlertTriangle, Activity, BookOpen,
-  Briefcase, BadgeCheck, BarChart3, ClipboardList
+  Briefcase, BadgeCheck, BarChart3, ClipboardList, Plus, Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +15,8 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { DashboardLayout } from "@/components/dashboard-layout";
-import { SearchableSelect } from "@/components/searchable-select";
+import { SearchableSelect, MultiSearchableSelect } from "@/components/searchable-select";
+import { Logo, LogoMark } from "@/components/logo";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -179,6 +180,23 @@ const TRANSIT_LONG_DURATIONS = ["15–30 days", "1–3 months", "More than 3 mon
 const EMPLOYED_STATUSES = ["Employed (Full-time)", "Employed (Part-time)", "Government Employee"];
 const WORKING_STATUSES = [...EMPLOYED_STATUSES, "Self-employed / Business Owner", "Freelancer / Consultant"];
 
+const VISA_REGIONS = ["Schengen / EU","United States","United Kingdom","Australia","Canada","Japan","UAE","Singapore","South Korea","New Zealand","Switzerland","Other"];
+const VISA_STATUSES = ["Currently valid","Expires within 6 months","Expired within last year","Expired 1–3 years ago"];
+
+const LOAD_MESSAGES = [
+  "Analyzing your personal profile…",
+  "Reviewing employment & financial strength…",
+  "Evaluating travel history & visa track record…",
+  "Checking home country ties & return intent…",
+  "Running embassy-style risk assessment…",
+  "Comparing against consular approval patterns…",
+  "Generating dimension scores…",
+  "Building your personalized action plan…",
+  "Finalizing your Deep Check report…",
+];
+
+type VisaHolding = { region: string; status: string };
+
 // Countries that officially do not allow dual nationality
 const NO_DUAL_NATIONALITY_COUNTRIES = new Set([
   "India","China","Japan","Singapore","Malaysia","United Arab Emirates","Saudi Arabia",
@@ -214,6 +232,34 @@ export default function DeepCheckPage() {
   const [result, setResult] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [provider, setProvider] = useState("");
+  const [visaHoldings, setVisaHoldings] = useState<VisaHolding[]>([]);
+  const [loadProgress, setLoadProgress] = useState(0);
+  const [loadMessage, setLoadMessage] = useState(LOAD_MESSAGES[0]);
+
+  // Animated progress bar while submitting
+  useEffect(() => {
+    if (!isSubmitting) { setLoadProgress(0); return; }
+    setLoadProgress(0);
+    let p = 0;
+    const tick = setInterval(() => {
+      p += Math.random() * 2.5 + 0.3;
+      if (p >= 90) { clearInterval(tick); p = 90; }
+      setLoadProgress(p);
+    }, 220);
+    return () => clearInterval(tick);
+  }, [isSubmitting]);
+
+  // Rotating status messages while submitting
+  useEffect(() => {
+    if (!isSubmitting) return;
+    let i = 0;
+    setLoadMessage(LOAD_MESSAGES[0]);
+    const tick = setInterval(() => {
+      i = (i + 1) % LOAD_MESSAGES.length;
+      setLoadMessage(LOAD_MESSAGES[i]);
+    }, 2800);
+    return () => clearInterval(tick);
+  }, [isSubmitting]);
 
   if (authLoading) return null;
   if (!user) { setLocation("/sign-in"); return null; }
@@ -617,10 +663,19 @@ export default function DeepCheckPage() {
       toast({ title: "Required fields missing", description: "Please fill in at least nationality, destination, and visa type.", variant: "destructive" });
       return;
     }
+    // Serialize visa holdings into form before submitting
+    const enrichedForm = {
+      ...form,
+      currentVisaHoldings: visaHoldings.length > 0
+        ? visaHoldings.map(v => `${v.region} (${v.status})`).join("; ")
+        : "None",
+    };
     setIsSubmitting(true);
     try {
-      const res = await apiRequest("POST", "/api/b2c/deep-check", { formData: form });
+      const res = await apiRequest("POST", "/api/b2c/deep-check", { formData: enrichedForm });
       const data = await res.json();
+      setLoadProgress(100);
+      await new Promise(r => setTimeout(r, 600));
       setResult(data.result);
       setProvider(data.check?.aiProvider || "");
       await queryClient.invalidateQueries({ queryKey: ["/api/b2c/checks"] });
@@ -630,6 +685,87 @@ export default function DeepCheckPage() {
       setIsSubmitting(false);
     }
   };
+
+  // ===================== ANIMATED PROGRESS SCREEN =====================
+  if (isSubmitting) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center"
+        style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 40%, #0f172a 100%)" }}>
+        {/* Subtle radial glow */}
+        <div className="absolute inset-0 pointer-events-none"
+          style={{ background: "radial-gradient(ellipse 60% 40% at 50% 40%, rgba(64,85,255,0.18) 0%, transparent 70%)" }} />
+
+        <div className="relative z-10 flex flex-col items-center gap-8 px-6 max-w-md w-full">
+          {/* Logo */}
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-2xl"
+              style={{ background: "linear-gradient(135deg,#4055FF,#7033F0,#FF2060)" }}>
+              <svg viewBox="0 0 24 24" fill="none" className="w-8 h-8 text-white">
+                <path d="M5 19L19 5M19 5H9M19 5V15" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <div className="text-center">
+              <p className="text-white font-bold text-xl tracking-tight">Visa Shuttle</p>
+              <p className="text-blue-300 text-xs font-medium tracking-widest uppercase mt-0.5">Deep Check</p>
+            </div>
+          </div>
+
+          {/* Brain pulse animation */}
+          <div className="relative">
+            <div className="w-24 h-24 rounded-full flex items-center justify-center"
+              style={{ background: "rgba(64,85,255,0.15)", boxShadow: "0 0 0 0 rgba(64,85,255,0.4)", animation: "pulse-ring 2s ease-out infinite" }}>
+              <div className="w-16 h-16 rounded-full flex items-center justify-center"
+                style={{ background: "rgba(64,85,255,0.25)" }}>
+                <Brain className="w-8 h-8 text-blue-300" />
+              </div>
+            </div>
+            <style>{`
+              @keyframes pulse-ring {
+                0% { box-shadow: 0 0 0 0 rgba(64,85,255,0.5); }
+                70% { box-shadow: 0 0 0 24px rgba(64,85,255,0); }
+                100% { box-shadow: 0 0 0 0 rgba(64,85,255,0); }
+              }
+            `}</style>
+          </div>
+
+          {/* Status message */}
+          <div className="text-center min-h-[2.5rem]">
+            <p className="text-white font-semibold text-base transition-all duration-500">{loadMessage}</p>
+            <p className="text-blue-400 text-xs mt-1">Claude AI is processing your visa profile</p>
+          </div>
+
+          {/* Progress bar */}
+          <div className="w-full space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-blue-300 font-medium">Analysis Progress</span>
+              <span className="text-blue-200 font-bold">{Math.round(loadProgress)}%</span>
+            </div>
+            <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+              <div className="h-full rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${loadProgress}%`, background: "linear-gradient(90deg,#4055FF,#7033F0,#FF2060)" }} />
+            </div>
+          </div>
+
+          {/* Steps indicator */}
+          <div className="flex gap-2 flex-wrap justify-center">
+            {["Profile","Travel","Finance","History","Documents","Analysis"].map((label, i) => {
+              const frac = loadProgress / 100;
+              const done = frac > (i + 1) / 6;
+              const active = !done && frac > i / 6;
+              return (
+                <div key={label} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-500 ${done ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : active ? "bg-blue-500/20 text-blue-200 border border-blue-400/40" : "bg-white/5 text-white/30 border border-white/10"}`}>
+                  {done ? <CheckCircle className="w-3 h-3" /> : <div className={`w-3 h-3 rounded-full border-2 ${active ? "border-blue-400 border-t-transparent animate-spin" : "border-white/20"}`} />}
+                  {label}
+                </div>
+              );
+            })}
+          </div>
+
+          <p className="text-blue-400/60 text-xs text-center">This usually takes 20–40 seconds</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <DashboardLayout title="New Deep Check" subtitle={`Step ${step} of ${STEPS.length} — ${currentStep.title}`}>
@@ -939,12 +1075,19 @@ export default function DeepCheckPage() {
               <div className="grid sm:grid-cols-2 gap-4">
                 <Sel label="Total International Trips (lifetime)" val={form.numberOfTrips || ""} onChange={val => { set("numberOfTrips")(val); if (val === "None") { set("countriesVisited")(""); set("previousVisaApprovals")("None"); set("hasOverstay")("No"); set("hasDeportation")("No"); } }} opts={["None","1–2 trips","3–5 trips","6–10 trips","10+ trips"]} />
                 <div>
-                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Countries Visited (last 3 years)</Label>
-                  <Input value={form.countriesVisited || ""} onChange={e => set("countriesVisited")(e.target.value)} placeholder={form.numberOfTrips === "None" ? "No trips recorded" : "e.g. UAE, Turkey, Malaysia"} disabled={form.numberOfTrips === "None"} />
-                  {form.numberOfTrips === "None" && form.countriesVisited && (
-                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                      <AlertTriangle className="w-3 h-3" /> You listed countries visited but declared zero international trips.
-                    </p>
+                  {form.numberOfTrips === "None" ? (
+                    <>
+                      <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Countries Visited (last 3 years)</Label>
+                      <div className="h-10 px-3 flex items-center text-sm text-muted-foreground bg-muted/50 border border-muted rounded-lg">No trips recorded</div>
+                    </>
+                  ) : (
+                    <MultiSearchableSelect
+                      label="Countries Visited (last 3 years)"
+                      value={form.countriesVisited || ""}
+                      onChange={set("countriesVisited")}
+                      options={COUNTRIES}
+                      placeholder="Select countries visited…"
+                    />
                   )}
                 </div>
                 <div>
@@ -983,10 +1126,50 @@ export default function DeepCheckPage() {
                 </div>
                 <DocToggle label="Any criminal record?" val={form.criminalRecord || ""} onChange={set("criminalRecord")} />
                 <DocToggle label="Any immigration violations?" val={form.immigrationViolation || ""} onChange={set("immigrationViolation")} />
-                <Sel label="Currently hold a valid visa for:" val={form.currentVisaHoldings || ""} onChange={set("currentVisaHoldings")} opts={["None","Schengen / EU","United States","United Kingdom","Australia","Canada","Japan","UAE","Other"]} tooltip="Holding strong country visa boosts credibility" />
-                {form.currentVisaHoldings && form.currentVisaHoldings !== "None" && (
-                  <Sel label="That visa's status" val={form.visaHoldingExpiry || ""} onChange={set("visaHoldingExpiry")} opts={["Currently valid","Expired within last year","Expired 1-3 years ago"]} />
-                )}
+                {/* ── Multi-visa holdings ─────────────────────────── */}
+                <div className="sm:col-span-2 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                      Currently held valid visas
+                      <span className="text-xs text-muted-foreground ml-1.5">(Holding strong-country visas boosts credibility)</span>
+                    </Label>
+                    <Button type="button" size="sm" variant="outline" className="gap-1.5 text-xs h-7 px-2.5"
+                      onClick={() => setVisaHoldings(prev => [...prev, { region: "", status: "" }])}>
+                      <Plus className="w-3.5 h-3.5" /> Add Visa
+                    </Button>
+                  </div>
+
+                  {visaHoldings.length === 0 && (
+                    <div className="text-sm text-muted-foreground border border-dashed border-muted rounded-lg px-4 py-3 text-center">
+                      No visas added — click <span className="font-semibold">Add Visa</span> to record any active/recent visas
+                    </div>
+                  )}
+
+                  {visaHoldings.map((vh, i) => (
+                    <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-start p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1 block">Visa / Country Region</Label>
+                        <select value={vh.region} onChange={e => setVisaHoldings(prev => prev.map((h, idx) => idx === i ? { ...h, region: e.target.value } : h))}
+                          className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-sm bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/20">
+                          <option value="">Select region…</option>
+                          {VISA_REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1 block">Visa Status</Label>
+                        <select value={vh.status} onChange={e => setVisaHoldings(prev => prev.map((h, idx) => idx === i ? { ...h, status: e.target.value } : h))}
+                          className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-sm bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/20">
+                          <option value="">Select status…</option>
+                          {VISA_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                      <button type="button" onClick={() => setVisaHoldings(prev => prev.filter((_, idx) => idx !== i))}
+                        className="mt-5 p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
