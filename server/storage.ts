@@ -299,6 +299,21 @@ export class MemStorage implements IStorage {
       createdAt: new Date(),
     };
     this.b2cUsersMap.set(demoB2cUser.id, demoB2cUser);
+
+    // Test account with unlimited Deep Check access (for QA / testing only)
+    const testB2cUser: B2cUser = {
+      id: "b2c-test",
+      email: "test@visashuttle.com",
+      password: bcrypt.hashSync("Test@12345", 10),
+      fullName: "Test Account",
+      freeChecksUsed: 0,
+      subscriptionPlan: "pro",
+      checkLimit: 9999,
+      deepCheckAccess: true,
+      stripeCustomerId: null,
+      createdAt: new Date(),
+    };
+    this.b2cUsersMap.set(testB2cUser.id, testB2cUser);
   }
 
   async getUser(id: string): Promise<User | undefined> {
