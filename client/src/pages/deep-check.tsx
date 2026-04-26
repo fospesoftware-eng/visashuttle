@@ -19,6 +19,7 @@ import { SearchableSelect, MultiSearchableSelect } from "@/components/searchable
 import { Logo, LogoMark } from "@/components/logo";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
 const COUNTRIES = ["Afghanistan","Albania","Algeria","Argentina","Australia","Austria","Azerbaijan","Bahrain","Bangladesh","Belgium","Brazil","Bulgaria","Cambodia","Canada","Chile","China","Colombia","Croatia","Cyprus","Czech Republic","Denmark","Egypt","Estonia","Ethiopia","Finland","France","Georgia","Germany","Ghana","Greece","Hungary","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Japan","Jordan","Kazakhstan","Kenya","Kuwait","Latvia","Lebanon","Lithuania","Luxembourg","Malaysia","Malta","Mexico","Morocco","Myanmar","Nepal","Netherlands","New Zealand","Nigeria","Norway","Oman","Pakistan","Philippines","Poland","Portugal","Qatar","Romania","Russia","Saudi Arabia","Serbia","Singapore","Slovakia","Slovenia","South Africa","South Korea","Spain","Sri Lanka","Sweden","Switzerland","Syria","Taiwan","Thailand","Tunisia","Turkey","Ukraine","United Arab Emirates","United Kingdom","United States","Uzbekistan","Venezuela","Vietnam","Yemen","Zimbabwe"];
@@ -235,6 +236,46 @@ export default function DeepCheckPage() {
   const [visaHoldings, setVisaHoldings] = useState<VisaHolding[]>([]);
   const [loadProgress, setLoadProgress] = useState(0);
   const [loadMessage, setLoadMessage] = useState(LOAD_MESSAGES[0]);
+  const [profileApplied, setProfileApplied] = useState(false);
+
+  // Load saved profile
+  const { data: savedProfile } = useQuery<any>({
+    queryKey: ["/api/b2c/profile"],
+    enabled: !!user,
+  });
+
+  // Auto pre-fill from saved profile on first load
+  useEffect(() => {
+    if (!savedProfile?.nationality || profileApplied) return;
+    setForm(f => ({
+      ...f,
+      nationality: savedProfile.nationality || f.nationality,
+      passportCountry: savedProfile.passportCountry || f.passportCountry,
+      dateOfBirth: savedProfile.dateOfBirth || f.dateOfBirth,
+      gender: savedProfile.gender || f.gender,
+      maritalStatus: savedProfile.maritalStatus || f.maritalStatus,
+      countryOfResidence: savedProfile.countryOfResidence || f.countryOfResidence,
+      employmentStatus: savedProfile.employmentStatus || f.employmentStatus,
+      jobTitle: savedProfile.jobTitle || f.jobTitle,
+      companyName: savedProfile.companyName || f.companyName,
+      yearsInJob: savedProfile.yearsInJob || f.yearsInJob,
+      monthlyIncome: savedProfile.monthlyIncome || f.monthlyIncome,
+      sourceOfIncome: savedProfile.sourceOfIncome || f.sourceOfIncome,
+      bankBalance: savedProfile.bankBalance || f.bankBalance,
+      tripFunding: savedProfile.tripFunding || f.tripFunding,
+      countriesVisited: savedProfile.countriesVisited || f.countriesVisited,
+      previousVisaRefusals: savedProfile.previousVisaRefusals || f.previousVisaRefusals,
+      hasBankStatement: savedProfile.hasBankStatement ? "Yes" : f.hasBankStatement,
+      hasTaxReturn: savedProfile.hasTaxReturn ? "Yes" : f.hasTaxReturn,
+      hasSalarySlips: savedProfile.hasSalarySlips ? "Yes" : f.hasSalarySlips,
+      hasCreditCard: savedProfile.hasCreditCard ? "Yes" : f.hasCreditCard,
+      hasProperty: savedProfile.hasProperty ? "Yes" : f.hasProperty,
+      familyInHomeCountry: savedProfile.familyInHomeCountry ? "Yes" : f.familyInHomeCountry,
+      propertyInHomeCountry: savedProfile.propertyInHomeCountry ? "Yes" : f.propertyInHomeCountry,
+    }));
+    setProfileApplied(true);
+    toast({ title: "Profile loaded", description: "Your saved profile has been pre-filled. Review and adjust as needed." });
+  }, [savedProfile]);
 
   // Animated progress bar while submitting
   useEffect(() => {
@@ -679,6 +720,36 @@ export default function DeepCheckPage() {
       setResult(data.result);
       setProvider(data.check?.aiProvider || "");
       await queryClient.invalidateQueries({ queryKey: ["/api/b2c/checks"] });
+
+      // Auto-save profile from form data
+      try {
+        await apiRequest("PUT", "/api/b2c/profile", {
+          nationality: form.nationality,
+          passportCountry: form.passportCountry,
+          dateOfBirth: form.dateOfBirth,
+          gender: form.gender,
+          maritalStatus: form.maritalStatus,
+          countryOfResidence: form.countryOfResidence,
+          employmentStatus: form.employmentStatus,
+          jobTitle: form.jobTitle,
+          companyName: form.companyName,
+          yearsInJob: form.yearsInJob,
+          monthlyIncome: form.monthlyIncome,
+          sourceOfIncome: form.sourceOfIncome,
+          bankBalance: form.bankBalance,
+          tripFunding: form.tripFunding,
+          countriesVisited: form.countriesVisited,
+          previousVisaRefusals: form.previousVisaRefusals,
+          hasBankStatement: form.hasBankStatement === "Yes",
+          hasTaxReturn: form.hasTaxReturn === "Yes",
+          hasSalarySlips: form.hasSalarySlips === "Yes",
+          hasCreditCard: form.hasCreditCard === "Yes",
+          hasProperty: form.hasProperty === "Yes",
+          familyInHomeCountry: form.familyInHomeCountry === "Yes",
+          propertyInHomeCountry: form.propertyInHomeCountry === "Yes",
+        });
+        await queryClient.invalidateQueries({ queryKey: ["/api/b2c/profile"] });
+      } catch (_) {}
     } catch (err: any) {
       toast({ title: "Deep Check failed", description: err.message || "Please try again.", variant: "destructive" });
     } finally {
@@ -698,16 +769,8 @@ export default function DeepCheckPage() {
         <div className="relative z-10 flex flex-col items-center gap-8 px-6 max-w-md w-full">
           {/* Logo */}
           <div className="flex flex-col items-center gap-3">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-2xl"
-              style={{ background: "linear-gradient(135deg,#4055FF,#7033F0,#FF2060)" }}>
-              <svg viewBox="0 0 24 24" fill="none" className="w-8 h-8 text-white">
-                <path d="M5 19L19 5M19 5H9M19 5V15" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </div>
-            <div className="text-center">
-              <p className="text-white font-bold text-xl tracking-tight">Visa Shuttle</p>
-              <p className="text-blue-300 text-xs font-medium tracking-widest uppercase mt-0.5">Deep Check</p>
-            </div>
+            <Logo variant="white" size="lg" showText={true} />
+            <p className="text-blue-300 text-xs font-medium tracking-widest uppercase -mt-1">Deep Check</p>
           </div>
 
           {/* Brain pulse animation */}
@@ -1128,6 +1191,25 @@ export default function DeepCheckPage() {
                 <DocToggle label="Any immigration violations?" val={form.immigrationViolation || ""} onChange={set("immigrationViolation")} />
                 {/* ── Multi-visa holdings ─────────────────────────── */}
                 <div className="sm:col-span-2 space-y-2">
+                  {/* Warn: already holds a valid visa for the destination country */}
+                  {visaHoldings.some(vh =>
+                    form.destinationCountry &&
+                    vh.region.toLowerCase() === form.destinationCountry.toLowerCase() &&
+                    (vh.status === "Currently valid" || vh.status === "Expires within 6 months")
+                  ) && (
+                    <div className="flex items-start gap-2.5 p-3 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-700">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                          You already hold a valid {form.destinationCountry} visa
+                        </p>
+                        <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                          Applying for the same visa type is likely unnecessary — wait until your current visa expires, or check if you need a different entry category (e.g. work vs tourist).
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between">
                     <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">
                       Currently held valid visas
