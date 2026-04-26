@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { 
   Home, Users, Briefcase, FileText, BarChart3, Settings, 
   ChevronLeft, ChevronRight, LogOut, Bell, Search,
-  Menu, X, Building2, ShieldCheck, Database, Activity
+  Menu, X, Building2, ShieldCheck, Database, Activity, Globe
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +47,7 @@ const agencyNavItems: NavItem[] = [
   { icon: Briefcase, label: "Applications", href: "/app/cases" },
   { icon: FileText, label: "Documents", href: "/app/documents" },
   { icon: BarChart3, label: "Reports", href: "/app/reports" },
+  { icon: Globe, label: "Visa Check", href: "/app/visa-check" },
   { icon: Settings, label: "Settings", href: "/app/settings" },
 ];
 

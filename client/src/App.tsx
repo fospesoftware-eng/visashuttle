@@ -22,6 +22,7 @@ import DeepCheckPage from "@/pages/deep-check";
 import SavedProfilePage from "@/pages/saved-profile";
 import SettingsPage from "@/pages/settings";
 
+import VisaCheckPage from "@/pages/visa-check";
 import AgencyDashboard from "@/pages/agency/dashboard";
 import LeadsPage from "@/pages/agency/leads";
 import CasesPage from "@/pages/agency/cases";
@@ -98,6 +99,7 @@ function Router() {
       <Route path="/app/documents" component={DocumentsPage} />
       <Route path="/app/reports" component={ReportsPage} />
       <Route path="/app/settings" component={AgencySettingsPage} />
+      <Route path="/app/visa-check" component={VisaCheckPage} />
 
       <Route path="/customer" component={CustomerDashboard} />
       <Route path="/customer/case" component={CustomerCasePage} />
