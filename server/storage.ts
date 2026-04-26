@@ -13,9 +13,12 @@ import {
   type B2cUser, type InsertB2cUser,
   type VisaCheck, type InsertVisaCheck,
   type SavedProfile, type InsertSavedProfile,
+  b2cUsers, visaChecks, savedProfiles,
 } from "@shared/schema";
+import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
+import { db } from "./db";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -781,4 +784,68 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// HybridStorage: uses MemStorage for agency/seed data, PostgreSQL for B2C user data
+class HybridStorage extends MemStorage {
+  // B2C Users — persisted to DB
+  async getB2cUser(id: string): Promise<B2cUser | undefined> {
+    const rows = await db.select().from(b2cUsers).where(eq(b2cUsers.id, id)).limit(1);
+    return rows[0];
+  }
+
+  async getB2cUserByEmail(email: string): Promise<B2cUser | undefined> {
+    const rows = await db.select().from(b2cUsers).where(eq(b2cUsers.email, email.toLowerCase())).limit(1);
+    return rows[0];
+  }
+
+  async createB2cUser(user: InsertB2cUser): Promise<B2cUser> {
+    const rows = await db.insert(b2cUsers).values({
+      ...user,
+      email: user.email.toLowerCase(),
+    }).returning();
+    return rows[0];
+  }
+
+  async updateB2cUser(id: string, data: Partial<Omit<B2cUser, 'id' | 'createdAt'>>): Promise<B2cUser | undefined> {
+    const rows = await db.update(b2cUsers).set(data).where(eq(b2cUsers.id, id)).returning();
+    return rows[0];
+  }
+
+  // Visa Checks — persisted to DB
+  async createVisaCheck(check: InsertVisaCheck): Promise<VisaCheck> {
+    const rows = await db.insert(visaChecks).values(check).returning();
+    return rows[0];
+  }
+
+  async getVisaChecksByUserId(userId: string): Promise<VisaCheck[]> {
+    return db.select().from(visaChecks).where(eq(visaChecks.userId, userId)).orderBy(desc(visaChecks.createdAt));
+  }
+
+  async getVisaCheck(id: string): Promise<VisaCheck | undefined> {
+    const rows = await db.select().from(visaChecks).where(eq(visaChecks.id, id)).limit(1);
+    return rows[0];
+  }
+
+  // Saved Profiles — persisted to DB
+  async getSavedProfile(userId: string): Promise<SavedProfile | undefined> {
+    const rows = await db.select().from(savedProfiles).where(eq(savedProfiles.userId, userId)).limit(1);
+    return rows[0];
+  }
+
+  async upsertSavedProfile(userId: string, data: Partial<InsertSavedProfile>): Promise<SavedProfile> {
+    const existing = await this.getSavedProfile(userId);
+    if (existing) {
+      const rows = await db.update(savedProfiles)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(savedProfiles.userId, userId))
+        .returning();
+      return rows[0];
+    }
+    const rows = await db.insert(savedProfiles).values({
+      ...data,
+      userId,
+    } as InsertSavedProfile).returning();
+    return rows[0];
+  }
+}
+
+export const storage = new HybridStorage();

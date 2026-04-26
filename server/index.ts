@@ -1,13 +1,14 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
-import MemoryStore from "memorystore";
+import connectPgSimple from "connect-pg-simple";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { pool } from "./db";
 
 const app = express();
 const httpServer = createServer(app);
-const MemoryStoreSession = MemoryStore(session);
+const PgStore = connectPgSimple(session);
 
 // Trust proxy for production (required for secure cookies behind reverse proxy)
 if (process.env.NODE_ENV === "production") {
@@ -42,8 +43,10 @@ app.use(
     secret: process.env.SESSION_SECRET || "visa-shuttle-dev-secret",
     resave: false,
     saveUninitialized: false,
-    store: new MemoryStoreSession({
-      checkPeriod: 86400000, // prune expired entries every 24h
+    store: new PgStore({
+      pool,
+      createTableIfMissing: true,
+      tableName: "sessions",
     }),
     cookie: {
       secure: process.env.NODE_ENV === "production",
