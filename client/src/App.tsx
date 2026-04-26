@@ -23,6 +23,7 @@ import SavedProfilePage from "@/pages/saved-profile";
 import SettingsPage from "@/pages/settings";
 
 import VisaCheckPage from "@/pages/visa-check";
+import VisaCheckPublicPage from "@/pages/visa-check-public";
 import AgencyDashboard from "@/pages/agency/dashboard";
 import LeadsPage from "@/pages/agency/leads";
 import CasesPage from "@/pages/agency/cases";
@@ -89,6 +90,7 @@ function Router() {
       <Route path="/deep-check" component={DeepCheckPage} />
       <Route path="/saved-profile" component={SavedProfilePage} />
       <Route path="/settings" component={SettingsPage} />
+      <Route path="/visa-check" component={VisaCheckPublicPage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/signup" component={SignupPage} />
 

@@ -41,6 +41,7 @@ export default function HomePage() {
           <Logo size="md" />
           <nav className="hidden md:flex items-center gap-6">
             <a href="#how-it-works" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">How It Works</a>
+            <Link href="/visa-check" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Visa Check</Link>
             <Link href="/pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Pricing</Link>
             <Link href="/business" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">For Agencies</Link>
           </nav>
