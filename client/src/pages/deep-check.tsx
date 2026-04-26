@@ -139,6 +139,46 @@ function DocToggle({ label, val, onChange, tooltip }: any) {
 
 const BLANK: Record<string, string> = {};
 
+// ── Date helpers ─────────────────────────────────────────────────────────────
+const TODAY = new Date().toISOString().split("T")[0];
+const TOMORROW = new Date(Date.now() + 86_400_000).toISOString().split("T")[0];
+const MIN_DOB = new Date(new Date().setFullYear(new Date().getFullYear() - 120))
+  .toISOString().split("T")[0];
+
+function getAge(dob: string): number | null {
+  if (!dob) return null;
+  const birth = new Date(dob);
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const m = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  return age;
+}
+
+// ── Visa-purpose compatibility ─────────────────────────────────────────────
+const VISA_PURPOSE_MAP: Record<string, string[]> = {
+  "Tourist Visa": ["Tourism & Sightseeing", "Wedding / Social Event", "Medical Treatment"],
+  "Business Visa": ["Business Meeting", "Conference / Event", "Investment / Business Setup"],
+  "Student Visa": ["Study / Education"],
+  "Work Visa": ["Employment"],
+  "Visit Visa": ["Family Visit", "Tourism & Sightseeing", "Wedding / Social Event", "Medical Treatment"],
+  "Transit Visa": ["Transit"],
+  "Investor Visa": ["Investment / Business Setup", "Business Meeting"],
+  "Spouse / Family Visa": ["Family Visit"],
+  "Conference / Event Visa": ["Conference / Event", "Business Meeting"],
+  "Medical Visa": ["Medical Treatment"],
+};
+
+function purposeMismatch(visaType: string, purpose: string): boolean {
+  if (!visaType || !purpose) return false;
+  const allowed = VISA_PURPOSE_MAP[visaType];
+  return !!allowed && !allowed.includes(purpose);
+}
+
+const TRANSIT_LONG_DURATIONS = ["15–30 days", "1–3 months", "More than 3 months"];
+const EMPLOYED_STATUSES = ["Employed (Full-time)", "Employed (Part-time)", "Government Employee"];
+const WORKING_STATUSES = [...EMPLOYED_STATUSES, "Self-employed / Business Owner", "Freelancer / Consultant"];
+
 export default function DeepCheckPage() {
   const { user, isLoading: authLoading } = useB2cAuth();
   const [, setLocation] = useLocation();
@@ -510,7 +550,41 @@ export default function DeepCheckPage() {
   const StepIcon = currentStep.icon;
   const progress = ((step - 1) / (STEPS.length - 1)) * 100;
 
-  const nextStep = () => { if (step < STEPS.length) setStep(s => s + 1); };
+  // Per-step required-field check
+  const STEP_REQUIRED: Record<number, { key: string; label: string }[]> = {
+    1: [{ key: "nationality", label: "Nationality" }],
+    2: [
+      { key: "destinationCountry", label: "Destination Country" },
+      { key: "visaType", label: "Visa Type" },
+      { key: "purposeOfTravel", label: "Purpose of Travel" },
+      { key: "tripDuration", label: "Trip Duration" },
+    ],
+    3: [{ key: "employmentStatus", label: "Employment Status" }],
+    4: [{ key: "bankBalance", label: "Bank Balance" }],
+    5: [{ key: "previousVisaRefusals", label: "Previous Visa Refusals" }],
+  };
+
+  const canAdvance = (): boolean => {
+    const required = STEP_REQUIRED[step] ?? [];
+    return required.every(r => !!form[r.key]);
+  };
+
+  const getMissingLabels = (): string => {
+    const required = STEP_REQUIRED[step] ?? [];
+    return required.filter(r => !form[r.key]).map(r => r.label).join(", ");
+  };
+
+  const nextStep = () => {
+    if (!canAdvance()) {
+      toast({
+        title: "Required fields missing",
+        description: `Please fill in: ${getMissingLabels()}`,
+        variant: "destructive",
+      });
+      return;
+    }
+    if (step < STEPS.length) setStep(s => s + 1);
+  };
   const prevStep = () => { if (step > 1) setStep(s => s - 1); };
 
   const handleSubmit = async () => {
@@ -582,8 +656,30 @@ export default function DeepCheckPage() {
                 <SearchableSelect label="Nationality *" required value={form.nationality || ""} onChange={set("nationality")} options={COUNTRIES} placeholder="Search nationality..." />
                 <SearchableSelect label="Passport Issued By" value={form.passportCountry || ""} onChange={set("passportCountry")} options={COUNTRIES} placeholder="If different from nationality…" />
                 <div>
-                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Date of Birth</Label>
-                  <Input type="date" value={form.dateOfBirth || ""} onChange={e => set("dateOfBirth")(e.target.value)} />
+                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">
+                    Date of Birth
+                    {form.dateOfBirth && (() => {
+                      const age = getAge(form.dateOfBirth);
+                      if (age === null || age < 0 || age > 120) return <span className="ml-2 text-xs text-red-500 font-semibold">Invalid date</span>;
+                      return <span className="ml-2 text-xs text-muted-foreground">Age: {age} years</span>;
+                    })()}
+                  </Label>
+                  <Input type="date" value={form.dateOfBirth || ""} min={MIN_DOB} max={TODAY}
+                    onChange={e => set("dateOfBirth")(e.target.value)} />
+                  {form.dateOfBirth && (() => {
+                    const age = getAge(form.dateOfBirth);
+                    if (age !== null && age < 3) return (
+                      <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> Applicant is too young to apply independently for most visa types.
+                      </p>
+                    );
+                    if (age !== null && age < 18) return (
+                      <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> Minor applicant — parental/guardian consent documents will be required.
+                      </p>
+                    );
+                    return null;
+                  })()}
                 </div>
                 <Sel label="Gender" val={form.gender || ""} onChange={set("gender")} opts={["Male","Female","Non-binary","Prefer not to say"]} />
                 <Sel label="Marital Status" val={form.maritalStatus || ""} onChange={set("maritalStatus")} opts={["Single","Married","Divorced","Widowed","Separated"]} />
@@ -607,12 +703,56 @@ export default function DeepCheckPage() {
             {step === 2 && (
               <div className="grid sm:grid-cols-2 gap-4">
                 <SearchableSelect label="Destination Country *" required value={form.destinationCountry || ""} onChange={set("destinationCountry")} options={COUNTRIES} placeholder="Search destination..." />
-                <Sel label="Visa Type *" val={form.visaType || ""} onChange={set("visaType")} opts={["Tourist Visa","Business Visa","Student Visa","Work Visa","Visit Visa","Transit Visa","Investor Visa","Spouse / Family Visa","Conference / Event Visa","Medical Visa"]} />
-                <Sel label="Purpose of Travel *" val={form.purposeOfTravel || ""} onChange={set("purposeOfTravel")} opts={["Tourism & Sightseeing","Business Meeting","Study / Education","Employment","Family Visit","Medical Treatment","Conference / Event","Transit","Wedding / Social Event","Investment / Business Setup"]} />
-                <Sel label="Trip Duration *" val={form.tripDuration || ""} onChange={set("tripDuration")} opts={["1–3 days","4–7 days","8–14 days","15–30 days","1–3 months","More than 3 months"]} />
+                <div>
+                  <Sel label="Visa Type *" val={form.visaType || ""} onChange={val => { set("visaType")(val); set("purposeOfTravel")(""); set("tripDuration")(""); }} opts={["Tourist Visa","Business Visa","Student Visa","Work Visa","Visit Visa","Transit Visa","Investor Visa","Spouse / Family Visa","Conference / Event Visa","Medical Visa"]} />
+                  {form.visaType && (() => {
+                    const age = getAge(form.dateOfBirth);
+                    if (age !== null && age < 3 && ["Student Visa","Work Visa","Business Visa","Investor Visa"].includes(form.visaType)) return (
+                      <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> A child under 3 cannot independently apply for a {form.visaType}.
+                      </p>
+                    );
+                    if (age !== null && age < 18 && form.visaType === "Work Visa") return (
+                      <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> Most countries do not issue Work Visas to minors (under 18).
+                      </p>
+                    );
+                    if (age !== null && age < 16 && form.visaType === "Student Visa") return (
+                      <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> Student visa for a child under 16 requires additional guardian/parental documentation.
+                      </p>
+                    );
+                    return null;
+                  })()}
+                </div>
+                <div>
+                  <Sel label="Purpose of Travel *" val={form.purposeOfTravel || ""} onChange={set("purposeOfTravel")} opts={["Tourism & Sightseeing","Business Meeting","Study / Education","Employment","Family Visit","Medical Treatment","Conference / Event","Transit","Wedding / Social Event","Investment / Business Setup"]} />
+                  {purposeMismatch(form.visaType, form.purposeOfTravel) && (
+                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" /> Travel purpose doesn't match visa type — embassies will likely question this.
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Sel label="Trip Duration *" val={form.tripDuration || ""} onChange={set("tripDuration")}
+                    opts={form.visaType === "Transit Visa"
+                      ? ["1–3 days","4–7 days"]
+                      : ["1–3 days","4–7 days","8–14 days","15–30 days","1–3 months","More than 3 months"]} />
+                  {form.visaType === "Transit Visa" && TRANSIT_LONG_DURATIONS.includes(form.tripDuration) && (
+                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" /> Transit visas are for short stays only (typically 24–72 hours). Please correct the duration.
+                    </p>
+                  )}
+                </div>
                 <div>
                   <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Planned Travel Date</Label>
-                  <Input type="date" value={form.plannedTravelDate || ""} onChange={e => set("plannedTravelDate")(e.target.value)} />
+                  <Input type="date" value={form.plannedTravelDate || ""} min={TOMORROW}
+                    onChange={e => set("plannedTravelDate")(e.target.value)} />
+                  {form.plannedTravelDate && form.plannedTravelDate < TODAY && (
+                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" /> Travel date cannot be in the past.
+                    </p>
+                  )}
                 </div>
                 <Sel label="Entry Type" val={form.entryType || ""} onChange={set("entryType")} opts={["Single Entry","Multiple Entry","Double Entry"]} />
                 <div className="sm:col-span-2">
@@ -669,44 +809,66 @@ export default function DeepCheckPage() {
             )}
 
             {/* ===== STEP 3: Employment & Income ===== */}
-            {step === 3 && (
-              <div className="grid sm:grid-cols-2 gap-4">
-                <Sel label="Employment Status *" val={form.employmentStatus || ""} onChange={set("employmentStatus")} opts={["Employed (Full-time)","Employed (Part-time)","Self-employed / Business Owner","Freelancer / Consultant","Student","Retired","Unemployed","Government Employee","Other"]} />
-                <div>
-                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Job Title</Label>
-                  <Input value={form.jobTitle || ""} onChange={e => set("jobTitle")(e.target.value)} placeholder="e.g. Senior Software Engineer" />
+            {step === 3 && (() => {
+              const isWorking = WORKING_STATUSES.includes(form.employmentStatus);
+              const isEmployed = EMPLOYED_STATUSES.includes(form.employmentStatus);
+              const isSelfEmployed = form.employmentStatus === "Self-employed / Business Owner" || form.employmentStatus === "Freelancer / Consultant";
+              const isRetired = form.employmentStatus === "Retired";
+              return (
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <Sel label="Employment Status *" val={form.employmentStatus || ""} onChange={set("employmentStatus")} opts={["Employed (Full-time)","Employed (Part-time)","Self-employed / Business Owner","Freelancer / Consultant","Student","Retired","Unemployed","Government Employee","Other"]} />
+                  {isWorking && (
+                    <div>
+                      <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Job Title</Label>
+                      <Input value={form.jobTitle || ""} onChange={e => set("jobTitle")(e.target.value)} placeholder="e.g. Senior Software Engineer" />
+                    </div>
+                  )}
+                  {isWorking && (
+                    <div>
+                      <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Company / Employer Name</Label>
+                      <Input value={form.companyName || ""} onChange={e => set("companyName")(e.target.value)} placeholder="e.g. Google India Ltd" />
+                    </div>
+                  )}
+                  {isWorking && (
+                    <Sel label="Years in Current Role" val={form.yearsInJob || ""} onChange={set("yearsInJob")} opts={["Less than 6 months","6 months – 1 year","1–2 years","2–5 years","5–10 years","More than 10 years"]} />
+                  )}
+                  <Sel label="Monthly Income (USD)" val={form.monthlyIncome || ""} onChange={set("monthlyIncome")} opts={["Less than $500","$500 – $1,000","$1,000 – $2,500","$2,500 – $5,000","$5,000 – $10,000","More than $10,000"]} />
+                  <Sel label="Monthly Living Expenses (USD)" val={form.monthlyExpenses || ""} onChange={set("monthlyExpenses")} opts={["Less than $500","$500 – $1,500","$1,500 – $3,000","More than $3,000"]} />
+                  <Sel label="Primary Income Source" val={form.sourceOfIncome || ""} onChange={set("sourceOfIncome")} opts={["Employment Salary","Business Revenue","Freelance / Consultancy","Investment Returns","Rental Income","Pension / Retirement","Family Support","Scholarship / Grant"]} />
+                  {isEmployed && (
+                    <DocToggle label="Employment contract available?" val={form.hasEmploymentContract || ""} onChange={set("hasEmploymentContract")} />
+                  )}
+                  {isEmployed && (
+                    <DocToggle label="Salary slips available (last 3 months)?" val={form.hasSalarySlips || ""} onChange={set("hasSalarySlips")} />
+                  )}
+                  <DocToggle label="Tax return / ITR available?" val={form.hasTaxReturn || ""} onChange={set("hasTaxReturn")} />
+                  {isSelfEmployed && (
+                    <>
+                      <DocToggle label="Business registration document?" val={form.hasBusinessRegistration || ""} onChange={set("hasBusinessRegistration")} />
+                      <Sel label="Business Type" val={form.businessType || ""} onChange={set("businessType")} opts={["Technology / IT","Consulting","Retail / Trading","Healthcare","Education","Real Estate","Import / Export","Other"]} />
+                    </>
+                  )}
+                  {isRetired && (
+                    <DocToggle label="Pension / retirement documents available?" val={form.hasPensionDocs || ""} onChange={set("hasPensionDocs")} />
+                  )}
                 </div>
-                <div>
-                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Company / Employer Name</Label>
-                  <Input value={form.companyName || ""} onChange={e => set("companyName")(e.target.value)} placeholder="e.g. Google India Ltd" />
-                </div>
-                <Sel label="Years in Current Role" val={form.yearsInJob || ""} onChange={set("yearsInJob")} opts={["Less than 6 months","6 months – 1 year","1–2 years","2–5 years","5–10 years","More than 10 years"]} />
-                <Sel label="Monthly Income (USD)" val={form.monthlyIncome || ""} onChange={set("monthlyIncome")} opts={["Less than $500","$500 – $1,000","$1,000 – $2,500","$2,500 – $5,000","$5,000 – $10,000","More than $10,000"]} />
-                <Sel label="Monthly Living Expenses (USD)" val={form.monthlyExpenses || ""} onChange={set("monthlyExpenses")} opts={["Less than $500","$500 – $1,500","$1,500 – $3,000","More than $3,000"]} />
-                <Sel label="Primary Income Source" val={form.sourceOfIncome || ""} onChange={set("sourceOfIncome")} opts={["Employment Salary","Business Revenue","Freelance / Consultancy","Investment Returns","Rental Income","Pension / Retirement","Family Support","Scholarship / Grant"]} />
-                <DocToggle label="Employment contract available?" val={form.hasEmploymentContract || ""} onChange={set("hasEmploymentContract")} />
-                <DocToggle label="Salary slips available (last 3 months)?" val={form.hasSalarySlips || ""} onChange={set("hasSalarySlips")} />
-                <DocToggle label="Tax return / ITR available?" val={form.hasTaxReturn || ""} onChange={set("hasTaxReturn")} />
-                {(form.employmentStatus === "Self-employed / Business Owner" || form.employmentStatus === "Freelancer / Consultant") && (
-                  <>
-                    <DocToggle label="Business registration document?" val={form.hasBusinessRegistration || ""} onChange={set("hasBusinessRegistration")} />
-                    <Sel label="Business Type" val={form.businessType || ""} onChange={set("businessType")} opts={["Technology / IT","Consulting","Retail / Trading","Healthcare","Education","Real Estate","Import / Export","Other"]} />
-                  </>
-                )}
-                {form.employmentStatus === "Retired" && (
-                  <DocToggle label="Pension / retirement documents available?" val={form.hasPensionDocs || ""} onChange={set("hasPensionDocs")} />
-                )}
-              </div>
-            )}
+              );
+            })()}
 
             {/* ===== STEP 4: Financial Depth ===== */}
             {step === 4 && (
               <div className="grid sm:grid-cols-2 gap-4">
                 <Sel label="Bank Balance (USD) *" val={form.bankBalance || ""} onChange={set("bankBalance")} opts={["Less than $1,000","$1,000 – $3,000","$3,000 – $7,000","$7,000 – $15,000","$15,000 – $30,000","More than $30,000"]} />
-                <DocToggle label="Bank statement available?" val={form.hasBankStatement || ""} onChange={set("hasBankStatement")} />
-                <Sel label="Bank Statement Coverage" val={form.bankStatementDuration || ""} onChange={set("bankStatementDuration")} opts={["1 month","3 months","6 months","12 months"]} />
-                <Sel label="Bank Transaction Pattern" val={form.hasBankTransactions || ""} onChange={set("hasBankTransactions")} opts={["Regular and consistent","Mostly regular","Irregular / seasonal","Large unexplained deposits"]} />
-                <DocToggle label="Unexplained large deposits in account?" val={form.hasLargeDeposits || ""} onChange={set("hasLargeDeposits")} />
+                <DocToggle label="Bank statement available?" val={form.hasBankStatement || ""} onChange={val => { set("hasBankStatement")(val); if (val === "No") { set("bankStatementDuration")(""); set("hasBankTransactions")(""); set("hasLargeDeposits")(""); } }} />
+                {form.hasBankStatement === "Yes" && (
+                  <Sel label="Bank Statement Coverage" val={form.bankStatementDuration || ""} onChange={set("bankStatementDuration")} opts={["1 month","3 months","6 months","12 months"]} />
+                )}
+                {form.hasBankStatement === "Yes" && (
+                  <Sel label="Bank Transaction Pattern" val={form.hasBankTransactions || ""} onChange={set("hasBankTransactions")} opts={["Regular and consistent","Mostly regular","Irregular / seasonal","Large unexplained deposits"]} />
+                )}
+                {form.hasBankStatement === "Yes" && (
+                  <DocToggle label="Unexplained large deposits in account?" val={form.hasLargeDeposits || ""} onChange={set("hasLargeDeposits")} />
+                )}
                 <DocToggle label="Credit card available?" val={form.hasCreditCard || ""} onChange={set("hasCreditCard")} />
                 <DocToggle label="Fixed deposits / term deposits?" val={form.hasFixedDeposits || ""} onChange={set("hasFixedDeposits")} />
                 <DocToggle label="Investment portfolio (stocks / mutual funds)?" val={form.hasInvestments || ""} onChange={set("hasInvestments")} />
@@ -762,7 +924,9 @@ export default function DeepCheckPage() {
                 <DocToggle label="Travel insurance policy?" val={form.hasTravelInsurance || ""} onChange={set("hasTravelInsurance")} />
                 <DocToggle label="Day-wise travel itinerary?" val={form.hasItinerary || ""} onChange={set("hasItinerary")} />
                 <DocToggle label="Invitation letter (host / company)?" val={form.hasInvitationLetter || ""} onChange={set("hasInvitationLetter")} />
-                <DocToggle label="Leave approval / NOC from employer?" val={form.hasLeaveApproval || ""} onChange={set("hasLeaveApproval")} />
+                {EMPLOYED_STATUSES.includes(form.employmentStatus) && (
+                  <DocToggle label="Leave approval / NOC from employer?" val={form.hasLeaveApproval || ""} onChange={set("hasLeaveApproval")} />
+                )}
                 <DocToggle label="Cover letter / personal statement?" val={form.hasCoverLetter || ""} onChange={set("hasCoverLetter")} />
                 <DocToggle label="Active health / medical insurance?" val={form.hasHealthInsurance || ""} onChange={set("hasHealthInsurance")} />
                 <DocToggle label="Police clearance certificate?" val={form.hasPoliceCharacterCertificate || ""} onChange={set("hasPoliceCharacterCertificate")} />
@@ -811,7 +975,7 @@ export default function DeepCheckPage() {
                 <ChevronLeft className="w-4 h-4" /> Back
               </Button>
               {step < STEPS.length ? (
-                <Button onClick={nextStep} className="gap-2" disabled={step === 1 && (!form.nationality || !form.destinationCountry || !form.visaType)}>
+                <Button onClick={nextStep} className="gap-2" disabled={!canAdvance()}>
                   Next <ChevronRight className="w-4 h-4" />
                 </Button>
               ) : (
