@@ -5,6 +5,7 @@ import {
   ChevronLeft, ChevronRight, LogOut, Bell, Search,
   Menu, X, Building2, ShieldCheck, Database, Activity, Globe
 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -34,7 +35,8 @@ interface DashboardLayoutProps {
 
 const adminNavItems: NavItem[] = [
   { icon: Home, label: "Dashboard", href: "/admin" },
-  { icon: Building2, label: "Tenants", href: "/admin/tenants" },
+  { icon: Building2, label: "Agencies", href: "/admin/tenants" },
+  { icon: Users, label: "Users", href: "/admin/users" },
   { icon: Database, label: "Visa Knowledge", href: "/admin/vkb" },
   { icon: ShieldCheck, label: "AI Governance", href: "/admin/ai" },
   { icon: Activity, label: "Audit Logs", href: "/admin/audit" },

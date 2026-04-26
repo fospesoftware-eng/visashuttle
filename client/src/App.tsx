@@ -40,6 +40,7 @@ import CustomerProfilePage from "@/pages/customer/profile";
 
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminTenantsPage from "@/pages/admin/tenants";
+import AdminUsersPage from "@/pages/admin/users";
 import AdminVKBPage from "@/pages/admin/vkb";
 import AdminAIPage from "@/pages/admin/ai";
 import AdminAuditPage from "@/pages/admin/audit";
@@ -113,6 +114,7 @@ function Router() {
       <Route path="/admin/tenants" component={AdminTenantsPage} />
       <Route path="/admin/vkb" component={AdminVKBPage} />
       <Route path="/admin/ai" component={AdminAIPage} />
+      <Route path="/admin/users" component={AdminUsersPage} />
       <Route path="/admin/audit" component={AdminAuditPage} />
       <Route path="/admin/settings" component={AdminSettingsPage} />
 

@@ -5,7 +5,7 @@
 VisaShuttle is a multi-tenant SaaS platform for travel agencies to manage visa applications with AI-powered document processing. The platform serves four user interfaces:
 
 1. **Public Marketing Website** - Landing pages, pricing, and signup flows
-2. **SaaS Admin Dashboard** - Tenant management, visa knowledge base, AI governance
+2. **SaaS Admin Dashboard** - Tenant management, user management, visa knowledge base, AI governance, audit logs, settings
 3. **Agency Dashboard** - CRM, case management, document center, reporting
 4. **Customer Portal** - Self-service application tracking and document uploads
 5. **Agency Public Landing Page** - Branded marketing page for each agency at `/w/:slug`

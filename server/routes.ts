@@ -34,6 +34,14 @@ function requireAgencyAuth(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+// Middleware to require SaaS admin role
+function requireAdminAuth(req: Request, res: Response, next: NextFunction) {
+  if (!req.session?.userId || req.session?.userRole !== "saas_admin") {
+    return res.status(403).json({ error: "Admin access required" });
+  }
+  next();
+}
+
 // Middleware to require white-label authentication
 function requireWLAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.session?.wlCustomerId || !req.session?.wlTenantId) {
@@ -872,6 +880,213 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Check not found" });
     }
     res.json(check);
+  });
+
+  // === Admin Routes ===
+
+  // Platform stats
+  app.get("/api/admin/stats", requireAdminAuth, async (req, res) => {
+    const [tenants, users, b2cUsers, activityLogs] = await Promise.all([
+      storage.getAllTenants(),
+      storage.getAllUsers(),
+      storage.getAllB2cUsers(),
+      storage.getAllActivityLogs(),
+    ]);
+    const allCaseCounts = await Promise.all(
+      tenants.map(t => storage.getCasesByTenantId(t.id))
+    );
+    const totalCases = allCaseCounts.reduce((acc, cases) => acc + cases.length, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const activityToday = activityLogs.filter(l => l.createdAt && new Date(l.createdAt) >= today).length;
+    res.json({
+      tenantCount: tenants.length,
+      activeTenantCount: tenants.filter(t => t.status === "active").length,
+      agencyUserCount: users.filter(u => u.role !== "saas_admin").length,
+      b2cUserCount: b2cUsers.length,
+      totalCases,
+      activityToday,
+      planBreakdown: {
+        starter: tenants.filter(t => t.plan === "starter").length,
+        professional: tenants.filter(t => t.plan === "professional").length,
+        enterprise: tenants.filter(t => t.plan === "enterprise").length,
+      },
+    });
+  });
+
+  // All tenants with enriched data
+  app.get("/api/admin/tenants", requireAdminAuth, async (req, res) => {
+    const tenants = await storage.getAllTenants();
+    const enriched = await Promise.all(
+      tenants.map(async (t) => {
+        const [users, cases] = await Promise.all([
+          storage.getUsersByTenantId(t.id),
+          storage.getCasesByTenantId(t.id),
+        ]);
+        return { ...t, userCount: users.length, caseCount: cases.length };
+      })
+    );
+    res.json(enriched.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0)));
+  });
+
+  // Create tenant (admin)
+  app.post("/api/admin/tenants", requireAdminAuth, async (req, res) => {
+    const { name, email, plan, status } = req.body;
+    if (!name) return res.status(400).json({ error: "Agency name is required" });
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const tenant = await storage.createTenant({
+      name,
+      slug,
+      plan: plan ?? "starter",
+      status: status ?? "active",
+      contactEmail: email ?? null,
+      logoUrl: null,
+      primaryColor: "#4055FF",
+      secondaryColor: "#FF2060",
+      accentColor: "#7033F0",
+      contactPhone: null,
+      whatsappNumber: null,
+      showPoweredBy: true,
+      authMethod: "otp",
+    });
+    await storage.createActivityLog({
+      tenantId: null,
+      userId: req.session.userId ?? null,
+      action: "admin.tenant.created",
+      entityType: "tenant",
+      entityId: tenant.id,
+      details: { name, plan, email },
+    });
+    res.status(201).json(tenant);
+  });
+
+  // Update tenant (admin)
+  app.patch("/api/admin/tenants/:id", requireAdminAuth, async (req, res) => {
+    const tenant = await storage.updateTenant(req.params.id, req.body);
+    if (!tenant) return res.status(404).json({ error: "Tenant not found" });
+    await storage.createActivityLog({
+      tenantId: null,
+      userId: req.session.userId ?? null,
+      action: "admin.tenant.updated",
+      entityType: "tenant",
+      entityId: req.params.id,
+      details: req.body,
+    });
+    res.json(tenant);
+  });
+
+  // Delete tenant (admin)
+  app.delete("/api/admin/tenants/:id", requireAdminAuth, async (req, res) => {
+    const ok = await storage.deleteTenant(req.params.id);
+    if (!ok) return res.status(404).json({ error: "Tenant not found" });
+    await storage.createActivityLog({
+      tenantId: null,
+      userId: req.session.userId ?? null,
+      action: "admin.tenant.deleted",
+      entityType: "tenant",
+      entityId: req.params.id,
+      details: {},
+    });
+    res.status(204).send();
+  });
+
+  // All agency users
+  app.get("/api/admin/users", requireAdminAuth, async (req, res) => {
+    const users = await storage.getAllUsers();
+    const safe = users.map(({ password: _, ...u }) => u);
+    res.json(safe.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0)));
+  });
+
+  // Create agency user (admin)
+  app.post("/api/admin/users", requireAdminAuth, async (req, res) => {
+    const { email, name, role, tenantId, password } = req.body;
+    if (!email || !name) return res.status(400).json({ error: "Email and name are required" });
+    const existing = await storage.getUserByEmail(email);
+    if (existing) return res.status(409).json({ error: "Email already in use" });
+    const hashedPassword = await import("bcryptjs").then(b => b.hash(password || "Welcome@123", 10));
+    const user = await storage.createUser({
+      email: email.toLowerCase().trim(),
+      name,
+      password: hashedPassword,
+      role: role ?? "agency_staff",
+      tenantId: tenantId ?? null,
+      avatarUrl: null,
+    });
+    await storage.createActivityLog({
+      tenantId: null,
+      userId: req.session.userId ?? null,
+      action: "admin.user.created",
+      entityType: "user",
+      entityId: user.id,
+      details: { email, name, role },
+    });
+    const { password: _, ...safeUser } = user;
+    res.status(201).json(safeUser);
+  });
+
+  // Update agency user (admin)
+  app.patch("/api/admin/users/:id", requireAdminAuth, async (req, res) => {
+    const { password, ...rest } = req.body;
+    let data: any = rest;
+    if (password) {
+      const hashedPassword = await import("bcryptjs").then(b => b.hash(password, 10));
+      data = { ...rest, password: hashedPassword };
+    }
+    const user = await storage.updateUser(req.params.id, data);
+    if (!user) return res.status(404).json({ error: "User not found" });
+    const { password: _, ...safeUser } = user;
+    res.json(safeUser);
+  });
+
+  // Delete agency user (admin)
+  app.delete("/api/admin/users/:id", requireAdminAuth, async (req, res) => {
+    if (req.params.id === "user-admin") {
+      return res.status(403).json({ error: "Cannot delete the system admin account" });
+    }
+    const ok = await storage.deleteUser(req.params.id);
+    if (!ok) return res.status(404).json({ error: "User not found" });
+    res.status(204).send();
+  });
+
+  // All B2C users
+  app.get("/api/admin/b2c-users", requireAdminAuth, async (req, res) => {
+    const users = await storage.getAllB2cUsers();
+    const safe = users.map(({ password: _, ...u }) => u);
+    res.json(safe);
+  });
+
+  // Update B2C user (admin)
+  app.patch("/api/admin/b2c-users/:id", requireAdminAuth, async (req, res) => {
+    const user = await storage.updateB2cUser(req.params.id, req.body);
+    if (!user) return res.status(404).json({ error: "B2C user not found" });
+    const { password: _, ...safeUser } = user;
+    res.json(safeUser);
+  });
+
+  // Delete B2C user (admin)
+  app.delete("/api/admin/b2c-users/:id", requireAdminAuth, async (req, res) => {
+    const ok = await storage.deleteB2cUser(req.params.id);
+    if (!ok) return res.status(404).json({ error: "B2C user not found" });
+    res.status(204).send();
+  });
+
+  // All activity logs
+  app.get("/api/admin/activity-logs", requireAdminAuth, async (req, res) => {
+    const logs = await storage.getAllActivityLogs();
+    res.json(logs);
+  });
+
+  // Visa templates (admin — enhanced with create/update/delete)
+  app.patch("/api/admin/visa-templates/:id", requireAdminAuth, async (req, res) => {
+    const template = await storage.updateVisaTemplate(req.params.id, req.body);
+    if (!template) return res.status(404).json({ error: "Template not found" });
+    res.json(template);
+  });
+
+  app.delete("/api/admin/visa-templates/:id", requireAdminAuth, async (req, res) => {
+    const ok = await storage.deleteVisaTemplate(req.params.id);
+    if (!ok) return res.status(404).json({ error: "Template not found" });
+    res.status(204).send();
   });
 
   // === Saved Profile Routes ===

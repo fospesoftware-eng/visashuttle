@@ -25,12 +25,16 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   getUsersByTenantId(tenantId: string): Promise<User[]>;
+  getAllUsers(): Promise<User[]>;
+  updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined>;
+  deleteUser(id: string): Promise<boolean>;
   
   getTenant(id: string): Promise<Tenant | undefined>;
   getTenantBySlug(slug: string): Promise<Tenant | undefined>;
   createTenant(tenant: InsertTenant): Promise<Tenant>;
   getAllTenants(): Promise<Tenant[]>;
   updateTenant(id: string, data: Partial<InsertTenant>): Promise<Tenant | undefined>;
+  deleteTenant(id: string): Promise<boolean>;
   
   getLeadsByTenantId(tenantId: string): Promise<Lead[]>;
   getLead(id: string): Promise<Lead | undefined>;
@@ -58,8 +62,11 @@ export interface IStorage {
   getAllVisaTemplates(): Promise<VisaTemplate[]>;
   getVisaTemplate(id: string): Promise<VisaTemplate | undefined>;
   createVisaTemplate(template: InsertVisaTemplate): Promise<VisaTemplate>;
+  updateVisaTemplate(id: string, data: Partial<InsertVisaTemplate>): Promise<VisaTemplate | undefined>;
+  deleteVisaTemplate(id: string): Promise<boolean>;
   
   getActivityLogsByTenantId(tenantId: string): Promise<ActivityLog[]>;
+  getAllActivityLogs(): Promise<ActivityLog[]>;
   createActivityLog(log: InsertActivityLog): Promise<ActivityLog>;
 
   getCustomerAccount(id: string): Promise<CustomerAccount | undefined>;
@@ -79,8 +86,10 @@ export interface IStorage {
   // B2C Users
   getB2cUser(id: string): Promise<B2cUser | undefined>;
   getB2cUserByEmail(email: string): Promise<B2cUser | undefined>;
+  getAllB2cUsers(): Promise<B2cUser[]>;
   createB2cUser(user: InsertB2cUser): Promise<B2cUser>;
   updateB2cUser(id: string, data: Partial<Omit<B2cUser, 'id' | 'createdAt'>>): Promise<B2cUser | undefined>;
+  deleteB2cUser(id: string): Promise<boolean>;
 
   // Visa Checks
   createVisaCheck(check: InsertVisaCheck): Promise<VisaCheck>;
@@ -320,6 +329,22 @@ export class MemStorage implements IStorage {
     return user;
   }
 
+  async getAllUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
+  }
+
+  async updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined> {
+    const user = this.users.get(id);
+    if (!user) return undefined;
+    const updated = { ...user, ...data };
+    this.users.set(id, updated);
+    return updated;
+  }
+
+  async deleteUser(id: string): Promise<boolean> {
+    return this.users.delete(id);
+  }
+
   async getTenant(id: string): Promise<Tenant | undefined> {
     return this.tenants.get(id);
   }
@@ -361,6 +386,10 @@ export class MemStorage implements IStorage {
     const updated = { ...tenant, ...data };
     this.tenants.set(id, updated);
     return updated;
+  }
+
+  async deleteTenant(id: string): Promise<boolean> {
+    return this.tenants.delete(id);
   }
 
   async getLeadsByTenantId(tenantId: string): Promise<Lead[]> {
@@ -549,8 +578,25 @@ export class MemStorage implements IStorage {
     return template;
   }
 
+  async updateVisaTemplate(id: string, data: Partial<InsertVisaTemplate>): Promise<VisaTemplate | undefined> {
+    const template = this.visaTemplates.get(id);
+    if (!template) return undefined;
+    const updated = { ...template, ...data, updatedAt: new Date() };
+    this.visaTemplates.set(id, updated);
+    return updated;
+  }
+
+  async deleteVisaTemplate(id: string): Promise<boolean> {
+    return this.visaTemplates.delete(id);
+  }
+
   async getActivityLogsByTenantId(tenantId: string): Promise<ActivityLog[]> {
     return Array.from(this.activityLogs.values()).filter(log => log.tenantId === tenantId);
+  }
+
+  async getAllActivityLogs(): Promise<ActivityLog[]> {
+    return Array.from(this.activityLogs.values())
+      .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
   }
 
   async createActivityLog(insertLog: InsertActivityLog): Promise<ActivityLog> {
@@ -695,12 +741,21 @@ export class MemStorage implements IStorage {
     return newUser;
   }
 
+  async getAllB2cUsers(): Promise<B2cUser[]> {
+    return Array.from(this.b2cUsersMap.values())
+      .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+  }
+
   async updateB2cUser(id: string, data: Partial<Omit<B2cUser, 'id' | 'createdAt'>>): Promise<B2cUser | undefined> {
     const user = this.b2cUsersMap.get(id);
     if (!user) return undefined;
     const updated = { ...user, ...data };
     this.b2cUsersMap.set(id, updated);
     return updated;
+  }
+
+  async deleteB2cUser(id: string): Promise<boolean> {
+    return this.b2cUsersMap.delete(id);
   }
 
   // Visa Checks
