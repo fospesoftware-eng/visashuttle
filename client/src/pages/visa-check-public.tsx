@@ -2,7 +2,8 @@ import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import {
   Globe, Plane, CheckCircle2, XCircle, Clock, Zap,
-  AlertTriangle, Info, Search, ChevronRight, Shield, ChevronDown
+  AlertTriangle, Info, Search, ChevronRight, Shield, ChevronDown,
+  FileText, ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -21,7 +22,8 @@ import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
   ALL_DESTINATIONS, VALID_VISAS, VISA_GROUPS,
-  findDestination, findBestConditionalRule, getEntryConfig, normalizeStatus, data
+  findDestination, findBestConditionalRule, getEntryConfig, normalizeStatus,
+  isConditionalEVisa, DOCUMENT_LABELS, data,
 } from "@/lib/visa-check-engine";
 
 export default function VisaCheckPublicPage() {
@@ -60,11 +62,28 @@ export default function VisaCheckPublicPage() {
   const effectiveMaxStay = isConditional
     ? conditionalRule!.max_stay_days
     : record?.base_entry.max_stay_days ?? null;
+  const baseMaxStay = record?.base_entry.max_stay_days ?? null;
 
   const availableConditionals = record?.conditional_entry_rules ?? [];
-  const allEligibleHeld = availableConditionals.flatMap((r) => r.eligible_if_holds);
+  const allEligibleHeld = [...new Set(availableConditionals.flatMap((r) => r.eligible_if_holds))];
 
-  const statusIsSame = record && normalizeStatus(record.base_entry.status) === normalizeStatus(effectiveStatus);
+  const normalBase = record ? normalizeStatus(record.base_entry.status) : "";
+  const normalEffective = normalizeStatus(effectiveStatus);
+  const statusUpgrade = isConditional && normalBase !== normalEffective;
+  const stayUpgrade = isConditional && (effectiveMaxStay ?? 0) > (baseMaxStay ?? 0);
+  const showUpgradeBanner = isConditional && (statusUpgrade || stayUpgrade);
+
+  // Deduplicate source refs by URL
+  const uniqueSources = record?.source_refs
+    ? record.source_refs.filter(
+        (s, i, arr) => arr.findIndex((x) => x.url === s.url || x.source_name === s.source_name) === i
+      )
+    : [];
+
+  // Document labels
+  const documents = (record?.common_documents ?? []).map(
+    (d) => DOCUMENT_LABELS[d] ?? d.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -96,13 +115,13 @@ export default function VisaCheckPublicPage() {
         <div className="relative max-w-3xl mx-auto px-4 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#4055FF]/10 text-[#4055FF] text-sm font-medium mb-4 border border-[#4055FF]/20">
             <Globe className="w-3.5 h-3.5" />
-            Free Visa Requirement Checker · 257 Destinations
+            Free Visa Requirement Checker · 257 Destinations · MEA India Data
           </div>
           <h1 className="text-3xl md:text-5xl font-bold tracking-tight mb-3">
             Do You Need a Visa?
           </h1>
           <p className="text-muted-foreground text-base md:text-lg max-w-xl mx-auto">
-            Check visa requirements for Indian passport holders. Select visas you already hold — the tool automatically unlocks faster entry options where available.
+            Precise visa requirements for Indian passport holders — sourced from India's Ministry of External Affairs. Select any visas you already hold to unlock better entry options.
           </p>
         </div>
       </section>
@@ -169,7 +188,7 @@ export default function VisaCheckPublicPage() {
             {/* Valid Visas — grouped & collapsible */}
             <div className="space-y-2">
               <Label>
-                Visas / Permits You Hold{" "}
+                Visas / Permits You Currently Hold{" "}
                 <span className="text-muted-foreground font-normal text-xs">(optional — unlocks better entry for some countries)</span>
               </Label>
               <div className="border rounded-lg divide-y overflow-hidden">
@@ -236,35 +255,72 @@ export default function VisaCheckPublicPage() {
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div>
                   <CardTitle className="text-xl">🇮🇳 India → {record.destination}</CardTitle>
-                  <CardDescription className="mt-1">Tourism / Business (ordinary passport)</CardDescription>
+                  <CardDescription className="mt-1">
+                    Tourism / Business · Ordinary Passport
+                    {record.confidence && (
+                      <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded-full font-semibold inline-block ${
+                        record.confidence === "high" ? "bg-emerald-100 text-emerald-700" :
+                        record.confidence === "medium" ? "bg-amber-100 text-amber-700" :
+                        "bg-slate-100 text-slate-600"
+                      }`}>
+                        {record.confidence === "high" ? "✓ High confidence" :
+                         record.confidence === "medium" ? "⚠ Verify before travel" :
+                         "Low confidence — verify with embassy"}
+                      </span>
+                    )}
+                  </CardDescription>
                 </div>
                 <div className={`flex items-center gap-2 px-4 py-2 rounded-full border-2 font-bold text-sm ${cfg.bg} ${cfg.border} ${cfg.color}`}>
-                  {normalizeStatus(effectiveStatus) === "visa_free" && <CheckCircle2 className="w-5 h-5" />}
-                  {normalizeStatus(effectiveStatus) === "visa_on_arrival" && <Plane className="w-5 h-5" />}
-                  {normalizeStatus(effectiveStatus) === "e_visa" && <Zap className="w-5 h-5" />}
-                  {normalizeStatus(effectiveStatus) === "visa_required" && <XCircle className="w-5 h-5" />}
+                  {normalEffective === "visa_free" && <CheckCircle2 className="w-5 h-5" />}
+                  {normalEffective === "visa_on_arrival" && <Plane className="w-5 h-5" />}
+                  {normalEffective === "e_visa" && <Zap className="w-5 h-5" />}
+                  {normalEffective === "visa_required" && <XCircle className="w-5 h-5" />}
                   {cfg.label}
                 </div>
               </div>
             </CardHeader>
+
             <CardContent className="space-y-4">
-              {/* Conditional unlock banner */}
-              {isConditional && (
+              {/* Conditional upgrade banner */}
+              {showUpgradeBanner && (
                 <div className="flex items-start gap-2.5 p-3 rounded-lg bg-amber-50 border border-amber-200">
                   <Zap className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                   <div>
                     <p className="text-sm font-semibold text-amber-800">Conditional Entry Unlocked by Your Visa</p>
                     <p className="text-xs text-amber-700 mt-0.5">
-                      Your held visa/permit grants you a better entry option than the standard requirement.
+                      Your held visa/permit gives you a better entry option than the standard requirement.
                     </p>
-                    {!statusIsSame && (
-                      <div className="flex items-center gap-2 mt-2 flex-wrap">
-                        <span className="text-xs text-amber-600">Standard:</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${baseCfg.badgeBg} ${baseCfg.badgeText}`}>{baseCfg.label}</span>
-                        <span className="text-xs text-amber-600">→ With your visa:</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${cfg.badgeBg} ${cfg.badgeText}`}>{cfg.label}</span>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      {statusUpgrade && (
+                        <>
+                          <span className="text-xs text-amber-600">Standard:</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${baseCfg.badgeBg} ${baseCfg.badgeText}`}>{baseCfg.label}</span>
+                          <span className="text-xs text-amber-600">→ With your visa:</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${cfg.badgeBg} ${cfg.badgeText}`}>{cfg.label}</span>
+                        </>
+                      )}
+                      {!statusUpgrade && stayUpgrade && (
+                        <>
+                          <span className="text-xs text-amber-600">Standard stay:</span>
+                          <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-amber-100 text-amber-700">{baseMaxStay} days</span>
+                          <span className="text-xs text-amber-600">→ With your visa:</span>
+                          <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-700">{effectiveMaxStay} days</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Turkey-style conditional e-visa note (base is visa_required but e-visa unlockable) */}
+              {!isConditional && isConditionalEVisa(record.base_entry.status) && availableConditionals.length > 0 && (
+                <div className="flex items-start gap-2.5 p-3 rounded-lg bg-purple-50 border border-purple-200">
+                  <Zap className="w-4 h-4 text-purple-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-purple-800">e-Visa Available — With Qualifying Documents</p>
+                    <p className="text-xs text-purple-700 mt-0.5">
+                      Without a qualifying third-country visa, you must apply at the embassy. Select the visas you hold above to check if you qualify for e-Visa.
+                    </p>
                   </div>
                 </div>
               )}
@@ -277,25 +333,48 @@ export default function VisaCheckPublicPage() {
                     <p className="text-xs text-muted-foreground">Maximum Stay</p>
                     <p className="text-sm font-semibold">{effectiveMaxStay} days</p>
                   </div>
+                  {stayUpgrade && !statusUpgrade && (
+                    <span className="ml-auto text-xs text-emerald-600 font-medium bg-emerald-50 px-2 py-0.5 rounded-full">
+                      +{(effectiveMaxStay ?? 0) - (baseMaxStay ?? 0)} days vs standard
+                    </span>
+                  )}
                 </div>
               )}
 
-              {/* Conditions text */}
+              {/* Conditions / notes */}
               <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Entry Conditions</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5">Entry Conditions</p>
                 <p className="text-sm text-foreground/80 leading-relaxed">
                   {isConditional ? conditionalRule!.conditions : record.base_entry.notes}
                 </p>
               </div>
 
+              {/* Documents required */}
+              {documents.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5" />
+                    Typical Documents Required
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {documents.map((doc) => (
+                      <span key={doc} className="inline-flex items-center gap-1 text-xs px-2 py-1 bg-background border rounded-md text-foreground/70">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-500 flex-shrink-0" />
+                        {doc}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Hint: easier entry available but not unlocked */}
-              {!isConditional && availableConditionals.length > 0 && (
+              {!isConditional && !isConditionalEVisa(record.base_entry.status) && availableConditionals.length > 0 && (
                 <div className="flex items-start gap-2.5 p-3 rounded-lg bg-blue-50 border border-blue-200">
                   <Info className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-semibold text-blue-800">Easier Entry May Be Available</p>
+                    <p className="text-sm font-semibold text-blue-800">Better Entry May Be Available</p>
                     <p className="text-xs text-blue-700 mt-0.5">
-                      Select the visas you hold above — holders of the following may qualify for simpler entry:
+                      Select your visas above — holders of the following documents may qualify for improved entry:
                     </p>
                     <div className="mt-1.5 flex flex-wrap gap-1">
                       {allEligibleHeld.map((v, i) => (
@@ -308,16 +387,33 @@ export default function VisaCheckPublicPage() {
 
               {/* Source & disclaimer */}
               <div className="flex items-start gap-2 p-3 rounded-lg bg-background/80 border">
-                <AlertTriangle className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  Always verify with the destination embassy or consulate before travel. Visa rules change frequently.
+                  <span className="font-medium text-foreground/70">Always verify with the destination embassy or consulate before travel.</span>{" "}
+                  Visa rules change frequently and individual circumstances vary.
                 </p>
               </div>
 
-              {record.source_refs && record.source_refs.length > 0 && (
-                <p className="text-[11px] text-muted-foreground">
-                  Sources: {record.source_refs.map((s) => s.source_name).join(" · ")} · Dataset v{(data as any).metadata?.version ?? "0.2"} ({(data as any).metadata?.created ?? ""})
-                </p>
+              {/* Sources */}
+              {uniqueSources.length > 0 && (
+                <div className="text-[11px] text-muted-foreground space-y-0.5">
+                  <p className="font-medium text-foreground/50 uppercase tracking-wide text-[10px]">Sources</p>
+                  {uniqueSources.map((s, i) => (
+                    <div key={i} className="flex items-start gap-1">
+                      <ExternalLink className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                      {s.url ? (
+                        <a href={s.url} target="_blank" rel="noopener noreferrer" className="hover:underline text-blue-600">
+                          {s.source_name}{s.last_updated ? ` (updated ${s.last_updated})` : ""}
+                        </a>
+                      ) : (
+                        <span>{s.source_name}{s.last_updated ? ` (updated ${s.last_updated})` : ""}</span>
+                      )}
+                    </div>
+                  ))}
+                  <p className="text-[10px] text-muted-foreground/60 mt-1">
+                    Dataset v{(data as any).metadata?.version ?? "0.2"} · Last checked: {record.last_checked ?? (data as any).metadata?.created ?? ""}
+                  </p>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -327,14 +423,14 @@ export default function VisaCheckPublicPage() {
           <Card>
             <CardContent className="py-10 text-center">
               <XCircle className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">No data found for <strong>{destination}</strong>. Please verify with the destination embassy.</p>
+              <p className="text-sm text-muted-foreground">No data found for <strong>{destination}</strong>. Please verify requirements with the destination embassy.</p>
             </CardContent>
           </Card>
         )}
 
         <div className="flex items-center gap-2 justify-center text-xs text-muted-foreground pt-2">
           <Shield className="w-3.5 h-3.5" />
-          <span>Data sourced from MEA India &amp; official sources. Always verify before travel.</span>
+          <span>Data sourced from MEA India (VFFIN) &amp; official embassy sources. Always verify before travel.</span>
         </div>
       </section>
     </div>
