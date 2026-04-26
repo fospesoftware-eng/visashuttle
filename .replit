@@ -42,3 +42,6 @@ waitForPort = 5000
 
 [userenv.shared]
 SITE_PASSWORD = "Fospe@7561"
+
+[agent]
+stack = "FULLSTACK_JS"
