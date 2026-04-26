@@ -1110,15 +1110,15 @@
       "base_entry_type": "e_visa",
       "max_stay_days": null,
       "purpose_scope": "tourism/business unless noted; verify per destination",
-      "base_conditions": "e-visa/ETA/e-permit listed by MEA; check official portal for category and duration.",
-      "conditional_unlock_available": false,
-      "eligible_if_holds": "",
-      "conditional_entry_type": "",
-      "conditional_max_stay_days": "",
-      "conditional_conditions": "",
+      "base_conditions": "e-Visa required for Indian passport holders who do not hold a qualifying third-country visa.",
+      "conditional_unlock_available": true,
+      "eligible_if_holds": "US visa, UK visa, Schengen visa, EU/Schengen visa or residence permit, Canada visa, Australia visa",
+      "conditional_entry_type": "visa_free",
+      "conditional_max_stay_days": 365,
+      "conditional_conditions": "Visa-free entry for up to 1 year for holders of a valid US, UK, Schengen/EU, Canadian, or Australian visa or residence permit. The qualifying visa must be valid.",
       "requires_prior_use_of_third_country_visa": false,
-      "notes": "Verify with destination embassy/consulate before travel.",
-      "source": "MEA VFFIN 27-Feb-2026"
+      "notes": "Holders of valid US, UK, Schengen, Canadian or Australian visa/residence permit may enter Georgia visa-free for up to 1 year. All others must obtain an e-Visa before travel. Verify with destination embassy/consulate before travel.",
+      "source": "MEA VFFIN 27-Feb-2026 / Georgian Immigration Portal"
     },
     {
       "origin_country": "India",
