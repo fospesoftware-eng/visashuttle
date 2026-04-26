@@ -179,6 +179,31 @@ const TRANSIT_LONG_DURATIONS = ["15–30 days", "1–3 months", "More than 3 mon
 const EMPLOYED_STATUSES = ["Employed (Full-time)", "Employed (Part-time)", "Government Employee"];
 const WORKING_STATUSES = [...EMPLOYED_STATUSES, "Self-employed / Business Owner", "Freelancer / Consultant"];
 
+// Countries that officially do not allow dual nationality
+const NO_DUAL_NATIONALITY_COUNTRIES = new Set([
+  "India","China","Japan","Singapore","Malaysia","United Arab Emirates","Saudi Arabia",
+  "Indonesia","South Korea","Thailand","Vietnam","Myanmar","Nepal","Pakistan",
+  "Bangladesh","Sri Lanka","Philippines","Kazakhstan","Azerbaijan","Uzbekistan",
+  "Algeria","Morocco","Tunisia","Ethiopia","Kenya","Zimbabwe","Venezuela","Ukraine",
+]);
+
+// Income source options filtered by employment status
+function getIncomeSourceOpts(empStatus: string): string[] {
+  if (empStatus === "Student") return ["Scholarship / Grant","Family Support","Investment Returns","Rental Income","Freelance / Consultancy"];
+  if (empStatus === "Retired") return ["Pension / Retirement","Investment Returns","Rental Income","Family Support"];
+  if (empStatus === "Unemployed") return ["Investment Returns","Rental Income","Family Support"];
+  if (empStatus === "Self-employed / Business Owner") return ["Business Revenue","Investment Returns","Rental Income","Family Support"];
+  if (empStatus === "Freelancer / Consultant") return ["Freelance / Consultancy","Investment Returns","Rental Income","Family Support"];
+  return ["Employment Salary","Business Revenue","Freelance / Consultancy","Investment Returns","Rental Income","Pension / Retirement","Family Support","Scholarship / Grant"];
+}
+
+// Trip funding options filtered by employment status
+function getTripFundingOpts(empStatus: string): string[] {
+  const base = ["Self-funded","Family member","Sponsor / Host","Scholarship / Grant","Business funds"];
+  if (EMPLOYED_STATUSES.includes(empStatus)) return ["Self-funded","Employer / Company","Family member","Sponsor / Host","Scholarship / Grant","Business funds"];
+  return base;
+}
+
 export default function DeepCheckPage() {
   const { user, isLoading: authLoading } = useB2cAuth();
   const [, setLocation] = useLocation();
@@ -682,12 +707,23 @@ export default function DeepCheckPage() {
                   })()}
                 </div>
                 <Sel label="Gender" val={form.gender || ""} onChange={set("gender")} opts={["Male","Female","Non-binary","Prefer not to say"]} />
-                <Sel label="Marital Status" val={form.maritalStatus || ""} onChange={set("maritalStatus")} opts={["Single","Married","Divorced","Widowed","Separated"]} />
-                <Sel label="Number of Children" val={form.numberOfChildren || ""} onChange={set("numberOfChildren")} opts={["0","1","2","3","4","5+"]} />
+                <div>
+                  <Sel label="Marital Status" val={form.maritalStatus || ""} onChange={val => { set("maritalStatus")(val); if (val === "Single") set("numberOfChildren")("0"); }} opts={["Single","Married","Divorced","Widowed","Separated"]} />
+                </div>
+                {form.maritalStatus !== "Single" && (
+                  <Sel label="Number of Dependent Children" val={form.numberOfChildren || ""} onChange={set("numberOfChildren")} opts={["0","1","2","3","4","5+"]} />
+                )}
                 <SearchableSelect label="Country of Residence" value={form.countryOfResidence || ""} onChange={set("countryOfResidence")} options={COUNTRIES} placeholder="Where do you live now?" />
                 <Sel label="Duration in Current Residence" val={form.monthsInCurrentResidence || ""} onChange={set("monthsInCurrentResidence")} opts={["Less than 6 months","6-12 months","1-3 years","3-5 years","5+ years"]} />
                 <Sel label="Passport Validity Remaining" val={form.passportMonthsValid || ""} onChange={set("passportMonthsValid")} opts={["6-12 months","12-24 months","24-48 months","48+ months"]} />
-                <Sel label="Dual Nationality?" val={form.hasDualNationality || ""} onChange={set("hasDualNationality")} opts={YES_NO} />
+                <div>
+                  <Sel label="Dual Nationality?" val={form.hasDualNationality || ""} onChange={val => { set("hasDualNationality")(val); if (val === "No") set("dualNationalityCountry")(""); }} opts={YES_NO} />
+                  {form.hasDualNationality === "Yes" && NO_DUAL_NATIONALITY_COUNTRIES.has(form.nationality) && (
+                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" /> {form.nationality} does not officially recognise dual nationality. Declaring this may complicate your application.
+                    </p>
+                  )}
+                </div>
                 {form.hasDualNationality === "Yes" && (
                   <SearchableSelect label="Second Nationality" value={form.dualNationalityCountry || ""} onChange={set("dualNationalityCountry")} options={COUNTRIES} placeholder="Second passport country…" />
                 )}
@@ -702,7 +738,14 @@ export default function DeepCheckPage() {
             {/* ===== STEP 2: Travel Plan ===== */}
             {step === 2 && (
               <div className="grid sm:grid-cols-2 gap-4">
-                <SearchableSelect label="Destination Country *" required value={form.destinationCountry || ""} onChange={set("destinationCountry")} options={COUNTRIES} placeholder="Search destination..." />
+                <div>
+                  <SearchableSelect label="Destination Country *" required value={form.destinationCountry || ""} onChange={set("destinationCountry")} options={COUNTRIES} placeholder="Search destination..." />
+                  {form.destinationCountry && form.nationality && form.destinationCountry === form.nationality && (
+                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" /> You are a citizen of {form.nationality} — you do not need a visa to enter your own country.
+                    </p>
+                  )}
+                </div>
                 <div>
                   <Sel label="Visa Type *" val={form.visaType || ""} onChange={val => { set("visaType")(val); set("purposeOfTravel")(""); set("tripDuration")(""); }} opts={["Tourist Visa","Business Visa","Student Visa","Work Visa","Visit Visa","Transit Visa","Investor Visa","Spouse / Family Visa","Conference / Event Visa","Medical Visa"]} />
                   {form.visaType && (() => {
@@ -724,6 +767,11 @@ export default function DeepCheckPage() {
                     );
                     return null;
                   })()}
+                  {form.visaType === "Spouse / Family Visa" && form.maritalStatus === "Single" && (
+                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" /> Spouse / Family Visa typically requires proof of marriage or legal partnership. Your marital status is "Single".
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Sel label="Purpose of Travel *" val={form.purposeOfTravel || ""} onChange={set("purposeOfTravel")} opts={["Tourism & Sightseeing","Business Meeting","Study / Education","Employment","Family Visit","Medical Treatment","Conference / Event","Transit","Wedding / Social Event","Investment / Business Setup"]} />
@@ -834,7 +882,7 @@ export default function DeepCheckPage() {
                   )}
                   <Sel label="Monthly Income (USD)" val={form.monthlyIncome || ""} onChange={set("monthlyIncome")} opts={["Less than $500","$500 – $1,000","$1,000 – $2,500","$2,500 – $5,000","$5,000 – $10,000","More than $10,000"]} />
                   <Sel label="Monthly Living Expenses (USD)" val={form.monthlyExpenses || ""} onChange={set("monthlyExpenses")} opts={["Less than $500","$500 – $1,500","$1,500 – $3,000","More than $3,000"]} />
-                  <Sel label="Primary Income Source" val={form.sourceOfIncome || ""} onChange={set("sourceOfIncome")} opts={["Employment Salary","Business Revenue","Freelance / Consultancy","Investment Returns","Rental Income","Pension / Retirement","Family Support","Scholarship / Grant"]} />
+                  <Sel label="Primary Income Source" val={form.sourceOfIncome || ""} onChange={set("sourceOfIncome")} opts={getIncomeSourceOpts(form.employmentStatus)} />
                   {isEmployed && (
                     <DocToggle label="Employment contract available?" val={form.hasEmploymentContract || ""} onChange={set("hasEmploymentContract")} />
                   )}
@@ -876,7 +924,7 @@ export default function DeepCheckPage() {
                   <Sel label="Approximate Investment Value" val={form.investmentValue || ""} onChange={set("investmentValue")} opts={["Less than $5,000","$5,000 – $20,000","$20,000 – $50,000","More than $50,000"]} />
                 )}
                 <DocToggle label="Property / real estate owned?" val={form.hasProperty || ""} onChange={set("hasProperty")} />
-                <Sel label="Trip Funding Source" val={form.tripFunding || ""} onChange={set("tripFunding")} opts={["Self-funded","Employer / Company","Family member","Sponsor / Host","Scholarship / Grant","Business funds"]} />
+                <Sel label="Trip Funding Source" val={form.tripFunding || ""} onChange={set("tripFunding")} opts={getTripFundingOpts(form.employmentStatus)} />
                 {(form.tripFunding === "Family member" || form.tripFunding === "Sponsor / Host") && (
                   <div>
                     <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Sponsor Details</Label>
@@ -889,12 +937,24 @@ export default function DeepCheckPage() {
             {/* ===== STEP 5: History & Current Visas ===== */}
             {step === 5 && (
               <div className="grid sm:grid-cols-2 gap-4">
-                <Sel label="Total International Trips (lifetime)" val={form.numberOfTrips || ""} onChange={set("numberOfTrips")} opts={["None","1–2 trips","3–5 trips","6–10 trips","10+ trips"]} />
+                <Sel label="Total International Trips (lifetime)" val={form.numberOfTrips || ""} onChange={val => { set("numberOfTrips")(val); if (val === "None") { set("countriesVisited")(""); set("previousVisaApprovals")("None"); set("hasOverstay")("No"); set("hasDeportation")("No"); } }} opts={["None","1–2 trips","3–5 trips","6–10 trips","10+ trips"]} />
                 <div>
                   <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Countries Visited (last 3 years)</Label>
-                  <Input value={form.countriesVisited || ""} onChange={e => set("countriesVisited")(e.target.value)} placeholder="e.g. UAE, Turkey, Malaysia" />
+                  <Input value={form.countriesVisited || ""} onChange={e => set("countriesVisited")(e.target.value)} placeholder={form.numberOfTrips === "None" ? "No trips recorded" : "e.g. UAE, Turkey, Malaysia"} disabled={form.numberOfTrips === "None"} />
+                  {form.numberOfTrips === "None" && form.countriesVisited && (
+                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" /> You listed countries visited but declared zero international trips.
+                    </p>
+                  )}
                 </div>
-                <Sel label="Previous Visa Approvals" val={form.previousVisaApprovals || ""} onChange={set("previousVisaApprovals")} opts={["None","1–2 visas approved","Several (3–5)","Many (6+)"]} />
+                <div>
+                  <Sel label="Previous Visa Approvals" val={form.previousVisaApprovals || ""} onChange={set("previousVisaApprovals")} opts={["None","1–2 visas approved","Several (3–5)","Many (6+)"]} />
+                  {form.numberOfTrips === "None" && form.previousVisaApprovals && form.previousVisaApprovals !== "None" && (
+                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" /> Cannot have prior visa approvals with zero international trips.
+                    </p>
+                  )}
+                </div>
                 <Sel label="Previous Visa Refusals *" val={form.previousVisaRefusals || ""} onChange={set("previousVisaRefusals")} opts={["No","Yes – once","Yes – multiple times"]} />
                 {form.previousVisaRefusals && form.previousVisaRefusals !== "No" && (
                   <>
@@ -905,8 +965,22 @@ export default function DeepCheckPage() {
                     <DocToggle label="Explanation letter prepared for refusal?" val={form.hasRefusalExplanationLetter || ""} onChange={set("hasRefusalExplanationLetter")} />
                   </>
                 )}
-                <DocToggle label="Any overstay history?" val={form.hasOverstay || ""} onChange={set("hasOverstay")} />
-                <DocToggle label="Any deportation history?" val={form.hasDeportation || ""} onChange={set("hasDeportation")} />
+                <div>
+                  <DocToggle label="Any overstay history?" val={form.hasOverstay || ""} onChange={set("hasOverstay")} />
+                  {form.numberOfTrips === "None" && form.hasOverstay === "Yes" && (
+                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" /> Cannot have overstay history with zero international trips.
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <DocToggle label="Any deportation history?" val={form.hasDeportation || ""} onChange={set("hasDeportation")} />
+                  {form.numberOfTrips === "None" && form.hasDeportation === "Yes" && (
+                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" /> Cannot have deportation history with zero international trips.
+                    </p>
+                  )}
+                </div>
                 <DocToggle label="Any criminal record?" val={form.criminalRecord || ""} onChange={set("criminalRecord")} />
                 <DocToggle label="Any immigration violations?" val={form.immigrationViolation || ""} onChange={set("immigrationViolation")} />
                 <Sel label="Currently hold a valid visa for:" val={form.currentVisaHoldings || ""} onChange={set("currentVisaHoldings")} opts={["None","Schengen / EU","United States","United Kingdom","Australia","Canada","Japan","UAE","Other"]} tooltip="Holding strong country visa boosts credibility" />
@@ -937,7 +1011,9 @@ export default function DeepCheckPage() {
             {/* ===== STEP 7: Home Ties & Extra ===== */}
             {step === 7 && (
               <div className="grid sm:grid-cols-2 gap-4">
-                <DocToggle label="Spouse / family in home country?" val={form.familyInHomeCountry || ""} onChange={set("familyInHomeCountry")} />
+                <DocToggle
+                  label={form.maritalStatus === "Single" ? "Family members in home country?" : "Spouse / family in home country?"}
+                  val={form.familyInHomeCountry || ""} onChange={set("familyInHomeCountry")} />
                 <DocToggle label="Property / real estate in home country?" val={form.propertyInHomeCountry || ""} onChange={set("propertyInHomeCountry")} />
                 <DocToggle label="Stable employment / active business at home?" val={form.stableEmploymentHome || ""} onChange={set("stableEmploymentHome")} />
                 <DocToggle label="Ongoing education / study at home?" val={form.ongoingEducation || ""} onChange={set("ongoingEducation")} />
