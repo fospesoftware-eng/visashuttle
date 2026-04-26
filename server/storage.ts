@@ -856,15 +856,19 @@ export class MemStorage implements IStorage {
 
 // HybridStorage: uses MemStorage for agency/seed data, PostgreSQL for B2C user data
 class HybridStorage extends MemStorage {
-  // B2C Users — persisted to DB
+  // B2C Users — persisted to DB, with in-memory fallback for seeded demo/test accounts
   async getB2cUser(id: string): Promise<B2cUser | undefined> {
     const rows = await db.select().from(b2cUsers).where(eq(b2cUsers.id, id)).limit(1);
-    return rows[0];
+    if (rows[0]) return rows[0];
+    // Fallback to in-memory seeded users (demo/test accounts)
+    return super.getB2cUser(id);
   }
 
   async getB2cUserByEmail(email: string): Promise<B2cUser | undefined> {
     const rows = await db.select().from(b2cUsers).where(eq(b2cUsers.email, email.toLowerCase())).limit(1);
-    return rows[0];
+    if (rows[0]) return rows[0];
+    // Fallback to in-memory seeded users (demo/test accounts)
+    return super.getB2cUserByEmail(email);
   }
 
   async createB2cUser(user: InsertB2cUser): Promise<B2cUser> {

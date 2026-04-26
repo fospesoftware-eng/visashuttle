@@ -45,3 +45,4 @@ SITE_PASSWORD = "Fospe@7561"
 
 [agent]
 stack = "FULLSTACK_JS"
+expertMode = true
