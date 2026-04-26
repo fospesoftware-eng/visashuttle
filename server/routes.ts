@@ -23,6 +23,8 @@ declare module "express-session" {
     siteAuthenticated?: boolean;
     // B2C visa checker users
     b2cUserId?: string;
+    // OTP verification (temporary, cleared after registration)
+    otpVerifiedPhone?: string;
   }
 }
 
@@ -747,14 +749,82 @@ export async function registerRoutes(
     next();
   }
 
-  // Register
+  // ── OTP Send ─────────────────────────────────────────────────────────────
+  app.post("/api/b2c/otp/send", async (req, res) => {
+    const { phone } = req.body;
+    if (!phone || typeof phone !== "string") {
+      return res.status(400).json({ error: "Phone number is required" });
+    }
+    const zauvApiKey = process.env.ZAVU_API_KEY;
+    if (!zauvApiKey) {
+      return res.status(503).json({ error: "SMS service not configured" });
+    }
+    try {
+      const response = await fetch("https://api.zavu.dev/v1/otp/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${zauvApiKey}`,
+        },
+        body: JSON.stringify({ phone }),
+      });
+      const data = await response.json() as any;
+      if (!response.ok) {
+        console.error("Zavu OTP send error:", data);
+        return res.status(502).json({ error: data.message || "Failed to send OTP. Please try again." });
+      }
+      res.json({ success: true, message: "OTP sent to your phone" });
+    } catch (err) {
+      console.error("OTP send error:", err);
+      res.status(502).json({ error: "SMS service temporarily unavailable" });
+    }
+  });
+
+  // ── OTP Verify ───────────────────────────────────────────────────────────
+  app.post("/api/b2c/otp/verify", async (req, res) => {
+    const { phone, otp } = req.body;
+    if (!phone || !otp) {
+      return res.status(400).json({ error: "Phone number and OTP code are required" });
+    }
+    const zauvApiKey = process.env.ZAVU_API_KEY;
+    if (!zauvApiKey) {
+      return res.status(503).json({ error: "SMS service not configured" });
+    }
+    try {
+      const response = await fetch("https://api.zavu.dev/v1/otp/verify", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${zauvApiKey}`,
+        },
+        body: JSON.stringify({ phone, otp }),
+      });
+      const data = await response.json() as any;
+      if (!response.ok) {
+        return res.status(400).json({ error: data.message || "Invalid or expired OTP code" });
+      }
+      req.session.otpVerifiedPhone = phone;
+      res.json({ success: true });
+    } catch (err) {
+      console.error("OTP verify error:", err);
+      res.status(502).json({ error: "SMS service temporarily unavailable" });
+    }
+  });
+
+  // ── B2C Register ──────────────────────────────────────────────────────────
   app.post("/api/b2c/auth/register", async (req, res) => {
-    const { email, password, fullName } = req.body;
+    const { email, password, fullName, phone } = req.body;
     if (!email || !password || !fullName) {
       return res.status(400).json({ error: "Name, email and password are required" });
     }
     if (password.length < 8) {
       return res.status(400).json({ error: "Password must be at least 8 characters" });
+    }
+    if (!phone || !req.session.otpVerifiedPhone) {
+      return res.status(400).json({ error: "Phone number verification is required" });
+    }
+    if (req.session.otpVerifiedPhone !== phone) {
+      return res.status(400).json({ error: "Phone number does not match the verified number" });
     }
     const existing = await storage.getB2cUserByEmail(email);
     if (existing) {
@@ -765,6 +835,8 @@ export async function registerRoutes(
       email: email.toLowerCase().trim(),
       password: hashedPassword,
       fullName: fullName.trim(),
+      phone: phone.trim(),
+      phoneVerified: true,
       freeChecksUsed: 0,
       subscriptionPlan: "free",
       checkLimit: 1,
@@ -772,6 +844,7 @@ export async function registerRoutes(
       stripeCustomerId: null,
     });
     req.session.b2cUserId = user.id;
+    req.session.otpVerifiedPhone = undefined;
     const { password: _, ...safeUser } = user;
     res.status(201).json({ user: safeUser });
   });

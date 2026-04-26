@@ -193,6 +193,8 @@ export const b2cUsers = pgTable("b2c_users", {
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   fullName: text("full_name").notNull(),
+  phone: text("phone"),
+  phoneVerified: boolean("phone_verified").notNull().default(false),
   freeChecksUsed: integer("free_checks_used").notNull().default(0),
   subscriptionPlan: text("subscription_plan").notNull().default("free"), // free, starter, pro
   checkLimit: integer("check_limit").notNull().default(1),
