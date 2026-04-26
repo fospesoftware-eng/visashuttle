@@ -536,6 +536,266 @@ function mockResult(form: VisaCheckFormData): AIVisaResult {
   };
 }
 
+// ============================================================
+// DEEP CHECK — Extended types, prompt and Claude-only runner
+// ============================================================
+
+export interface DeepCheckFormData extends VisaCheckFormData {
+  // Extended personal
+  passportMonthsValid?: string;      // "6-12 months" | "12-24 months" | "24-48 months" | "48+ months"
+  hasDualNationality?: string;       // Yes / No
+  dualNationalityCountry?: string;
+  educationLevel?: string;           // High School / Bachelor's / Master's / PhD / Other
+  fieldOfStudy?: string;
+  // Extended financial
+  hasInvestments?: string;           // Yes / No (stocks, mutual funds, bonds)
+  hasFixedDeposits?: string;         // Yes / No
+  investmentValue?: string;          // rough range
+  monthlyExpenses?: string;          // <$500 / $500-$1500 / $1500-$3000 / $3000+
+  hasBankTransactions?: string;      // regular consistent / irregular / large unexplained
+  // Destination ties
+  destinationContacts?: string;      // None / Relatives / Friends / Business contacts / Academic institution
+  destinationContactStatus?: string; // Their visa/residency status
+  // Current visa holdings
+  currentVisaHoldings?: string;      // None / Schengen / US / UK / Australia / Japan / Canada
+  visaHoldingExpiry?: string;        // still valid / expired within 2 years / older
+  // Trip specifics
+  specificCitiesPlanned?: string;
+  eventOrConferenceName?: string;
+  hasConferenceInvitation?: string;  // Yes / No
+  purposeDetailedExplanation?: string;
+  // Additional docs & compliance
+  hasHealthInsurance?: string;       // Yes / No
+  hasPoliceCharacterCertificate?: string;
+  hasRefusalExplanationLetter?: string;
+  // Home country depth
+  monthsInCurrentResidence?: string; // <6 months / 6-12 months / 1-3 years / 3-5 years / 5+ years
+  hasEmploymentContract?: string;
+  hasGovtIssuedId?: string;
+  hasSocialMedia?: string;           // Active public social presence? Yes / No
+}
+
+export interface DeepCheckDimensionScores {
+  financial: number;          // 0-100
+  documents: number;          // 0-100
+  travelHistory: number;      // 0-100
+  homeTies: number;           // 0-100
+  visaProfile: number;        // 0-100
+}
+
+export interface DeepCheckRiskDetail {
+  factor: string;
+  severity: "critical" | "high" | "medium" | "low";
+  detail: string;
+  mitigation: string;
+}
+
+export interface DeepCheckActionItem {
+  priority: "immediate" | "before_applying" | "optional";
+  action: string;
+  impact: string;
+  timeframe: string;
+}
+
+export interface DeepCheckResult extends AIVisaResult {
+  dimensionScores: DeepCheckDimensionScores;
+  riskDetails: DeepCheckRiskDetail[];
+  actionPlan: DeepCheckActionItem[];
+  embassyInsight: string;
+  profileGrade: string;           // A+ / A / B+ / B / C+ / C / D / F
+  documentCompletionRate: number; // 0-100 — how complete your docs are
+  confidenceLevel: string;        // "Very High" | "High" | "Moderate" | "Low"
+}
+
+function buildDeepCheckSystemPrompt(): string {
+  return `You are an elite immigration intelligence system used by professional visa consultants. You have access to embassy decision patterns, approval rate data, and consular officer evaluation criteria for every country. 
+
+Perform a thorough "embassy-style" deep risk assessment on the applicant's complete profile and return ONLY a valid JSON object with this EXACT structure:
+
+{
+  "approvalChance": <integer 5-95>,
+  "profileGrade": "<A+|A|B+|B|C+|C|D|F>",
+  "statusLabel": "<High Chance|Good Chance|Moderate Chance|Low Chance|Very Risky>",
+  "confidenceLevel": "<Very High|High|Moderate|Low>",
+  "summary": "<3-4 sentence professional embassy-style assessment referencing their specific nationality, destination, visa type, employment, financial profile, and key risk/strength signals>",
+  "embassyInsight": "<2-3 sentences of specific intelligence about how the destination country's embassy/consulate ACTUALLY processes applications from this nationality — include any known quotas, preferred applicant profiles, recent policy changes, interview requirements, or processing patterns>",
+  "dimensionScores": {
+    "financial": <integer 0-100>,
+    "documents": <integer 0-100>,
+    "travelHistory": <integer 0-100>,
+    "homeTies": <integer 0-100>,
+    "visaProfile": <integer 0-100>
+  },
+  "documentCompletionRate": <integer 0-100>,
+  "strengths": ["<specific strength 1>", "<specific strength 2>", "<specific strength 3>", "<specific strength 4>", "<specific strength 5>"],
+  "riskDetails": [
+    { "factor": "<risk factor name>", "severity": "<critical|high|medium|low>", "detail": "<Why this is a risk and how it is likely to be perceived by a consular officer>", "mitigation": "<Specific actionable mitigation>"},
+    ...provide ALL identified risk factors...
+  ],
+  "missingDocuments": ["<specific missing document>", ...],
+  "requiredDocuments": ["<required document 1>", "<required document 2>", ...at least 8 documents...],
+  "countrySpecificConcerns": ["<highly specific concern about this exact nationality+destination+visa type combination>", "<specific concern 2>", "<specific concern 3>"],
+  "actionPlan": [
+    { "priority": "<immediate|before_applying|optional>", "action": "<Concrete specific action>", "impact": "<Estimated improvement to approval chance, e.g. +8-12%>", "timeframe": "<e.g. 1-2 weeks>" },
+    ...provide 6-8 action items sorted by priority...
+  ],
+  "improvementTips": ["<tip 1>", "<tip 2>", "<tip 3>", "<tip 4>", "<tip 5>"],
+  "nextSteps": ["<step 1>", "<step 2>", "<step 3>", "<step 4>", "<step 5>"],
+  "finalRecommendation": "<One direct, specific, actionable recommendation — not generic. Reference their actual situation. E.g.: 'With your Nigerian passport applying for a UK tourist visa and two prior refusals, we recommend postponing application for 6 months while building a 12-month bank statement showing consistent income above £2,500/month, then apply with a strong cover letter addressing each prior refusal.'>",
+  "disclaimer": "Visa Shuttle's Deep Check uses AI analysis of your profile against known visa approval patterns. This is an educational assessment — final decisions rest solely with the embassy or immigration authority."
+}
+
+SCORING RULES (be precise, realistic — not generous):
+profileGrade: A+ (90-95), A (82-89), B+ (74-81), B (65-73), C+ (55-64), C (45-54), D (30-44), F (5-29)
+confidenceLevel: "Very High" if all key fields provided, "High" if most provided, "Moderate" if some gaps, "Low" if many fields missing.
+
+DIMENSION SCORING:
+- financial (0-100): Assess bank balance, statement availability, consistency, investments, income stability, funding source, credit card, property. 100 = excellent evidence of self-sufficiency.
+- documents (0-100): How complete are their travel documents. 100 = return ticket + hotel + insurance + itinerary + invitation + cover letter + bank statement + NOC + salary slips.
+- travelHistory (0-100): Previous international trips, prior approvals/refusals, overstay, deportation. 100 = many successful trips, no refusals, no violations.
+- homeTies (0-100): Family, property, employment, financial obligations in home country. 100 = married with children, owns property, long-term stable employment, mortgage.
+- visaProfile (0-100): How well this nationality + visa type + destination combination typically performs. Consider passport strength, visa type complexity, bilateral relationships.
+
+SEVERITY RULES for riskDetails:
+- critical: Deportation history, criminal record, multiple refusals for same destination
+- high: Single refusal (same destination), overstay, immigration violation, unemployed with low balance
+- medium: Weak bank balance, no return ticket, first-time visitor to high-scrutiny destination, self-employed without docs
+- low: Minor gaps like missing itinerary, no cover letter, short bank statement
+
+Tailor EVERYTHING to the specific nationality + destination + visa type combination. Be specific, not generic.
+Return ONLY valid JSON. No markdown, no code blocks, no explanation outside the JSON.`;
+}
+
+function buildDeepCheckUserPrompt(form: DeepCheckFormData): string {
+  const base = buildUserPrompt(form);
+  const extra: string[] = [
+    "",
+    "=== DEEP CHECK — EXTENDED PROFILE ===",
+    "",
+    "--- Passport & Identity ---",
+    form.passportMonthsValid ? `Passport Validity Remaining: ${form.passportMonthsValid}` : "",
+    form.hasDualNationality ? `Dual Nationality: ${form.hasDualNationality}` : "",
+    form.dualNationalityCountry ? `Second Nationality: ${form.dualNationalityCountry}` : "",
+    form.hasGovtIssuedId ? `Government-issued National ID Available: ${form.hasGovtIssuedId}` : "",
+    "",
+    "--- Education & Professional Background ---",
+    form.educationLevel ? `Highest Education Level: ${form.educationLevel}` : "",
+    form.fieldOfStudy ? `Field of Study / Specialization: ${form.fieldOfStudy}` : "",
+    form.hasEmploymentContract ? `Employment Contract Available: ${form.hasEmploymentContract}` : "",
+    "",
+    "--- Extended Financial Profile ---",
+    form.monthlyExpenses ? `Monthly Living Expenses (USD): ${form.monthlyExpenses}` : "",
+    form.hasInvestments ? `Investment Portfolio (stocks/mutual funds/bonds): ${form.hasInvestments}` : "",
+    form.hasFixedDeposits ? `Fixed Deposits / Term Deposits: ${form.hasFixedDeposits}` : "",
+    form.investmentValue ? `Approximate Investment Value: ${form.investmentValue}` : "",
+    form.hasBankTransactions ? `Bank Transaction Pattern: ${form.hasBankTransactions}` : "",
+    "",
+    "--- Current Visa Holdings ---",
+    form.currentVisaHoldings ? `Currently Holds Valid Visa(s) For: ${form.currentVisaHoldings}` : "No current visa holdings mentioned",
+    form.visaHoldingExpiry ? `Visa Holding Status: ${form.visaHoldingExpiry}` : "",
+    "",
+    "--- Destination Country Connections ---",
+    form.destinationContacts ? `Contacts at Destination Country: ${form.destinationContacts}` : "None declared",
+    form.destinationContactStatus ? `Contact's Visa/Residency Status: ${form.destinationContactStatus}` : "",
+    "",
+    "--- Detailed Trip Information ---",
+    form.specificCitiesPlanned ? `Specific Cities / Regions Planned: ${form.specificCitiesPlanned}` : "",
+    form.eventOrConferenceName ? `Event / Conference Name: ${form.eventOrConferenceName}` : "",
+    form.hasConferenceInvitation ? `Conference / Event Invitation Letter: ${form.hasConferenceInvitation}` : "",
+    form.purposeDetailedExplanation ? `Detailed Purpose of Visit: ${form.purposeDetailedExplanation}` : "",
+    "",
+    "--- Additional Documents & Compliance ---",
+    form.hasHealthInsurance ? `Active Health / Medical Insurance: ${form.hasHealthInsurance}` : "",
+    form.hasPoliceCharacterCertificate ? `Police Clearance Certificate: ${form.hasPoliceCharacterCertificate}` : "",
+    form.hasRefusalExplanationLetter ? `Refusal Explanation Letter Prepared: ${form.hasRefusalExplanationLetter}` : "",
+    "",
+    "--- Home Country Depth ---",
+    form.monthsInCurrentResidence ? `Duration in Current Residence Country: ${form.monthsInCurrentResidence}` : "",
+    form.hasSocialMedia ? `Active Social Media Presence: ${form.hasSocialMedia}` : "",
+  ];
+
+  return base + extra.filter(Boolean).join("\n");
+}
+
+async function callClaudeDeepCheck(form: DeepCheckFormData): Promise<DeepCheckResult> {
+  if (!ANTHROPIC_API_KEY) throw new Error("Anthropic API key not configured");
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-opus-4-5",
+      max_tokens: 3000,
+      system: buildDeepCheckSystemPrompt(),
+      messages: [{ role: "user", content: buildDeepCheckUserPrompt(form) }],
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Claude Deep Check error: ${response.status} ${errorText}`);
+  }
+
+  const data = await response.json() as any;
+  const content = data.content[0]?.text;
+  if (!content) throw new Error("No content from Claude");
+
+  const jsonMatch = content.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error("No JSON in Claude response");
+
+  const parsed = JSON.parse(jsonMatch[0]) as DeepCheckResult;
+  parsed.statusLabel = getStatusLabel(parsed.approvalChance);
+  return parsed;
+}
+
+function mockDeepCheckResult(form: DeepCheckFormData): DeepCheckResult {
+  const base = mockResult(form);
+  const score = base.approvalChance;
+  return {
+    ...base,
+    profileGrade: score >= 90 ? "A+" : score >= 82 ? "A" : score >= 74 ? "B+" : score >= 65 ? "B" : score >= 55 ? "C+" : score >= 45 ? "C" : score >= 30 ? "D" : "F",
+    confidenceLevel: "Moderate",
+    documentCompletionRate: Math.min(95, Math.max(20, score + 5)),
+    embassyInsight: `The ${form.destinationCountry} consulate processing ${form.nationality} applicants for ${form.visaType} applications typically requires comprehensive financial documentation and prefers applications with at least 6 months of bank statements. Processing times vary from 5-15 working days. Interview requirements depend on individual profile assessment.`,
+    dimensionScores: {
+      financial: Math.min(95, Math.max(15, score - 5 + Math.floor(Math.random() * 15))),
+      documents: Math.min(95, Math.max(15, score - 10 + Math.floor(Math.random() * 20))),
+      travelHistory: Math.min(95, Math.max(15, score + Math.floor(Math.random() * 10))),
+      homeTies: Math.min(95, Math.max(15, score + 5 + Math.floor(Math.random() * 10))),
+      visaProfile: Math.min(95, Math.max(15, score - 3 + Math.floor(Math.random() * 12))),
+    },
+    riskDetails: base.riskFactors.slice(0, 4).map((f, i) => ({
+      factor: f.split(" ").slice(0, 4).join(" "),
+      severity: i === 0 ? "high" : i === 1 ? "medium" : "low" as any,
+      detail: f,
+      mitigation: base.improvementTips[i] || "Prepare comprehensive documentation addressing this concern.",
+    })),
+    actionPlan: base.nextSteps.slice(0, 5).map((s, i) => ({
+      priority: i === 0 ? "immediate" : i <= 2 ? "before_applying" : "optional" as any,
+      action: s,
+      impact: `+${5 + i * 3}-${8 + i * 3}% improvement`,
+      timeframe: i === 0 ? "This week" : i <= 2 ? "2-4 weeks" : "1-3 months",
+    })),
+  };
+}
+
+export async function runDeepCheck(form: DeepCheckFormData): Promise<{ result: DeepCheckResult; provider: string }> {
+  if (ANTHROPIC_API_KEY) {
+    try {
+      const result = await callClaudeDeepCheck(form);
+      return { result, provider: "claude" };
+    } catch (e) {
+      console.error("[DeepCheck] Claude failed:", e);
+    }
+  }
+  console.warn("[DeepCheck] Falling back to mock (no Anthropic key or Claude failed)");
+  return { result: mockDeepCheckResult(form), provider: "mock" };
+}
+
 export async function runVisaCheck(form: VisaCheckFormData): Promise<{ result: AIVisaResult; provider: string }> {
   if (AI_PROVIDER === "anthropic" && ANTHROPIC_API_KEY) {
     try {

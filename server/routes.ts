@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { runVisaCheck } from "./ai";
+import { runVisaCheck, runDeepCheck } from "./ai";
 import bcrypt from "bcryptjs";
 
 // Site-wide password for protecting the entire application
@@ -862,6 +862,41 @@ export async function registerRoutes(
     } catch (err) {
       console.error("[B2C Check] Error:", err);
       res.status(500).json({ error: "Failed to run visa check. Please try again." });
+    }
+  });
+
+  // === Deep Check Route (Claude-powered) ===
+  app.post("/api/b2c/deep-check", requireB2cAuth, async (req, res) => {
+    const userId = req.session.b2cUserId!;
+    const user = await storage.getB2cUser(userId);
+    if (!user) return res.status(401).json({ error: "User not found" });
+
+    if (!user.deepCheckAccess) {
+      return res.status(403).json({ error: "Deep Check requires Pro plan access", upgrade: true });
+    }
+
+    const formData = req.body.formData;
+    if (!formData || !formData.nationality || !formData.destinationCountry || !formData.visaType) {
+      return res.status(400).json({ error: "Required fields missing: nationality, destinationCountry, visaType" });
+    }
+
+    try {
+      const { result, provider } = await runDeepCheck(formData);
+
+      const visaCheck = await storage.createVisaCheck({
+        userId,
+        checkType: "deep",
+        formData,
+        aiProvider: provider,
+        approvalChance: result.approvalChance,
+        statusLabel: result.statusLabel,
+        aiResponse: result as any,
+      });
+
+      res.json({ check: visaCheck, result });
+    } catch (err) {
+      console.error("[Deep Check] Error:", err);
+      res.status(500).json({ error: "Failed to run deep check. Please try again." });
     }
   });
 

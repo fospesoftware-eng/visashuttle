@@ -1,195 +1,842 @@
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { useEffect } from "react";
 import {
-  Crown, Lock, Sparkles, CheckCircle, FileText, Search,
-  TrendingUp, Download, Shield, ArrowRight, Zap
+  Crown, Lock, Sparkles, CheckCircle, FileText, AlertCircle,
+  TrendingUp, Download, Shield, ArrowRight, Zap, ChevronLeft,
+  ChevronRight, Brain, User, Plane, CreditCard, Globe, Home,
+  Info, RefreshCw, Flag, Star, AlertTriangle, Activity, BookOpen,
+  Briefcase, BadgeCheck, BarChart3, ClipboardList
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
 import { DashboardLayout } from "@/components/dashboard-layout";
+import { SearchableSelect } from "@/components/searchable-select";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
-const FEATURES = [
-  { icon: Search, title: "Embassy-Style Risk Analysis", desc: "Deep review mirroring how consular officers evaluate your application — scoring each factor the way embassies do." },
-  { icon: AlertIcon, title: "Red Flag Detection", desc: "AI identifies specific red flags in your profile that are most likely to cause rejection, with severity ratings." },
-  { icon: FileText, title: "Document Gap Analysis", desc: "Complete audit of required vs. available documents, with specific instructions on what's missing and how to obtain it." },
-  { icon: TrendingUp, title: "Personalized Improvement Plan", desc: "Step-by-step action plan to boost your visa approval chance — tailored to your exact profile and destination." },
-  { icon: Download, title: "Downloadable PDF Report", desc: "Export your full visa analysis as a professional PDF report — ideal for consultations or record-keeping." },
-  { icon: Shield, title: "Risk Mitigation Advice", desc: "Concrete strategies to address each identified risk factor before submitting your application." },
+const COUNTRIES = ["Afghanistan","Albania","Algeria","Argentina","Australia","Austria","Azerbaijan","Bahrain","Bangladesh","Belgium","Brazil","Bulgaria","Cambodia","Canada","Chile","China","Colombia","Croatia","Cyprus","Czech Republic","Denmark","Egypt","Estonia","Ethiopia","Finland","France","Georgia","Germany","Ghana","Greece","Hungary","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Japan","Jordan","Kazakhstan","Kenya","Kuwait","Latvia","Lebanon","Lithuania","Luxembourg","Malaysia","Malta","Mexico","Morocco","Myanmar","Nepal","Netherlands","New Zealand","Nigeria","Norway","Oman","Pakistan","Philippines","Poland","Portugal","Qatar","Romania","Russia","Saudi Arabia","Serbia","Singapore","Slovakia","Slovenia","South Africa","South Korea","Spain","Sri Lanka","Sweden","Switzerland","Syria","Taiwan","Thailand","Tunisia","Turkey","Ukraine","United Arab Emirates","United Kingdom","United States","Uzbekistan","Venezuela","Vietnam","Yemen","Zimbabwe"];
+
+const YES_NO = ["Yes", "No"];
+const YES_NO_MAYBE = ["Yes", "No", "Planning to get"];
+
+const STEPS = [
+  { n: 1, title: "Personal Profile", icon: User, bg: "bg-blue-50", color: "text-blue-600" },
+  { n: 2, title: "Travel Plan", icon: Plane, bg: "bg-purple-50", color: "text-purple-600" },
+  { n: 3, title: "Employment & Income", icon: Briefcase, bg: "bg-emerald-50", color: "text-emerald-600" },
+  { n: 4, title: "Financial Depth", icon: CreditCard, bg: "bg-amber-50", color: "text-amber-600" },
+  { n: 5, title: "History & Visas", icon: Globe, bg: "bg-rose-50", color: "text-rose-600" },
+  { n: 6, title: "Documents", icon: FileText, bg: "bg-orange-50", color: "text-orange-600" },
+  { n: 7, title: "Home Ties & Extra", icon: Home, bg: "bg-teal-50", color: "text-teal-600" },
 ];
 
-function AlertIcon(props: any) {
+type SeverityKey = "critical" | "high" | "medium" | "low";
+type PriorityKey = "immediate" | "before_applying" | "optional";
+
+const SEVERITY_STYLE: Record<SeverityKey, string> = {
+  critical: "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300",
+  high: "bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300",
+  medium: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300",
+  low: "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400",
+};
+
+const PRIORITY_STYLE: Record<PriorityKey, string> = {
+  immediate: "border-l-red-500 bg-red-50 dark:bg-red-950/20",
+  before_applying: "border-l-amber-500 bg-amber-50 dark:bg-amber-950/20",
+  optional: "border-l-slate-300 bg-slate-50 dark:bg-slate-800/30",
+};
+
+const PRIORITY_LABEL: Record<PriorityKey, string> = {
+  immediate: "Do now",
+  before_applying: "Before applying",
+  optional: "Optional",
+};
+
+const PRIORITY_BADGE: Record<PriorityKey, string> = {
+  immediate: "bg-red-100 text-red-700",
+  before_applying: "bg-amber-100 text-amber-700",
+  optional: "bg-slate-100 text-slate-600",
+};
+
+// Score gauge SVG
+function ScoreGauge({ score, grade }: { score: number; grade: string }) {
+  const radius = 90;
+  const stroke = 12;
+  const normalizedRadius = radius - stroke / 2;
+  const circumference = normalizedRadius * 2 * Math.PI;
+  const arc = circumference * 0.75;
+  const dashOffset = arc - (score / 100) * arc;
+
+  const color = score >= 80 ? "#10b981" : score >= 60 ? "#3b82f6" : score >= 40 ? "#f59e0b" : score >= 20 ? "#f97316" : "#ef4444";
+
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} {...props}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-    </svg>
+    <div className="relative flex items-center justify-center" style={{ width: 200, height: 200 }}>
+      <svg width={200} height={200} viewBox="0 0 200 200" style={{ transform: "rotate(-225deg)" }}>
+        <circle cx={100} cy={100} r={normalizedRadius} fill="none" stroke="hsl(var(--muted))" strokeWidth={stroke} strokeDasharray={`${arc} ${circumference}`} />
+        <circle cx={100} cy={100} r={normalizedRadius} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round"
+          strokeDasharray={`${arc} ${circumference}`} strokeDashoffset={dashOffset}
+          style={{ transition: "stroke-dashoffset 1s ease, stroke 0.5s ease" }} />
+      </svg>
+      <div className="absolute text-center">
+        <p className="text-5xl font-black" style={{ color }}>{score}%</p>
+        <p className="text-sm font-bold text-muted-foreground mt-1">{grade}</p>
+      </div>
+    </div>
   );
 }
+
+function DimBar({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-muted-foreground font-medium">{label}</span>
+        <span className="font-bold">{value}%</span>
+      </div>
+      <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+        <div className={`h-full rounded-full transition-all duration-700 ${color}`} style={{ width: `${value}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function Sel({ label, val, onChange, opts, tooltip }: any) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 block">
+        {label}{tooltip && <span className="text-xs text-muted-foreground ml-1">({tooltip})</span>}
+      </Label>
+      <select value={val} onChange={e => onChange(e.target.value)}
+        className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary">
+        <option value="">Select…</option>
+        {opts.map((o: string) => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
+
+function DocToggle({ label, val, onChange, tooltip }: any) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 block">
+        {label}{tooltip && <span className="text-xs text-muted-foreground ml-1">({tooltip})</span>}
+      </Label>
+      <div className="flex gap-2 flex-wrap">
+        {YES_NO.map(o => (
+          <button key={o} type="button" onClick={() => onChange(o)}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium border transition-all ${val === o ? "bg-primary text-white border-primary" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-primary/50"}`}>
+            {o}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const BLANK: Record<string, string> = {};
 
 export default function DeepCheckPage() {
   const { user, isLoading: authLoading } = useB2cAuth();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
 
-  useEffect(() => {
-    if (!authLoading && !user) setLocation("/sign-in");
-  }, [user, authLoading]);
+  const [step, setStep] = useState(1);
+  const [form, setForm] = useState<Record<string, string>>({ ...BLANK });
+  const [result, setResult] = useState<any>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [provider, setProvider] = useState("");
 
-  if (authLoading || !user) return null;
+  if (authLoading) return null;
+  if (!user) { setLocation("/sign-in"); return null; }
+
+  const set = (key: string) => (val: string) => setForm(prev => ({ ...prev, [key]: val }));
 
   const hasAccess = user.deepCheckAccess;
 
-  return (
-    <DashboardLayout title="Deep Check" subtitle="Embassy-style advanced visa risk analysis">
-      <div className="max-w-4xl">
-        {/* Hero */}
-        <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white p-8 md:p-10 mb-8">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(59,130,246,0.15),transparent_60%)]" />
-          <div className="relative">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
-                <Crown className="w-5 h-5 text-amber-400" />
+  // ===================== RESULT SCORECARD =====================
+  if (result) {
+    const score: number = result.approvalChance ?? 0;
+    const grade: string = result.profileGrade ?? "—";
+    const dims = result.dimensionScores ?? {};
+    const riskDetails: any[] = result.riskDetails ?? [];
+    const actionPlan: any[] = result.actionPlan ?? [];
+    const statusLabel: string = result.statusLabel ?? "";
+    const docRate: number = result.documentCompletionRate ?? 0;
+    const confidence: string = result.confidenceLevel ?? "";
+
+    const statusColor =
+      score >= 80 ? "text-emerald-600 bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:text-emerald-400"
+      : score >= 60 ? "text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:text-blue-400"
+      : score >= 40 ? "text-amber-600 bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400"
+      : "text-red-600 bg-red-50 border-red-200 dark:bg-red-950/20 dark:text-red-400";
+
+    return (
+      <DashboardLayout title="Deep Check Results" subtitle="AI-powered embassy-style visa analysis">
+        <div className="max-w-4xl space-y-6">
+          {/* Powered by Claude badge */}
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 text-xs font-semibold text-purple-700 dark:text-purple-300">
+                <Brain className="w-3.5 h-3.5" />
+                Powered by Claude AI
               </div>
-              <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30 font-semibold">Pro Feature</Badge>
+              {confidence && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted text-xs font-medium text-muted-foreground border">
+                  Confidence: {confidence}
+                </div>
+              )}
             </div>
-            <h1 className="text-3xl md:text-4xl font-bold mb-3 leading-tight">Deep Visa Risk Analysis</h1>
-            <p className="text-blue-100 text-lg max-w-2xl leading-relaxed">
-              Go beyond the basic score. Get a full embassy-style deep dive into your visa profile — 
-              red flag detection, document gap audit, improvement plan, and a downloadable PDF report.
-            </p>
-            {!hasAccess && (
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => { setResult(null); setStep(1); setForm({ ...BLANK }); }}>
+              <RefreshCw className="w-3.5 h-3.5" /> New Deep Check
+            </Button>
+          </div>
+
+          {/* Score hero */}
+          <Card className="overflow-hidden">
+            <CardContent className="p-0">
+              <div className="bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white p-6 md:p-8">
+                <div className="flex flex-col md:flex-row items-center gap-8">
+                  <div className="flex-shrink-0">
+                    <ScoreGauge score={score} grade={grade} />
+                  </div>
+                  <div className="flex-1 text-center md:text-left">
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold border ${statusColor} mb-3`}>
+                      <Activity className="w-4 h-4" />
+                      {statusLabel}
+                    </span>
+                    <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">
+                      {form.nationality} → {form.destinationCountry}
+                    </h2>
+                    <p className="text-blue-100 text-sm leading-relaxed mb-4 max-w-xl">{result.summary}</p>
+                    <div className="flex flex-wrap gap-2">
+                      <span className="px-2.5 py-1 rounded-lg bg-white/10 text-xs font-medium">{form.visaType}</span>
+                      <span className="px-2.5 py-1 rounded-lg bg-white/10 text-xs font-medium">Doc: {docRate}% complete</span>
+                      <span className="px-2.5 py-1 rounded-lg bg-white/10 text-xs font-medium">Grade: {grade}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Profile dimension scores */}
+          {dims && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4 text-primary" />
+                  Profile Dimension Scores
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid sm:grid-cols-2 gap-x-8 gap-y-3">
+                <DimBar label="Financial Strength" value={dims.financial ?? 0} color="bg-emerald-500" />
+                <DimBar label="Document Completeness" value={dims.documents ?? 0} color="bg-blue-500" />
+                <DimBar label="Travel History" value={dims.travelHistory ?? 0} color="bg-purple-500" />
+                <DimBar label="Home Country Ties" value={dims.homeTies ?? 0} color="bg-amber-500" />
+                <DimBar label="Visa Profile Match" value={dims.visaProfile ?? 0} color="bg-rose-500" />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Embassy Insight */}
+          {result.embassyInsight && (
+            <Card className="border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20">
+              <CardContent className="p-5 flex gap-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Flag className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <p className="font-semibold text-blue-800 dark:text-blue-200 text-sm mb-1">Embassy Intelligence — {form.destinationCountry}</p>
+                  <p className="text-blue-700 dark:text-blue-300 text-sm leading-relaxed">{result.embassyInsight}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Two-column: Strengths + Risk Details */}
+          <div className="grid md:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4" /> Profile Strengths
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {(result.strengths ?? []).map((s: string, i: number) => (
+                  <div key={i} className="flex gap-2 p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-800 text-sm">
+                    <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-emerald-800 dark:text-emerald-300">{s}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold text-red-700 dark:text-red-400 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" /> Risk Analysis
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {riskDetails.length > 0 ? riskDetails.map((r: any, i: number) => {
+                  const sev = (r.severity || "low") as SeverityKey;
+                  return (
+                    <div key={i} className={`p-3 rounded-lg border text-sm ${SEVERITY_STYLE[sev]}`}>
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className="font-semibold">{r.factor}</span>
+                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${SEVERITY_STYLE[sev]}`}>{r.severity}</span>
+                      </div>
+                      <p className="text-xs opacity-90 mb-1">{r.detail}</p>
+                      {r.mitigation && (
+                        <p className="text-xs opacity-75 italic">→ {r.mitigation}</p>
+                      )}
+                    </div>
+                  );
+                }) : (result.riskFactors ?? []).map((r: string, i: number) => (
+                  <div key={i} className="flex gap-2 p-2.5 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-800 text-sm">
+                    <AlertCircle className="w-4 h-4 text-orange-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-orange-800 dark:text-orange-300">{r}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Action Plan */}
+          {actionPlan.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <ClipboardList className="w-4 h-4 text-primary" />
+                  Your Personalized Action Plan
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {actionPlan.map((item: any, i: number) => {
+                  const p = (item.priority || "optional") as PriorityKey;
+                  return (
+                    <div key={i} className={`flex gap-4 p-4 rounded-xl border-l-4 ${PRIORITY_STYLE[p]}`}>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${PRIORITY_BADGE[p]}`}>{PRIORITY_LABEL[p]}</span>
+                          {item.timeframe && <span className="text-xs text-muted-foreground">{item.timeframe}</span>}
+                        </div>
+                        <p className="text-sm font-semibold text-foreground">{item.action}</p>
+                        {item.impact && <p className="text-xs text-muted-foreground mt-0.5">{item.impact}</p>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Document audit */}
+          <div className="grid md:grid-cols-2 gap-4">
+            {(result.missingDocuments ?? []).length > 0 && (
+              <Card className="border-amber-200 dark:border-amber-800">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" /> Missing Documents
+                    <Badge className="ml-auto bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300 text-[10px]">{result.missingDocuments.length}</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-1.5">
+                  {result.missingDocuments.map((d: string, i: number) => (
+                    <div key={i} className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-300">
+                      <div className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
+                      {d}
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                  <FileText className="w-4 h-4" /> Required Documents
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1.5">
+                {(result.requiredDocuments ?? []).map((d: string, i: number) => (
+                  <div key={i} className="flex items-center gap-2 text-sm text-foreground">
+                    <CheckCircle className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                    {d}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Country-specific concerns */}
+          {(result.countrySpecificConcerns ?? []).length > 0 && (
+            <Card className="border-orange-200 dark:border-orange-800 bg-orange-50/50 dark:bg-orange-950/10">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold text-orange-700 dark:text-orange-400 flex items-center gap-2">
+                  <Flag className="w-4 h-4" /> {form.destinationCountry} — Embassy Concerns
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {result.countrySpecificConcerns.map((c: string, i: number) => (
+                  <div key={i} className="flex gap-3 p-3 rounded-xl bg-orange-50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-800 text-sm">
+                    <Info className="w-4 h-4 text-orange-500 flex-shrink-0 mt-0.5" />
+                    <span className="text-orange-800 dark:text-orange-300">{c}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Improvement tips */}
+          {(result.improvementTips ?? []).length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold text-primary flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4" /> Improvement Tips
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid sm:grid-cols-2 gap-2">
+                {result.improvementTips.map((t: string, i: number) => (
+                  <div key={i} className="flex gap-2 p-2.5 rounded-lg bg-primary/5 border border-primary/10 text-sm">
+                    <Zap className="w-3.5 h-3.5 text-primary flex-shrink-0 mt-0.5" />
+                    <span className="text-foreground">{t}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Final recommendation */}
+          {result.finalRecommendation && (
+            <Card className={`border-2 ${score >= 60 ? "border-emerald-200 bg-emerald-50/60 dark:bg-emerald-950/20 dark:border-emerald-800" : score >= 40 ? "border-amber-200 bg-amber-50/60 dark:bg-amber-950/20 dark:border-amber-800" : "border-red-200 bg-red-50/60 dark:bg-red-950/20 dark:border-red-800"}`}>
+              <CardContent className="p-5 flex gap-3">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${score >= 60 ? "bg-emerald-100 dark:bg-emerald-900/50" : score >= 40 ? "bg-amber-100 dark:bg-amber-900/50" : "bg-red-100 dark:bg-red-900/50"}`}>
+                  <BadgeCheck className={`w-5 h-5 ${score >= 60 ? "text-emerald-600 dark:text-emerald-400" : score >= 40 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"}`} />
+                </div>
+                <div>
+                  <p className="font-bold text-sm mb-1">Final Recommendation</p>
+                  <p className="text-sm leading-relaxed text-foreground">{result.finalRecommendation}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Disclaimer & actions */}
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 border text-xs text-muted-foreground">
+            <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+            <span>{result.disclaimer}</span>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <Button className="gap-2" style={{ background: "linear-gradient(135deg,#4055FF,#FF2060)" }}
+              onClick={() => { setResult(null); setStep(1); setForm({ ...BLANK }); }}>
+              <RefreshCw className="w-4 h-4" /> New Deep Check
+            </Button>
+            <Link href="/history">
+              <Button variant="outline" className="gap-2">View History</Button>
+            </Link>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // ===================== UPGRADE / NO ACCESS =====================
+  if (!hasAccess) {
+    return (
+      <DashboardLayout title="Deep Check" subtitle="Embassy-style AI visa risk analysis">
+        <div className="max-w-3xl space-y-6">
+          <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white p-8 md:p-10">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(59,130,246,0.15),transparent_60%)]" />
+            <div className="relative">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
+                  <Crown className="w-5 h-5 text-amber-400" />
+                </div>
+                <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30 font-semibold">Pro Feature</Badge>
+              </div>
+              <h1 className="text-3xl md:text-4xl font-bold mb-3">Deep Visa Risk Analysis</h1>
+              <p className="text-blue-100 text-lg max-w-2xl leading-relaxed">
+                Go beyond a basic score. Our AI runs an embassy-style deep analysis — risk severity breakdown, dimension scoring, action plan, and embassy intelligence.
+              </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <Link href="/pricing">
                   <Button className="bg-white text-blue-900 hover:bg-blue-50 font-semibold gap-2" data-testid="button-upgrade">
-                    <Crown className="w-4 h-4 text-amber-500" />
-                    Upgrade to Pro — $29/mo
-                    <ArrowRight className="w-4 h-4" />
+                    <Crown className="w-4 h-4 text-amber-500" /> Upgrade to Pro — $29/mo <ArrowRight className="w-4 h-4" />
                   </Button>
                 </Link>
                 <Link href="/check">
                   <Button variant="ghost" className="text-white hover:bg-white/10 gap-2">
-                    <Sparkles className="w-4 h-4" />
-                    Run Free Basic Check First
+                    <Sparkles className="w-4 h-4" /> Try Free Basic Check
                   </Button>
                 </Link>
+              </div>
+            </div>
+          </div>
+          {[
+            { icon: Brain, title: "Claude AI Analysis", desc: "Every deep check runs exclusively on Claude — Anthropic's frontier model trained on embassy evaluation patterns and consular officer decision criteria." },
+            { icon: BarChart3, title: "5-Dimension Scoring", desc: "Scores across Financial Strength, Document Completeness, Travel History, Home Country Ties, and Visa Profile Match." },
+            { icon: AlertTriangle, title: "Severity-Tagged Risk Flags", desc: "Each risk factor is tagged Critical / High / Medium / Low with specific mitigation advice — exactly how a consular officer would weigh it." },
+            { icon: ClipboardList, title: "Personalized Action Plan", desc: "Prioritized action items (Immediate / Before Applying / Optional) with estimated approval chance improvement for each action." },
+            { icon: Flag, title: "Embassy Intelligence", desc: "Country-specific insight on how your destination's embassy actually processes applications from your nationality." },
+            { icon: Download, title: "Full PDF Report", desc: "Export your complete visa analysis as a professional PDF — perfect for sharing with a consultant or keeping as a record." },
+          ].map(({ icon: Icon, title, desc }) => (
+            <Card key={title}>
+              <CardContent className="p-5 flex gap-4">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Icon className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-semibold text-sm">{title}</h3>
+                    <Lock className="w-3 h-3 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // ===================== MULTI-STEP FORM =====================
+  const currentStep = STEPS[step - 1];
+  const StepIcon = currentStep.icon;
+  const progress = ((step - 1) / (STEPS.length - 1)) * 100;
+
+  const nextStep = () => { if (step < STEPS.length) setStep(s => s + 1); };
+  const prevStep = () => { if (step > 1) setStep(s => s - 1); };
+
+  const handleSubmit = async () => {
+    if (!form.nationality || !form.destinationCountry || !form.visaType) {
+      toast({ title: "Required fields missing", description: "Please fill in at least nationality, destination, and visa type.", variant: "destructive" });
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const res = await apiRequest("POST", "/api/b2c/deep-check", { formData: form });
+      const data = await res.json();
+      setResult(data.result);
+      setProvider(data.check?.aiProvider || "");
+      await queryClient.invalidateQueries({ queryKey: ["/api/b2c/checks"] });
+    } catch (err: any) {
+      toast({ title: "Deep Check failed", description: err.message || "Please try again.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <DashboardLayout title="New Deep Check" subtitle={`Step ${step} of ${STEPS.length} — ${currentStep.title}`}>
+      <div className="max-w-3xl">
+        {/* Pro badge */}
+        <div className="mb-4 flex items-center gap-2 px-3 py-2 rounded-xl bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800">
+          <Crown className="w-4 h-4 text-purple-600 dark:text-purple-400 flex-shrink-0" />
+          <span className="text-sm text-purple-700 dark:text-purple-300 font-medium">Deep Check — Claude AI Powered Analysis</span>
+          <span className="ml-auto text-xs text-purple-500">More thorough than basic check</span>
+        </div>
+
+        {/* Step pills */}
+        <div className="mb-5">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-3">
+            {STEPS.map(s => {
+              const SIcon = s.icon;
+              const done = s.n < step;
+              const active = s.n === step;
+              return (
+                <div key={s.n} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold flex-shrink-0 transition-all ${done ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400" : active ? `${s.bg} ${s.color} shadow-sm dark:bg-opacity-20` : "bg-white dark:bg-slate-800 text-muted-foreground border border-muted"}`}>
+                  {done ? <CheckCircle className="w-3 h-3" /> : <SIcon className="w-3 h-3" />}
+                  <span className="hidden sm:inline">{s.title}</span>
+                  <span className="sm:hidden">{s.n}</span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, background: "linear-gradient(90deg,#7033F0,#4055FF,#FF2060)" }} />
+          </div>
+        </div>
+
+        <Card className="shadow-sm">
+          <CardContent className="p-6 md:p-8">
+            {/* Step header */}
+            <div className="flex items-center gap-3 mb-6 pb-4 border-b">
+              <div className={`w-10 h-10 rounded-xl ${currentStep.bg} dark:bg-opacity-20 flex items-center justify-center flex-shrink-0`}>
+                <StepIcon className={`w-5 h-5 ${currentStep.color}`} />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Step {step} of {STEPS.length}</p>
+                <h2 className="font-bold text-lg">{currentStep.title}</h2>
+              </div>
+            </div>
+
+            {/* ===== STEP 1: Personal Profile ===== */}
+            {step === 1 && (
+              <div className="grid sm:grid-cols-2 gap-4">
+                <SearchableSelect label="Nationality *" required value={form.nationality || ""} onChange={set("nationality")} options={COUNTRIES} placeholder="Search nationality..." />
+                <SearchableSelect label="Passport Issued By" value={form.passportCountry || ""} onChange={set("passportCountry")} options={COUNTRIES} placeholder="If different from nationality…" />
+                <div>
+                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Date of Birth</Label>
+                  <Input type="date" value={form.dateOfBirth || ""} onChange={e => set("dateOfBirth")(e.target.value)} />
+                </div>
+                <Sel label="Gender" val={form.gender || ""} onChange={set("gender")} opts={["Male","Female","Non-binary","Prefer not to say"]} />
+                <Sel label="Marital Status" val={form.maritalStatus || ""} onChange={set("maritalStatus")} opts={["Single","Married","Divorced","Widowed","Separated"]} />
+                <Sel label="Number of Children" val={form.numberOfChildren || ""} onChange={set("numberOfChildren")} opts={["0","1","2","3","4","5+"]} />
+                <SearchableSelect label="Country of Residence" value={form.countryOfResidence || ""} onChange={set("countryOfResidence")} options={COUNTRIES} placeholder="Where do you live now?" />
+                <Sel label="Duration in Current Residence" val={form.monthsInCurrentResidence || ""} onChange={set("monthsInCurrentResidence")} opts={["Less than 6 months","6-12 months","1-3 years","3-5 years","5+ years"]} />
+                <Sel label="Passport Validity Remaining" val={form.passportMonthsValid || ""} onChange={set("passportMonthsValid")} opts={["6-12 months","12-24 months","24-48 months","48+ months"]} />
+                <Sel label="Dual Nationality?" val={form.hasDualNationality || ""} onChange={set("hasDualNationality")} opts={YES_NO} />
+                {form.hasDualNationality === "Yes" && (
+                  <SearchableSelect label="Second Nationality" value={form.dualNationalityCountry || ""} onChange={set("dualNationalityCountry")} options={COUNTRIES} placeholder="Second passport country…" />
+                )}
+                <Sel label="Highest Education Level" val={form.educationLevel || ""} onChange={set("educationLevel")} opts={["High School","Bachelor's Degree","Master's Degree","PhD / Doctoral","Diploma / Certificate","Other"]} />
+                <div>
+                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Field of Study / Specialization</Label>
+                  <Input value={form.fieldOfStudy || ""} onChange={e => set("fieldOfStudy")(e.target.value)} placeholder="e.g. Computer Science, Business, Medicine" />
+                </div>
               </div>
             )}
-          </div>
-        </div>
 
-        {/* Features grid */}
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold text-slate-800 mb-4">What's Included in Deep Check</h2>
-          <div className="grid md:grid-cols-2 gap-4">
-            {FEATURES.map(({ icon: Icon, title, desc }) => (
-              <Card key={title} className={`border ${hasAccess ? "border-slate-100" : "border-slate-100 opacity-80"}`}>
-                <CardContent className="p-5 flex gap-4">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${hasAccess ? "bg-blue-50" : "bg-slate-100"}`}>
-                    <Icon className={`w-5 h-5 ${hasAccess ? "text-blue-600" : "text-slate-400"}`} />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-sm text-slate-800">{title}</h3>
-                      {!hasAccess && <Lock className="w-3 h-3 text-slate-400" />}
+            {/* ===== STEP 2: Travel Plan ===== */}
+            {step === 2 && (
+              <div className="grid sm:grid-cols-2 gap-4">
+                <SearchableSelect label="Destination Country *" required value={form.destinationCountry || ""} onChange={set("destinationCountry")} options={COUNTRIES} placeholder="Search destination..." />
+                <Sel label="Visa Type *" val={form.visaType || ""} onChange={set("visaType")} opts={["Tourist Visa","Business Visa","Student Visa","Work Visa","Visit Visa","Transit Visa","Investor Visa","Spouse / Family Visa","Conference / Event Visa","Medical Visa"]} />
+                <Sel label="Purpose of Travel *" val={form.purposeOfTravel || ""} onChange={set("purposeOfTravel")} opts={["Tourism & Sightseeing","Business Meeting","Study / Education","Employment","Family Visit","Medical Treatment","Conference / Event","Transit","Wedding / Social Event","Investment / Business Setup"]} />
+                <Sel label="Trip Duration *" val={form.tripDuration || ""} onChange={set("tripDuration")} opts={["1–3 days","4–7 days","8–14 days","15–30 days","1–3 months","More than 3 months"]} />
+                <div>
+                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Planned Travel Date</Label>
+                  <Input type="date" value={form.plannedTravelDate || ""} onChange={e => set("plannedTravelDate")(e.target.value)} />
+                </div>
+                <Sel label="Entry Type" val={form.entryType || ""} onChange={set("entryType")} opts={["Single Entry","Multiple Entry","Double Entry"]} />
+                <div className="sm:col-span-2">
+                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Specific Cities / Regions Planned</Label>
+                  <Input value={form.specificCitiesPlanned || ""} onChange={e => set("specificCitiesPlanned")(e.target.value)} placeholder="e.g. Paris, Lyon, Nice" />
+                </div>
+                <div className="sm:col-span-2">
+                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Detailed Purpose of Visit</Label>
+                  <Textarea value={form.purposeDetailedExplanation || ""} onChange={e => set("purposeDetailedExplanation")(e.target.value)} placeholder="Describe in detail why you are visiting, what you plan to do, and how this trip fits your personal/professional plans…" rows={3} />
+                </div>
+                {(form.visaType === "Conference / Event Visa" || form.visaType === "Business Visa") && (
+                  <>
+                    <div>
+                      <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Event / Conference Name</Label>
+                      <Input value={form.eventOrConferenceName || ""} onChange={e => set("eventOrConferenceName")(e.target.value)} placeholder="e.g. World Tourism Forum 2025" />
                     </div>
-                    <p className="text-sm text-slate-500 leading-relaxed">{desc}</p>
+                    <DocToggle label="Conference / Event Invitation Letter?" val={form.hasConferenceInvitation || ""} onChange={set("hasConferenceInvitation")} />
+                    <div>
+                      <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Inviting Company / Organisation</Label>
+                      <Input value={form.invitingCompanyName || ""} onChange={e => set("invitingCompanyName")(e.target.value)} placeholder="e.g. Acme Corp GmbH" />
+                    </div>
+                  </>
+                )}
+                {form.visaType === "Student Visa" && (
+                  <>
+                    <div>
+                      <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Institution / University Name</Label>
+                      <Input value={form.institutionName || ""} onChange={e => set("institutionName")(e.target.value)} placeholder="e.g. University of Toronto" />
+                    </div>
+                    <Sel label="Study Level" val={form.studyLevel || ""} onChange={set("studyLevel")} opts={["Undergraduate / Bachelor's","Postgraduate / Master's","PhD / Doctoral","Certificate / Diploma","Language Course"]} />
+                    <DocToggle label="Acceptance letter received?" val={form.hasAcceptanceLetter || ""} onChange={set("hasAcceptanceLetter")} />
+                    <Sel label="Scholarship / Financial Aid Available?" val={form.scholarshipAvailable || ""} onChange={set("scholarshipAvailable")} opts={YES_NO} />
+                  </>
+                )}
+                {form.visaType === "Work Visa" && (
+                  <>
+                    <DocToggle label="Formal job offer letter available?" val={form.hasJobOffer || ""} onChange={set("hasJobOffer")} />
+                    <div>
+                      <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Hiring Company Name</Label>
+                      <Input value={form.hiringCompanyName || ""} onChange={e => set("hiringCompanyName")(e.target.value)} placeholder="e.g. TechCorp Ltd" />
+                    </div>
+                  </>
+                )}
+                {form.visaType === "Spouse / Family Visa" && (
+                  <>
+                    <Sel label="Relationship to Host" val={form.hostRelationship || ""} onChange={set("hostRelationship")} opts={["Spouse / Partner","Parent","Child","Sibling","Other relative"]} />
+                    <Sel label="Host's Visa / Residency Status" val={form.hostVisaStatus || ""} onChange={set("hostVisaStatus")} opts={["Citizen","Permanent Resident","Valid Long-term Visa","Student Visa","Work Visa","Asylum Seeker"]} />
+                  </>
+                )}
+                <div className="sm:col-span-2">
+                  <DocToggle label="First-time visitor to this destination?" val={form.firstTimeVisitor || ""} onChange={set("firstTimeVisitor")} />
+                </div>
+              </div>
+            )}
+
+            {/* ===== STEP 3: Employment & Income ===== */}
+            {step === 3 && (
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Sel label="Employment Status *" val={form.employmentStatus || ""} onChange={set("employmentStatus")} opts={["Employed (Full-time)","Employed (Part-time)","Self-employed / Business Owner","Freelancer / Consultant","Student","Retired","Unemployed","Government Employee","Other"]} />
+                <div>
+                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Job Title</Label>
+                  <Input value={form.jobTitle || ""} onChange={e => set("jobTitle")(e.target.value)} placeholder="e.g. Senior Software Engineer" />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Company / Employer Name</Label>
+                  <Input value={form.companyName || ""} onChange={e => set("companyName")(e.target.value)} placeholder="e.g. Google India Ltd" />
+                </div>
+                <Sel label="Years in Current Role" val={form.yearsInJob || ""} onChange={set("yearsInJob")} opts={["Less than 6 months","6 months – 1 year","1–2 years","2–5 years","5–10 years","More than 10 years"]} />
+                <Sel label="Monthly Income (USD)" val={form.monthlyIncome || ""} onChange={set("monthlyIncome")} opts={["Less than $500","$500 – $1,000","$1,000 – $2,500","$2,500 – $5,000","$5,000 – $10,000","More than $10,000"]} />
+                <Sel label="Monthly Living Expenses (USD)" val={form.monthlyExpenses || ""} onChange={set("monthlyExpenses")} opts={["Less than $500","$500 – $1,500","$1,500 – $3,000","More than $3,000"]} />
+                <Sel label="Primary Income Source" val={form.sourceOfIncome || ""} onChange={set("sourceOfIncome")} opts={["Employment Salary","Business Revenue","Freelance / Consultancy","Investment Returns","Rental Income","Pension / Retirement","Family Support","Scholarship / Grant"]} />
+                <DocToggle label="Employment contract available?" val={form.hasEmploymentContract || ""} onChange={set("hasEmploymentContract")} />
+                <DocToggle label="Salary slips available (last 3 months)?" val={form.hasSalarySlips || ""} onChange={set("hasSalarySlips")} />
+                <DocToggle label="Tax return / ITR available?" val={form.hasTaxReturn || ""} onChange={set("hasTaxReturn")} />
+                {(form.employmentStatus === "Self-employed / Business Owner" || form.employmentStatus === "Freelancer / Consultant") && (
+                  <>
+                    <DocToggle label="Business registration document?" val={form.hasBusinessRegistration || ""} onChange={set("hasBusinessRegistration")} />
+                    <Sel label="Business Type" val={form.businessType || ""} onChange={set("businessType")} opts={["Technology / IT","Consulting","Retail / Trading","Healthcare","Education","Real Estate","Import / Export","Other"]} />
+                  </>
+                )}
+                {form.employmentStatus === "Retired" && (
+                  <DocToggle label="Pension / retirement documents available?" val={form.hasPensionDocs || ""} onChange={set("hasPensionDocs")} />
+                )}
+              </div>
+            )}
+
+            {/* ===== STEP 4: Financial Depth ===== */}
+            {step === 4 && (
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Sel label="Bank Balance (USD) *" val={form.bankBalance || ""} onChange={set("bankBalance")} opts={["Less than $1,000","$1,000 – $3,000","$3,000 – $7,000","$7,000 – $15,000","$15,000 – $30,000","More than $30,000"]} />
+                <DocToggle label="Bank statement available?" val={form.hasBankStatement || ""} onChange={set("hasBankStatement")} />
+                <Sel label="Bank Statement Coverage" val={form.bankStatementDuration || ""} onChange={set("bankStatementDuration")} opts={["1 month","3 months","6 months","12 months"]} />
+                <Sel label="Bank Transaction Pattern" val={form.hasBankTransactions || ""} onChange={set("hasBankTransactions")} opts={["Regular and consistent","Mostly regular","Irregular / seasonal","Large unexplained deposits"]} />
+                <DocToggle label="Unexplained large deposits in account?" val={form.hasLargeDeposits || ""} onChange={set("hasLargeDeposits")} />
+                <DocToggle label="Credit card available?" val={form.hasCreditCard || ""} onChange={set("hasCreditCard")} />
+                <DocToggle label="Fixed deposits / term deposits?" val={form.hasFixedDeposits || ""} onChange={set("hasFixedDeposits")} />
+                <DocToggle label="Investment portfolio (stocks / mutual funds)?" val={form.hasInvestments || ""} onChange={set("hasInvestments")} />
+                {form.hasInvestments === "Yes" && (
+                  <Sel label="Approximate Investment Value" val={form.investmentValue || ""} onChange={set("investmentValue")} opts={["Less than $5,000","$5,000 – $20,000","$20,000 – $50,000","More than $50,000"]} />
+                )}
+                <DocToggle label="Property / real estate owned?" val={form.hasProperty || ""} onChange={set("hasProperty")} />
+                <Sel label="Trip Funding Source" val={form.tripFunding || ""} onChange={set("tripFunding")} opts={["Self-funded","Employer / Company","Family member","Sponsor / Host","Scholarship / Grant","Business funds"]} />
+                {(form.tripFunding === "Family member" || form.tripFunding === "Sponsor / Host") && (
+                  <div>
+                    <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Sponsor Details</Label>
+                    <Input value={form.sponsorDetails || ""} onChange={e => set("sponsorDetails")(e.target.value)} placeholder="Name, relationship, their status" />
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
+                )}
+              </div>
+            )}
 
-        {/* Lock screen or CTA */}
-        {!hasAccess ? (
-          <Card className="border-2 border-dashed border-blue-200 bg-gradient-to-br from-blue-50 to-slate-50">
-            <CardContent className="py-12 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-blue-100 flex items-center justify-center mx-auto mb-4">
-                <Lock className="w-8 h-8 text-blue-600" />
+            {/* ===== STEP 5: History & Current Visas ===== */}
+            {step === 5 && (
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Sel label="Total International Trips (lifetime)" val={form.numberOfTrips || ""} onChange={set("numberOfTrips")} opts={["None","1–2 trips","3–5 trips","6–10 trips","10+ trips"]} />
+                <div>
+                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Countries Visited (last 3 years)</Label>
+                  <Input value={form.countriesVisited || ""} onChange={e => set("countriesVisited")(e.target.value)} placeholder="e.g. UAE, Turkey, Malaysia" />
+                </div>
+                <Sel label="Previous Visa Approvals" val={form.previousVisaApprovals || ""} onChange={set("previousVisaApprovals")} opts={["None","1–2 visas approved","Several (3–5)","Many (6+)"]} />
+                <Sel label="Previous Visa Refusals *" val={form.previousVisaRefusals || ""} onChange={set("previousVisaRefusals")} opts={["No","Yes – once","Yes – multiple times"]} />
+                {form.previousVisaRefusals && form.previousVisaRefusals !== "No" && (
+                  <>
+                    <div>
+                      <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Refusal Reason (if known)</Label>
+                      <Input value={form.refusalReason || ""} onChange={e => set("refusalReason")(e.target.value)} placeholder="e.g. Insufficient funds, ties to home country" />
+                    </div>
+                    <DocToggle label="Explanation letter prepared for refusal?" val={form.hasRefusalExplanationLetter || ""} onChange={set("hasRefusalExplanationLetter")} />
+                  </>
+                )}
+                <DocToggle label="Any overstay history?" val={form.hasOverstay || ""} onChange={set("hasOverstay")} />
+                <DocToggle label="Any deportation history?" val={form.hasDeportation || ""} onChange={set("hasDeportation")} />
+                <DocToggle label="Any criminal record?" val={form.criminalRecord || ""} onChange={set("criminalRecord")} />
+                <DocToggle label="Any immigration violations?" val={form.immigrationViolation || ""} onChange={set("immigrationViolation")} />
+                <Sel label="Currently hold a valid visa for:" val={form.currentVisaHoldings || ""} onChange={set("currentVisaHoldings")} opts={["None","Schengen / EU","United States","United Kingdom","Australia","Canada","Japan","UAE","Other"]} tooltip="Holding strong country visa boosts credibility" />
+                {form.currentVisaHoldings && form.currentVisaHoldings !== "None" && (
+                  <Sel label="That visa's status" val={form.visaHoldingExpiry || ""} onChange={set("visaHoldingExpiry")} opts={["Currently valid","Expired within last year","Expired 1-3 years ago"]} />
+                )}
               </div>
-              <h3 className="text-xl font-bold text-slate-800 mb-2">Deep Check Requires Pro Plan</h3>
-              <p className="text-slate-500 mb-6 max-w-md mx-auto">
-                Upgrade to Pro for $29/month to unlock Deep Check, 20 basic checks per month, 
-                PDF reports, and priority support.
-              </p>
-              <div className="flex flex-wrap justify-center gap-3">
-                <Link href="/pricing">
-                  <Button className="bg-blue-600 hover:bg-blue-700 gap-2" size="lg" data-testid="button-upgrade-cta">
-                    <Crown className="w-4 h-4" />
-                    View Pricing Plans
-                  </Button>
-                </Link>
-                <Link href="/check">
-                  <Button variant="outline" size="lg" className="gap-2">
-                    <Sparkles className="w-4 h-4" />
-                    Try Free Basic Check
-                  </Button>
-                </Link>
+            )}
+
+            {/* ===== STEP 6: Documents ===== */}
+            {step === 6 && (
+              <div className="grid sm:grid-cols-2 gap-4">
+                <DocToggle label="Return / onward ticket booked?" val={form.hasReturnTicket || ""} onChange={set("hasReturnTicket")} />
+                <DocToggle label="Hotel / accommodation booked?" val={form.hasHotelBooking || ""} onChange={set("hasHotelBooking")} />
+                <DocToggle label="Travel insurance policy?" val={form.hasTravelInsurance || ""} onChange={set("hasTravelInsurance")} />
+                <DocToggle label="Day-wise travel itinerary?" val={form.hasItinerary || ""} onChange={set("hasItinerary")} />
+                <DocToggle label="Invitation letter (host / company)?" val={form.hasInvitationLetter || ""} onChange={set("hasInvitationLetter")} />
+                <DocToggle label="Leave approval / NOC from employer?" val={form.hasLeaveApproval || ""} onChange={set("hasLeaveApproval")} />
+                <DocToggle label="Cover letter / personal statement?" val={form.hasCoverLetter || ""} onChange={set("hasCoverLetter")} />
+                <DocToggle label="Active health / medical insurance?" val={form.hasHealthInsurance || ""} onChange={set("hasHealthInsurance")} />
+                <DocToggle label="Police clearance certificate?" val={form.hasPoliceCharacterCertificate || ""} onChange={set("hasPoliceCharacterCertificate")} />
+                <DocToggle label="Government-issued national ID?" val={form.hasGovtIssuedId || ""} onChange={set("hasGovtIssuedId")} />
               </div>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="border border-blue-200 bg-blue-50">
-            <CardContent className="p-6 text-center">
-              <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center mx-auto mb-4">
-                <Zap className="w-6 h-6 text-blue-600" />
+            )}
+
+            {/* ===== STEP 7: Home Ties & Extra ===== */}
+            {step === 7 && (
+              <div className="grid sm:grid-cols-2 gap-4">
+                <DocToggle label="Spouse / family in home country?" val={form.familyInHomeCountry || ""} onChange={set("familyInHomeCountry")} />
+                <DocToggle label="Property / real estate in home country?" val={form.propertyInHomeCountry || ""} onChange={set("propertyInHomeCountry")} />
+                <DocToggle label="Stable employment / active business at home?" val={form.stableEmploymentHome || ""} onChange={set("stableEmploymentHome")} />
+                <DocToggle label="Ongoing education / study at home?" val={form.ongoingEducation || ""} onChange={set("ongoingEducation")} />
+                <DocToggle label="Financial commitments at home (loans/EMI/rent)?" val={form.financialCommitmentsHome || ""} onChange={set("financialCommitmentsHome")} />
+                <Sel label="Dependents in home country" val={form.dependentsHomeCountry || ""} onChange={set("dependentsHomeCountry")} opts={["None","1","2","3","4","5+"]} tooltip="Spouse, children, parents" />
+                <Sel label="Contacts at destination country" val={form.destinationContacts || ""} onChange={set("destinationContacts")} opts={["None","Close relatives","Friends","Business contacts","Academic institution"]} />
+                {form.destinationContacts && form.destinationContacts !== "None" && (
+                  <Sel label="Their visa / residency status" val={form.destinationContactStatus || ""} onChange={set("destinationContactStatus")} opts={["Citizen","Permanent Resident","Long-term Work Visa","Student Visa","Temporary Visitor","Asylum Seeker"]} />
+                )}
+                <DocToggle label="Active public social media presence?" val={form.hasSocialMedia || ""} onChange={set("hasSocialMedia")} tooltip="LinkedIn, Instagram, Facebook showing travel history" />
+
+                {/* Summary box */}
+                <div className="sm:col-span-2 mt-4 p-4 rounded-xl bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800">
+                  <div className="flex items-start gap-3">
+                    <Brain className="w-5 h-5 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-purple-800 dark:text-purple-200 text-sm">Ready for Claude AI Analysis</p>
+                      <p className="text-xs text-purple-600 dark:text-purple-400 mt-0.5 leading-relaxed">
+                        Your answers across all {STEPS.length} dimensions will be sent to Claude to generate a comprehensive embassy-style visa risk report with dimension scores, severity-tagged risk flags, and a personalized action plan.
+                      </p>
+                      {form.nationality && form.destinationCountry && (
+                        <p className="text-xs text-purple-700 dark:text-purple-300 mt-2 font-medium">
+                          Analyzing: {form.nationality} → {form.destinationCountry} ({form.visaType || "Visa type not selected"})
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
-              <h3 className="font-semibold text-slate-800 mb-2">Deep Check is Available</h3>
-              <p className="text-slate-600 text-sm mb-4">You have Pro access. Start a Deep Check by running a visa check and selecting "Deep Check" mode.</p>
-              <Link href="/check">
-                <Button className="bg-blue-600 hover:bg-blue-700 gap-2" data-testid="button-start-deep">
-                  <Crown className="w-4 h-4" />
-                  Start Deep Check
+            )}
+
+            {/* Navigation */}
+            <div className="flex items-center justify-between mt-8 pt-5 border-t">
+              <Button variant="outline" onClick={prevStep} disabled={step === 1} className="gap-2">
+                <ChevronLeft className="w-4 h-4" /> Back
+              </Button>
+              {step < STEPS.length ? (
+                <Button onClick={nextStep} className="gap-2" disabled={step === 1 && (!form.nationality || !form.destinationCountry || !form.visaType)}>
+                  Next <ChevronRight className="w-4 h-4" />
                 </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Comparison */}
-        <div className="mt-8">
-          <h2 className="text-lg font-semibold text-slate-800 mb-4">Basic vs Deep Check</h2>
-          <Card>
-            <CardContent className="p-0 overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50">
-                    <th className="text-left px-5 py-3 font-semibold text-slate-600">Feature</th>
-                    <th className="px-4 py-3 text-center font-semibold text-slate-600">Basic (Free)</th>
-                    <th className="px-4 py-3 text-center font-semibold text-blue-700 bg-blue-50">Deep (Pro)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {[
-                    ["Approval chance score", true, true],
-                    ["Status label (High/Good/Moderate/Low)", true, true],
-                    ["AI summary", true, true],
-                    ["Strengths & Risk factors", true, true],
-                    ["Document checklist", true, true],
-                    ["Improvement tips", true, true],
-                    ["Next steps", true, true],
-                    ["Embassy-style risk analysis", false, true],
-                    ["Red flag detection & severity", false, true],
-                    ["Deep document gap audit", false, true],
-                    ["Personalized improvement plan", false, true],
-                    ["PDF report download", false, true],
-                    ["Risk mitigation strategies", false, true],
-                  ].map(([feature, basic, deep]) => (
-                    <tr key={feature as string} className="hover:bg-slate-50/50">
-                      <td className="px-5 py-2.5 text-slate-700">{feature as string}</td>
-                      <td className="px-4 py-2.5 text-center">
-                        {basic ? <CheckCircle className="w-4 h-4 text-emerald-500 mx-auto" /> : <span className="text-slate-300 text-lg">—</span>}
-                      </td>
-                      <td className="px-4 py-2.5 text-center bg-blue-50/50">
-                        {deep ? <CheckCircle className="w-4 h-4 text-blue-600 mx-auto" /> : <span className="text-slate-300 text-lg">—</span>}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </CardContent>
-          </Card>
-        </div>
+              ) : (
+                <Button
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                  className="gap-2 px-6"
+                  style={{ background: "linear-gradient(135deg,#7033F0,#4055FF,#FF2060)" }}
+                  data-testid="button-run-deep-check"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      Analyzing with Claude…
+                    </>
+                  ) : (
+                    <>
+                      <Brain className="w-4 h-4" /> Run Deep Check
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </DashboardLayout>
   );
