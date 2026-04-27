@@ -956,7 +956,50 @@ export async function registerRoutes(
     }
 
     try {
-      const { result, provider } = await runVisaCheck(formData);
+      // ── Visa-free / VOA short-circuit ──────────────────────────────────────
+      const { getEntryRequirement } = await import("../shared/visa-free.js");
+      const entryReq = getEntryRequirement(formData.nationality, formData.destinationCountry);
+
+      let result: any;
+      let provider: string;
+
+      if (entryReq === "visa_free") {
+        result = {
+          approvalChance: 100,
+          statusLabel: "Visa Free",
+          summary: `Citizens of ${formData.nationality} do not need a visa to enter ${formData.destinationCountry}. Entry is visa-free for tourism and short stays.`,
+          strengths: [`${formData.nationality} passport has visa-free access to ${formData.destinationCountry}`, "No visa application required", "No visa fees applicable"],
+          riskFactors: [],
+          missingDocuments: [],
+          requiredDocuments: ["Valid passport (at least 6 months validity)", "Return/onward ticket", "Proof of accommodation"],
+          countrySpecificConcerns: [`Maximum stay duration may apply — check local immigration rules for ${formData.destinationCountry}`, "Ensure your passport is valid for the full duration of your trip"],
+          improvementTips: [],
+          nextSteps: ["Book your flights", "Ensure passport validity is at least 6 months", "Carry proof of accommodation and return ticket"],
+          finalRecommendation: `Great news! No visa is required for ${formData.nationality} citizens visiting ${formData.destinationCountry}. Simply travel with a valid passport.`,
+          disclaimer: "Visa-free entry is based on current bilateral agreements. Always verify the latest entry requirements with the official embassy or immigration authority before travel.",
+        };
+        provider = "visa-free-db";
+      } else if (entryReq === "visa_on_arrival") {
+        result = {
+          approvalChance: 95,
+          statusLabel: "Visa on Arrival",
+          summary: `${formData.nationality} citizens can obtain a visa on arrival at ${formData.destinationCountry}. The process is straightforward and approval is nearly guaranteed.`,
+          strengths: [`Visa on arrival available for ${formData.nationality} passport holders`, "Simple and quick process at the port of entry", "No advance application required"],
+          riskFactors: ["Carry sufficient cash for VOA fees", "Entry is not 100% guaranteed — officers have discretion"],
+          missingDocuments: [],
+          requiredDocuments: ["Valid passport (6+ months validity)", "Return/onward ticket", "Proof of accommodation", "Sufficient funds (cash for VOA fee)", "Completed arrival card"],
+          countrySpecificConcerns: ["VOA fees vary — check current rates before travel", "Some nationalities may face additional checks"],
+          improvementTips: ["Carry proof of hotel booking and return ticket", "Have local currency or USD for the VOA fee"],
+          nextSteps: ["Check the current VOA fee", "Book accommodation in advance", "Carry required documents to the arrival counter"],
+          finalRecommendation: `${formData.nationality} citizens can get a visa on arrival at ${formData.destinationCountry}. Prepare the required documents and fee for a smooth entry.`,
+          disclaimer: "Visa on arrival policies can change. Verify current requirements with the official immigration authority or your airline before departure.",
+        };
+        provider = "visa-free-db";
+      } else {
+        const aiResult = await runVisaCheck(formData);
+        result = aiResult.result;
+        provider = aiResult.provider;
+      }
 
       const visaCheck = await storage.createVisaCheck({
         userId,
