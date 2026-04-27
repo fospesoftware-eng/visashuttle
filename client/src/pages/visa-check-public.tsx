@@ -95,7 +95,7 @@ export default function VisaCheckPublicPage() {
             <Link href="/#how-it-works" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">How It Works</Link>
             <Link href="/visa-check" className="text-sm font-medium text-foreground transition-colors">Visa Check</Link>
             <Link href="/pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Pricing</Link>
-            <Link href="/business" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">For Agencies</Link>
+            <Link href="/business" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">For Business</Link>
           </nav>
           <div className="flex items-center gap-3">
             <ThemeToggle />
