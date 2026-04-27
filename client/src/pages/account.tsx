@@ -213,7 +213,7 @@ export default function AccountPage() {
                   <p className="text-sm text-slate-400 mb-4">Your first check is free — no card needed</p>
                   <Link href="/check">
                     <Button size="sm" className="border-0 text-white hover:opacity-90" style={{background:"linear-gradient(135deg,#4055FF,#FF2060)"}} data-testid="button-first-check">
-                      <Sparkles className="w-3.5 h-3.5 mr-1.5" />
+                      <PlaneTakeoff className="w-3.5 h-3.5 mr-1.5" />
                       Start Free Check
                     </Button>
                   </Link>
@@ -345,7 +345,7 @@ export default function AccountPage() {
                     <Link href="/check">
                       <div className="flex items-center gap-2 p-2.5 rounded-lg hover:bg-slate-50 cursor-pointer group">
                         <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
-                          <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                          <PlaneTakeoff className="w-3.5 h-3.5 text-blue-600" />
                         </div>
                         <span className="text-xs text-slate-600 group-hover:text-slate-900">Run your first free check</span>
                         <ChevronRight className="w-3 h-3 text-slate-300 ml-auto" />
