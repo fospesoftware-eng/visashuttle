@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Eye, EyeOff, CheckCircle, Sparkles, Globe, Shield, Zap, Phone, ArrowLeft, RotateCcw } from "lucide-react";
+import { Eye, EyeOff, CheckCircle, Sparkles, Globe, Shield, Zap, Phone, ArrowLeft, RotateCcw, ChevronDown, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,251 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 
+// ── Country Data ─────────────────────────────────────────────────────────────
+interface Country {
+  code: string;
+  name: string;
+  dial: string;
+  flag: string;
+}
+
+const COUNTRIES: Country[] = [
+  { code: "IN", name: "India", dial: "+91", flag: "🇮🇳" },
+  { code: "US", name: "United States", dial: "+1", flag: "🇺🇸" },
+  { code: "GB", name: "United Kingdom", dial: "+44", flag: "🇬🇧" },
+  { code: "AE", name: "United Arab Emirates", dial: "+971", flag: "🇦🇪" },
+  { code: "AU", name: "Australia", dial: "+61", flag: "🇦🇺" },
+  { code: "CA", name: "Canada", dial: "+1", flag: "🇨🇦" },
+  { code: "SG", name: "Singapore", dial: "+65", flag: "🇸🇬" },
+  { code: "DE", name: "Germany", dial: "+49", flag: "🇩🇪" },
+  { code: "FR", name: "France", dial: "+33", flag: "🇫🇷" },
+  { code: "IT", name: "Italy", dial: "+39", flag: "🇮🇹" },
+  { code: "ES", name: "Spain", dial: "+34", flag: "🇪🇸" },
+  { code: "NL", name: "Netherlands", dial: "+31", flag: "🇳🇱" },
+  { code: "PT", name: "Portugal", dial: "+351", flag: "🇵🇹" },
+  { code: "BE", name: "Belgium", dial: "+32", flag: "🇧🇪" },
+  { code: "SE", name: "Sweden", dial: "+46", flag: "🇸🇪" },
+  { code: "NO", name: "Norway", dial: "+47", flag: "🇳🇴" },
+  { code: "DK", name: "Denmark", dial: "+45", flag: "🇩🇰" },
+  { code: "FI", name: "Finland", dial: "+358", flag: "🇫🇮" },
+  { code: "CH", name: "Switzerland", dial: "+41", flag: "🇨🇭" },
+  { code: "AT", name: "Austria", dial: "+43", flag: "🇦🇹" },
+  { code: "PL", name: "Poland", dial: "+48", flag: "🇵🇱" },
+  { code: "CZ", name: "Czech Republic", dial: "+420", flag: "🇨🇿" },
+  { code: "HU", name: "Hungary", dial: "+36", flag: "🇭🇺" },
+  { code: "RO", name: "Romania", dial: "+40", flag: "🇷🇴" },
+  { code: "GR", name: "Greece", dial: "+30", flag: "🇬🇷" },
+  { code: "TR", name: "Turkey", dial: "+90", flag: "🇹🇷" },
+  { code: "RU", name: "Russia", dial: "+7", flag: "🇷🇺" },
+  { code: "UA", name: "Ukraine", dial: "+380", flag: "🇺🇦" },
+  { code: "PK", name: "Pakistan", dial: "+92", flag: "🇵🇰" },
+  { code: "BD", name: "Bangladesh", dial: "+880", flag: "🇧🇩" },
+  { code: "LK", name: "Sri Lanka", dial: "+94", flag: "🇱🇰" },
+  { code: "NP", name: "Nepal", dial: "+977", flag: "🇳🇵" },
+  { code: "CN", name: "China", dial: "+86", flag: "🇨🇳" },
+  { code: "JP", name: "Japan", dial: "+81", flag: "🇯🇵" },
+  { code: "KR", name: "South Korea", dial: "+82", flag: "🇰🇷" },
+  { code: "PH", name: "Philippines", dial: "+63", flag: "🇵🇭" },
+  { code: "MY", name: "Malaysia", dial: "+60", flag: "🇲🇾" },
+  { code: "ID", name: "Indonesia", dial: "+62", flag: "🇮🇩" },
+  { code: "TH", name: "Thailand", dial: "+66", flag: "🇹🇭" },
+  { code: "VN", name: "Vietnam", dial: "+84", flag: "🇻🇳" },
+  { code: "HK", name: "Hong Kong", dial: "+852", flag: "🇭🇰" },
+  { code: "TW", name: "Taiwan", dial: "+886", flag: "🇹🇼" },
+  { code: "SA", name: "Saudi Arabia", dial: "+966", flag: "🇸🇦" },
+  { code: "QA", name: "Qatar", dial: "+974", flag: "🇶🇦" },
+  { code: "KW", name: "Kuwait", dial: "+965", flag: "🇰🇼" },
+  { code: "BH", name: "Bahrain", dial: "+973", flag: "🇧🇭" },
+  { code: "OM", name: "Oman", dial: "+968", flag: "🇴🇲" },
+  { code: "EG", name: "Egypt", dial: "+20", flag: "🇪🇬" },
+  { code: "ZA", name: "South Africa", dial: "+27", flag: "🇿🇦" },
+  { code: "NG", name: "Nigeria", dial: "+234", flag: "🇳🇬" },
+  { code: "KE", name: "Kenya", dial: "+254", flag: "🇰🇪" },
+  { code: "GH", name: "Ghana", dial: "+233", flag: "🇬🇭" },
+  { code: "ET", name: "Ethiopia", dial: "+251", flag: "🇪🇹" },
+  { code: "TZ", name: "Tanzania", dial: "+255", flag: "🇹🇿" },
+  { code: "MX", name: "Mexico", dial: "+52", flag: "🇲🇽" },
+  { code: "BR", name: "Brazil", dial: "+55", flag: "🇧🇷" },
+  { code: "AR", name: "Argentina", dial: "+54", flag: "🇦🇷" },
+  { code: "CO", name: "Colombia", dial: "+57", flag: "🇨🇴" },
+  { code: "CL", name: "Chile", dial: "+56", flag: "🇨🇱" },
+  { code: "PE", name: "Peru", dial: "+51", flag: "🇵🇪" },
+  { code: "NZ", name: "New Zealand", dial: "+64", flag: "🇳🇿" },
+  { code: "IE", name: "Ireland", dial: "+353", flag: "🇮🇪" },
+  { code: "IL", name: "Israel", dial: "+972", flag: "🇮🇱" },
+  { code: "NG", name: "Nigeria", dial: "+234", flag: "🇳🇬" },
+  { code: "MA", name: "Morocco", dial: "+212", flag: "🇲🇦" },
+];
+
+// Timezone → ISO country code mapping
+const TIMEZONE_COUNTRY: Record<string, string> = {
+  "Asia/Kolkata": "IN",
+  "Asia/Calcutta": "IN",
+  "America/New_York": "US",
+  "America/Chicago": "US",
+  "America/Denver": "US",
+  "America/Los_Angeles": "US",
+  "Europe/London": "GB",
+  "Asia/Dubai": "AE",
+  "Australia/Sydney": "AU",
+  "Australia/Melbourne": "AU",
+  "America/Toronto": "CA",
+  "America/Vancouver": "CA",
+  "Asia/Singapore": "SG",
+  "Europe/Berlin": "DE",
+  "Europe/Paris": "FR",
+  "Europe/Rome": "IT",
+  "Europe/Madrid": "ES",
+  "Europe/Amsterdam": "NL",
+  "Europe/Lisbon": "PT",
+  "Europe/Brussels": "BE",
+  "Europe/Stockholm": "SE",
+  "Europe/Oslo": "NO",
+  "Europe/Copenhagen": "DK",
+  "Europe/Helsinki": "FI",
+  "Europe/Zurich": "CH",
+  "Europe/Vienna": "AT",
+  "Europe/Warsaw": "PL",
+  "Europe/Prague": "CZ",
+  "Europe/Budapest": "HU",
+  "Europe/Bucharest": "RO",
+  "Europe/Athens": "GR",
+  "Europe/Istanbul": "TR",
+  "Europe/Moscow": "RU",
+  "Europe/Kiev": "UA",
+  "Asia/Karachi": "PK",
+  "Asia/Dhaka": "BD",
+  "Asia/Colombo": "LK",
+  "Asia/Kathmandu": "NP",
+  "Asia/Shanghai": "CN",
+  "Asia/Tokyo": "JP",
+  "Asia/Seoul": "KR",
+  "Asia/Manila": "PH",
+  "Asia/Kuala_Lumpur": "MY",
+  "Asia/Jakarta": "ID",
+  "Asia/Bangkok": "TH",
+  "Asia/Ho_Chi_Minh": "VN",
+  "Asia/Hong_Kong": "HK",
+  "Asia/Taipei": "TW",
+  "Asia/Riyadh": "SA",
+  "Asia/Qatar": "QA",
+  "Asia/Kuwait": "KW",
+  "Asia/Bahrain": "BH",
+  "Asia/Muscat": "OM",
+  "Africa/Cairo": "EG",
+  "Africa/Johannesburg": "ZA",
+  "Africa/Lagos": "NG",
+  "Africa/Nairobi": "KE",
+  "Africa/Accra": "GH",
+  "Africa/Addis_Ababa": "ET",
+  "America/Mexico_City": "MX",
+  "America/Sao_Paulo": "BR",
+  "America/Buenos_Aires": "AR",
+  "America/Bogota": "CO",
+  "America/Santiago": "CL",
+  "America/Lima": "PE",
+  "Pacific/Auckland": "NZ",
+  "Europe/Dublin": "IE",
+  "Asia/Jerusalem": "IL",
+  "Africa/Casablanca": "MA",
+};
+
+function detectCountry(): Country {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const code = TIMEZONE_COUNTRY[tz];
+  if (code) {
+    const found = COUNTRIES.find(c => c.code === code);
+    if (found) return found;
+  }
+  return COUNTRIES[0]; // Default India
+}
+
+// ── Country Selector Component ────────────────────────────────────────────────
+function CountrySelector({ selected, onSelect }: { selected: Country; onSelect: (c: Country) => void }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const filtered = COUNTRIES.filter(c =>
+    c.name.toLowerCase().includes(search.toLowerCase()) ||
+    c.dial.includes(search)
+  );
+
+  // Deduplicate by dial+flag for display
+  const seen = new Set<string>();
+  const unique = filtered.filter(c => {
+    const key = `${c.code}-${c.dial}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setSearch("");
+      }
+    }
+    if (open) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  return (
+    <div ref={dropdownRef} className="relative">
+      <button
+        type="button"
+        className="flex items-center gap-1.5 h-10 px-3 rounded-l-md border border-r-0 bg-muted hover:bg-muted/80 transition-colors text-sm font-medium min-w-[90px] border-input"
+        onClick={() => { setOpen(o => !o); setSearch(""); }}
+        data-testid="button-country-selector"
+      >
+        <span className="text-lg leading-none">{selected.flag}</span>
+        <span className="text-muted-foreground">{selected.dial}</span>
+        <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute z-50 top-full left-0 mt-1 w-72 rounded-xl border bg-popover shadow-lg overflow-hidden">
+          <div className="p-2 border-b">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+              <input
+                autoFocus
+                type="text"
+                placeholder="Search country..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 text-sm bg-background border rounded-lg focus:outline-none focus:ring-1 focus:ring-[#4055FF]"
+                data-testid="input-country-search"
+              />
+            </div>
+          </div>
+          <div className="overflow-y-auto max-h-52">
+            {unique.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No countries found</p>
+            ) : (
+              unique.map(c => (
+                <button
+                  key={c.code}
+                  type="button"
+                  className={`w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-accent transition-colors text-left ${selected.code === c.code ? "bg-accent/50" : ""}`}
+                  onClick={() => { onSelect(c); setOpen(false); setSearch(""); }}
+                  data-testid={`option-country-${c.code}`}
+                >
+                  <span className="text-lg">{c.flag}</span>
+                  <span className="flex-1 truncate">{c.name}</span>
+                  <span className="text-muted-foreground font-mono text-xs">{c.dial}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
 type Step = "info" | "otp";
 
 export default function JoinPage() {
@@ -19,14 +264,15 @@ export default function JoinPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [resendCountdown, setResendCountdown] = useState(0);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [country, setCountry] = useState<Country>(() => detectCountry());
 
   const [form, setForm] = useState({
     fullName: "",
     email: "",
-    phone: "",
+    localPhone: "",
     password: "",
   });
-  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [otp, setOtp] = useState(["", "", "", ""]);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -36,15 +282,17 @@ export default function JoinPage() {
     };
   }, []);
 
+  function getFullPhone() {
+    const local = form.localPhone.replace(/\D/g, "");
+    return `${country.dial}${local}`;
+  }
+
   function startResendCountdown() {
     setResendCountdown(60);
     if (countdownRef.current) clearInterval(countdownRef.current);
     countdownRef.current = setInterval(() => {
       setResendCountdown(prev => {
-        if (prev <= 1) {
-          clearInterval(countdownRef.current!);
-          return 0;
-        }
+        if (prev <= 1) { clearInterval(countdownRef.current!); return 0; }
         return prev - 1;
       });
     }, 1000);
@@ -55,30 +303,24 @@ export default function JoinPage() {
     if (!form.fullName.trim()) e.fullName = "Name is required";
     if (!form.email.trim()) e.email = "Email is required";
     else if (!/^\S+@\S+\.\S+$/.test(form.email)) e.email = "Enter a valid email";
-    if (!form.phone.trim()) e.phone = "Phone number is required";
-    else if (!/^\+?[1-9]\d{6,14}$/.test(form.phone.replace(/[\s\-()]/g, ""))) {
-      e.phone = "Enter a valid phone number with country code (e.g. +44 7911 123456)";
-    }
+    const localDigits = form.localPhone.replace(/\D/g, "");
+    if (!localDigits) e.phone = "Phone number is required";
+    else if (localDigits.length < 5) e.phone = "Enter a valid phone number";
     if (!form.password) e.password = "Password is required";
     else if (form.password.length < 8) e.password = "At least 8 characters required";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
 
-  function normalizePhone(raw: string) {
-    const stripped = raw.replace(/[\s\-()]/g, "");
-    return stripped.startsWith("+") ? stripped : `+${stripped}`;
-  }
-
   async function handleSendOtp() {
     if (!validateInfo()) return;
     setIsLoading(true);
+    const phone = getFullPhone();
     try {
-      const normalizedPhone = normalizePhone(form.phone);
-      await apiRequest("POST", "/api/b2c/otp/send", { phone: normalizedPhone });
+      await apiRequest("POST", "/api/b2c/otp/send", { phone, email: form.email });
       setStep("otp");
       startResendCountdown();
-      toast({ title: "Code sent!", description: `A 6-digit code was sent to ${normalizedPhone}` });
+      toast({ title: "Code sent!", description: `A 4-digit code was sent to ${phone}` });
       setTimeout(() => otpRefs.current[0]?.focus(), 200);
     } catch (err: any) {
       toast({ title: "Failed to send code", description: err.message || "Please try again", variant: "destructive" });
@@ -90,10 +332,10 @@ export default function JoinPage() {
   async function handleResend() {
     if (resendCountdown > 0) return;
     setIsLoading(true);
+    const phone = getFullPhone();
     try {
-      const normalizedPhone = normalizePhone(form.phone);
-      await apiRequest("POST", "/api/b2c/otp/send", { phone: normalizedPhone });
-      setOtp(["", "", "", "", "", ""]);
+      await apiRequest("POST", "/api/b2c/otp/send", { phone, email: form.email });
+      setOtp(["", "", "", ""]);
       startResendCountdown();
       otpRefs.current[0]?.focus();
       toast({ title: "Code resent", description: "A new code was sent to your phone" });
@@ -109,7 +351,7 @@ export default function JoinPage() {
     const next = [...otp];
     next[index] = digit;
     setOtp(next);
-    if (digit && index < 5) {
+    if (digit && index < 3) {
       otpRefs.current[index + 1]?.focus();
     }
   }
@@ -122,29 +364,29 @@ export default function JoinPage() {
 
   function handleOtpPaste(e: React.ClipboardEvent<HTMLInputElement>) {
     e.preventDefault();
-    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 4);
     const next = [...otp];
     pasted.split("").forEach((char, i) => { next[i] = char; });
     setOtp(next);
-    const lastFilled = Math.min(pasted.length, 5);
+    const lastFilled = Math.min(pasted.length, 3);
     otpRefs.current[lastFilled]?.focus();
   }
 
   async function handleVerifyAndRegister() {
     const code = otp.join("");
-    if (code.length < 6) {
-      toast({ title: "Enter the full code", description: "Please enter all 6 digits", variant: "destructive" });
+    if (code.length < 4) {
+      toast({ title: "Enter the full code", description: "Please enter all 4 digits", variant: "destructive" });
       return;
     }
     setIsLoading(true);
+    const phone = getFullPhone();
     try {
-      const normalizedPhone = normalizePhone(form.phone);
-      await apiRequest("POST", "/api/b2c/otp/verify", { phone: normalizedPhone, otp: code });
+      await apiRequest("POST", "/api/b2c/otp/verify", { phone, otp: code });
       await apiRequest("POST", "/api/b2c/auth/register", {
         email: form.email,
         password: form.password,
         fullName: form.fullName,
-        phone: normalizedPhone,
+        phone,
       });
       await queryClient.invalidateQueries({ queryKey: ["/api/b2c/auth/me"] });
       setLocation("/check");
@@ -210,7 +452,7 @@ export default function JoinPage() {
         <main className="flex-1 flex items-center justify-center p-6">
           <div className="w-full max-w-md">
 
-            {/* ── Step 1: Account Info ────────────────────────────────── */}
+            {/* ── Step 1: Account Info ──────────────────────────────────── */}
             {step === "info" && (
               <>
                 <div className="mb-8">
@@ -218,10 +460,7 @@ export default function JoinPage() {
                   <p className="text-muted-foreground">Get your first visa check free — no credit card needed</p>
                 </div>
 
-                <form
-                  onSubmit={e => { e.preventDefault(); handleSendOtp(); }}
-                  className="space-y-4"
-                >
+                <form onSubmit={e => { e.preventDefault(); handleSendOtp(); }} className="space-y-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="fullName">Full Name</Label>
                     <Input
@@ -250,22 +489,22 @@ export default function JoinPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="phone">Phone Number</Label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Label htmlFor="localPhone">Phone Number</Label>
+                    <div className={`flex rounded-md ${errors.phone ? "ring-1 ring-red-400" : ""}`}>
+                      <CountrySelector selected={country} onSelect={setCountry} />
                       <Input
-                        id="phone"
+                        id="localPhone"
                         type="tel"
-                        placeholder="+44 7911 123456"
-                        value={form.phone}
-                        onChange={e => { setForm(f => ({ ...f, phone: e.target.value })); setErrors(er => ({ ...er, phone: "" })); }}
-                        className={`pl-9 ${errors.phone ? "border-red-400" : ""}`}
+                        placeholder="9876543210"
+                        value={form.localPhone}
+                        onChange={e => { setForm(f => ({ ...f, localPhone: e.target.value })); setErrors(er => ({ ...er, phone: "" })); }}
+                        className="rounded-l-none border-l-0 focus-visible:ring-offset-0"
                         data-testid="input-phone"
                       />
                     </div>
                     {errors.phone
                       ? <p className="text-xs text-red-500">{errors.phone}</p>
-                      : <p className="text-xs text-muted-foreground">Include country code. We'll send a verification code.</p>
+                      : <p className="text-xs text-muted-foreground">We'll send a 4-digit verification code to this number</p>
                     }
                   </div>
 
@@ -329,13 +568,13 @@ export default function JoinPage() {
               </>
             )}
 
-            {/* ── Step 2: OTP Verification ────────────────────────────── */}
+            {/* ── Step 2: OTP Verification ──────────────────────────────── */}
             {step === "otp" && (
               <>
                 <button
                   type="button"
                   className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors"
-                  onClick={() => { setStep("info"); setOtp(["", "", "", "", "", ""]); }}
+                  onClick={() => { setStep("info"); setOtp(["", "", "", ""]); }}
                   data-testid="button-back-to-info"
                 >
                   <ArrowLeft className="w-4 h-4" />
@@ -348,15 +587,15 @@ export default function JoinPage() {
                   </div>
                   <h2 className="text-2xl font-bold mb-1">Verify your phone</h2>
                   <p className="text-muted-foreground">
-                    We sent a 6-digit code to{" "}
-                    <span className="font-medium text-foreground">{normalizePhone(form.phone)}</span>
+                    We sent a 4-digit code to{" "}
+                    <span className="font-medium text-foreground">{getFullPhone()}</span>
                   </p>
                 </div>
 
                 <div className="space-y-6">
                   <div>
                     <Label className="mb-3 block">Enter verification code</Label>
-                    <div className="flex gap-2.5 justify-between" data-testid="otp-input-group">
+                    <div className="flex gap-3 justify-center" data-testid="otp-input-group">
                       {otp.map((digit, i) => (
                         <input
                           key={i}
@@ -368,19 +607,19 @@ export default function JoinPage() {
                           onChange={e => handleOtpChange(i, e.target.value)}
                           onKeyDown={e => handleOtpKeyDown(i, e)}
                           onPaste={i === 0 ? handleOtpPaste : undefined}
-                          className="w-full aspect-square text-center text-xl font-semibold rounded-xl border-2 bg-background transition-all focus:outline-none focus:border-[#4055FF] dark:focus:border-[#4055FF]"
+                          className="w-16 h-16 text-center text-2xl font-bold rounded-xl border-2 bg-background transition-all focus:outline-none focus:border-[#4055FF]"
                           style={{ borderColor: digit ? "#4055FF" : undefined }}
                           data-testid={`input-otp-${i}`}
                         />
                       ))}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-2">Tip: you can paste the full code at once</p>
+                    <p className="text-xs text-muted-foreground text-center mt-2">Tip: you can paste the full code at once</p>
                   </div>
 
                   <Button
                     className="w-full h-11 text-base font-semibold border-0 text-white hover:opacity-90"
                     style={{ background: "linear-gradient(135deg,#4055FF,#FF2060)" }}
-                    disabled={isLoading || otp.join("").length < 6}
+                    disabled={isLoading || otp.join("").length < 4}
                     onClick={handleVerifyAndRegister}
                     data-testid="button-verify-create"
                   >

@@ -759,9 +759,20 @@ export async function registerRoutes(
 
   // ── OTP Send ─────────────────────────────────────────────────────────────
   app.post("/api/b2c/otp/send", async (req, res) => {
-    const { phone } = req.body;
+    const { phone, email } = req.body;
     if (!phone || typeof phone !== "string") {
       return res.status(400).json({ error: "Phone number is required" });
+    }
+    // Early duplicate checks before spending an OTP
+    if (email) {
+      const existingEmail = await storage.getB2cUserByEmail(email);
+      if (existingEmail) {
+        return res.status(409).json({ error: "An account with this email already exists" });
+      }
+    }
+    const existingPhone = await storage.getB2cUserByPhone(phone);
+    if (existingPhone) {
+      return res.status(409).json({ error: "An account with this phone number already exists" });
     }
     const dbConfig = await storage.getSmsConfig();
     const result = await sendOtp(phone, dbConfig);
@@ -856,6 +867,10 @@ export async function registerRoutes(
     const existing = await storage.getB2cUserByEmail(email);
     if (existing) {
       return res.status(409).json({ error: "An account with this email already exists" });
+    }
+    const existingPhone = await storage.getB2cUserByPhone(phone);
+    if (existingPhone) {
+      return res.status(409).json({ error: "An account with this phone number already exists" });
     }
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await storage.createB2cUser({

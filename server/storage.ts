@@ -87,6 +87,7 @@ export interface IStorage {
   // B2C Users
   getB2cUser(id: string): Promise<B2cUser | undefined>;
   getB2cUserByEmail(email: string): Promise<B2cUser | undefined>;
+  getB2cUserByPhone(phone: string): Promise<B2cUser | undefined>;
   getAllB2cUsers(): Promise<B2cUser[]>;
   createB2cUser(user: InsertB2cUser): Promise<B2cUser>;
   updateB2cUser(id: string, data: Partial<Omit<B2cUser, 'id' | 'createdAt'>>): Promise<B2cUser | undefined>;
@@ -749,6 +750,12 @@ export class MemStorage implements IStorage {
     );
   }
 
+  async getB2cUserByPhone(phone: string): Promise<B2cUser | undefined> {
+    return Array.from(this.b2cUsersMap.values()).find(
+      u => u.phone === phone
+    );
+  }
+
   async createB2cUser(user: InsertB2cUser): Promise<B2cUser> {
     const id = randomUUID();
     const newUser: B2cUser = {
@@ -883,6 +890,12 @@ class HybridStorage extends MemStorage {
     if (rows[0]) return rows[0];
     // Fallback to in-memory seeded users (demo/test accounts)
     return super.getB2cUserByEmail(email);
+  }
+
+  async getB2cUserByPhone(phone: string): Promise<B2cUser | undefined> {
+    const rows = await db.select().from(b2cUsers).where(eq(b2cUsers.phone, phone)).limit(1);
+    if (rows[0]) return rows[0];
+    return super.getB2cUserByPhone(phone);
   }
 
   async createB2cUser(user: InsertB2cUser): Promise<B2cUser> {
