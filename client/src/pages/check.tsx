@@ -382,12 +382,17 @@ export default function CheckPage() {
 
   function back() { setStep(s => Math.max(1, s - 1)); }
 
+  const MIN_PROGRESS_MS = 12000; // always show progress for at least 12 seconds
+
   async function handleSubmit() {
     if (!canCheck) { setLocation("/pricing"); return; }
     setIsSubmitting(true);
     try {
-      const res = await apiRequest("POST", "/api/b2c/check", { checkType: "basic", formData: form });
-      const data = await res.json();
+      const [res] = await Promise.all([
+        apiRequest("POST", "/api/b2c/check", { checkType: "basic", formData: form }),
+        new Promise(resolve => setTimeout(resolve, MIN_PROGRESS_MS)),
+      ]);
+      const data = await (res as Response).json();
       setResult(data.result);
       setAiProvider(data.check?.aiProvider || "");
       await queryClient.invalidateQueries({ queryKey: ["/api/b2c/auth/me"] });
@@ -476,7 +481,7 @@ export default function CheckPage() {
             ))}
           </div>
 
-          <p className="text-xs text-slate-400 text-center">This usually takes 5–10 seconds</p>
+          <p className="text-xs text-slate-400 text-center">This usually takes 10–15 seconds</p>
         </div>
       </DashboardLayout>
     );
