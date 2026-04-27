@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, FileText, Upload, MessageSquare, User, LogOut } from "lucide-react";
+import { Compass, FolderOpen, CloudUpload, MessageCircle, UserCircle2, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -17,11 +17,11 @@ interface CustomerLayoutProps {
 }
 
 const navItems = [
-  { icon: Home, label: "Home", href: "/customer" },
-  { icon: FileText, label: "My Case", href: "/customer/case" },
-  { icon: Upload, label: "Upload", href: "/customer/upload" },
-  { icon: MessageSquare, label: "Messages", href: "/customer/messages" },
-  { icon: User, label: "Profile", href: "/customer/profile" },
+  { icon: Compass, label: "Home", href: "/customer" },
+  { icon: FolderOpen, label: "My Case", href: "/customer/case" },
+  { icon: CloudUpload, label: "Upload", href: "/customer/upload" },
+  { icon: MessageCircle, label: "Messages", href: "/customer/messages" },
+  { icon: UserCircle2, label: "Profile", href: "/customer/profile" },
 ];
 
 export function CustomerLayout({ children }: CustomerLayoutProps) {
@@ -44,7 +44,7 @@ export function CustomerLayout({ children }: CustomerLayoutProps) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem data-testid="menu-profile">
-                <User className="w-4 h-4 mr-2" />
+                <UserCircle2 className="w-4 h-4 mr-2" />
                 Profile
               </DropdownMenuItem>
               <DropdownMenuSeparator />

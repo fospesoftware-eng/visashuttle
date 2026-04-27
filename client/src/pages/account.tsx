@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
-  Sparkles, Crown, User, Clock, TrendingUp, CheckCircle, AlertCircle,
+  PlaneTakeoff, Crown, User, Clock, TrendingUp, CheckCircle, AlertCircle,
   ArrowRight, Plus, Brain, BarChart3, Zap, FileText, Bell, ChevronRight
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -143,10 +143,10 @@ export default function AccountPage() {
               <Card className="cursor-pointer hover:shadow-md hover:border-blue-200 transition-all group bg-white">
                 <CardContent className="p-4 flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform" style={{background:"linear-gradient(135deg,#4055FF,#FF2060)"}}>
-                    <Sparkles className="w-5 h-5 text-white" />
+                    <PlaneTakeoff className="w-5 h-5 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-slate-800 text-sm">New Visa Check</p>
+                    <p className="font-semibold text-slate-800 text-sm">Free Visa Check</p>
                     <p className="text-xs text-slate-500">AI approval analysis</p>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-500 transition-colors" />

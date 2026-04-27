@@ -572,7 +572,7 @@ export default function CheckPage() {
   const progress = ((step - 1) / (STEPS.length - 1)) * 100;
 
   return (
-    <DashboardLayout title="New Visa Check" subtitle={`Step ${step} of ${STEPS.length} — ${currentStep.title}`}>
+    <DashboardLayout title="Free Visa Check" subtitle={`Step ${step} of ${STEPS.length} — ${currentStep.title}`}>
       <div className="w-full max-w-3xl">
 
         {/* Limit warning */}

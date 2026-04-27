@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Eye, EyeOff, Sparkles } from "lucide-react";
+import { Eye, EyeOff, PlaneTakeoff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,7 +40,7 @@ export default function SignInPage() {
         <Logo size="lg" showText variant="white" />
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/15 text-sm font-medium mb-8">
-            <Sparkles className="w-3.5 h-3.5" />
+            <PlaneTakeoff className="w-3.5 h-3.5" />
             AI-Powered Visa Insights
           </div>
           <h1 className="text-3xl xl:text-4xl font-bold mb-4 leading-tight">

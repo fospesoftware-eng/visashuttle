@@ -1,21 +1,21 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
-  LayoutDashboard, Sparkles, Crown, User, Clock, CreditCard,
-  Settings, LogOut, Menu, X, ChevronRight, Shield, ChevronDown
+  Compass, PlaneTakeoff, ScanSearch, Luggage, ScrollText,
+  Ticket, SlidersHorizontal, LogOut, Menu, X, ChevronRight, Shield, Crown
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
 import { Button } from "@/components/ui/button";
 
 const NAV_ITEMS = [
-  { icon: LayoutDashboard, label: "Dashboard", href: "/account" },
-  { icon: Sparkles, label: "New Visa Check", href: "/check" },
-  { icon: Crown, label: "Deep Check", href: "/deep-check", premium: true },
-  { icon: User, label: "Saved Profile", href: "/saved-profile" },
-  { icon: Clock, label: "Check History", href: "/history" },
-  { icon: CreditCard, label: "Pricing", href: "/pricing" },
-  { icon: Settings, label: "Settings", href: "/settings" },
+  { icon: Compass, label: "Dashboard", href: "/account" },
+  { icon: PlaneTakeoff, label: "Free Visa Check", href: "/check" },
+  { icon: ScanSearch, label: "Deep Check", href: "/deep-check", premium: true },
+  { icon: Luggage, label: "Saved Profile", href: "/saved-profile" },
+  { icon: ScrollText, label: "Check History", href: "/history" },
+  { icon: Ticket, label: "Pricing", href: "/pricing" },
+  { icon: SlidersHorizontal, label: "Settings", href: "/settings" },
 ];
 
 interface DashboardLayoutProps {

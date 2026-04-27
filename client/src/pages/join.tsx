@@ -389,7 +389,7 @@ export default function JoinPage() {
         phone,
       });
       await queryClient.invalidateQueries({ queryKey: ["/api/b2c/auth/me"] });
-      setLocation("/check");
+      setLocation("/account");
     } catch (err: any) {
       toast({ title: "Verification failed", description: err.message || "Invalid or expired code", variant: "destructive" });
     } finally {
