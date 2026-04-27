@@ -32,8 +32,9 @@ export function useB2cAuth() {
   });
 
   const user = data?.user ?? null;
-  const checksRemaining = user ? Math.max(0, (user.checkLimit || 1) - (user.freeChecksUsed || 0)) : 0;
-  const canCheck = checksRemaining > 0;
+  const isDemo = user?.subscriptionPlan === "demo";
+  const checksRemaining = isDemo ? Infinity : user ? Math.max(0, (user.checkLimit || 1) - (user.freeChecksUsed || 0)) : 0;
+  const canCheck = isDemo ? true : checksRemaining > 0;
 
-  return { user, isLoading, logout: logoutMutation.mutate, checksRemaining, canCheck };
+  return { user, isLoading, logout: logoutMutation.mutate, checksRemaining, canCheck, isDemo };
 }

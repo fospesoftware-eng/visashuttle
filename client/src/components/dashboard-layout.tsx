@@ -26,7 +26,7 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children, title, subtitle }: DashboardLayoutProps) {
   const [location] = useLocation();
-  const { user, logout, checksRemaining, canCheck } = useB2cAuth();
+  const { user, logout, checksRemaining, canCheck, isDemo } = useB2cAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => { setSidebarOpen(false); }, [location]);
@@ -52,10 +52,13 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
           </div>
           <div className="mt-2.5 flex items-center justify-between gap-2">
             <span className={`text-xs px-2 py-0.5 rounded-full font-semibold capitalize ${
-              user.subscriptionPlan === "pro" ? "bg-purple-100 text-purple-700" : user.subscriptionPlan === "starter" ? "bg-[#4055FF]/10 text-[#4055FF]" : "bg-slate-100 text-slate-600"
-            }`}>{user.subscriptionPlan}</span>
+              isDemo ? "bg-amber-100 text-amber-700" :
+              user.subscriptionPlan === "pro" ? "bg-purple-100 text-purple-700" :
+              user.subscriptionPlan === "starter" ? "bg-[#4055FF]/10 text-[#4055FF]" :
+              "bg-slate-100 text-slate-600"
+            }`}>{isDemo ? "Demo" : user.subscriptionPlan}</span>
             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${canCheck ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"}`}>
-              {checksRemaining} check{checksRemaining !== 1 ? "s" : ""} left
+              {isDemo ? "Unlimited checks" : `${checksRemaining} check${checksRemaining !== 1 ? "s" : ""} left`}
             </span>
           </div>
         </div>
@@ -89,7 +92,7 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
 
       {/* Bottom */}
       <div className="flex-shrink-0 p-3 border-t border-slate-100">
-        {!canCheck && user?.subscriptionPlan === "free" && (
+        {!canCheck && user?.subscriptionPlan === "free" && !isDemo && (
           <Link href="/pricing">
             <div className="mb-2 p-3 rounded-xl text-white cursor-pointer transition-all hover:opacity-90" style={{background:"linear-gradient(135deg,#4055FF,#FF2060)"}}>
               <div className="flex items-center gap-1.5 mb-1">

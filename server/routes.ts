@@ -939,11 +939,14 @@ export async function registerRoutes(
 
     const checkType = req.body.checkType || "basic";
 
+    // Demo accounts bypass all limits
+    const isDemo = user.subscriptionPlan === "demo";
+
     // Enforce limits
-    if (checkType === "deep" && !user.deepCheckAccess) {
+    if (!isDemo && checkType === "deep" && !user.deepCheckAccess) {
       return res.status(403).json({ error: "Deep Check requires a Pro plan", upgrade: true });
     }
-    if (checkType === "basic") {
+    if (!isDemo && checkType === "basic") {
       const checksUsed = user.freeChecksUsed || 0;
       if (checksUsed >= user.checkLimit) {
         return res.status(403).json({ error: "Check limit reached. Please upgrade your plan.", upgrade: true });
@@ -1011,10 +1014,12 @@ export async function registerRoutes(
         aiResponse: result as any,
       });
 
-      // Increment checks used
-      await storage.updateB2cUser(userId, {
-        freeChecksUsed: (user.freeChecksUsed || 0) + 1,
-      });
+      // Increment checks used (skip for demo accounts)
+      if (!isDemo) {
+        await storage.updateB2cUser(userId, {
+          freeChecksUsed: (user.freeChecksUsed || 0) + 1,
+        });
+      }
 
       res.json({ check: visaCheck, result });
     } catch (err) {
