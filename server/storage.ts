@@ -13,7 +13,8 @@ import {
   type B2cUser, type InsertB2cUser,
   type VisaCheck, type InsertVisaCheck,
   type SavedProfile, type InsertSavedProfile,
-  b2cUsers, visaChecks, savedProfiles,
+  type SmsConfig, type InsertSmsConfig,
+  b2cUsers, visaChecks, savedProfiles, smsConfig as smsConfigTable,
 } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -99,6 +100,10 @@ export interface IStorage {
   // Saved Profiles
   getSavedProfile(userId: string): Promise<SavedProfile | undefined>;
   upsertSavedProfile(userId: string, data: Partial<InsertSavedProfile>): Promise<SavedProfile>;
+
+  // SMS Config
+  getSmsConfig(): Promise<SmsConfig | undefined>;
+  upsertSmsConfig(data: Partial<InsertSmsConfig>): Promise<SmsConfig>;
 }
 
 export class MemStorage implements IStorage {
@@ -291,6 +296,8 @@ export class MemStorage implements IStorage {
       email: "demo@visashuttle.com",
       password: bcrypt.hashSync("Demo@12345", 10),
       fullName: "Demo User",
+      phone: null,
+      phoneVerified: false,
       freeChecksUsed: 0,
       subscriptionPlan: "free",
       checkLimit: 1,
@@ -306,6 +313,8 @@ export class MemStorage implements IStorage {
       email: "test@visashuttle.com",
       password: bcrypt.hashSync("Test@12345", 10),
       fullName: "Test Account",
+      phone: null,
+      phoneVerified: false,
       freeChecksUsed: 0,
       subscriptionPlan: "pro",
       checkLimit: 9999,
@@ -852,6 +861,11 @@ export class MemStorage implements IStorage {
     this.savedProfilesMap.set(id, newProfile);
     return newProfile;
   }
+
+  async getSmsConfig(): Promise<SmsConfig | undefined> { return undefined; }
+  async upsertSmsConfig(data: Partial<InsertSmsConfig>): Promise<SmsConfig> {
+    throw new Error("SMS config only available in HybridStorage");
+  }
 }
 
 // HybridStorage: uses MemStorage for agency/seed data, PostgreSQL for B2C user data
@@ -918,6 +932,27 @@ class HybridStorage extends MemStorage {
       ...data,
       userId,
     } as InsertSavedProfile).returning();
+    return rows[0];
+  }
+
+  // SMS Config — single-row config stored in DB
+  async getSmsConfig(): Promise<SmsConfig | undefined> {
+    const rows = await db.select().from(smsConfigTable).limit(1);
+    return rows[0];
+  }
+
+  async upsertSmsConfig(data: Partial<InsertSmsConfig>): Promise<SmsConfig> {
+    const existing = await this.getSmsConfig();
+    if (existing) {
+      const rows = await db.update(smsConfigTable)
+        .set({ ...data, updatedAt: new Date() })
+        .returning();
+      return rows[0];
+    }
+    const rows = await db.insert(smsConfigTable).values({
+      provider: "msg91",
+      ...data,
+    }).returning();
     return rows[0];
   }
 }

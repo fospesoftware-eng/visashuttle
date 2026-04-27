@@ -2,12 +2,26 @@
  * SMS Gateway Provider Abstraction
  *
  * Default provider: MSG91
- * Fallback provider: Zavu
+ * Secondary provider: Zavu
  *
- * Set SMS_PROVIDER env var to "zavu" to switch providers.
+ * Credentials are read from the database (admin-managed) first,
+ * falling back to environment variables if not set in DB.
+ *
+ * To switch providers, set SMS_PROVIDER env var to "zavu",
+ * or configure it in the admin settings panel.
  */
 
+import type { SmsConfig } from "@shared/schema";
+
 export type SmsProvider = "msg91" | "zavu";
+
+export interface SmsProviderConfig {
+  provider?: string;
+  msg91AuthKey?: string | null;
+  msg91TemplateId?: string | null;
+  msg91SenderId?: string | null;
+  zauvApiKey?: string | null;
+}
 
 export interface OtpSendResult {
   success: boolean;
@@ -19,42 +33,51 @@ export interface OtpVerifyResult {
   error?: string;
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function resolveConfig(dbConfig?: SmsProviderConfig | null): SmsProviderConfig {
+  return {
+    provider: dbConfig?.provider || process.env.SMS_PROVIDER || "msg91",
+    msg91AuthKey: dbConfig?.msg91AuthKey || process.env.MSG91_AUTH_KEY || null,
+    msg91TemplateId: dbConfig?.msg91TemplateId || process.env.MSG91_TEMPLATE_ID || null,
+    msg91SenderId: dbConfig?.msg91SenderId || process.env.MSG91_SENDER_ID || null,
+    zauvApiKey: dbConfig?.zauvApiKey || process.env.ZAVU_API_KEY || null,
+  };
+}
+
+function getActiveProvider(cfg: SmsProviderConfig): SmsProvider {
+  const p = (cfg.provider || "msg91").toLowerCase();
+  return p === "zavu" ? "zavu" : "msg91";
+}
+
 // ─── MSG91 ───────────────────────────────────────────────────────────────────
 
-/**
- * Format phone for MSG91: strip "+" and non-digits.
- * MSG91 expects: countryCode + number, e.g. 919876543210
- */
 function formatPhoneForMsg91(phone: string): string {
   return phone.replace(/\D/g, "");
 }
 
-async function msg91SendOtp(phone: string): Promise<OtpSendResult> {
-  const authKey = process.env.MSG91_AUTH_KEY;
-  const templateId = process.env.MSG91_TEMPLATE_ID;
-
-  if (!authKey) {
-    return { success: false, error: "MSG91 auth key not configured" };
-  }
-  if (!templateId) {
-    return { success: false, error: "MSG91 OTP template ID not configured" };
-  }
+async function msg91SendOtp(phone: string, cfg: SmsProviderConfig): Promise<OtpSendResult> {
+  if (!cfg.msg91AuthKey) return { success: false, error: "MSG91 Auth Key is not configured" };
+  if (!cfg.msg91TemplateId) return { success: false, error: "MSG91 Template ID is not configured" };
 
   const mobile = formatPhoneForMsg91(phone);
 
   try {
+    const body: Record<string, any> = {
+      template_id: cfg.msg91TemplateId,
+      mobile,
+      otp_length: 6,
+      otp_expiry: 10,
+    };
+    if (cfg.msg91SenderId) body.sender = cfg.msg91SenderId;
+
     const response = await fetch("https://control.msg91.com/api/v5/otp", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "authkey": authKey,
+        "authkey": cfg.msg91AuthKey,
       },
-      body: JSON.stringify({
-        template_id: templateId,
-        mobile,
-        otp_length: 6,
-        otp_expiry: 10,
-      }),
+      body: JSON.stringify(body),
     });
 
     const data = await response.json() as any;
@@ -67,16 +90,12 @@ async function msg91SendOtp(phone: string): Promise<OtpSendResult> {
     return { success: true };
   } catch (err) {
     console.error("[MSG91] Send OTP exception:", err);
-    return { success: false, error: "MSG91 service unavailable" };
+    return { success: false, error: "MSG91 service temporarily unavailable" };
   }
 }
 
-async function msg91VerifyOtp(phone: string, otp: string): Promise<OtpVerifyResult> {
-  const authKey = process.env.MSG91_AUTH_KEY;
-
-  if (!authKey) {
-    return { success: false, error: "MSG91 auth key not configured" };
-  }
+async function msg91VerifyOtp(phone: string, otp: string, cfg: SmsProviderConfig): Promise<OtpVerifyResult> {
+  if (!cfg.msg91AuthKey) return { success: false, error: "MSG91 Auth Key is not configured" };
 
   const mobile = formatPhoneForMsg91(phone);
 
@@ -85,7 +104,7 @@ async function msg91VerifyOtp(phone: string, otp: string): Promise<OtpVerifyResu
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "authkey": authKey,
+        "authkey": cfg.msg91AuthKey,
       },
       body: JSON.stringify({ mobile, otp }),
     });
@@ -100,100 +119,89 @@ async function msg91VerifyOtp(phone: string, otp: string): Promise<OtpVerifyResu
     return { success: true };
   } catch (err) {
     console.error("[MSG91] Verify OTP exception:", err);
-    return { success: false, error: "MSG91 service unavailable" };
+    return { success: false, error: "MSG91 service temporarily unavailable" };
   }
 }
 
 // ─── Zavu ────────────────────────────────────────────────────────────────────
 
-async function zavuSendOtp(phone: string): Promise<OtpSendResult> {
-  const apiKey = process.env.ZAVU_API_KEY;
-
-  if (!apiKey) {
-    return { success: false, error: "Zavu API key not configured" };
-  }
+async function zavuSendOtp(phone: string, cfg: SmsProviderConfig): Promise<OtpSendResult> {
+  if (!cfg.zauvApiKey) return { success: false, error: "Zavu API key is not configured" };
 
   try {
     const response = await fetch("https://api.zavu.dev/v1/otp/send", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
+        "Authorization": `Bearer ${cfg.zauvApiKey}`,
       },
       body: JSON.stringify({ phone }),
     });
 
     const data = await response.json() as any;
-
     if (!response.ok) {
       console.error("[Zavu] Send OTP error:", data);
       return { success: false, error: data.message || "Failed to send OTP via Zavu" };
     }
-
     return { success: true };
   } catch (err) {
     console.error("[Zavu] Send OTP exception:", err);
-    return { success: false, error: "Zavu service unavailable" };
+    return { success: false, error: "Zavu service temporarily unavailable" };
   }
 }
 
-async function zavuVerifyOtp(phone: string, otp: string): Promise<OtpVerifyResult> {
-  const apiKey = process.env.ZAVU_API_KEY;
-
-  if (!apiKey) {
-    return { success: false, error: "Zavu API key not configured" };
-  }
+async function zavuVerifyOtp(phone: string, otp: string, cfg: SmsProviderConfig): Promise<OtpVerifyResult> {
+  if (!cfg.zauvApiKey) return { success: false, error: "Zavu API key is not configured" };
 
   try {
     const response = await fetch("https://api.zavu.dev/v1/otp/verify", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
+        "Authorization": `Bearer ${cfg.zauvApiKey}`,
       },
       body: JSON.stringify({ phone, otp }),
     });
 
     const data = await response.json() as any;
-
     if (!response.ok) {
       console.error("[Zavu] Verify OTP error:", data);
       return { success: false, error: data.message || "Invalid or expired OTP" };
     }
-
     return { success: true };
   } catch (err) {
     console.error("[Zavu] Verify OTP exception:", err);
-    return { success: false, error: "Zavu service unavailable" };
+    return { success: false, error: "Zavu service temporarily unavailable" };
   }
 }
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
-function getActiveProvider(): SmsProvider {
-  const override = (process.env.SMS_PROVIDER || "").toLowerCase();
-  if (override === "zavu") return "zavu";
-  return "msg91";
-}
-
-export async function sendOtp(phone: string): Promise<OtpSendResult> {
-  const provider = getActiveProvider();
+export async function sendOtp(phone: string, dbConfig?: SmsProviderConfig | null): Promise<OtpSendResult> {
+  const cfg = resolveConfig(dbConfig);
+  const provider = getActiveProvider(cfg);
   console.log(`[SMS] Sending OTP via ${provider} to ${phone}`);
-  if (provider === "zavu") return zavuSendOtp(phone);
-  return msg91SendOtp(phone);
+  return provider === "zavu" ? zavuSendOtp(phone, cfg) : msg91SendOtp(phone, cfg);
 }
 
-export async function verifyOtp(phone: string, otp: string): Promise<OtpVerifyResult> {
-  const provider = getActiveProvider();
+export async function verifyOtp(phone: string, otp: string, dbConfig?: SmsProviderConfig | null): Promise<OtpVerifyResult> {
+  const cfg = resolveConfig(dbConfig);
+  const provider = getActiveProvider(cfg);
   console.log(`[SMS] Verifying OTP via ${provider} for ${phone}`);
-  if (provider === "zavu") return zavuVerifyOtp(phone, otp);
-  return msg91VerifyOtp(phone, otp);
+  return provider === "zavu" ? zavuVerifyOtp(phone, otp, cfg) : msg91VerifyOtp(phone, otp, cfg);
 }
 
-export function getSmsProviderStatus(): { provider: SmsProvider; msg91Ready: boolean; zavuReady: boolean } {
+export function getSmsProviderStatus(dbConfig?: SmsProviderConfig | null): {
+  provider: SmsProvider;
+  msg91Ready: boolean;
+  zavuReady: boolean;
+  usingDb: boolean;
+} {
+  const cfg = resolveConfig(dbConfig);
   return {
-    provider: getActiveProvider(),
-    msg91Ready: !!(process.env.MSG91_AUTH_KEY && process.env.MSG91_TEMPLATE_ID),
-    zavuReady: !!process.env.ZAVU_API_KEY,
+    provider: getActiveProvider(cfg),
+    msg91Ready: !!(cfg.msg91AuthKey && cfg.msg91TemplateId),
+    zavuReady: !!cfg.zauvApiKey,
+    usingDb: !!(dbConfig?.msg91AuthKey || dbConfig?.zauvApiKey),
   };
 }

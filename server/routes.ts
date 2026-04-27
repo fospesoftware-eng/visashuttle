@@ -8,6 +8,11 @@ import bcrypt from "bcryptjs";
 // Site-wide password for protecting the entire application
 const SITE_PASSWORD = process.env.SITE_PASSWORD;
 
+function maskKey(key: string): string {
+  if (key.length <= 8) return "••••••••";
+  return key.slice(0, 4) + "•".repeat(key.length - 8) + key.slice(-4);
+}
+
 // Extend Express Session with white-label customer data AND agency/admin user data
 declare module "express-session" {
   interface SessionData {
@@ -756,7 +761,8 @@ export async function registerRoutes(
     if (!phone || typeof phone !== "string") {
       return res.status(400).json({ error: "Phone number is required" });
     }
-    const result = await sendOtp(phone);
+    const dbConfig = await storage.getSmsConfig();
+    const result = await sendOtp(phone, dbConfig);
     if (!result.success) {
       return res.status(502).json({ error: result.error || "Failed to send OTP. Please try again." });
     }
@@ -769,7 +775,8 @@ export async function registerRoutes(
     if (!phone || !otp) {
       return res.status(400).json({ error: "Phone number and OTP code are required" });
     }
-    const result = await verifyOtp(phone, otp);
+    const dbConfig = await storage.getSmsConfig();
+    const result = await verifyOtp(phone, otp, dbConfig);
     if (!result.success) {
       return res.status(400).json({ error: result.error || "Invalid or expired OTP code" });
     }
@@ -777,9 +784,47 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
-  // ── SMS Provider Status (admin) ──────────────────────────────────────────
-  app.get("/api/admin/sms/status", requireAgencyAuth, (req, res) => {
-    res.json(getSmsProviderStatus());
+  // ── Admin: Get SMS Config ─────────────────────────────────────────────────
+  app.get("/api/admin/sms-config", requireAgencyAuth, async (req, res) => {
+    const cfg = await storage.getSmsConfig();
+    const status = getSmsProviderStatus(cfg);
+    // Mask sensitive keys before sending to client
+    res.json({
+      provider: cfg?.provider ?? "msg91",
+      msg91AuthKey: cfg?.msg91AuthKey ? maskKey(cfg.msg91AuthKey) : "",
+      msg91TemplateId: cfg?.msg91TemplateId ?? "",
+      msg91SenderId: cfg?.msg91SenderId ?? "",
+      zauvApiKey: cfg?.zauvApiKey ? maskKey(cfg.zauvApiKey) : "",
+      status,
+      hasMsg91AuthKey: !!cfg?.msg91AuthKey,
+      hasZavuApiKey: !!cfg?.zauvApiKey,
+    });
+  });
+
+  // ── Admin: Save SMS Config ────────────────────────────────────────────────
+  app.post("/api/admin/sms-config", requireAgencyAuth, async (req, res) => {
+    const { provider, msg91AuthKey, msg91TemplateId, msg91SenderId, zauvApiKey } = req.body;
+    const current = await storage.getSmsConfig();
+    // Only overwrite a field if the new value is not a masked placeholder
+    const patch: Record<string, any> = { provider };
+    if (msg91AuthKey && !msg91AuthKey.includes("•")) patch.msg91AuthKey = msg91AuthKey;
+    if (msg91TemplateId !== undefined) patch.msg91TemplateId = msg91TemplateId || null;
+    if (msg91SenderId !== undefined) patch.msg91SenderId = msg91SenderId || null;
+    if (zauvApiKey && !zauvApiKey.includes("•")) patch.zauvApiKey = zauvApiKey;
+    await storage.upsertSmsConfig(patch);
+    const updated = await storage.getSmsConfig();
+    const status = getSmsProviderStatus(updated);
+    res.json({ success: true, status });
+  });
+
+  // ── Admin: Test SMS Config ────────────────────────────────────────────────
+  app.post("/api/admin/sms-config/test", requireAgencyAuth, async (req, res) => {
+    const { phone } = req.body;
+    if (!phone) return res.status(400).json({ error: "Phone number is required for testing" });
+    const dbConfig = await storage.getSmsConfig();
+    const result = await sendOtp(phone, dbConfig);
+    if (!result.success) return res.status(502).json({ error: result.error });
+    res.json({ success: true, message: `Test OTP sent to ${phone}` });
   });
 
   // ── B2C Register ──────────────────────────────────────────────────────────

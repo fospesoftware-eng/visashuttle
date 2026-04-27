@@ -44,8 +44,20 @@ Preferred communication style: Simple, everyday language.
 - **Agency Owner**: owner@demoagency.com / Demo@12345
 - **Customer**: customer@demo.com / Demo@12345
 - **B2C Demo User**: demo@visashuttle.com / Demo@12345 (seeded on every restart)
+- **B2C Test User**: test@visashuttle.com / Test@12345 (pro plan, deepCheckAccess: true)
 - **Site-Wide Password**: Fospe@7561 (stored as SITE_PASSWORD env var)
 - **Customer OTP (dev only)**: 123456
+
+### SMS Gateway (OTP for B2C Registration)
+- **Default provider**: MSG91 (`server/sms.ts`)
+- **Secondary provider**: Zavu
+- **Config storage**: `sms_config` DB table (managed via admin settings → Integrations tab)
+- **Admin UI**: `/admin/settings` → Integrations tab → SMS Gateway card
+- **API routes**: `POST /api/admin/sms-config` (save), `GET /api/admin/sms-config` (load), `POST /api/admin/sms-config/test` (send test OTP)
+- **OTP routes**: `POST /api/b2c/otp/send`, `POST /api/b2c/otp/verify`
+- **Credentials fallback**: DB config → `MSG91_AUTH_KEY` / `MSG91_TEMPLATE_ID` env vars
+- **MSG91 required fields**: Auth Key + OTP Template ID (create at control.msg91.com)
+- **Phone stored on**: `b2c_users.phone` (nullable) + `b2c_users.phone_verified` (boolean)
 
 ### Authentication Architecture
 Three distinct auth systems coexist:

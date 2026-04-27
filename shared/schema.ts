@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, jsonb, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -278,3 +278,18 @@ export const otpCodes = pgTable("otp_codes", {
 export const insertOTPCodeSchema = createInsertSchema(otpCodes).omit({ id: true, createdAt: true });
 export type InsertOTPCode = z.infer<typeof insertOTPCodeSchema>;
 export type OTPCode = typeof otpCodes.$inferSelect;
+
+// ── SMS Provider Config ───────────────────────────────────────────────────────
+export const smsConfig = pgTable("sms_config", {
+  id: serial("id").primaryKey(),
+  provider: text("provider").notNull().default("msg91"),
+  msg91AuthKey: text("msg91_auth_key"),
+  msg91TemplateId: text("msg91_template_id"),
+  msg91SenderId: text("msg91_sender_id"),
+  zauvApiKey: text("zavu_api_key"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSmsConfigSchema = createInsertSchema(smsConfig).omit({ id: true, updatedAt: true });
+export type InsertSmsConfig = z.infer<typeof insertSmsConfigSchema>;
+export type SmsConfig = typeof smsConfig.$inferSelect;
