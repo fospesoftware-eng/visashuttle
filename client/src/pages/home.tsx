@@ -220,8 +220,18 @@ export default function HomePage() {
       {/* Hero */}
       <section className="relative overflow-hidden pt-14 pb-10 md:pt-24 md:pb-20">
         <div className="absolute inset-0 bg-gradient-to-br from-[#4055FF]/5 via-white to-[#FF2060]/5 dark:from-[#4055FF]/15 dark:via-background dark:to-[#FF2060]/10" />
-        <div className="absolute top-0 right-0 w-[700px] h-[700px] bg-[#FF2060]/8 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
-        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-[#4055FF]/8 rounded-full blur-3xl translate-y-1/2 -translate-x-1/3" />
+        <div
+          className="absolute top-0 right-0 w-[700px] h-[700px] bg-[#FF2060]/8 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"
+          style={{ animation: "hero-drift-a 20s ease-in-out infinite" }}
+        />
+        <div
+          className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-[#4055FF]/8 rounded-full blur-3xl translate-y-1/2 -translate-x-1/3"
+          style={{ animation: "hero-drift-b 26s ease-in-out infinite" }}
+        />
+        <div
+          className="absolute top-1/2 left-1/2 w-[380px] h-[380px] bg-[#9033F5]/5 dark:bg-[#9033F5]/8 rounded-full blur-3xl pointer-events-none"
+          style={{ animation: "hero-pulse-glow 12s ease-in-out infinite 3s" }}
+        />
 
         <div className="relative max-w-7xl mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
