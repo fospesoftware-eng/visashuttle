@@ -959,18 +959,25 @@ export async function registerRoutes(
     }
 
     try {
-      // ── Visa-free / VOA short-circuit ──────────────────────────────────────
+      // ── Visa-free / VOA / Resident short-circuit ───────────────────────────
       const { getEntryRequirement } = await import("../shared/visa-free.js");
-      const entryReq = getEntryRequirement(formData.nationality, formData.destinationCountry);
+      const entryReq = getEntryRequirement(
+        formData.nationality,
+        formData.destinationCountry,
+        { passportCountry: formData.passportCountry, countryOfResidence: formData.countryOfResidence }
+      );
 
       let result: any;
       let provider: string;
 
       if (entryReq === "visa_free") {
+        const isCitizenByPassport = formData.passportCountry === formData.destinationCountry;
         result = {
           approvalChance: 100,
           statusLabel: "Visa Free",
-          summary: `Citizens of ${formData.nationality} do not need a visa to enter ${formData.destinationCountry}. Entry is visa-free for tourism and short stays.`,
+          summary: isCitizenByPassport
+            ? `You hold a ${formData.destinationCountry} passport and are a citizen of ${formData.destinationCountry}. No visa is required to enter your own country.`
+            : `Citizens of ${formData.nationality} do not need a visa to enter ${formData.destinationCountry}. Entry is visa-free for tourism and short stays.`,
           strengths: [`${formData.nationality} passport has visa-free access to ${formData.destinationCountry}`, "No visa application required", "No visa fees applicable"],
           riskFactors: [],
           missingDocuments: [],
@@ -980,6 +987,22 @@ export async function registerRoutes(
           nextSteps: ["Book your flights", "Ensure passport validity is at least 6 months", "Carry proof of accommodation and return ticket"],
           finalRecommendation: `Great news! No visa is required for ${formData.nationality} citizens visiting ${formData.destinationCountry}. Simply travel with a valid passport.`,
           disclaimer: "Visa-free entry is based on current bilateral agreements. Always verify the latest entry requirements with the official embassy or immigration authority before travel.",
+        };
+        provider = "visa-free-db";
+      } else if (entryReq === "resident") {
+        result = {
+          approvalChance: 100,
+          statusLabel: "Already Resident",
+          summary: `You are currently a legal resident of ${formData.destinationCountry}. You do not need to apply for a new visa to return to your country of residence.`,
+          strengths: [`You already hold a valid residence permit / visa for ${formData.destinationCountry}`, "Re-entry on existing residence status — no new visa application required"],
+          riskFactors: ["Ensure your current residence visa / permit has not expired", "Confirm your re-entry permit is still valid if you have been abroad for an extended period"],
+          missingDocuments: [],
+          requiredDocuments: ["Valid passport", "Valid residence permit / ID card for " + formData.destinationCountry, "Re-entry visa if required by your residence type"],
+          countrySpecificConcerns: [`Check the re-entry validity period on your ${formData.destinationCountry} residence permit`, "Long absences may require special re-entry documentation in some countries"],
+          improvementTips: [],
+          nextSteps: ["Verify your residence permit expiry date", "Confirm re-entry rules with your local immigration authority if you have been away for more than 6 months"],
+          finalRecommendation: `As a resident of ${formData.destinationCountry}, no new visa is required. Simply present your valid residence permit at the border.`,
+          disclaimer: "Residency-based re-entry rules vary. Always check the specific conditions of your residence permit before travel.",
         };
         provider = "visa-free-db";
       } else if (entryReq === "visa_on_arrival") {
@@ -1044,7 +1067,56 @@ export async function registerRoutes(
     }
 
     try {
-      const { result, provider } = await runDeepCheck(formData);
+      // ── Same visa-free / resident short-circuit as basic check ─────────────
+      const { getEntryRequirement } = await import("../shared/visa-free.js");
+      const entryReq = getEntryRequirement(
+        formData.nationality,
+        formData.destinationCountry,
+        { passportCountry: formData.passportCountry, countryOfResidence: formData.countryOfResidence }
+      );
+
+      let result: any;
+      let provider: string;
+
+      if (entryReq === "visa_free") {
+        result = {
+          approvalChance: 100,
+          statusLabel: "Visa Free",
+          summary: formData.passportCountry === formData.destinationCountry
+            ? `You hold a ${formData.destinationCountry} passport. No visa required to enter your own country.`
+            : `${formData.nationality} citizens have visa-free access to ${formData.destinationCountry}.`,
+          strengths: ["Visa-free bilateral agreement in place", "No visa application required", "No fees applicable"],
+          riskFactors: [],
+          missingDocuments: [],
+          requiredDocuments: ["Valid passport (6+ months validity)", "Return/onward ticket", "Proof of accommodation"],
+          countrySpecificConcerns: [`Check maximum stay allowance for ${formData.destinationCountry}`],
+          improvementTips: [],
+          nextSteps: ["Book flights", "Ensure passport validity", "Carry accommodation proof"],
+          finalRecommendation: `No visa required. Simply travel with your valid passport.`,
+          disclaimer: "Always verify entry requirements before travel as rules can change.",
+        };
+        provider = "visa-free-db";
+      } else if (entryReq === "resident") {
+        result = {
+          approvalChance: 100,
+          statusLabel: "Already Resident",
+          summary: `You are a legal resident of ${formData.destinationCountry}. No new visa is required — re-enter on your existing residence permit.`,
+          strengths: ["Valid residence status in destination country", "No new visa application required"],
+          riskFactors: ["Verify residence permit has not expired", "Check re-entry validity if abroad for extended period"],
+          missingDocuments: [],
+          requiredDocuments: ["Valid passport", `Valid ${formData.destinationCountry} residence permit or ID card`],
+          countrySpecificConcerns: [`Check re-entry conditions on your ${formData.destinationCountry} residence permit`],
+          improvementTips: [],
+          nextSteps: ["Verify permit expiry", "Confirm re-entry rules if away for 6+ months"],
+          finalRecommendation: `As a ${formData.destinationCountry} resident, no new visa is required. Present your residence permit at the border.`,
+          disclaimer: "Residency re-entry rules vary. Confirm with local immigration authority before travel.",
+        };
+        provider = "visa-free-db";
+      } else {
+        const deepResult = await runDeepCheck(formData);
+        result = deepResult.result;
+        provider = deepResult.provider;
+      }
 
       const visaCheck = await storage.createVisaCheck({
         userId,

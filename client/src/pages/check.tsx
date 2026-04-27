@@ -294,7 +294,7 @@ export default function CheckPage() {
   const [aiProvider, setAiProvider] = useState("");
   const [tab, setTab] = useState<"overview" | "docs" | "tips" | "country">("overview");
   const [profileUsed, setProfileUsed] = useState(false);
-  const [entryReq, setEntryReq] = useState<"visa_free" | "visa_on_arrival" | null>(null);
+  const [entryReq, setEntryReq] = useState<"visa_free" | "visa_on_arrival" | "resident" | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) setLocation("/join");
@@ -312,14 +312,18 @@ export default function CheckPage() {
     }
   }, [savedProfile]);
 
-  // Detect visa-free / VOA when nationality + destination are selected
+  // Detect visa-free / VOA / resident when relevant fields change
   useEffect(() => {
     if (form.nationality && form.destinationCountry) {
-      setEntryReq(getEntryRequirement(form.nationality, form.destinationCountry));
+      setEntryReq(getEntryRequirement(
+        form.nationality,
+        form.destinationCountry,
+        { passportCountry: form.passportCountry, countryOfResidence: form.countryOfResidence }
+      ));
     } else {
       setEntryReq(null);
     }
-  }, [form.nationality, form.destinationCountry]);
+  }, [form.nationality, form.destinationCountry, form.passportCountry, form.countryOfResidence]);
 
   // Auto-set purpose of travel when visa type changes
   useEffect(() => {
@@ -750,6 +754,15 @@ export default function CheckPage() {
                     </div>
                   </div>
                 )}
+                {entryReq === "resident" && (
+                  <div className="flex items-start gap-3 p-4 rounded-xl bg-purple-50 border-2 border-purple-200">
+                    <BadgeCheck className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-purple-800 text-sm">You Already Reside Here — No Visa Required</p>
+                      <p className="text-sm text-purple-700">Your country of residence is {form.destinationCountry}. You already hold a valid residence permit. No new visa application is needed — simply re-enter on your existing status.</p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid sm:grid-cols-2 gap-4">
                   <Sel label="Visa Type *" val={form.visaType} onChange={set("visaType")} opts={OPTS.visaType} required testId="select-visa-type" />
@@ -892,10 +905,24 @@ export default function CheckPage() {
                 </div>
 
                 {entryReq && (
-                  <div className={`flex items-center gap-3 p-3 rounded-xl border ${entryReq === "visa_free" ? "bg-emerald-50 border-emerald-200" : "bg-blue-50 border-blue-200"}`}>
-                    <BadgeCheck className={`w-4 h-4 flex-shrink-0 ${entryReq === "visa_free" ? "text-emerald-600" : "text-blue-600"}`} />
-                    <span className={`text-sm font-semibold ${entryReq === "visa_free" ? "text-emerald-800" : "text-blue-800"}`}>
-                      {entryReq === "visa_free" ? "Visa-Free Entry Detected" : "Visa on Arrival Detected"} — {form.nationality} → {form.destinationCountry}
+                  <div className={`flex items-center gap-3 p-3 rounded-xl border ${
+                    entryReq === "visa_free" ? "bg-emerald-50 border-emerald-200" :
+                    entryReq === "resident" ? "bg-purple-50 border-purple-200" :
+                    "bg-blue-50 border-blue-200"
+                  }`}>
+                    <BadgeCheck className={`w-4 h-4 flex-shrink-0 ${
+                      entryReq === "visa_free" ? "text-emerald-600" :
+                      entryReq === "resident" ? "text-purple-600" :
+                      "text-blue-600"
+                    }`} />
+                    <span className={`text-sm font-semibold ${
+                      entryReq === "visa_free" ? "text-emerald-800" :
+                      entryReq === "resident" ? "text-purple-800" :
+                      "text-blue-800"
+                    }`}>
+                      {entryReq === "visa_free" ? "Visa-Free Entry Detected" :
+                       entryReq === "resident" ? "Already Resident — No New Visa Required" :
+                       "Visa on Arrival Detected"} — {form.nationality} → {form.destinationCountry}
                     </span>
                   </div>
                 )}

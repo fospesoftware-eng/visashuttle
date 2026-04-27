@@ -154,16 +154,38 @@ export const VISA_ON_ARRIVAL: Record<string, string[]> = {
   ],
 };
 
-/** Returns "visa_free", "visa_on_arrival", or null */
+export type EntryRequirement = "visa_free" | "visa_on_arrival" | "resident" | null;
+
+/**
+ * Returns the entry requirement for a traveller.
+ *  - "visa_free"    : no visa needed (citizen or bilateral agreement)
+ *  - "visa_on_arrival" : can get VOA at the port of entry
+ *  - "resident"     : already legally residing in destination — no new visa required
+ *  - null           : must apply for a visa
+ */
 export function getEntryRequirement(
   nationality: string,
-  destination: string
-): "visa_free" | "visa_on_arrival" | null {
-  // Same country = no visa needed (you're a citizen)
+  destination: string,
+  opts?: { passportCountry?: string; countryOfResidence?: string }
+): EntryRequirement {
+  if (!nationality || !destination) return null;
+
+  // 1. Citizen of destination by nationality
   if (nationality === destination) return "visa_free";
+
+  // 2. Passport issued by destination country → citizen
+  if (opts?.passportCountry && opts.passportCountry === destination) return "visa_free";
+
+  // 3. Already a legal resident of destination → no new visa required
+  if (opts?.countryOfResidence && opts.countryOfResidence === destination) return "resident";
+
+  // 4. Bilateral visa-free agreements
   const free = VISA_FREE[nationality];
   if (free?.includes(destination)) return "visa_free";
+
+  // 5. Visa on arrival
   const voa = VISA_ON_ARRIVAL[nationality];
   if (voa?.includes(destination)) return "visa_on_arrival";
+
   return null;
 }
