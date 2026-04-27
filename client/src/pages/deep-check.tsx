@@ -5,7 +5,7 @@ import {
   TrendingUp, Download, Shield, ArrowRight, Zap, ChevronLeft,
   ChevronRight, Brain, User, Plane, CreditCard, Globe, Home,
   Info, RefreshCw, Flag, Star, AlertTriangle, Activity, BookOpen,
-  Briefcase, BadgeCheck, BarChart3, ClipboardList, Plus, Trash2
+  Briefcase, BadgeCheck, BarChart3, ClipboardList, Plus, Trash2, Users
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -877,6 +877,81 @@ export default function DeepCheckPage() {
             {/* ===== STEP 1: Personal Profile ===== */}
             {step === 1 && (
               <div className="grid sm:grid-cols-2 gap-4">
+
+                {/* ── Applicant Type ───────────────────────────────────────────── */}
+                <div className="sm:col-span-2">
+                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">
+                    Applicant Type
+                  </Label>
+                  <div className="flex gap-3">
+                    {[
+                      { value: "individual", label: "Individual", icon: User, desc: "Just yourself" },
+                      { value: "family", label: "Family", icon: Users, desc: "You + spouse / children" },
+                    ].map(opt => {
+                      const Ic = opt.icon;
+                      const selected = (form.applicantType || "individual") === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => {
+                            set("applicantType")(opt.value);
+                            if (opt.value === "individual") {
+                              set("spouseName")("");
+                              set("spouseNationality")("");
+                              set("childrenTraveling")("");
+                              set("childrenAges")("");
+                            }
+                          }}
+                          className={`flex-1 flex items-center gap-3 p-3.5 rounded-xl border-2 text-left transition-all ${
+                            selected
+                              ? "border-purple-400 bg-purple-50 dark:bg-purple-950/20"
+                              : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-slate-300"
+                          }`}
+                        >
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${selected ? "bg-purple-600" : "bg-slate-100 dark:bg-slate-800"}`}>
+                            <Ic className={`w-4 h-4 ${selected ? "text-white" : "text-slate-400"}`} />
+                          </div>
+                          <div>
+                            <p className={`text-sm font-semibold ${selected ? "text-purple-800 dark:text-purple-200" : "text-slate-700 dark:text-slate-300"}`}>{opt.label}</p>
+                            <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                          </div>
+                          {selected && <CheckCircle className="w-4 h-4 text-purple-500 ml-auto flex-shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* ── Family details (spouse + children) ──────────────────────── */}
+                {(form.applicantType || "individual") === "family" && (
+                  <>
+                    <div className="sm:col-span-2">
+                      <div className="p-4 rounded-xl bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 space-y-4">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Users className="w-4 h-4 text-purple-600" />
+                          <span className="text-sm font-semibold text-purple-800 dark:text-purple-200">Family Members Traveling</span>
+                        </div>
+                        <div className="grid sm:grid-cols-2 gap-4">
+                          <div>
+                            <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Spouse / Partner Full Name</Label>
+                            <Input value={form.spouseName || ""} onChange={e => set("spouseName")(e.target.value)} placeholder="e.g. Jane Smith" />
+                          </div>
+                          <SearchableSelect label="Spouse / Partner Nationality" value={form.spouseNationality || ""} onChange={set("spouseNationality")} options={COUNTRIES} placeholder="Select nationality…" />
+                          <Sel label="Number of Children Traveling" val={form.childrenTraveling || ""} onChange={set("childrenTraveling")} opts={["0","1","2","3","4","5+"]} />
+                          {form.childrenTraveling && form.childrenTraveling !== "0" && (
+                            <div>
+                              <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Children's Ages <span className="text-xs text-muted-foreground">(optional)</span></Label>
+                              <Input value={form.childrenAges || ""} onChange={e => set("childrenAges")(e.target.value)} placeholder="e.g. 5, 8, 12" />
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-xs text-purple-600 dark:text-purple-400">Your Deep Check will cover all family members traveling together in a single assessment.</p>
+                      </div>
+                    </div>
+                  </>
+                )}
+
                 <SearchableSelect label="Nationality *" required value={form.nationality || ""} onChange={set("nationality")} options={COUNTRIES} placeholder="Search nationality..." />
                 <SearchableSelect label="Passport Issued By" value={form.passportCountry || ""} onChange={set("passportCountry")} options={COUNTRIES} placeholder="If different from nationality…" />
                 <div>

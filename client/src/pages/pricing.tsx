@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { CheckCircle, Sparkles, Zap, Crown, ArrowRight, Info } from "lucide-react";
+import { CheckCircle, Sparkles, Crown, ArrowRight, Info, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,8 +10,10 @@ import { useB2cAuth } from "@/hooks/use-b2c-auth";
 const plans = [
   {
     name: "Free",
+    key: "free",
     icon: Sparkles,
     price: "$0",
+    originalPrice: null,
     period: "",
     description: "Perfect for a one-time check",
     badge: null,
@@ -21,7 +23,7 @@ const plans = [
     features: [
       "1 Basic AI visa check",
       "Approval chance percentage",
-      "Status label (High/Good/Moderate/Low)",
+      "Status label (High / Good / Moderate / Low)",
       "Strengths & risk factors",
       "Basic next steps",
     ],
@@ -31,42 +33,22 @@ const plans = [
     href: "/join",
   },
   {
-    name: "Starter",
-    icon: Zap,
-    price: "$9",
-    period: "/month",
-    description: "For frequent travelers",
-    badge: null,
-    color: "text-blue-600",
-    bg: "bg-blue-100 dark:bg-blue-900/30",
-    border: "border-blue-200 dark:border-blue-800",
-    features: [
-      "5 Basic AI visa checks per month",
-      "Full AI explanation & analysis",
-      "Document gap analysis",
-      "Personalized recommendations",
-      "Check history & dashboard",
-      "Priority email support",
-    ],
-    limitations: ["No Deep Check", "No PDF report"],
-    cta: "Start Starter Plan",
-    ctaVariant: "default" as const,
-    href: "/join",
-  },
-  {
-    name: "Pro",
+    name: "Deep Check",
+    key: "pro",
     icon: Crown,
-    price: "$29",
-    period: "/month",
-    description: "For serious visa applicants",
-    badge: "Most Popular",
+    price: "$5",
+    originalPrice: "$10",
+    period: "/check",
+    description: "Embassy-style deep analysis for serious applicants",
+    badge: "Limited Discount",
     color: "text-purple-600",
     bg: "bg-purple-100 dark:bg-purple-900/30",
     border: "border-purple-300 dark:border-purple-700",
     features: [
-      "20 Basic AI visa checks per month",
-      "Deep Check access (detailed embassy-style analysis)",
-      "Full document gap analysis",
+      "Full embassy-style risk analysis",
+      "Deep Check with 7 profile dimensions",
+      "Individual & Family applicant support",
+      "Document gap analysis & action plan",
       "Red flag identification",
       "Personalized improvement plan",
       "PDF report download",
@@ -74,7 +56,7 @@ const plans = [
       "Priority support",
     ],
     limitations: [],
-    cta: "Start Pro Plan",
+    cta: "Get Deep Check",
     ctaVariant: "default" as const,
     href: "/join",
   },
@@ -109,7 +91,7 @@ export default function PricingPage() {
       </header>
 
       <section className="py-16 md:py-24 px-4">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-3xl mx-auto">
           <div className="text-center mb-14">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-sm font-medium mb-5 border border-blue-200 dark:border-blue-800">
               <Sparkles className="w-3.5 h-3.5" />
@@ -119,23 +101,24 @@ export default function PricingPage() {
               Choose Your Plan
             </h1>
             <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-              Start free. Upgrade when you need more checks or deeper analysis. No surprises.
+              Start free. Upgrade to Deep Check for a full embassy-style analysis when you need it most.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 gap-6">
             {plans.map((plan) => {
               const Icon = plan.icon;
-              const isCurrentPlan = user?.subscriptionPlan === plan.name.toLowerCase();
+              const isCurrentPlan = user?.subscriptionPlan === plan.key;
               return (
                 <Card
                   key={plan.name}
                   className={`relative ${plan.border} ${plan.badge ? "shadow-xl shadow-purple-500/10" : "shadow"}`}
-                  data-testid={`card-plan-${plan.name.toLowerCase()}`}
+                  data-testid={`card-plan-${plan.key}`}
                 >
                   {plan.badge && (
                     <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                      <Badge className="bg-gradient-to-r from-purple-600 to-blue-600 text-white border-0 px-4 py-1 text-xs font-semibold">
+                      <Badge className="bg-gradient-to-r from-purple-600 to-blue-600 text-white border-0 px-4 py-1 text-xs font-semibold flex items-center gap-1.5">
+                        <Tag className="w-3 h-3" />
                         {plan.badge}
                       </Badge>
                     </div>
@@ -146,10 +129,19 @@ export default function PricingPage() {
                     </div>
                     <h3 className="text-xl font-bold mb-1">{plan.name}</h3>
                     <p className="text-muted-foreground text-sm mb-4">{plan.description}</p>
-                    <div className="mb-6">
+                    <div className="mb-6 flex items-end gap-2">
                       <span className="text-4xl font-black">{plan.price}</span>
-                      {plan.period && <span className="text-muted-foreground text-sm ml-1">{plan.period}</span>}
+                      {plan.originalPrice && (
+                        <span className="text-lg font-semibold text-muted-foreground line-through mb-1">{plan.originalPrice}</span>
+                      )}
+                      {plan.period && <span className="text-muted-foreground text-sm mb-1">{plan.period}</span>}
                     </div>
+                    {plan.originalPrice && (
+                      <div className="mb-5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
+                        <Tag className="w-3 h-3" />
+                        50% off — limited time discount
+                      </div>
+                    )}
 
                     <div className="space-y-2.5 mb-6">
                       {plan.features.map(f => (
@@ -175,7 +167,7 @@ export default function PricingPage() {
                         <Button
                           className={`w-full ${plan.badge ? "bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 border-0 text-white" : ""}`}
                           variant={plan.ctaVariant}
-                          data-testid={`button-plan-${plan.name.toLowerCase()}`}
+                          data-testid={`button-plan-${plan.key}`}
                         >
                           {plan.cta}
                           <ArrowRight className="w-4 h-4 ml-2" />
@@ -205,8 +197,9 @@ export default function PricingPage() {
             {[
               { q: "Is the free check really free?", a: "Yes — every new account gets 1 full AI visa check at no cost. No credit card required." },
               { q: "How accurate is the AI scoring?", a: "Our AI analyzes 14 key factors used by immigration authorities and provides a probability estimate. It's a guidance tool, not a legal guarantee." },
-              { q: "What is the Deep Check?", a: "Deep Check is available on the Pro plan. It asks more detailed questions (financial profile, travel history, document checklist) and returns an embassy-style risk analysis with a PDF report." },
-              { q: "Can I cancel anytime?", a: "Yes. Paid plans can be cancelled at any time. You'll retain access until the end of your billing period." },
+              { q: "What is the Deep Check?", a: "Deep Check asks detailed questions across 7 dimensions (personal profile, finances, travel history, home ties, and more) and returns an embassy-style risk analysis with an action plan. It also supports Family applications (spouse + children)." },
+              { q: "How does the $5 Deep Check discount work?", a: "The regular price of a Deep Check is $10 per report. For a limited time it's available at $5. No subscription required — pay only when you need it." },
+              { q: "Can I check for my family?", a: "Yes. The Deep Check supports Family applicants, covering the primary applicant, spouse, and children traveling together in a single assessment." },
             ].map(({ q, a }) => (
               <div key={q} className="p-5 rounded-xl bg-background border">
                 <h4 className="font-semibold mb-2">{q}</h4>
