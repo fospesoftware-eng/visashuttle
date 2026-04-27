@@ -236,7 +236,7 @@ function CountrySelector({ selected, onSelect }: { selected: Country; onSelect: 
                 <button
                   key={c.code}
                   type="button"
-                  className={`w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-accent transition-colors text-left ${selected.code === c.code ? "bg-accent/50" : ""}`}
+                  className={`w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-muted transition-colors text-left ${selected.code === c.code ? "bg-[#4055FF]/10 dark:bg-[#4055FF]/20 text-[#4055FF] dark:text-[#8899FF]" : ""}`}
                   onClick={() => { onSelect(c); setOpen(false); setSearch(""); }}
                   data-testid={`option-country-${c.code}`}
                 >
