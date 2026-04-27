@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { runVisaCheck, runDeepCheck } from "./ai";
+import { sendOtp, verifyOtp, getSmsProviderStatus } from "./sms";
 import bcrypt from "bcryptjs";
 
 // Site-wide password for protecting the entire application
@@ -755,29 +756,11 @@ export async function registerRoutes(
     if (!phone || typeof phone !== "string") {
       return res.status(400).json({ error: "Phone number is required" });
     }
-    const zauvApiKey = process.env.ZAVU_API_KEY;
-    if (!zauvApiKey) {
-      return res.status(503).json({ error: "SMS service not configured" });
+    const result = await sendOtp(phone);
+    if (!result.success) {
+      return res.status(502).json({ error: result.error || "Failed to send OTP. Please try again." });
     }
-    try {
-      const response = await fetch("https://api.zavu.dev/v1/otp/send", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${zauvApiKey}`,
-        },
-        body: JSON.stringify({ phone }),
-      });
-      const data = await response.json() as any;
-      if (!response.ok) {
-        console.error("Zavu OTP send error:", data);
-        return res.status(502).json({ error: data.message || "Failed to send OTP. Please try again." });
-      }
-      res.json({ success: true, message: "OTP sent to your phone" });
-    } catch (err) {
-      console.error("OTP send error:", err);
-      res.status(502).json({ error: "SMS service temporarily unavailable" });
-    }
+    res.json({ success: true, message: "OTP sent to your phone" });
   });
 
   // ── OTP Verify ───────────────────────────────────────────────────────────
@@ -786,29 +769,17 @@ export async function registerRoutes(
     if (!phone || !otp) {
       return res.status(400).json({ error: "Phone number and OTP code are required" });
     }
-    const zauvApiKey = process.env.ZAVU_API_KEY;
-    if (!zauvApiKey) {
-      return res.status(503).json({ error: "SMS service not configured" });
+    const result = await verifyOtp(phone, otp);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error || "Invalid or expired OTP code" });
     }
-    try {
-      const response = await fetch("https://api.zavu.dev/v1/otp/verify", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${zauvApiKey}`,
-        },
-        body: JSON.stringify({ phone, otp }),
-      });
-      const data = await response.json() as any;
-      if (!response.ok) {
-        return res.status(400).json({ error: data.message || "Invalid or expired OTP code" });
-      }
-      req.session.otpVerifiedPhone = phone;
-      res.json({ success: true });
-    } catch (err) {
-      console.error("OTP verify error:", err);
-      res.status(502).json({ error: "SMS service temporarily unavailable" });
-    }
+    req.session.otpVerifiedPhone = phone;
+    res.json({ success: true });
+  });
+
+  // ── SMS Provider Status (admin) ──────────────────────────────────────────
+  app.get("/api/admin/sms/status", requireAgencyAuth, (req, res) => {
+    res.json(getSmsProviderStatus());
   });
 
   // ── B2C Register ──────────────────────────────────────────────────────────
