@@ -266,7 +266,6 @@ export default function JoinPage() {
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [country, setCountry] = useState<Country>(() => detectCountry());
   const [ipDetecting, setIpDetecting] = useState(true);
-  const [ipDetected, setIpDetected] = useState(false);
 
   useEffect(() => {
     fetch("https://ipapi.co/json/")
@@ -274,10 +273,7 @@ export default function JoinPage() {
       .then(data => {
         if (data?.country_code) {
           const found = COUNTRIES.find(c => c.code === data.country_code);
-          if (found) {
-            setCountry(found);
-            setIpDetected(true);
-          }
+          if (found) setCountry(found);
         }
       })
       .catch(() => {})
@@ -515,15 +511,9 @@ export default function JoinPage() {
                           Detecting location…
                         </span>
                       )}
-                      {!ipDetecting && ipDetected && (
-                        <span className="text-xs text-emerald-600 flex items-center gap-1">
-                          <MapPin className="w-3 h-3" />
-                          Code set from your location
-                        </span>
-                      )}
                     </div>
                     <div className={`flex rounded-md ${errors.phone ? "ring-1 ring-red-400" : ""}`}>
-                      <CountrySelector selected={country} onSelect={c => { setCountry(c); setIpDetected(false); }} />
+                      <CountrySelector selected={country} onSelect={setCountry} />
                       <Input
                         id="localPhone"
                         type="tel"
