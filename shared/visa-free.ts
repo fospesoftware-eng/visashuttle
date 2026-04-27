@@ -159,6 +159,8 @@ export function getEntryRequirement(
   nationality: string,
   destination: string
 ): "visa_free" | "visa_on_arrival" | null {
+  // Same country = no visa needed (you're a citizen)
+  if (nationality === destination) return "visa_free";
   const free = VISA_FREE[nationality];
   if (free?.includes(destination)) return "visa_free";
   const voa = VISA_ON_ARRIVAL[nationality];
