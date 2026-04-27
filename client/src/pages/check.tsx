@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
+import { ConsentCheckbox } from "@/components/consent-checkbox";
 import {
   PlaneTakeoff, Brain, ChevronDown, CheckCircle, AlertCircle,
   FileText, Info, RefreshCw, ChevronLeft, ChevronRight,
@@ -290,6 +291,8 @@ export default function CheckPage() {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<FormData>(EMPTY);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [consentChecked, setConsentChecked] = useState(false);
+  const [consentError, setConsentError] = useState("");
   const [result, setResult] = useState<AIResult | null>(null);
   const [aiProvider, setAiProvider] = useState("");
   const [tab, setTab] = useState<"overview" | "docs" | "tips" | "country">("overview");
@@ -390,6 +393,8 @@ export default function CheckPage() {
 
   async function handleSubmit() {
     if (!canCheck) { setLocation("/pricing"); return; }
+    if (!consentChecked) { setConsentError("Please agree to the Terms & Conditions before submitting"); return; }
+    setConsentError("");
     setIsSubmitting(true);
     try {
       const [res] = await Promise.all([
@@ -932,6 +937,13 @@ export default function CheckPage() {
                   <ReviewSection title="About You" icon={User} items={[["Employment", form.employmentStatus], ["Job Title", form.jobTitle], ["Company", form.companyName], ["Monthly Income", form.monthlyIncome], ["Bank Balance", form.bankBalance], ["Trip Funded By", form.tripFunding], ["Refusals", form.previousVisaRefusals]]} />
                   <ReviewSection title="Documents" icon={FileText} items={[["Bank Statement", form.hasBankStatement], ["Return Ticket", form.hasReturnTicket], ["Travel Insurance", form.hasTravelInsurance], ["Hotel Booking", form.hasHotelBooking], ["Salary Slips", form.hasSalarySlips], ["Leave Approval", form.hasLeaveApproval], ["Family Home", form.familyInHomeCountry]]} />
                 </div>
+
+                <ConsentCheckbox
+                  checked={consentChecked}
+                  onChange={v => { setConsentChecked(v); setConsentError(""); }}
+                  error={consentError}
+                  context="check"
+                />
 
                 <Button
                   onClick={handleSubmit}

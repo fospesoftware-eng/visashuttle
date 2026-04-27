@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
+import { ConsentCheckbox } from "@/components/consent-checkbox";
 import {
   Crown, Lock, Sparkles, CheckCircle, FileText, AlertCircle,
   TrendingUp, Download, Shield, ArrowRight, Zap, ChevronLeft,
@@ -232,6 +233,8 @@ export default function DeepCheckPage() {
   const [form, setForm] = useState<Record<string, string>>({ ...BLANK });
   const [result, setResult] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [consentChecked, setConsentChecked] = useState(false);
+  const [consentError, setConsentError] = useState("");
   const [provider, setProvider] = useState("");
   const [visaHoldings, setVisaHoldings] = useState<VisaHolding[]>([]);
   const [loadProgress, setLoadProgress] = useState(0);
@@ -704,6 +707,8 @@ export default function DeepCheckPage() {
       toast({ title: "Required fields missing", description: "Please fill in at least nationality, destination, and visa type.", variant: "destructive" });
       return;
     }
+    if (!consentChecked) { setConsentError("Please agree to the Terms & Conditions before running the check"); return; }
+    setConsentError("");
     // Serialize visa holdings into form before submitting
     const enrichedForm = {
       ...form,
@@ -1395,6 +1400,13 @@ export default function DeepCheckPage() {
                   Next <ChevronRight className="w-4 h-4" />
                 </Button>
               ) : (
+                <div className="flex flex-col items-end gap-3">
+                  <ConsentCheckbox
+                    checked={consentChecked}
+                    onChange={v => { setConsentChecked(v); setConsentError(""); }}
+                    error={consentError}
+                    context="deepcheck"
+                  />
                 <Button
                   onClick={handleSubmit}
                   disabled={isSubmitting}
@@ -1413,6 +1425,7 @@ export default function DeepCheckPage() {
                     </>
                   )}
                 </Button>
+                </div>
               )}
             </div>
           </CardContent>

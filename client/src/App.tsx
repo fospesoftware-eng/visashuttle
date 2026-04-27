@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/lib/theme";
 import { PasswordGate } from "@/components/password-gate";
+import { CookieBanner } from "@/components/cookie-banner";
 
 import NotFound from "@/pages/not-found";
 import HomePage from "@/pages/home";
@@ -45,6 +46,8 @@ import AdminVKBPage from "@/pages/admin/vkb";
 import AdminAIPage from "@/pages/admin/ai";
 import AdminAuditPage from "@/pages/admin/audit";
 import AdminSettingsPage from "@/pages/admin/settings";
+
+import PrivacyPolicyPage from "@/pages/privacy-policy";
 
 import AgencyHomePage from "@/pages/whitelabel/agency-home";
 import WhiteLabelLoginPage from "@/pages/whitelabel/login";
@@ -94,6 +97,7 @@ function Router() {
       <Route path="/visa-check" component={VisaCheckPublicPage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/signup" component={SignupPage} />
+      <Route path="/privacy-policy" component={PrivacyPolicyPage} />
 
       <Route path="/app" component={AgencyDashboard} />
       <Route path="/app/leads" component={LeadsPage} />
@@ -142,6 +146,7 @@ function App() {
             <Toaster />
             <SubdomainRedirect />
             <Router />
+            <CookieBanner />
           </PasswordGate>
         </TooltipProvider>
       </QueryClientProvider>

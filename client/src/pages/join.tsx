@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Eye, EyeOff, CheckCircle, Sparkles, Globe, Shield, Zap, Phone, ArrowLeft, RotateCcw, ChevronDown, Search, MapPin } from "lucide-react";
+import { ConsentCheckbox } from "@/components/consent-checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -289,6 +290,7 @@ export default function JoinPage() {
   const [otp, setOtp] = useState(["", "", "", ""]);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [consentChecked, setConsentChecked] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -322,6 +324,7 @@ export default function JoinPage() {
     else if (localDigits.length < 5) e.phone = "Enter a valid phone number";
     if (!form.password) e.password = "Password is required";
     else if (form.password.length < 8) e.password = "At least 8 characters required";
+    if (!consentChecked) e.consent = "You must agree to the Terms & Conditions to continue";
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -553,6 +556,13 @@ export default function JoinPage() {
                     </div>
                     {errors.password && <p className="text-xs text-red-500">{errors.password}</p>}
                   </div>
+
+                  <ConsentCheckbox
+                    checked={consentChecked}
+                    onChange={v => { setConsentChecked(v); setErrors(er => ({ ...er, consent: "" })); }}
+                    error={errors.consent}
+                    context="signup"
+                  />
 
                   <Button
                     type="submit"

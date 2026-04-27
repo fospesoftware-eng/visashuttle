@@ -548,8 +548,8 @@ export default function HomePage() {
             <div className="flex items-center gap-6 text-sm text-muted-foreground">
               <Link href="/pricing" className="hover:text-foreground transition-colors">Pricing</Link>
               <Link href="/business" className="hover:text-foreground transition-colors">For Business</Link>
-              <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
-              <a href="#" className="hover:text-foreground transition-colors">Terms</a>
+              <Link href="/privacy-policy" className="hover:text-foreground transition-colors">Privacy & Cookies</Link>
+              <Link href="/privacy-policy" className="hover:text-foreground transition-colors">Terms</Link>
             </div>
             <p className="text-xs text-muted-foreground text-center max-w-sm">
               AI-based estimation only. Does not guarantee visa approval.
