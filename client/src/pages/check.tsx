@@ -403,8 +403,9 @@ export default function CheckPage() {
   function resetForm() { setForm(EMPTY); setResult(null); setStep(1); setProfileUsed(false); }
 
   if (authLoading || !user) return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
-      <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 gap-4">
+      <img src="/logo-loading.gif" alt="Loading..." className="w-20 h-20 object-contain" />
+      <p className="text-sm text-slate-500 font-medium">Loading your profile…</p>
     </div>
   );
 
@@ -850,24 +851,31 @@ export default function CheckPage() {
                   <ReviewSection title="Documents" icon={FileText} items={[["Bank Statement", form.hasBankStatement], ["Return Ticket", form.hasReturnTicket], ["Travel Insurance", form.hasTravelInsurance], ["Hotel Booking", form.hasHotelBooking], ["Salary Slips", form.hasSalarySlips], ["Leave Approval", form.hasLeaveApproval], ["Family Home", form.familyInHomeCountry]]} />
                 </div>
 
-                <Button
-                  onClick={handleSubmit}
-                  disabled={isSubmitting || !canCheck}
-                  className="w-full h-12 text-base font-semibold border-0 text-white hover:opacity-90 gap-2 mt-2"
-                  style={{background:"linear-gradient(135deg,#4055FF,#9033F5,#FF2060)"}}
-                  data-testid="button-submit-check"
-                >
-                  {isSubmitting ? (
-                    <span className="flex items-center gap-2">
-                      <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Analyzing your visa profile...
-                    </span>
-                  ) : !canCheck ? (
-                    <span className="flex items-center gap-2"><Lock className="w-5 h-5" /> Upgrade to Run More Checks</span>
-                  ) : (
-                    <span className="flex items-center gap-2"><PlaneTakeoff className="w-5 h-5" /> Generate AI Visa Assessment</span>
-                  )}
-                </Button>
+                {isSubmitting && (
+                  <div className="flex flex-col items-center justify-center py-8 gap-4">
+                    <img src="/logo-loading.gif" alt="Analyzing..." className="w-24 h-24 object-contain" />
+                    <div className="text-center">
+                      <p className="font-semibold text-slate-700 text-sm">AI is analyzing your visa profile…</p>
+                      <p className="text-xs text-slate-400 mt-1">This usually takes 5–10 seconds</p>
+                    </div>
+                  </div>
+                )}
+
+                {!isSubmitting && (
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={!canCheck}
+                    className="w-full h-12 text-base font-semibold border-0 text-white hover:opacity-90 gap-2 mt-2"
+                    style={{background:"linear-gradient(135deg,#4055FF,#9033F5,#FF2060)"}}
+                    data-testid="button-submit-check"
+                  >
+                    {!canCheck ? (
+                      <span className="flex items-center gap-2"><Lock className="w-5 h-5" /> Upgrade to Run More Checks</span>
+                    ) : (
+                      <span className="flex items-center gap-2"><PlaneTakeoff className="w-5 h-5" /> Generate AI Visa Assessment</span>
+                    )}
+                  </Button>
+                )}
               </div>
             )}
 
