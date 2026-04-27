@@ -24,7 +24,7 @@ interface SmsConfigResponse {
   msg91SenderId: string;
   zauvApiKey: string;
   mcCustomerId: string;
-  mcPassword: string;
+  mcAuthToken: string;
   hasMsg91AuthKey: boolean;
   hasZavuApiKey: boolean;
   hasMcCredentials: boolean;
@@ -43,7 +43,7 @@ function SmsGatewayCard() {
   const [provider, setProvider] = useState("msg91");
   const [showMsg91Key, setShowMsg91Key] = useState(false);
   const [showZavuKey, setShowZavuKey] = useState(false);
-  const [showMcPassword, setShowMcPassword] = useState(false);
+  const [showMcAuthToken, setShowMcAuthToken] = useState(false);
   const [testPhone, setTestPhone] = useState("");
   const [showZavu, setShowZavu] = useState(false);
   const [showMc, setShowMc] = useState(false);
@@ -53,7 +53,7 @@ function SmsGatewayCard() {
     msg91SenderId: "",
     zauvApiKey: "",
     mcCustomerId: "",
-    mcPassword: "",
+    mcAuthToken: "",
   });
 
   const { data: cfg, isLoading } = useQuery<SmsConfigResponse>({
@@ -69,7 +69,7 @@ function SmsGatewayCard() {
         msg91SenderId: cfg.msg91SenderId || "",
         zauvApiKey: cfg.zauvApiKey || "",
         mcCustomerId: cfg.mcCustomerId || "",
-        mcPassword: cfg.mcPassword || "",
+        mcAuthToken: cfg.mcAuthToken || "",
       });
     }
   }, [cfg]);
@@ -178,7 +178,7 @@ function SmsGatewayCard() {
               </SelectItem>
             </SelectContent>
           </Select>
-          <p className="text-xs text-muted-foreground">MSG91 is the recommended default provider</p>
+          <p className="text-xs text-muted-foreground">MessageCentral is the default provider</p>
         </div>
 
         <Separator />
@@ -358,29 +358,32 @@ function SmsGatewayCard() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="mcPassword">
-                  Password <span className="text-red-500">*</span>
+                <Label htmlFor="mcAuthToken">
+                  Auth Token <span className="text-red-500">*</span>
                 </Label>
                 <div className="relative">
                   <Input
-                    id="mcPassword"
-                    type={showMcPassword ? "text" : "password"}
-                    placeholder={cfg?.hasMcCredentials ? "Password saved — enter new value to update" : "Your MessageCentral account password"}
-                    value={form.mcPassword}
-                    onChange={e => setForm(f => ({ ...f, mcPassword: e.target.value }))}
+                    id="mcAuthToken"
+                    type={showMcAuthToken ? "text" : "password"}
+                    placeholder={cfg?.hasMcCredentials ? "Token saved — enter new value to update" : "Paste your MessageCentral Auth Token"}
+                    value={form.mcAuthToken}
+                    onChange={e => setForm(f => ({ ...f, mcAuthToken: e.target.value }))}
                     className="pr-10 font-mono text-sm"
-                    data-testid="input-mc-password"
+                    data-testid="input-mc-auth-token"
                   />
                   <button
                     type="button"
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    onClick={() => setShowMcPassword(s => !s)}
+                    onClick={() => setShowMcAuthToken(s => !s)}
                   >
-                    {showMcPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showMcAuthToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Used to generate an auth token for each OTP request (base64-encoded automatically)
+                  Long-lived JWT auth token from your{" "}
+                  <a href="https://www.messagecentral.com" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+                    MessageCentral dashboard
+                  </a>
                 </p>
               </div>
 
@@ -388,7 +391,7 @@ function SmsGatewayCard() {
                 <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
                   <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
                   <p className="text-xs text-amber-700 dark:text-amber-300">
-                    Customer ID and Password are required to use MessageCentral. Enter both and save.
+                    Customer ID and Auth Token are required to use MessageCentral. Enter both and save.
                   </p>
                 </div>
               )}

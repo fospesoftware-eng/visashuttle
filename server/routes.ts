@@ -803,17 +803,17 @@ export async function registerRoutes(
       msg91SenderId: cfg?.msg91SenderId ?? "",
       zauvApiKey: cfg?.zauvApiKey ? maskKey(cfg.zauvApiKey) : "",
       mcCustomerId: cfg?.mcCustomerId ?? "",
-      mcPassword: cfg?.mcPassword ? maskKey(cfg.mcPassword) : "",
+      mcAuthToken: cfg?.mcAuthToken ? maskKey(cfg.mcAuthToken) : "",
       status,
       hasMsg91AuthKey: !!cfg?.msg91AuthKey,
       hasZavuApiKey: !!cfg?.zauvApiKey,
-      hasMcCredentials: !!(cfg?.mcCustomerId && cfg?.mcPassword),
+      hasMcCredentials: !!(cfg?.mcCustomerId && cfg?.mcAuthToken),
     });
   });
 
   // ── Admin: Save SMS Config ────────────────────────────────────────────────
   app.post("/api/admin/sms-config", requireAgencyAuth, async (req, res) => {
-    const { provider, msg91AuthKey, msg91TemplateId, msg91SenderId, zauvApiKey, mcCustomerId, mcPassword } = req.body;
+    const { provider, msg91AuthKey, msg91TemplateId, msg91SenderId, zauvApiKey, mcCustomerId, mcAuthToken } = req.body;
     // Only overwrite a field if the new value is not a masked placeholder
     const patch: Record<string, any> = { provider };
     if (msg91AuthKey && !msg91AuthKey.includes("•")) patch.msg91AuthKey = msg91AuthKey;
@@ -821,7 +821,7 @@ export async function registerRoutes(
     if (msg91SenderId !== undefined) patch.msg91SenderId = msg91SenderId || null;
     if (zauvApiKey && !zauvApiKey.includes("•")) patch.zauvApiKey = zauvApiKey;
     if (mcCustomerId !== undefined) patch.mcCustomerId = mcCustomerId || null;
-    if (mcPassword && !mcPassword.includes("•")) patch.mcPassword = mcPassword;
+    if (mcAuthToken && !mcAuthToken.includes("•")) patch.mcAuthToken = mcAuthToken;
     await storage.upsertSmsConfig(patch);
     const updated = await storage.getSmsConfig();
     const status = getSmsProviderStatus(updated);

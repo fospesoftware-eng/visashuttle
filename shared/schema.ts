@@ -282,13 +282,13 @@ export type OTPCode = typeof otpCodes.$inferSelect;
 // ── SMS Provider Config ───────────────────────────────────────────────────────
 export const smsConfig = pgTable("sms_config", {
   id: serial("id").primaryKey(),
-  provider: text("provider").notNull().default("msg91"),
+  provider: text("provider").notNull().default("messagecentral"),
   msg91AuthKey: text("msg91_auth_key"),
   msg91TemplateId: text("msg91_template_id"),
   msg91SenderId: text("msg91_sender_id"),
   zauvApiKey: text("zavu_api_key"),
   mcCustomerId: text("mc_customer_id"),
-  mcPassword: text("mc_password"),
+  mcAuthToken: text("mc_auth_token"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
