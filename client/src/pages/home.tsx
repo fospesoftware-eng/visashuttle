@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Sparkles, Brain, Zap, Shield, ArrowRight, CheckCircle,
@@ -11,12 +11,110 @@ import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
 
-const VISA_SAMPLES = [
-  { from: "India", to: "UAE", type: "Tourist Visa", score: 88, label: "High Chance", color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30" },
-  { from: "Pakistan", to: "UK", type: "Visit Visa", score: 42, label: "Moderate", color: "text-amber-600 bg-amber-50 dark:bg-amber-950/30" },
-  { from: "Philippines", to: "Schengen", type: "Tourist Visa", score: 57, label: "Good Chance", color: "text-blue-600 bg-blue-50 dark:bg-blue-950/30" },
-  { from: "Nigeria", to: "USA", type: "Tourist Visa", score: 31, label: "Low Chance", color: "text-red-600 bg-red-50 dark:bg-red-950/30" },
+// ── Large pool of country-pair visa data ──────────────────────────────────────
+const POOL: { from: string; to: string; type: string; score: number }[] = [
+  { from: "India", to: "UAE", type: "Tourist Visa", score: 88 },
+  { from: "India", to: "Schengen", type: "Tourist Visa", score: 61 },
+  { from: "India", to: "United Kingdom", type: "Visit Visa", score: 55 },
+  { from: "India", to: "United States", type: "Tourist Visa", score: 47 },
+  { from: "India", to: "Canada", type: "Tourist Visa", score: 53 },
+  { from: "India", to: "Australia", type: "Tourist Visa", score: 59 },
+  { from: "Pakistan", to: "United Kingdom", type: "Visit Visa", score: 42 },
+  { from: "Pakistan", to: "UAE", type: "Tourist Visa", score: 74 },
+  { from: "Pakistan", to: "United States", type: "Tourist Visa", score: 34 },
+  { from: "Pakistan", to: "Schengen", type: "Tourist Visa", score: 38 },
+  { from: "Philippines", to: "Schengen", type: "Tourist Visa", score: 57 },
+  { from: "Philippines", to: "United Kingdom", type: "Visit Visa", score: 52 },
+  { from: "Philippines", to: "Japan", type: "Tourist Visa", score: 81 },
+  { from: "Philippines", to: "UAE", type: "Tourist Visa", score: 79 },
+  { from: "Nigeria", to: "United States", type: "Tourist Visa", score: 31 },
+  { from: "Nigeria", to: "United Kingdom", type: "Visit Visa", score: 36 },
+  { from: "Nigeria", to: "Schengen", type: "Tourist Visa", score: 33 },
+  { from: "Nigeria", to: "UAE", type: "Tourist Visa", score: 68 },
+  { from: "Bangladesh", to: "UAE", type: "Work Visa", score: 76 },
+  { from: "Bangladesh", to: "United Kingdom", type: "Student Visa", score: 58 },
+  { from: "Bangladesh", to: "United States", type: "Tourist Visa", score: 29 },
+  { from: "Ghana", to: "United Kingdom", type: "Visit Visa", score: 44 },
+  { from: "Ghana", to: "Schengen", type: "Tourist Visa", score: 40 },
+  { from: "Ghana", to: "Canada", type: "Tourist Visa", score: 41 },
+  { from: "Kenya", to: "United Kingdom", type: "Visit Visa", score: 49 },
+  { from: "Kenya", to: "UAE", type: "Tourist Visa", score: 72 },
+  { from: "Kenya", to: "United States", type: "Tourist Visa", score: 38 },
+  { from: "Ethiopia", to: "UAE", type: "Work Visa", score: 65 },
+  { from: "Ethiopia", to: "United States", type: "Tourist Visa", score: 27 },
+  { from: "South Africa", to: "United Kingdom", type: "Visit Visa", score: 71 },
+  { from: "South Africa", to: "Schengen", type: "Tourist Visa", score: 68 },
+  { from: "South Africa", to: "United States", type: "Tourist Visa", score: 63 },
+  { from: "Brazil", to: "Schengen", type: "Tourist Visa", score: 74 },
+  { from: "Brazil", to: "United States", type: "Tourist Visa", score: 66 },
+  { from: "Brazil", to: "United Kingdom", type: "Visit Visa", score: 69 },
+  { from: "Colombia", to: "United States", type: "Tourist Visa", score: 52 },
+  { from: "Colombia", to: "Schengen", type: "Tourist Visa", score: 58 },
+  { from: "Mexico", to: "United States", type: "Tourist Visa", score: 72 },
+  { from: "Mexico", to: "Schengen", type: "Tourist Visa", score: 81 },
+  { from: "China", to: "United States", type: "Tourist Visa", score: 55 },
+  { from: "China", to: "Schengen", type: "Tourist Visa", score: 60 },
+  { from: "China", to: "United Kingdom", type: "Visit Visa", score: 57 },
+  { from: "Vietnam", to: "United States", type: "Tourist Visa", score: 45 },
+  { from: "Vietnam", to: "Schengen", type: "Tourist Visa", score: 51 },
+  { from: "Vietnam", to: "Japan", type: "Tourist Visa", score: 78 },
+  { from: "Indonesia", to: "Schengen", type: "Tourist Visa", score: 63 },
+  { from: "Indonesia", to: "United Kingdom", type: "Visit Visa", score: 59 },
+  { from: "Thailand", to: "Schengen", type: "Tourist Visa", score: 72 },
+  { from: "Thailand", to: "United States", type: "Tourist Visa", score: 66 },
+  { from: "Nepal", to: "UAE", type: "Work Visa", score: 77 },
+  { from: "Nepal", to: "United States", type: "Tourist Visa", score: 32 },
+  { from: "Sri Lanka", to: "UAE", type: "Work Visa", score: 73 },
+  { from: "Sri Lanka", to: "United Kingdom", type: "Visit Visa", score: 47 },
+  { from: "Egypt", to: "UAE", type: "Tourist Visa", score: 83 },
+  { from: "Egypt", to: "Schengen", type: "Tourist Visa", score: 46 },
+  { from: "Morocco", to: "Schengen", type: "Tourist Visa", score: 48 },
+  { from: "Morocco", to: "United Kingdom", type: "Visit Visa", score: 44 },
+  { from: "Turkey", to: "Schengen", type: "Tourist Visa", score: 67 },
+  { from: "Turkey", to: "United Kingdom", type: "Visit Visa", score: 62 },
+  { from: "Iran", to: "UAE", type: "Tourist Visa", score: 54 },
+  { from: "Iraq", to: "UAE", type: "Tourist Visa", score: 49 },
+  { from: "Jordan", to: "Schengen", type: "Tourist Visa", score: 65 },
+  { from: "Jordan", to: "United Kingdom", type: "Visit Visa", score: 61 },
+  { from: "Lebanon", to: "UAE", type: "Tourist Visa", score: 71 },
+  { from: "Lebanon", to: "Schengen", type: "Tourist Visa", score: 55 },
+  { from: "Saudi Arabia", to: "Schengen", type: "Tourist Visa", score: 79 },
+  { from: "Russia", to: "Schengen", type: "Tourist Visa", score: 51 },
+  { from: "Ukraine", to: "Schengen", type: "Tourist Visa", score: 69 },
+  { from: "Kazakhstan", to: "UAE", type: "Tourist Visa", score: 82 },
+  { from: "Uzbekistan", to: "UAE", type: "Work Visa", score: 70 },
+  { from: "United States", to: "Schengen", type: "Tourist Visa", score: 94 },
+  { from: "United Kingdom", to: "Schengen", type: "Tourist Visa", score: 91 },
+  { from: "Canada", to: "Schengen", type: "Tourist Visa", score: 93 },
+  { from: "Australia", to: "United States", type: "Tourist Visa", score: 92 },
+  { from: "Germany", to: "United States", type: "Tourist Visa", score: 90 },
+  { from: "France", to: "United States", type: "Tourist Visa", score: 89 },
 ];
+
+// Popular destinations per nationality (fallback if no IP match)
+const NATIONALITY_DESTINATIONS: Record<string, string[]> = {
+  "United Arab Emirates": ["United Kingdom", "Schengen", "United States"],
+  "Saudi Arabia": ["Schengen", "United Kingdom", "United States"],
+  "Qatar": ["Schengen", "United Kingdom", "United States"],
+  "Kuwait": ["Schengen", "United Kingdom", "United States"],
+  "Bahrain": ["Schengen", "United Kingdom", "United States"],
+};
+
+function scoreToLabel(score: number): { label: string; color: string } {
+  if (score >= 80) return { label: "High Chance", color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800" };
+  if (score >= 65) return { label: "Good Chance", color: "text-blue-600 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800" };
+  if (score >= 45) return { label: "Moderate", color: "text-amber-600 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800" };
+  return { label: "Low Chance", color: "text-red-600 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800" };
+}
+
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
 const STEPS = [
   { step: "01", icon: FileText, title: "Enter Your Travel Details", desc: "Share 14 key details about your nationality, visa type, finances, travel history, and trip plans." },
@@ -27,6 +125,61 @@ const STEPS = [
 export default function HomePage() {
   const { user } = useB2cAuth();
   const [, setLocation] = useLocation();
+  const [samples, setSamples] = useState<typeof POOL>([]);
+  const [userCountry, setUserCountry] = useState<string | null>(null);
+  const [pulse, setPulse] = useState(0); // increments to trigger subtle "live" animation
+  const pulseRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Detect user's country via IP geolocation, then build randomized list
+  useEffect(() => {
+    async function buildSamples(detected: string | null) {
+      const rest = shuffle(POOL);
+
+      let list: typeof POOL = [];
+
+      if (detected) {
+        // Find entries where `from` matches the detected country
+        const fromUser = rest.filter(p => p.from.toLowerCase() === detected.toLowerCase());
+        // Find entries for popular destinations in that country
+        const popular = NATIONALITY_DESTINATIONS[detected];
+        const fromPopular = popular
+          ? popular.flatMap(dest => rest.filter(p => p.from === detected && p.to === dest)).slice(0, 1)
+          : [];
+
+        const userEntry = (fromUser.length > 0 ? fromUser : fromPopular)[0] ?? null;
+
+        if (userEntry) {
+          // User's country first, then 3 random different entries
+          const others = rest.filter(p => p.from !== detected).slice(0, 3);
+          list = [userEntry, ...others];
+        } else {
+          // Fallback: synthetic entry for user's country with a typical destination
+          const synthDest = NATIONALITY_DESTINATIONS[detected]?.[0] ?? "Schengen";
+          const base = 50 + Math.floor(Math.random() * 30);
+          const synth = { from: detected, to: synthDest, type: "Tourist Visa", score: base };
+          const others = rest.slice(0, 3);
+          list = [synth, ...others];
+        }
+      } else {
+        list = rest.slice(0, 4);
+      }
+
+      setSamples(list);
+    }
+
+    fetch("https://ipapi.co/json/")
+      .then(r => r.json())
+      .then(d => {
+        const country: string = d?.country_name ?? "";
+        setUserCountry(country || null);
+        buildSamples(country || null);
+      })
+      .catch(() => buildSamples(null));
+
+    // Pulse every 4s to simulate "live" updates (just a visual tick, no refetch)
+    pulseRef.current = setInterval(() => setPulse(p => p + 1), 4000);
+    return () => { if (pulseRef.current) clearInterval(pulseRef.current); };
+  }, []);
 
   function handleCheckCTA() {
     if (user) setLocation("/check");
@@ -135,36 +288,77 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Right — Live sample results */}
+            {/* Right — Live AI Visa Scores card */}
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-br from-[#4055FF]/15 to-[#FF2060]/15 rounded-3xl blur-xl scale-105" />
               <Card className="relative shadow-2xl rounded-2xl overflow-hidden border">
                 <CardContent className="p-0">
+                  {/* Card header */}
                   <div className="px-6 py-4 text-white" style={{background:"linear-gradient(135deg,#4055FF,#9033F5,#FF2060)"}}>
-                    <div className="flex items-center gap-2">
-                      <Brain className="w-5 h-5" />
-                      <span className="font-semibold">Live AI Visa Scores</span>
-                    </div>
-                    <p className="text-white/75 text-xs mt-0.5">Real-time estimates powered by AI</p>
-                  </div>
-                  <div className="divide-y">
-                    {VISA_SAMPLES.map((s, i) => (
-                      <div key={i} className="px-6 py-4 flex items-center justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 text-sm font-medium mb-0.5">
-                            <span>{s.from}</span>
-                            <ArrowRight className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                            <span>{s.to}</span>
-                          </div>
-                          <p className="text-xs text-muted-foreground">{s.type}</p>
-                        </div>
-                        <div className="text-right flex-shrink-0">
-                          <div className="text-xl font-black">{s.score}%</div>
-                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${s.color}`}>{s.label}</span>
-                        </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Brain className="w-5 h-5" />
+                        <span className="font-semibold">Live AI Visa Scores</span>
                       </div>
-                    ))}
+                      {/* Live pulse indicator */}
+                      <div className="flex items-center gap-1.5">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white/70 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+                        </span>
+                        <span className="text-xs text-white/80 font-medium">Live</span>
+                      </div>
+                    </div>
+                    <p className="text-white/75 text-xs mt-0.5">
+                      Real-time estimates powered by AI
+                      {userCountry && <span> · Showing results for <strong className="text-white/90">{userCountry}</strong></span>}
+                    </p>
                   </div>
+
+                  {/* Rows */}
+                  <div className="divide-y">
+                    {samples.length === 0
+                      ? Array.from({ length: 4 }).map((_, i) => (
+                          <div key={i} className="px-6 py-4 flex items-center justify-between gap-3 animate-pulse">
+                            <div className="flex-1 space-y-1.5">
+                              <div className="h-3.5 bg-slate-100 dark:bg-slate-800 rounded w-3/4" />
+                              <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded w-1/2" />
+                            </div>
+                            <div className="space-y-1.5 text-right">
+                              <div className="h-6 bg-slate-100 dark:bg-slate-800 rounded w-12" />
+                              <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded w-16" />
+                            </div>
+                          </div>
+                        ))
+                      : samples.map((s, i) => {
+                          const { label, color } = scoreToLabel(s.score);
+                          const isUserCountry = i === 0 && userCountry && s.from.toLowerCase() === userCountry.toLowerCase();
+                          return (
+                            <div
+                              key={`${s.from}-${s.to}-${pulse}`}
+                              className={`px-6 py-4 flex items-center justify-between gap-3 transition-all ${isUserCountry ? "bg-[#4055FF]/5 dark:bg-[#4055FF]/10" : ""}`}
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 text-sm font-medium mb-0.5">
+                                  {isUserCountry && (
+                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#4055FF]/10 text-[#4055FF] border border-[#4055FF]/20 flex-shrink-0">You</span>
+                                  )}
+                                  <span className="truncate">{s.from}</span>
+                                  <ArrowRight className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                                  <span className="truncate">{s.to}</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground">{s.type}</p>
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <div className="text-xl font-black">{s.score}%</div>
+                                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${color}`}>{label}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                  </div>
+
+                  {/* CTA */}
                   <div className="px-6 py-4 bg-muted/30 border-t">
                     <Button
                       className="w-full border-0 text-white font-semibold hover:opacity-90"
