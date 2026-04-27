@@ -287,6 +287,8 @@ export const smsConfig = pgTable("sms_config", {
   msg91TemplateId: text("msg91_template_id"),
   msg91SenderId: text("msg91_sender_id"),
   zauvApiKey: text("zavu_api_key"),
+  mcCustomerId: text("mc_customer_id"),
+  mcPassword: text("mc_password"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 

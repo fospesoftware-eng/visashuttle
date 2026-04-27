@@ -31,6 +31,8 @@ declare module "express-session" {
     b2cUserId?: string;
     // OTP verification (temporary, cleared after registration)
     otpVerifiedPhone?: string;
+    // MessageCentral verification ID (needed to verify OTP)
+    mcVerificationId?: string;
   }
 }
 
@@ -766,6 +768,10 @@ export async function registerRoutes(
     if (!result.success) {
       return res.status(502).json({ error: result.error || "Failed to send OTP. Please try again." });
     }
+    // MessageCentral returns a verificationId that must be passed back on verify
+    if (result.verificationId) {
+      req.session.mcVerificationId = result.verificationId;
+    }
     res.json({ success: true, message: "OTP sent to your phone" });
   });
 
@@ -776,11 +782,12 @@ export async function registerRoutes(
       return res.status(400).json({ error: "Phone number and OTP code are required" });
     }
     const dbConfig = await storage.getSmsConfig();
-    const result = await verifyOtp(phone, otp, dbConfig);
+    const result = await verifyOtp(phone, otp, dbConfig, req.session.mcVerificationId);
     if (!result.success) {
       return res.status(400).json({ error: result.error || "Invalid or expired OTP code" });
     }
     req.session.otpVerifiedPhone = phone;
+    req.session.mcVerificationId = undefined;
     res.json({ success: true });
   });
 
@@ -795,22 +802,26 @@ export async function registerRoutes(
       msg91TemplateId: cfg?.msg91TemplateId ?? "",
       msg91SenderId: cfg?.msg91SenderId ?? "",
       zauvApiKey: cfg?.zauvApiKey ? maskKey(cfg.zauvApiKey) : "",
+      mcCustomerId: cfg?.mcCustomerId ?? "",
+      mcPassword: cfg?.mcPassword ? maskKey(cfg.mcPassword) : "",
       status,
       hasMsg91AuthKey: !!cfg?.msg91AuthKey,
       hasZavuApiKey: !!cfg?.zauvApiKey,
+      hasMcCredentials: !!(cfg?.mcCustomerId && cfg?.mcPassword),
     });
   });
 
   // ── Admin: Save SMS Config ────────────────────────────────────────────────
   app.post("/api/admin/sms-config", requireAgencyAuth, async (req, res) => {
-    const { provider, msg91AuthKey, msg91TemplateId, msg91SenderId, zauvApiKey } = req.body;
-    const current = await storage.getSmsConfig();
+    const { provider, msg91AuthKey, msg91TemplateId, msg91SenderId, zauvApiKey, mcCustomerId, mcPassword } = req.body;
     // Only overwrite a field if the new value is not a masked placeholder
     const patch: Record<string, any> = { provider };
     if (msg91AuthKey && !msg91AuthKey.includes("•")) patch.msg91AuthKey = msg91AuthKey;
     if (msg91TemplateId !== undefined) patch.msg91TemplateId = msg91TemplateId || null;
     if (msg91SenderId !== undefined) patch.msg91SenderId = msg91SenderId || null;
     if (zauvApiKey && !zauvApiKey.includes("•")) patch.zauvApiKey = zauvApiKey;
+    if (mcCustomerId !== undefined) patch.mcCustomerId = mcCustomerId || null;
+    if (mcPassword && !mcPassword.includes("•")) patch.mcPassword = mcPassword;
     await storage.upsertSmsConfig(patch);
     const updated = await storage.getSmsConfig();
     const status = getSmsProviderStatus(updated);

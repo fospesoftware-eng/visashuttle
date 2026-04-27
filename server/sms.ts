@@ -1,19 +1,15 @@
 /**
  * SMS Gateway Provider Abstraction
  *
- * Default provider: MSG91
- * Secondary provider: Zavu
+ * Providers: MSG91 (default), Zavu, MessageCentral
  *
  * Credentials are read from the database (admin-managed) first,
  * falling back to environment variables if not set in DB.
- *
- * To switch providers, set SMS_PROVIDER env var to "zavu",
- * or configure it in the admin settings panel.
  */
 
 import type { SmsConfig } from "@shared/schema";
 
-export type SmsProvider = "msg91" | "zavu";
+export type SmsProvider = "msg91" | "zavu" | "messagecentral";
 
 export interface SmsProviderConfig {
   provider?: string;
@@ -21,11 +17,15 @@ export interface SmsProviderConfig {
   msg91TemplateId?: string | null;
   msg91SenderId?: string | null;
   zauvApiKey?: string | null;
+  mcCustomerId?: string | null;
+  mcPassword?: string | null;
 }
 
 export interface OtpSendResult {
   success: boolean;
   error?: string;
+  /** Provider-specific token needed to verify the OTP (MessageCentral) */
+  verificationId?: string;
 }
 
 export interface OtpVerifyResult {
@@ -42,12 +42,16 @@ function resolveConfig(dbConfig?: SmsProviderConfig | null): SmsProviderConfig {
     msg91TemplateId: dbConfig?.msg91TemplateId || process.env.MSG91_TEMPLATE_ID || null,
     msg91SenderId: dbConfig?.msg91SenderId || process.env.MSG91_SENDER_ID || null,
     zauvApiKey: dbConfig?.zauvApiKey || process.env.ZAVU_API_KEY || null,
+    mcCustomerId: dbConfig?.mcCustomerId || process.env.MC_CUSTOMER_ID || null,
+    mcPassword: dbConfig?.mcPassword || process.env.MC_PASSWORD || null,
   };
 }
 
 function getActiveProvider(cfg: SmsProviderConfig): SmsProvider {
   const p = (cfg.provider || "msg91").toLowerCase();
-  return p === "zavu" ? "zavu" : "msg91";
+  if (p === "zavu") return "zavu";
+  if (p === "messagecentral") return "messagecentral";
+  return "msg91";
 }
 
 // ─── MSG91 ───────────────────────────────────────────────────────────────────
@@ -175,26 +179,158 @@ async function zavuVerifyOtp(phone: string, otp: string, cfg: SmsProviderConfig)
   }
 }
 
+// ─── MessageCentral ───────────────────────────────────────────────────────────
+// API flow:
+//  1. POST /auth/v1/authentication  → get JWT authToken
+//  2. GET  /verification/v3/send    → send OTP; returns verificationId
+//  3. GET  /verification/v3/validateOtp → verify code with verificationId
+
+const MC_BASE = "https://cpaas.messagecentral.com";
+
+async function mcGetAuthToken(cfg: SmsProviderConfig): Promise<string | null> {
+  if (!cfg.mcCustomerId || !cfg.mcPassword) return null;
+
+  try {
+    const key = Buffer.from(cfg.mcPassword).toString("base64");
+    const url = `${MC_BASE}/auth/v1/authentication?customerId=${encodeURIComponent(cfg.mcCustomerId)}&key=${encodeURIComponent(key)}&scope=NEW&country=91&email=`;
+
+    const response = await fetch(url, { method: "GET" });
+
+    if (!response.ok) {
+      console.error("[MC] Auth failed:", response.status);
+      return null;
+    }
+
+    const data = await response.json() as any;
+    return data?.token ?? data?.data?.token ?? null;
+  } catch (err) {
+    console.error("[MC] Auth exception:", err);
+    return null;
+  }
+}
+
+/** Extract country code prefix (digits only before the local number).
+ *  For a phone like +919876543210 or 919876543210 we pass countryCode=91, mobileNumber=9876543210
+ *  For numbers without country code prefix we default to countryCode=91 */
+function parseMcPhone(phone: string): { countryCode: string; mobileNumber: string } {
+  const digits = phone.replace(/\D/g, "");
+  // Common country code lengths: 1, 2, 3 digits. Detect by length.
+  // If > 10 digits assume country code prefix
+  if (digits.length > 10) {
+    const ccLen = digits.length - 10;
+    return { countryCode: digits.slice(0, ccLen), mobileNumber: digits.slice(ccLen) };
+  }
+  return { countryCode: "91", mobileNumber: digits };
+}
+
+async function mcSendOtp(phone: string, cfg: SmsProviderConfig): Promise<OtpSendResult> {
+  if (!cfg.mcCustomerId) return { success: false, error: "MessageCentral Customer ID is not configured" };
+  if (!cfg.mcPassword) return { success: false, error: "MessageCentral Password is not configured" };
+
+  const authToken = await mcGetAuthToken(cfg);
+  if (!authToken) return { success: false, error: "MessageCentral authentication failed — check Customer ID and Password" };
+
+  const { countryCode, mobileNumber } = parseMcPhone(phone);
+
+  try {
+    const url = `${MC_BASE}/verification/v3/send?countryCode=${countryCode}&customerId=${encodeURIComponent(cfg.mcCustomerId)}&flowType=SMS&mobileNumber=${mobileNumber}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { authToken },
+    });
+
+    const data = await response.json() as any;
+
+    if (!response.ok || (data.responseCode && data.responseCode !== 200)) {
+      console.error("[MC] Send OTP error:", data);
+      return { success: false, error: data.message || "Failed to send OTP via MessageCentral" };
+    }
+
+    const verificationId: string = data?.data?.verificationId ?? data?.token ?? "";
+    if (!verificationId) {
+      console.error("[MC] No verificationId returned:", data);
+      return { success: false, error: "MessageCentral did not return a verification ID" };
+    }
+
+    return { success: true, verificationId };
+  } catch (err) {
+    console.error("[MC] Send OTP exception:", err);
+    return { success: false, error: "MessageCentral service temporarily unavailable" };
+  }
+}
+
+async function mcVerifyOtp(
+  phone: string,
+  otp: string,
+  cfg: SmsProviderConfig,
+  verificationId: string,
+): Promise<OtpVerifyResult> {
+  if (!cfg.mcCustomerId) return { success: false, error: "MessageCentral Customer ID is not configured" };
+  if (!cfg.mcPassword) return { success: false, error: "MessageCentral Password is not configured" };
+  if (!verificationId) return { success: false, error: "Verification session expired — please request a new OTP" };
+
+  const authToken = await mcGetAuthToken(cfg);
+  if (!authToken) return { success: false, error: "MessageCentral authentication failed" };
+
+  try {
+    const url = `${MC_BASE}/verification/v3/validateOtp?verificationId=${encodeURIComponent(verificationId)}&customerId=${encodeURIComponent(cfg.mcCustomerId)}&code=${encodeURIComponent(otp)}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { authToken },
+    });
+
+    const data = await response.json() as any;
+
+    if (!response.ok) {
+      console.error("[MC] Verify OTP error:", data);
+      return { success: false, error: data.message || "Invalid or expired OTP" };
+    }
+
+    const status: string = data?.data?.responseCode ?? data?.responseCode ?? "";
+    if (status !== "VERIFICATION_COMPLETED" && status !== "200" && data.responseCode !== 200) {
+      console.error("[MC] Verify OTP rejected:", data);
+      return { success: false, error: data.message || "OTP verification failed" };
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.error("[MC] Verify OTP exception:", err);
+    return { success: false, error: "MessageCentral service temporarily unavailable" };
+  }
+}
+
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 export async function sendOtp(phone: string, dbConfig?: SmsProviderConfig | null): Promise<OtpSendResult> {
   const cfg = resolveConfig(dbConfig);
   const provider = getActiveProvider(cfg);
   console.log(`[SMS] Sending OTP via ${provider} to ${phone}`);
-  return provider === "zavu" ? zavuSendOtp(phone, cfg) : msg91SendOtp(phone, cfg);
+  if (provider === "zavu") return zavuSendOtp(phone, cfg);
+  if (provider === "messagecentral") return mcSendOtp(phone, cfg);
+  return msg91SendOtp(phone, cfg);
 }
 
-export async function verifyOtp(phone: string, otp: string, dbConfig?: SmsProviderConfig | null): Promise<OtpVerifyResult> {
+export async function verifyOtp(
+  phone: string,
+  otp: string,
+  dbConfig?: SmsProviderConfig | null,
+  verificationId?: string,
+): Promise<OtpVerifyResult> {
   const cfg = resolveConfig(dbConfig);
   const provider = getActiveProvider(cfg);
   console.log(`[SMS] Verifying OTP via ${provider} for ${phone}`);
-  return provider === "zavu" ? zavuVerifyOtp(phone, otp, cfg) : msg91VerifyOtp(phone, otp, cfg);
+  if (provider === "zavu") return zavuVerifyOtp(phone, otp, cfg);
+  if (provider === "messagecentral") return mcVerifyOtp(phone, otp, cfg, verificationId ?? "");
+  return msg91VerifyOtp(phone, otp, cfg);
 }
 
 export function getSmsProviderStatus(dbConfig?: SmsProviderConfig | null): {
   provider: SmsProvider;
   msg91Ready: boolean;
   zavuReady: boolean;
+  mcReady: boolean;
   usingDb: boolean;
 } {
   const cfg = resolveConfig(dbConfig);
@@ -202,6 +338,7 @@ export function getSmsProviderStatus(dbConfig?: SmsProviderConfig | null): {
     provider: getActiveProvider(cfg),
     msg91Ready: !!(cfg.msg91AuthKey && cfg.msg91TemplateId),
     zavuReady: !!cfg.zauvApiKey,
-    usingDb: !!(dbConfig?.msg91AuthKey || dbConfig?.zauvApiKey),
+    mcReady: !!(cfg.mcCustomerId && cfg.mcPassword),
+    usingDb: !!(dbConfig?.msg91AuthKey || dbConfig?.zauvApiKey || dbConfig?.mcCustomerId),
   };
 }
