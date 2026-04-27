@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
-  PlaneTakeoff, Brain, ChevronDown, CheckCircle, AlertCircle, TrendingUp,
-  FileText, Lightbulb, Info, RefreshCw, ChevronLeft, ChevronRight,
+  PlaneTakeoff, Brain, ChevronDown, CheckCircle, AlertCircle,
+  FileText, Info, RefreshCw, ChevronLeft, ChevronRight,
   User, MapPin, CreditCard, Globe, Clock, Crown, Download, Lock,
-  ArrowRight, Flag, Home, Star, BadgeCheck
+  ArrowRight, BadgeCheck
 } from "lucide-react";
 import { getEntryRequirement } from "@shared/visa-free";
 import { Button } from "@/components/ui/button";
@@ -409,6 +409,46 @@ export default function CheckPage() {
     </div>
   );
 
+  // ===== PROGRESS SCREEN (basic check analyzing) =====
+  if (isSubmitting) {
+    const steps = [
+      "Reviewing your travel details…",
+      "Assessing financial strength…",
+      "Checking document readiness…",
+      "Comparing against embassy requirements…",
+      "Calculating your approval estimate…",
+    ];
+    return (
+      <DashboardLayout title="Analyzing Your Visa Profile" subtitle="Basic Check — please wait">
+        <div className="w-full max-w-md mx-auto flex flex-col items-center justify-center min-h-[60vh] gap-8">
+          {/* Animated logo */}
+          <div className="relative">
+            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-[#4055FF]/20 to-[#FF2060]/10 blur-2xl scale-150" />
+            <img src="/logo-loading.gif" alt="Analyzing..." className="relative w-32 h-32 object-contain drop-shadow-xl" />
+          </div>
+
+          {/* Headline */}
+          <div className="text-center space-y-2">
+            <h2 className="text-xl font-bold text-slate-800">AI is reviewing your profile</h2>
+            <p className="text-sm text-slate-500">{form.nationality} → {form.destinationCountry} · {form.visaType}</p>
+          </div>
+
+          {/* Step checklist */}
+          <div className="w-full space-y-2.5">
+            {steps.map((s, i) => (
+              <div key={i} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white border border-slate-100 shadow-sm">
+                <span className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 border-2 border-[#4055FF] border-t-transparent animate-spin" style={{ animationDuration: `${1.2 + i * 0.3}s` }} />
+                <span className="text-sm text-slate-600">{s}</span>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-xs text-slate-400 text-center">This usually takes 5–10 seconds</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   // ===== RESULT SCREEN =====
   if (result) {
     const c = getColors(result.approvalChance);
@@ -457,9 +497,9 @@ export default function CheckPage() {
                 </div>
               </div>
 
-              {/* Tabs */}
+              {/* Tabs — basic check shows Overview + Documents only */}
               <div className="flex gap-1 mb-5 p-1 bg-slate-100 rounded-xl overflow-x-auto">
-                {([["overview","Overview"],["docs","Documents"],["tips","Action Plan"],["country","Country Info"]] as const).map(([t, label]) => (
+                {([["overview","Overview"],["docs","Documents"]] as const).map(([t, label]) => (
                   <button
                     key={t}
                     onClick={() => setTab(t)}
@@ -533,53 +573,6 @@ export default function CheckPage() {
                         </div>
                       ))}
                     </div>
-                  </div>
-                </div>
-              )}
-
-              {tab === "tips" && (
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs font-semibold text-[#4055FF] uppercase tracking-wide flex items-center gap-1.5 mb-2.5">
-                      <Lightbulb className="w-3.5 h-3.5" /> Improvement Tips
-                    </p>
-                    <div className="space-y-1.5">
-                      {result.improvementTips?.map((t, i) => (
-                        <div key={i} className="flex gap-2 p-2.5 rounded-lg bg-[#4055FF]/8 border border-[#4055FF]/15 text-xs">
-                          <Lightbulb className="w-3.5 h-3.5 text-[#4055FF] flex-shrink-0 mt-0.5" />
-                          <span className="text-[#4055FF]/90">{t}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-slate-700 uppercase tracking-wide flex items-center gap-1.5 mb-2.5">
-                      <TrendingUp className="w-3.5 h-3.5 text-emerald-600" /> Next Steps
-                    </p>
-                    <div className="space-y-1.5">
-                      {result.nextSteps?.map((s, i) => (
-                        <div key={i} className="flex gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-100 text-xs">
-                          <span className="w-4 h-4 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{i+1}</span>
-                          <span className="text-slate-700">{s}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {tab === "country" && (
-                <div>
-                  <p className="text-xs font-semibold text-orange-700 uppercase tracking-wide flex items-center gap-1.5 mb-3">
-                    <Flag className="w-3.5 h-3.5" /> {form.destinationCountry} — Specific Requirements & Notes
-                  </p>
-                  <div className="space-y-2">
-                    {(result.countrySpecificConcerns || []).map((c, i) => (
-                      <div key={i} className="flex gap-3 p-3 rounded-xl bg-orange-50 border border-orange-100 text-sm">
-                        <Info className="w-4 h-4 text-orange-500 flex-shrink-0 mt-0.5" />
-                        <span className="text-orange-800">{c}</span>
-                      </div>
-                    ))}
                   </div>
                 </div>
               )}
@@ -851,31 +844,19 @@ export default function CheckPage() {
                   <ReviewSection title="Documents" icon={FileText} items={[["Bank Statement", form.hasBankStatement], ["Return Ticket", form.hasReturnTicket], ["Travel Insurance", form.hasTravelInsurance], ["Hotel Booking", form.hasHotelBooking], ["Salary Slips", form.hasSalarySlips], ["Leave Approval", form.hasLeaveApproval], ["Family Home", form.familyInHomeCountry]]} />
                 </div>
 
-                {isSubmitting && (
-                  <div className="flex flex-col items-center justify-center py-8 gap-4">
-                    <img src="/logo-loading.gif" alt="Analyzing..." className="w-24 h-24 object-contain" />
-                    <div className="text-center">
-                      <p className="font-semibold text-slate-700 text-sm">AI is analyzing your visa profile…</p>
-                      <p className="text-xs text-slate-400 mt-1">This usually takes 5–10 seconds</p>
-                    </div>
-                  </div>
-                )}
-
-                {!isSubmitting && (
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={!canCheck}
-                    className="w-full h-12 text-base font-semibold border-0 text-white hover:opacity-90 gap-2 mt-2"
-                    style={{background:"linear-gradient(135deg,#4055FF,#9033F5,#FF2060)"}}
-                    data-testid="button-submit-check"
-                  >
-                    {!canCheck ? (
-                      <span className="flex items-center gap-2"><Lock className="w-5 h-5" /> Upgrade to Run More Checks</span>
-                    ) : (
-                      <span className="flex items-center gap-2"><PlaneTakeoff className="w-5 h-5" /> Generate AI Visa Assessment</span>
-                    )}
-                  </Button>
-                )}
+                <Button
+                  onClick={handleSubmit}
+                  disabled={!canCheck}
+                  className="w-full h-12 text-base font-semibold border-0 text-white hover:opacity-90 gap-2 mt-2"
+                  style={{background:"linear-gradient(135deg,#4055FF,#9033F5,#FF2060)"}}
+                  data-testid="button-submit-check"
+                >
+                  {!canCheck ? (
+                    <span className="flex items-center gap-2"><Lock className="w-5 h-5" /> Upgrade to Run More Checks</span>
+                  ) : (
+                    <span className="flex items-center gap-2"><PlaneTakeoff className="w-5 h-5" /> Generate AI Visa Assessment</span>
+                  )}
+                </Button>
               </div>
             )}
 
