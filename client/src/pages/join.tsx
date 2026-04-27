@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Eye, EyeOff, CheckCircle, Sparkles, Globe, Shield, Zap, Phone, ArrowLeft, RotateCcw, ChevronDown, Search } from "lucide-react";
+import { Eye, EyeOff, CheckCircle, Sparkles, Globe, Shield, Zap, Phone, ArrowLeft, RotateCcw, ChevronDown, Search, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -265,17 +265,23 @@ export default function JoinPage() {
   const [resendCountdown, setResendCountdown] = useState(0);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [country, setCountry] = useState<Country>(() => detectCountry());
+  const [ipDetecting, setIpDetecting] = useState(true);
+  const [ipDetected, setIpDetected] = useState(false);
 
   useEffect(() => {
-    fetch("https://ipwho.is/")
+    fetch("https://ipapi.co/json/")
       .then(r => r.json())
       .then(data => {
         if (data?.country_code) {
           const found = COUNTRIES.find(c => c.code === data.country_code);
-          if (found) setCountry(found);
+          if (found) {
+            setCountry(found);
+            setIpDetected(true);
+          }
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setIpDetecting(false));
   }, []);
 
   const [form, setForm] = useState({
@@ -501,9 +507,23 @@ export default function JoinPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="localPhone">Phone Number</Label>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="localPhone">Phone Number</Label>
+                      {ipDetecting && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1 animate-pulse">
+                          <MapPin className="w-3 h-3" />
+                          Detecting location…
+                        </span>
+                      )}
+                      {!ipDetecting && ipDetected && (
+                        <span className="text-xs text-emerald-600 flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          Code set from your location
+                        </span>
+                      )}
+                    </div>
                     <div className={`flex rounded-md ${errors.phone ? "ring-1 ring-red-400" : ""}`}>
-                      <CountrySelector selected={country} onSelect={setCountry} />
+                      <CountrySelector selected={country} onSelect={c => { setCountry(c); setIpDetected(false); }} />
                       <Input
                         id="localPhone"
                         type="tel"
