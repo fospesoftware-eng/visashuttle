@@ -266,6 +266,18 @@ export default function JoinPage() {
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [country, setCountry] = useState<Country>(() => detectCountry());
 
+  useEffect(() => {
+    fetch("https://ipwho.is/")
+      .then(r => r.json())
+      .then(data => {
+        if (data?.country_code) {
+          const found = COUNTRIES.find(c => c.code === data.country_code);
+          if (found) setCountry(found);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const [form, setForm] = useState({
     fullName: "",
     email: "",
