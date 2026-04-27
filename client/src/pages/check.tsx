@@ -91,6 +91,28 @@ const OPTS = {
   studyLevel: ["High School / Secondary","Undergraduate / Bachelor's","Postgraduate / Master's","PhD / Doctoral","Certificate / Diploma","Language Course","Short Course / Training"],
 };
 
+// Maps each visa type to: { allowed purposes, recommended default }
+const VISA_PURPOSE_MAP: Record<string, { allowed: string[]; default: string }> = {
+  "Tourist Visa":          { allowed: ["Tourism & Sightseeing","Wedding / Social Event","Medical Treatment"], default: "Tourism & Sightseeing" },
+  "Business Visa":         { allowed: ["Business Meeting","Conference / Event","Investment / Business Setup"], default: "Business Meeting" },
+  "Student Visa":          { allowed: ["Study / Education"], default: "Study / Education" },
+  "Work Visa":             { allowed: ["Employment"], default: "Employment" },
+  "Visit Visa":            { allowed: ["Family Visit","Tourism & Sightseeing","Wedding / Social Event"], default: "Family Visit" },
+  "Transit Visa":          { allowed: ["Transit"], default: "Transit" },
+  "Investor Visa":         { allowed: ["Investment / Business Setup","Business Meeting"], default: "Investment / Business Setup" },
+  "Spouse / Family Visa":  { allowed: ["Family Visit","Wedding / Social Event"], default: "Family Visit" },
+  "Conference / Event Visa":{ allowed: ["Conference / Event","Business Meeting"], default: "Conference / Event" },
+  "Medical Visa":          { allowed: ["Medical Treatment"], default: "Medical Treatment" },
+};
+
+function getPurposeMismatch(visaType: string, purpose: string): string | null {
+  if (!visaType || !purpose) return null;
+  const map = VISA_PURPOSE_MAP[visaType];
+  if (!map) return null;
+  if (map.allowed.includes(purpose)) return null;
+  return `"${purpose}" is not a typical purpose for a ${visaType}. Expected: ${map.allowed.join(", ")}.`;
+}
+
 interface FormData {
   // Step 1 - Personal Profile
   nationality: string; passportCountry: string; dateOfBirth: string; gender: string;
@@ -298,6 +320,17 @@ export default function CheckPage() {
       setEntryReq(null);
     }
   }, [form.nationality, form.destinationCountry]);
+
+  // Auto-set purpose of travel when visa type changes
+  useEffect(() => {
+    if (!form.visaType) return;
+    const map = VISA_PURPOSE_MAP[form.visaType];
+    if (!map) return;
+    // Only auto-set if purpose is empty OR it's now a mismatch
+    if (!form.purposeOfTravel || !map.allowed.includes(form.purposeOfTravel)) {
+      setForm(f => ({ ...f, purposeOfTravel: map.default }));
+    }
+  }, [form.visaType]);
 
   function applyProfile() {
     if (!savedProfile) return;
@@ -716,6 +749,30 @@ export default function CheckPage() {
                 <div className="grid sm:grid-cols-2 gap-4">
                   <Sel label="Visa Type *" val={form.visaType} onChange={set("visaType")} opts={OPTS.visaType} required testId="select-visa-type" />
                   <Sel label="Purpose of Travel *" val={form.purposeOfTravel} onChange={set("purposeOfTravel")} opts={OPTS.purposeOfTravel} required />
+                </div>
+
+                {/* Mismatch warning */}
+                {(() => {
+                  const mismatch = getPurposeMismatch(form.visaType, form.purposeOfTravel);
+                  return mismatch ? (
+                    <div className="flex items-start gap-3 p-3.5 rounded-xl bg-amber-50 border border-amber-200">
+                      <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-semibold text-amber-800">Purpose & visa type mismatch</p>
+                        <p className="text-xs text-amber-700 mt-0.5">{mismatch}</p>
+                        <button
+                          type="button"
+                          className="mt-1.5 text-xs font-semibold text-amber-800 underline underline-offset-2"
+                          onClick={() => setForm(f => ({ ...f, purposeOfTravel: VISA_PURPOSE_MAP[f.visaType]?.default || f.purposeOfTravel }))}
+                        >
+                          Auto-fix to "{VISA_PURPOSE_MAP[form.visaType]?.default}"
+                        </button>
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
+
+                <div className="grid sm:grid-cols-2 gap-4">
                   <Sel label="Trip Duration *" val={form.tripDuration} onChange={set("tripDuration")} opts={OPTS.tripDuration} required />
                   <div>
                     <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Planned Travel Date</Label>
