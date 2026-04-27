@@ -219,36 +219,64 @@ export default function HomePage() {
 
       {/* Hero */}
       <section className="relative overflow-hidden pt-14 pb-10 md:pt-24 md:pb-20">
+        {/* Base gradient wash */}
         <div className="absolute inset-0 bg-gradient-to-br from-[#4055FF]/5 via-white to-[#FF2060]/5 dark:from-[#4055FF]/15 dark:via-background dark:to-[#FF2060]/10" />
 
-        {/* Slow-spinning aurora blob — rotates like a globe axis, very faint */}
+        {/* Rotating aurora oval — tilted like a globe axis */}
         <div
-          className="absolute top-1/2 left-1/2 w-[900px] h-[500px] rounded-[60%] blur-3xl pointer-events-none"
+          className="absolute top-1/2 left-1/2 w-[1000px] h-[420px] rounded-[50%] blur-3xl pointer-events-none"
           style={{
-            background: "linear-gradient(135deg,#4055FF18,#9033F514,#FF206010)",
-            animation: "hero-aurora-spin 40s linear infinite",
+            background: "conic-gradient(from 0deg,#4055FF1a,#9033F512,#FF20600d,#4055FF00,#4055FF1a)",
+            animation: "hero-aurora-rotate 50s linear infinite",
           }}
         />
 
-        {/* Two drifting orbs on figure-8 paths */}
+        {/* Two soft colour orbs drifting on offset figure-8 paths */}
         <div
-          className="absolute top-0 right-0 w-[680px] h-[680px] bg-[#FF2060]/7 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"
-          style={{ animation: "hero-drift-a 22s ease-in-out infinite" }}
+          className="absolute top-0 right-0 w-[640px] h-[640px] bg-[#FF2060]/8 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"
+          style={{ animation: "hero-drift-a 24s ease-in-out infinite" }}
         />
         <div
-          className="absolute bottom-0 left-0 w-[520px] h-[520px] bg-[#4055FF]/7 rounded-full blur-3xl translate-y-1/2 -translate-x-1/3"
-          style={{ animation: "hero-drift-b 28s ease-in-out infinite" }}
+          className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-[#4055FF]/8 rounded-full blur-3xl translate-y-1/2 -translate-x-1/3"
+          style={{ animation: "hero-drift-b 30s ease-in-out infinite" }}
         />
 
-        {/* Radar ping rings — two staggered to stay continuous */}
-        <div
-          className="absolute top-[40%] left-[28%] w-[320px] h-[320px] rounded-full border border-[#4055FF]/12 pointer-events-none"
-          style={{ animation: "hero-radar-ping 8s ease-out infinite" }}
-        />
-        <div
-          className="absolute top-[40%] left-[28%] w-[320px] h-[320px] rounded-full border border-[#9033F5]/10 pointer-events-none"
-          style={{ animation: "hero-radar-ping 8s ease-out infinite 4s" }}
-        />
+        {/* SVG animated flight-path arcs — marching dashes like global travel routes */}
+        <svg
+          className="absolute inset-0 w-full h-full pointer-events-none"
+          viewBox="0 0 1280 580"
+          preserveAspectRatio="xMidYMid slice"
+          aria-hidden="true"
+        >
+          {/* Arc 1 — sweeps bottom-left to upper-right, brand blue */}
+          <path
+            d="M-80,480 Q280,60 660,260 Q900,400 1360,100"
+            fill="none" stroke="#4055FF" strokeWidth="1.2" strokeOpacity="0.13"
+            strokeDasharray="10 25"
+            style={{ animation: "hero-flight-march 3s linear infinite" }}
+          />
+          {/* Arc 2 — shallower, offset, purple */}
+          <path
+            d="M-60,200 Q320,420 680,190 Q960,30 1340,320"
+            fill="none" stroke="#9033F5" strokeWidth="1" strokeOpacity="0.10"
+            strokeDasharray="10 25"
+            style={{ animation: "hero-flight-march 4.5s linear infinite 1.2s" }}
+          />
+          {/* Arc 3 — tight S-curve, pink */}
+          <path
+            d="M120,520 Q380,140 700,350 Q980,530 1300,210"
+            fill="none" stroke="#FF2060" strokeWidth="0.9" strokeOpacity="0.08"
+            strokeDasharray="10 25"
+            style={{ animation: "hero-flight-march 3.8s linear infinite 2.5s" }}
+          />
+          {/* Arc 4 — long flat sweep across mid-hero, blue again */}
+          <path
+            d="M-100,310 Q400,100 750,290 Q1050,450 1380,200"
+            fill="none" stroke="#4055FF" strokeWidth="0.8" strokeOpacity="0.07"
+            strokeDasharray="10 25"
+            style={{ animation: "hero-flight-march 5.5s linear infinite 0.8s" }}
+          />
+        </svg>
 
         <div className="relative max-w-7xl mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -324,7 +352,6 @@ export default function HomePage() {
                   <div className="px-6 py-4 text-white" style={{background:"linear-gradient(135deg,#4055FF,#9033F5,#FF2060)"}}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Brain className="w-5 h-5" />
                         <span className="font-semibold">Live AI Visa Scores</span>
                       </div>
                       {/* Live pulse indicator */}

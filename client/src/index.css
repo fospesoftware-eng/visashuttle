@@ -242,32 +242,31 @@
 
 /* ── Hero background animations ───────────────────────────────────────────── */
 
-/* Two main orbs drift slowly in lazy figure-8-like paths */
+/* Orbs drift on offset figure-8 paths */
 @keyframes hero-drift-a {
-  0%   { translate:  0px   0px; }
-  20%  { translate: -55px  40px; }
-  45%  { translate:  30px  60px; }
-  70%  { translate:  50px -30px; }
-  100% { translate:  0px   0px; }
+  0%   { translate:   0px   0px; }
+  20%  { translate: -60px  45px; }
+  45%  { translate:  35px  65px; }
+  70%  { translate:  55px -35px; }
+  100% { translate:   0px   0px; }
 }
-
 @keyframes hero-drift-b {
-  0%   { translate:  0px   0px; }
-  25%  { translate:  45px -55px; }
-  50%  { translate: -35px -20px; }
-  75%  { translate: -50px  40px; }
-  100% { translate:  0px   0px; }
+  0%   { translate:   0px   0px; }
+  25%  { translate:  50px -60px; }
+  55%  { translate: -40px -25px; }
+  80%  { translate: -55px  45px; }
+  100% { translate:   0px   0px; }
 }
 
-/* Slow-spinning aurora blob behind everything */
-@keyframes hero-aurora-spin {
-  from { transform: translate(-50%, -50%) rotate(0deg) scale(1); }
-  50%  { transform: translate(-50%, -50%) rotate(180deg) scale(1.15); }
-  to   { transform: translate(-50%, -50%) rotate(360deg) scale(1); }
+/* Aurora oval rotates like a tilted globe axis */
+@keyframes hero-aurora-rotate {
+  from { transform: translate(-50%, -50%) rotate(-15deg) scale(1); }
+  50%  { transform: translate(-50%, -50%) rotate(165deg) scale(1.12); }
+  to   { transform: translate(-50%, -50%) rotate(345deg) scale(1); }
 }
 
-/* Radar ping — expands outward and fades, like a visa scan sweep */
-@keyframes hero-radar-ping {
-  0%   { transform: translate(-50%, -50%) scale(0.2); opacity: 0.5; }
-  100% { transform: translate(-50%, -50%) scale(2.8); opacity: 0; }
+/* Flight path dashes march continuously along the SVG path */
+@keyframes hero-flight-march {
+  from { stroke-dashoffset: 35; }
+  to   { stroke-dashoffset: 0; }
 }
