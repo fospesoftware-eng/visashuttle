@@ -220,17 +220,34 @@ export default function HomePage() {
       {/* Hero */}
       <section className="relative overflow-hidden pt-14 pb-10 md:pt-24 md:pb-20">
         <div className="absolute inset-0 bg-gradient-to-br from-[#4055FF]/5 via-white to-[#FF2060]/5 dark:from-[#4055FF]/15 dark:via-background dark:to-[#FF2060]/10" />
+
+        {/* Slow-spinning aurora blob — rotates like a globe axis, very faint */}
         <div
-          className="absolute top-0 right-0 w-[700px] h-[700px] bg-[#FF2060]/8 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"
-          style={{ animation: "hero-drift-a 20s ease-in-out infinite" }}
+          className="absolute top-1/2 left-1/2 w-[900px] h-[500px] rounded-[60%] blur-3xl pointer-events-none"
+          style={{
+            background: "linear-gradient(135deg,#4055FF18,#9033F514,#FF206010)",
+            animation: "hero-aurora-spin 40s linear infinite",
+          }}
+        />
+
+        {/* Two drifting orbs on figure-8 paths */}
+        <div
+          className="absolute top-0 right-0 w-[680px] h-[680px] bg-[#FF2060]/7 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"
+          style={{ animation: "hero-drift-a 22s ease-in-out infinite" }}
         />
         <div
-          className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-[#4055FF]/8 rounded-full blur-3xl translate-y-1/2 -translate-x-1/3"
-          style={{ animation: "hero-drift-b 26s ease-in-out infinite" }}
+          className="absolute bottom-0 left-0 w-[520px] h-[520px] bg-[#4055FF]/7 rounded-full blur-3xl translate-y-1/2 -translate-x-1/3"
+          style={{ animation: "hero-drift-b 28s ease-in-out infinite" }}
+        />
+
+        {/* Radar ping rings — two staggered to stay continuous */}
+        <div
+          className="absolute top-[40%] left-[28%] w-[320px] h-[320px] rounded-full border border-[#4055FF]/12 pointer-events-none"
+          style={{ animation: "hero-radar-ping 8s ease-out infinite" }}
         />
         <div
-          className="absolute top-1/2 left-1/2 w-[380px] h-[380px] bg-[#9033F5]/5 dark:bg-[#9033F5]/8 rounded-full blur-3xl pointer-events-none"
-          style={{ animation: "hero-pulse-glow 12s ease-in-out infinite 3s" }}
+          className="absolute top-[40%] left-[28%] w-[320px] h-[320px] rounded-full border border-[#9033F5]/10 pointer-events-none"
+          style={{ animation: "hero-radar-ping 8s ease-out infinite 4s" }}
         />
 
         <div className="relative max-w-7xl mx-auto px-4">
@@ -340,19 +357,15 @@ export default function HomePage() {
                             </div>
                           </div>
                         ))
-                      : samples.map((s, i) => {
+                      : samples.map((s) => {
                           const { label, color } = scoreToLabel(s.score);
-                          const isUserCountry = i === 0 && userCountry && s.from.toLowerCase() === userCountry.toLowerCase();
                           return (
                             <div
                               key={`${s.from}-${s.to}-${pulse}`}
-                              className={`px-6 py-4 flex items-center justify-between gap-3 transition-all ${isUserCountry ? "bg-[#4055FF]/5 dark:bg-[#4055FF]/10" : ""}`}
+                              className="px-6 py-4 flex items-center justify-between gap-3 transition-all"
                             >
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1.5 text-sm font-medium mb-0.5">
-                                  {isUserCountry && (
-                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#4055FF]/10 text-[#4055FF] border border-[#4055FF]/20 flex-shrink-0">You</span>
-                                  )}
                                   <span className="truncate">{s.from}</span>
                                   <ArrowRight className="w-3 h-3 text-muted-foreground flex-shrink-0" />
                                   <span className="truncate">{s.to}</span>
