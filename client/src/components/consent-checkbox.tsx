@@ -34,7 +34,6 @@ export function ConsentCheckbox({ checked, onChange, error, context = "signup" }
                 ? "border-red-400 bg-red-50 dark:bg-red-950/20"
                 : "border-input bg-background group-hover:border-[#4055FF]/50"
             }`}
-            onClick={() => onChange(!checked)}
           >
             {checked && (
               <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none">
@@ -47,7 +46,7 @@ export function ConsentCheckbox({ checked, onChange, error, context = "signup" }
           {label}
           <button
             type="button"
-            onClick={() => setModal("terms")}
+            onClick={e => { e.preventDefault(); e.stopPropagation(); setModal("terms"); }}
             className="text-[#4055FF] hover:underline font-medium"
           >
             Terms & Conditions
@@ -55,7 +54,7 @@ export function ConsentCheckbox({ checked, onChange, error, context = "signup" }
           {" "}and{" "}
           <button
             type="button"
-            onClick={() => setModal("privacy")}
+            onClick={e => { e.preventDefault(); e.stopPropagation(); setModal("privacy"); }}
             className="text-[#4055FF] hover:underline font-medium"
           >
             Privacy Policy
