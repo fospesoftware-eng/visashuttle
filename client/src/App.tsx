@@ -48,6 +48,7 @@ import AdminAuditPage from "@/pages/admin/audit";
 import AdminSettingsPage from "@/pages/admin/settings";
 
 import PrivacyPolicyPage from "@/pages/privacy-policy";
+import SchengenSlotsPage from "@/pages/schengen-slots";
 
 import AgencyHomePage from "@/pages/whitelabel/agency-home";
 import WhiteLabelLoginPage from "@/pages/whitelabel/login";
@@ -98,6 +99,7 @@ function Router() {
       <Route path="/login" component={LoginPage} />
       <Route path="/signup" component={SignupPage} />
       <Route path="/privacy-policy" component={PrivacyPolicyPage} />
+      <Route path="/schengen-slots" component={SchengenSlotsPage} />
 
       <Route path="/app" component={AgencyDashboard} />
       <Route path="/app/leads" component={LeadsPage} />
