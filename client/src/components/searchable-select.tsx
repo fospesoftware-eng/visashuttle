@@ -8,11 +8,12 @@ interface SearchableSelectProps {
   placeholder?: string;
   label?: string;
   required?: boolean;
+  allowCustom?: boolean;
   "data-testid"?: string;
 }
 
 export function SearchableSelect({
-  options, value, onChange, placeholder = "Search...", label, required, "data-testid": testId
+  options, value, onChange, placeholder = "Search...", label, required, allowCustom, "data-testid": testId
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -22,6 +23,8 @@ export function SearchableSelect({
   const filtered = query.length > 0
     ? options.filter(o => o.toLowerCase().includes(query.toLowerCase()))
     : options;
+
+  const showCustomOption = allowCustom && query.trim().length > 0 && !options.some(o => o.toLowerCase() === query.toLowerCase());
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -89,7 +92,17 @@ export function SearchableSelect({
             </div>
           </div>
           <div className="max-h-52 overflow-y-auto overscroll-contain">
-            {filtered.length === 0 ? (
+            {showCustomOption && (
+              <button
+                type="button"
+                onClick={() => select(query.trim())}
+                className="w-full text-left px-4 py-2.5 text-sm flex items-center gap-2 hover:bg-blue-50 transition-colors text-blue-700 border-b border-slate-100"
+              >
+                <span className="text-slate-400 text-xs">Use:</span>
+                <span className="font-medium truncate">{query.trim()}</span>
+              </button>
+            )}
+            {filtered.length === 0 && !showCustomOption ? (
               <div className="px-4 py-3 text-sm text-slate-400 text-center">No results found</div>
             ) : (
               filtered.map(opt => (

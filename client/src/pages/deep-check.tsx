@@ -17,6 +17,7 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { SearchableSelect, MultiSearchableSelect } from "@/components/searchable-select";
+import { getUniversitiesForCountry } from "@/data/universities";
 import { Logo, LogoMark } from "@/components/logo";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -1105,9 +1106,18 @@ export default function DeepCheckPage() {
                 )}
                 {form.visaType === "Student Visa" && (
                   <>
-                    <div>
-                      <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Institution / University Name</Label>
-                      <Input value={form.institutionName || ""} onChange={e => set("institutionName")(e.target.value)} placeholder="e.g. University of Toronto" />
+                    <div className="sm:col-span-2">
+                      <SearchableSelect
+                        label="Institution / University Name"
+                        value={form.institutionName || ""}
+                        onChange={set("institutionName")}
+                        options={getUniversitiesForCountry(form.destinationCountry || "")}
+                        placeholder={form.destinationCountry ? "Search or type institution name..." : "Select destination country first"}
+                        allowCustom
+                      />
+                      {form.destinationCountry && getUniversitiesForCountry(form.destinationCountry).length === 0 && (
+                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">No suggestions for {form.destinationCountry} — type your institution name directly.</p>
+                      )}
                     </div>
                     <Sel label="Study Level" val={form.studyLevel || ""} onChange={set("studyLevel")} opts={["Undergraduate / Bachelor's","Postgraduate / Master's","PhD / Doctoral","Certificate / Diploma","Language Course"]} />
                     <DocToggle label="Acceptance letter received?" val={form.hasAcceptanceLetter || ""} onChange={set("hasAcceptanceLetter")} />

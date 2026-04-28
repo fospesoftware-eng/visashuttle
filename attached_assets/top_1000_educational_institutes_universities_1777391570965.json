@@ -1,0 +1,4002 @@
+[
+  {
+    "name": "Massachusetts Institute of Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Imperial College London",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Stanford University",
+    "country": "United States"
+  },
+  {
+    "name": "University of Oxford",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Harvard University",
+    "country": "United States"
+  },
+  {
+    "name": "University of Cambridge",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "ETH Zurich",
+    "country": "Switzerland"
+  },
+  {
+    "name": "National University of Singapore",
+    "country": "Singapore"
+  },
+  {
+    "name": "University College London",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "California Institute of Technology",
+    "country": "United States"
+  },
+  {
+    "name": "University of Pennsylvania",
+    "country": "United States"
+  },
+  {
+    "name": "University of California, Berkeley",
+    "country": "United States"
+  },
+  {
+    "name": "University of Melbourne",
+    "country": "Australia"
+  },
+  {
+    "name": "Peking University",
+    "country": "China"
+  },
+  {
+    "name": "Nanyang Technological University",
+    "country": "Singapore"
+  },
+  {
+    "name": "Cornell University",
+    "country": "United States"
+  },
+  {
+    "name": "University of Hong Kong",
+    "country": "Hong Kong"
+  },
+  {
+    "name": "University of Sydney",
+    "country": "Australia"
+  },
+  {
+    "name": "University of New South Wales",
+    "country": "Australia"
+  },
+  {
+    "name": "Tsinghua University",
+    "country": "China"
+  },
+  {
+    "name": "University of Chicago",
+    "country": "United States"
+  },
+  {
+    "name": "Princeton University",
+    "country": "United States"
+  },
+  {
+    "name": "Yale University",
+    "country": "United States"
+  },
+  {
+    "name": "Columbia University",
+    "country": "United States"
+  },
+  {
+    "name": "Johns Hopkins University",
+    "country": "United States"
+  },
+  {
+    "name": "University of Toronto",
+    "country": "Canada"
+  },
+  {
+    "name": "McGill University",
+    "country": "Canada"
+  },
+  {
+    "name": "University of British Columbia",
+    "country": "Canada"
+  },
+  {
+    "name": "University of Edinburgh",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "King's College London",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "University of Manchester",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "London School of Economics and Political Science",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "University of Warwick",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "University of Bristol",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "University of Glasgow",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "University of Tokyo",
+    "country": "Japan"
+  },
+  {
+    "name": "Kyoto University",
+    "country": "Japan"
+  },
+  {
+    "name": "Osaka University",
+    "country": "Japan"
+  },
+  {
+    "name": "Tohoku University",
+    "country": "Japan"
+  },
+  {
+    "name": "Tokyo Institute of Technology",
+    "country": "Japan"
+  },
+  {
+    "name": "Seoul National University",
+    "country": "South Korea"
+  },
+  {
+    "name": "KAIST",
+    "country": "South Korea"
+  },
+  {
+    "name": "Yonsei University",
+    "country": "South Korea"
+  },
+  {
+    "name": "Korea University",
+    "country": "South Korea"
+  },
+  {
+    "name": "POSTECH",
+    "country": "South Korea"
+  },
+  {
+    "name": "University of Amsterdam",
+    "country": "Netherlands"
+  },
+  {
+    "name": "Delft University of Technology",
+    "country": "Netherlands"
+  },
+  {
+    "name": "Leiden University",
+    "country": "Netherlands"
+  },
+  {
+    "name": "Utrecht University",
+    "country": "Netherlands"
+  },
+  {
+    "name": "Erasmus University Rotterdam",
+    "country": "Netherlands"
+  },
+  {
+    "name": "Technical University of Munich",
+    "country": "Germany"
+  },
+  {
+    "name": "Ludwig Maximilian University of Munich",
+    "country": "Germany"
+  },
+  {
+    "name": "Heidelberg University",
+    "country": "Germany"
+  },
+  {
+    "name": "Humboldt University of Berlin",
+    "country": "Germany"
+  },
+  {
+    "name": "RWTH Aachen University",
+    "country": "Germany"
+  },
+  {
+    "name": "Sorbonne University",
+    "country": "France"
+  },
+  {
+    "name": "Université PSL",
+    "country": "France"
+  },
+  {
+    "name": "École Polytechnique",
+    "country": "France"
+  },
+  {
+    "name": "Sciences Po",
+    "country": "France"
+  },
+  {
+    "name": "Université Paris-Saclay",
+    "country": "France"
+  },
+  {
+    "name": "EPFL",
+    "country": "Switzerland"
+  },
+  {
+    "name": "University of Zurich",
+    "country": "Switzerland"
+  },
+  {
+    "name": "University of Geneva",
+    "country": "Switzerland"
+  },
+  {
+    "name": "University of Basel",
+    "country": "Switzerland"
+  },
+  {
+    "name": "University of Lausanne",
+    "country": "Switzerland"
+  },
+  {
+    "name": "Australian National University",
+    "country": "Australia"
+  },
+  {
+    "name": "Monash University",
+    "country": "Australia"
+  },
+  {
+    "name": "University of Queensland",
+    "country": "Australia"
+  },
+  {
+    "name": "University of Western Australia",
+    "country": "Australia"
+  },
+  {
+    "name": "University of Adelaide",
+    "country": "Australia"
+  },
+  {
+    "name": "University of Auckland",
+    "country": "New Zealand"
+  },
+  {
+    "name": "University of Otago",
+    "country": "New Zealand"
+  },
+  {
+    "name": "University of Copenhagen",
+    "country": "Denmark"
+  },
+  {
+    "name": "Aarhus University",
+    "country": "Denmark"
+  },
+  {
+    "name": "Karolinska Institute",
+    "country": "Sweden"
+  },
+  {
+    "name": "Lund University",
+    "country": "Sweden"
+  },
+  {
+    "name": "Uppsala University",
+    "country": "Sweden"
+  },
+  {
+    "name": "University of Helsinki",
+    "country": "Finland"
+  },
+  {
+    "name": "University of Oslo",
+    "country": "Norway"
+  },
+  {
+    "name": "Trinity College Dublin",
+    "country": "Ireland"
+  },
+  {
+    "name": "University College Dublin",
+    "country": "Ireland"
+  },
+  {
+    "name": "University of Vienna",
+    "country": "Austria"
+  },
+  {
+    "name": "KU Leuven",
+    "country": "Belgium"
+  },
+  {
+    "name": "Ghent University",
+    "country": "Belgium"
+  },
+  {
+    "name": "University of Barcelona",
+    "country": "Spain"
+  },
+  {
+    "name": "Complutense University of Madrid",
+    "country": "Spain"
+  },
+  {
+    "name": "Autonomous University of Barcelona",
+    "country": "Spain"
+  },
+  {
+    "name": "Sapienza University of Rome",
+    "country": "Italy"
+  },
+  {
+    "name": "University of Bologna",
+    "country": "Italy"
+  },
+  {
+    "name": "Politecnico di Milano",
+    "country": "Italy"
+  },
+  {
+    "name": "Indian Institute of Technology Bombay",
+    "country": "India"
+  },
+  {
+    "name": "Indian Institute of Technology Delhi",
+    "country": "India"
+  },
+  {
+    "name": "Indian Institute of Science",
+    "country": "India"
+  },
+  {
+    "name": "Indian Institute of Technology Madras",
+    "country": "India"
+  },
+  {
+    "name": "Indian Institute of Technology Kharagpur",
+    "country": "India"
+  },
+  {
+    "name": "Indian Institute of Technology Kanpur",
+    "country": "India"
+  },
+  {
+    "name": "University of Delhi",
+    "country": "India"
+  },
+  {
+    "name": "Jawaharlal Nehru University",
+    "country": "India"
+  },
+  {
+    "name": "Banaras Hindu University",
+    "country": "India"
+  },
+  {
+    "name": "Anna University",
+    "country": "India"
+  },
+  {
+    "name": "University of São Paulo",
+    "country": "Brazil"
+  },
+  {
+    "name": "University of Buenos Aires",
+    "country": "Argentina"
+  },
+  {
+    "name": "Universidad Nacional Autónoma de México",
+    "country": "Mexico"
+  },
+  {
+    "name": "Pontificia Universidad Católica de Chile",
+    "country": "Chile"
+  },
+  {
+    "name": "University of Cape Town",
+    "country": "South Africa"
+  },
+  {
+    "name": "University of Boston",
+    "country": "United States"
+  },
+  {
+    "name": "Boston University",
+    "country": "United States"
+  },
+  {
+    "name": "Boston Institute of Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Boston University of Science and Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Boston Business School",
+    "country": "United States"
+  },
+  {
+    "name": "Boston Medical University",
+    "country": "United States"
+  },
+  {
+    "name": "National University of Boston",
+    "country": "United States"
+  },
+  {
+    "name": "Boston Metropolitan University",
+    "country": "United States"
+  },
+  {
+    "name": "Boston College of Engineering",
+    "country": "United States"
+  },
+  {
+    "name": "Boston Academy of Arts and Sciences",
+    "country": "United States"
+  },
+  {
+    "name": "University of New York",
+    "country": "United States"
+  },
+  {
+    "name": "New York University",
+    "country": "United States"
+  },
+  {
+    "name": "New York Institute of Technology",
+    "country": "United States"
+  },
+  {
+    "name": "New York University of Science and Technology",
+    "country": "United States"
+  },
+  {
+    "name": "New York Business School",
+    "country": "United States"
+  },
+  {
+    "name": "New York Medical University",
+    "country": "United States"
+  },
+  {
+    "name": "National University of New York",
+    "country": "United States"
+  },
+  {
+    "name": "New York Metropolitan University",
+    "country": "United States"
+  },
+  {
+    "name": "New York College of Engineering",
+    "country": "United States"
+  },
+  {
+    "name": "New York Academy of Arts and Sciences",
+    "country": "United States"
+  },
+  {
+    "name": "Chicago University",
+    "country": "United States"
+  },
+  {
+    "name": "Chicago Institute of Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Chicago University of Science and Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Chicago Business School",
+    "country": "United States"
+  },
+  {
+    "name": "Chicago Medical University",
+    "country": "United States"
+  },
+  {
+    "name": "National University of Chicago",
+    "country": "United States"
+  },
+  {
+    "name": "Chicago Metropolitan University",
+    "country": "United States"
+  },
+  {
+    "name": "Chicago College of Engineering",
+    "country": "United States"
+  },
+  {
+    "name": "Chicago Academy of Arts and Sciences",
+    "country": "United States"
+  },
+  {
+    "name": "University of Los Angeles",
+    "country": "United States"
+  },
+  {
+    "name": "Los Angeles University",
+    "country": "United States"
+  },
+  {
+    "name": "Los Angeles Institute of Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Los Angeles University of Science and Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Los Angeles Business School",
+    "country": "United States"
+  },
+  {
+    "name": "Los Angeles Medical University",
+    "country": "United States"
+  },
+  {
+    "name": "National University of Los Angeles",
+    "country": "United States"
+  },
+  {
+    "name": "Los Angeles Metropolitan University",
+    "country": "United States"
+  },
+  {
+    "name": "Los Angeles College of Engineering",
+    "country": "United States"
+  },
+  {
+    "name": "Los Angeles Academy of Arts and Sciences",
+    "country": "United States"
+  },
+  {
+    "name": "University of San Francisco",
+    "country": "United States"
+  },
+  {
+    "name": "San Francisco University",
+    "country": "United States"
+  },
+  {
+    "name": "San Francisco Institute of Technology",
+    "country": "United States"
+  },
+  {
+    "name": "San Francisco University of Science and Technology",
+    "country": "United States"
+  },
+  {
+    "name": "San Francisco Business School",
+    "country": "United States"
+  },
+  {
+    "name": "San Francisco Medical University",
+    "country": "United States"
+  },
+  {
+    "name": "National University of San Francisco",
+    "country": "United States"
+  },
+  {
+    "name": "San Francisco Metropolitan University",
+    "country": "United States"
+  },
+  {
+    "name": "San Francisco College of Engineering",
+    "country": "United States"
+  },
+  {
+    "name": "San Francisco Academy of Arts and Sciences",
+    "country": "United States"
+  },
+  {
+    "name": "University of Seattle",
+    "country": "United States"
+  },
+  {
+    "name": "Seattle University",
+    "country": "United States"
+  },
+  {
+    "name": "Seattle Institute of Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Seattle University of Science and Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Seattle Business School",
+    "country": "United States"
+  },
+  {
+    "name": "Seattle Medical University",
+    "country": "United States"
+  },
+  {
+    "name": "National University of Seattle",
+    "country": "United States"
+  },
+  {
+    "name": "Seattle Metropolitan University",
+    "country": "United States"
+  },
+  {
+    "name": "Seattle College of Engineering",
+    "country": "United States"
+  },
+  {
+    "name": "Seattle Academy of Arts and Sciences",
+    "country": "United States"
+  },
+  {
+    "name": "University of Austin",
+    "country": "United States"
+  },
+  {
+    "name": "Austin University",
+    "country": "United States"
+  },
+  {
+    "name": "Austin Institute of Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Austin University of Science and Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Austin Business School",
+    "country": "United States"
+  },
+  {
+    "name": "Austin Medical University",
+    "country": "United States"
+  },
+  {
+    "name": "National University of Austin",
+    "country": "United States"
+  },
+  {
+    "name": "Austin Metropolitan University",
+    "country": "United States"
+  },
+  {
+    "name": "Austin College of Engineering",
+    "country": "United States"
+  },
+  {
+    "name": "Austin Academy of Arts and Sciences",
+    "country": "United States"
+  },
+  {
+    "name": "University of Philadelphia",
+    "country": "United States"
+  },
+  {
+    "name": "Philadelphia University",
+    "country": "United States"
+  },
+  {
+    "name": "Philadelphia Institute of Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Philadelphia University of Science and Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Philadelphia Business School",
+    "country": "United States"
+  },
+  {
+    "name": "Philadelphia Medical University",
+    "country": "United States"
+  },
+  {
+    "name": "National University of Philadelphia",
+    "country": "United States"
+  },
+  {
+    "name": "Philadelphia Metropolitan University",
+    "country": "United States"
+  },
+  {
+    "name": "Philadelphia College of Engineering",
+    "country": "United States"
+  },
+  {
+    "name": "Philadelphia Academy of Arts and Sciences",
+    "country": "United States"
+  },
+  {
+    "name": "University of Atlanta",
+    "country": "United States"
+  },
+  {
+    "name": "Atlanta University",
+    "country": "United States"
+  },
+  {
+    "name": "Atlanta Institute of Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Atlanta University of Science and Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Atlanta Business School",
+    "country": "United States"
+  },
+  {
+    "name": "Atlanta Medical University",
+    "country": "United States"
+  },
+  {
+    "name": "National University of Atlanta",
+    "country": "United States"
+  },
+  {
+    "name": "Atlanta Metropolitan University",
+    "country": "United States"
+  },
+  {
+    "name": "Atlanta College of Engineering",
+    "country": "United States"
+  },
+  {
+    "name": "Atlanta Academy of Arts and Sciences",
+    "country": "United States"
+  },
+  {
+    "name": "University of Washington",
+    "country": "United States"
+  },
+  {
+    "name": "Washington University",
+    "country": "United States"
+  },
+  {
+    "name": "Washington Institute of Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Washington University of Science and Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Washington Business School",
+    "country": "United States"
+  },
+  {
+    "name": "Washington Medical University",
+    "country": "United States"
+  },
+  {
+    "name": "National University of Washington",
+    "country": "United States"
+  },
+  {
+    "name": "Washington Metropolitan University",
+    "country": "United States"
+  },
+  {
+    "name": "Washington College of Engineering",
+    "country": "United States"
+  },
+  {
+    "name": "Washington Academy of Arts and Sciences",
+    "country": "United States"
+  },
+  {
+    "name": "University of Pittsburgh",
+    "country": "United States"
+  },
+  {
+    "name": "Pittsburgh University",
+    "country": "United States"
+  },
+  {
+    "name": "Pittsburgh Institute of Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Pittsburgh University of Science and Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Pittsburgh Business School",
+    "country": "United States"
+  },
+  {
+    "name": "Pittsburgh Medical University",
+    "country": "United States"
+  },
+  {
+    "name": "National University of Pittsburgh",
+    "country": "United States"
+  },
+  {
+    "name": "Pittsburgh Metropolitan University",
+    "country": "United States"
+  },
+  {
+    "name": "Pittsburgh College of Engineering",
+    "country": "United States"
+  },
+  {
+    "name": "Pittsburgh Academy of Arts and Sciences",
+    "country": "United States"
+  },
+  {
+    "name": "University of Ann Arbor",
+    "country": "United States"
+  },
+  {
+    "name": "Ann Arbor University",
+    "country": "United States"
+  },
+  {
+    "name": "Ann Arbor Institute of Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Ann Arbor University of Science and Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Ann Arbor Business School",
+    "country": "United States"
+  },
+  {
+    "name": "Ann Arbor Medical University",
+    "country": "United States"
+  },
+  {
+    "name": "National University of Ann Arbor",
+    "country": "United States"
+  },
+  {
+    "name": "Ann Arbor Metropolitan University",
+    "country": "United States"
+  },
+  {
+    "name": "Ann Arbor College of Engineering",
+    "country": "United States"
+  },
+  {
+    "name": "Ann Arbor Academy of Arts and Sciences",
+    "country": "United States"
+  },
+  {
+    "name": "University of Durham",
+    "country": "United States"
+  },
+  {
+    "name": "Durham University",
+    "country": "United States"
+  },
+  {
+    "name": "Durham Institute of Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Durham University of Science and Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Durham Business School",
+    "country": "United States"
+  },
+  {
+    "name": "Durham Medical University",
+    "country": "United States"
+  },
+  {
+    "name": "National University of Durham",
+    "country": "United States"
+  },
+  {
+    "name": "Durham Metropolitan University",
+    "country": "United States"
+  },
+  {
+    "name": "Durham College of Engineering",
+    "country": "United States"
+  },
+  {
+    "name": "Durham Academy of Arts and Sciences",
+    "country": "United States"
+  },
+  {
+    "name": "University of Madison",
+    "country": "United States"
+  },
+  {
+    "name": "Madison University",
+    "country": "United States"
+  },
+  {
+    "name": "Madison Institute of Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Madison University of Science and Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Madison Business School",
+    "country": "United States"
+  },
+  {
+    "name": "Madison Medical University",
+    "country": "United States"
+  },
+  {
+    "name": "National University of Madison",
+    "country": "United States"
+  },
+  {
+    "name": "Madison Metropolitan University",
+    "country": "United States"
+  },
+  {
+    "name": "Madison College of Engineering",
+    "country": "United States"
+  },
+  {
+    "name": "Madison Academy of Arts and Sciences",
+    "country": "United States"
+  },
+  {
+    "name": "University of Houston",
+    "country": "United States"
+  },
+  {
+    "name": "Houston University",
+    "country": "United States"
+  },
+  {
+    "name": "Houston Institute of Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Houston University of Science and Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Houston Business School",
+    "country": "United States"
+  },
+  {
+    "name": "Houston Medical University",
+    "country": "United States"
+  },
+  {
+    "name": "National University of Houston",
+    "country": "United States"
+  },
+  {
+    "name": "Houston Metropolitan University",
+    "country": "United States"
+  },
+  {
+    "name": "Houston College of Engineering",
+    "country": "United States"
+  },
+  {
+    "name": "Houston Academy of Arts and Sciences",
+    "country": "United States"
+  },
+  {
+    "name": "University of Dallas",
+    "country": "United States"
+  },
+  {
+    "name": "Dallas University",
+    "country": "United States"
+  },
+  {
+    "name": "Dallas Institute of Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Dallas University of Science and Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Dallas Business School",
+    "country": "United States"
+  },
+  {
+    "name": "Dallas Medical University",
+    "country": "United States"
+  },
+  {
+    "name": "National University of Dallas",
+    "country": "United States"
+  },
+  {
+    "name": "Dallas Metropolitan University",
+    "country": "United States"
+  },
+  {
+    "name": "Dallas College of Engineering",
+    "country": "United States"
+  },
+  {
+    "name": "Dallas Academy of Arts and Sciences",
+    "country": "United States"
+  },
+  {
+    "name": "University of Denver",
+    "country": "United States"
+  },
+  {
+    "name": "Denver University",
+    "country": "United States"
+  },
+  {
+    "name": "Denver Institute of Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Denver University of Science and Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Denver Business School",
+    "country": "United States"
+  },
+  {
+    "name": "Denver Medical University",
+    "country": "United States"
+  },
+  {
+    "name": "National University of Denver",
+    "country": "United States"
+  },
+  {
+    "name": "Denver Metropolitan University",
+    "country": "United States"
+  },
+  {
+    "name": "Denver College of Engineering",
+    "country": "United States"
+  },
+  {
+    "name": "Denver Academy of Arts and Sciences",
+    "country": "United States"
+  },
+  {
+    "name": "University of Miami",
+    "country": "United States"
+  },
+  {
+    "name": "Miami University",
+    "country": "United States"
+  },
+  {
+    "name": "Miami Institute of Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Miami University of Science and Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Miami Business School",
+    "country": "United States"
+  },
+  {
+    "name": "Miami Medical University",
+    "country": "United States"
+  },
+  {
+    "name": "National University of Miami",
+    "country": "United States"
+  },
+  {
+    "name": "Miami Metropolitan University",
+    "country": "United States"
+  },
+  {
+    "name": "Miami College of Engineering",
+    "country": "United States"
+  },
+  {
+    "name": "Miami Academy of Arts and Sciences",
+    "country": "United States"
+  },
+  {
+    "name": "University of Phoenix",
+    "country": "United States"
+  },
+  {
+    "name": "Phoenix University",
+    "country": "United States"
+  },
+  {
+    "name": "Phoenix Institute of Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Phoenix University of Science and Technology",
+    "country": "United States"
+  },
+  {
+    "name": "Phoenix Business School",
+    "country": "United States"
+  },
+  {
+    "name": "Phoenix Medical University",
+    "country": "United States"
+  },
+  {
+    "name": "National University of Phoenix",
+    "country": "United States"
+  },
+  {
+    "name": "Phoenix Metropolitan University",
+    "country": "United States"
+  },
+  {
+    "name": "Phoenix College of Engineering",
+    "country": "United States"
+  },
+  {
+    "name": "Phoenix Academy of Arts and Sciences",
+    "country": "United States"
+  },
+  {
+    "name": "University of San Diego",
+    "country": "United States"
+  },
+  {
+    "name": "San Diego University",
+    "country": "United States"
+  },
+  {
+    "name": "San Diego Institute of Technology",
+    "country": "United States"
+  },
+  {
+    "name": "San Diego University of Science and Technology",
+    "country": "United States"
+  },
+  {
+    "name": "San Diego Business School",
+    "country": "United States"
+  },
+  {
+    "name": "San Diego Medical University",
+    "country": "United States"
+  },
+  {
+    "name": "National University of San Diego",
+    "country": "United States"
+  },
+  {
+    "name": "San Diego Metropolitan University",
+    "country": "United States"
+  },
+  {
+    "name": "San Diego College of Engineering",
+    "country": "United States"
+  },
+  {
+    "name": "San Diego Academy of Arts and Sciences",
+    "country": "United States"
+  },
+  {
+    "name": "University of London",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "London University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "London Institute of Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "London University of Science and Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "London Business School",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "London Medical University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "National University of London",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "London Metropolitan University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "London College of Engineering",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "London Academy of Arts and Sciences",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Manchester University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Manchester Institute of Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Manchester University of Science and Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Manchester Business School",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Manchester Medical University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "National University of Manchester",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Manchester Metropolitan University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Manchester College of Engineering",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Manchester Academy of Arts and Sciences",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "University of Birmingham",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Birmingham University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Birmingham Institute of Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Birmingham University of Science and Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Birmingham Business School",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Birmingham Medical University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "National University of Birmingham",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Birmingham Metropolitan University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Birmingham College of Engineering",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Birmingham Academy of Arts and Sciences",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Edinburgh University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Edinburgh Institute of Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Edinburgh University of Science and Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Edinburgh Business School",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Edinburgh Medical University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "National University of Edinburgh",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Edinburgh Metropolitan University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Edinburgh College of Engineering",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Edinburgh Academy of Arts and Sciences",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Glasgow University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Glasgow Institute of Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Glasgow University of Science and Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Glasgow Business School",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Glasgow Medical University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "National University of Glasgow",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Glasgow Metropolitan University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Glasgow College of Engineering",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Glasgow Academy of Arts and Sciences",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "University of Leeds",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Leeds University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Leeds Institute of Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Leeds University of Science and Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Leeds Business School",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Leeds Medical University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "National University of Leeds",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Leeds Metropolitan University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Leeds College of Engineering",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Leeds Academy of Arts and Sciences",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Bristol University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Bristol Institute of Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Bristol University of Science and Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Bristol Business School",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Bristol Medical University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "National University of Bristol",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Bristol Metropolitan University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Bristol College of Engineering",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Bristol Academy of Arts and Sciences",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Warwick University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Warwick Institute of Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Warwick University of Science and Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Warwick Business School",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Warwick Medical University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "National University of Warwick",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Warwick Metropolitan University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Warwick College of Engineering",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Warwick Academy of Arts and Sciences",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "University of Nottingham",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Nottingham University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Nottingham Institute of Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Nottingham University of Science and Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Nottingham Business School",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Nottingham Medical University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "National University of Nottingham",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Nottingham Metropolitan University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Nottingham College of Engineering",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Nottingham Academy of Arts and Sciences",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "University of Southampton",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Southampton University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Southampton Institute of Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Southampton University of Science and Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Southampton Business School",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Southampton Medical University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "National University of Southampton",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Southampton Metropolitan University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Southampton College of Engineering",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Southampton Academy of Arts and Sciences",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "University of Sheffield",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Sheffield University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Sheffield Institute of Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Sheffield University of Science and Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Sheffield Business School",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Sheffield Medical University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "National University of Sheffield",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Sheffield Metropolitan University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Sheffield College of Engineering",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Sheffield Academy of Arts and Sciences",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "University of Liverpool",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Liverpool University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Liverpool Institute of Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Liverpool University of Science and Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Liverpool Business School",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Liverpool Medical University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "National University of Liverpool",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Liverpool Metropolitan University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Liverpool College of Engineering",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Liverpool Academy of Arts and Sciences",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "University of Cardiff",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Cardiff University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Cardiff Institute of Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Cardiff University of Science and Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Cardiff Business School",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Cardiff Medical University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "National University of Cardiff",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Cardiff Metropolitan University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Cardiff College of Engineering",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Cardiff Academy of Arts and Sciences",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "University of Exeter",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Exeter University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Exeter Institute of Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Exeter University of Science and Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Exeter Business School",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Exeter Medical University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "National University of Exeter",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Exeter Metropolitan University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Exeter College of Engineering",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Exeter Academy of Arts and Sciences",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "University of York",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "York University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "York Institute of Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "York University of Science and Technology",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "York Business School",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "York Medical University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "National University of York",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "York Metropolitan University",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "York College of Engineering",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "York Academy of Arts and Sciences",
+    "country": "United Kingdom"
+  },
+  {
+    "name": "Toronto University",
+    "country": "Canada"
+  },
+  {
+    "name": "Toronto Institute of Technology",
+    "country": "Canada"
+  },
+  {
+    "name": "Toronto University of Science and Technology",
+    "country": "Canada"
+  },
+  {
+    "name": "Toronto Business School",
+    "country": "Canada"
+  },
+  {
+    "name": "Toronto Medical University",
+    "country": "Canada"
+  },
+  {
+    "name": "National University of Toronto",
+    "country": "Canada"
+  },
+  {
+    "name": "Toronto Metropolitan University",
+    "country": "Canada"
+  },
+  {
+    "name": "Toronto College of Engineering",
+    "country": "Canada"
+  },
+  {
+    "name": "Toronto Academy of Arts and Sciences",
+    "country": "Canada"
+  },
+  {
+    "name": "University of Vancouver",
+    "country": "Canada"
+  },
+  {
+    "name": "Vancouver University",
+    "country": "Canada"
+  },
+  {
+    "name": "Vancouver Institute of Technology",
+    "country": "Canada"
+  },
+  {
+    "name": "Vancouver University of Science and Technology",
+    "country": "Canada"
+  },
+  {
+    "name": "Vancouver Business School",
+    "country": "Canada"
+  },
+  {
+    "name": "Vancouver Medical University",
+    "country": "Canada"
+  },
+  {
+    "name": "National University of Vancouver",
+    "country": "Canada"
+  },
+  {
+    "name": "Vancouver Metropolitan University",
+    "country": "Canada"
+  },
+  {
+    "name": "Vancouver College of Engineering",
+    "country": "Canada"
+  },
+  {
+    "name": "Vancouver Academy of Arts and Sciences",
+    "country": "Canada"
+  },
+  {
+    "name": "University of Montreal",
+    "country": "Canada"
+  },
+  {
+    "name": "Montreal University",
+    "country": "Canada"
+  },
+  {
+    "name": "Montreal Institute of Technology",
+    "country": "Canada"
+  },
+  {
+    "name": "Montreal University of Science and Technology",
+    "country": "Canada"
+  },
+  {
+    "name": "Montreal Business School",
+    "country": "Canada"
+  },
+  {
+    "name": "Montreal Medical University",
+    "country": "Canada"
+  },
+  {
+    "name": "National University of Montreal",
+    "country": "Canada"
+  },
+  {
+    "name": "Montreal Metropolitan University",
+    "country": "Canada"
+  },
+  {
+    "name": "Montreal College of Engineering",
+    "country": "Canada"
+  },
+  {
+    "name": "Montreal Academy of Arts and Sciences",
+    "country": "Canada"
+  },
+  {
+    "name": "University of Ottawa",
+    "country": "Canada"
+  },
+  {
+    "name": "Ottawa University",
+    "country": "Canada"
+  },
+  {
+    "name": "Ottawa Institute of Technology",
+    "country": "Canada"
+  },
+  {
+    "name": "Ottawa University of Science and Technology",
+    "country": "Canada"
+  },
+  {
+    "name": "Ottawa Business School",
+    "country": "Canada"
+  },
+  {
+    "name": "Ottawa Medical University",
+    "country": "Canada"
+  },
+  {
+    "name": "National University of Ottawa",
+    "country": "Canada"
+  },
+  {
+    "name": "Ottawa Metropolitan University",
+    "country": "Canada"
+  },
+  {
+    "name": "Ottawa College of Engineering",
+    "country": "Canada"
+  },
+  {
+    "name": "Ottawa Academy of Arts and Sciences",
+    "country": "Canada"
+  },
+  {
+    "name": "University of Calgary",
+    "country": "Canada"
+  },
+  {
+    "name": "Calgary University",
+    "country": "Canada"
+  },
+  {
+    "name": "Calgary Institute of Technology",
+    "country": "Canada"
+  },
+  {
+    "name": "Calgary University of Science and Technology",
+    "country": "Canada"
+  },
+  {
+    "name": "Calgary Business School",
+    "country": "Canada"
+  },
+  {
+    "name": "Calgary Medical University",
+    "country": "Canada"
+  },
+  {
+    "name": "National University of Calgary",
+    "country": "Canada"
+  },
+  {
+    "name": "Calgary Metropolitan University",
+    "country": "Canada"
+  },
+  {
+    "name": "Calgary College of Engineering",
+    "country": "Canada"
+  },
+  {
+    "name": "Calgary Academy of Arts and Sciences",
+    "country": "Canada"
+  },
+  {
+    "name": "University of Edmonton",
+    "country": "Canada"
+  },
+  {
+    "name": "Edmonton University",
+    "country": "Canada"
+  },
+  {
+    "name": "Edmonton Institute of Technology",
+    "country": "Canada"
+  },
+  {
+    "name": "Edmonton University of Science and Technology",
+    "country": "Canada"
+  },
+  {
+    "name": "Edmonton Business School",
+    "country": "Canada"
+  },
+  {
+    "name": "Edmonton Medical University",
+    "country": "Canada"
+  },
+  {
+    "name": "National University of Edmonton",
+    "country": "Canada"
+  },
+  {
+    "name": "Edmonton Metropolitan University",
+    "country": "Canada"
+  },
+  {
+    "name": "Edmonton College of Engineering",
+    "country": "Canada"
+  },
+  {
+    "name": "Edmonton Academy of Arts and Sciences",
+    "country": "Canada"
+  },
+  {
+    "name": "University of Waterloo",
+    "country": "Canada"
+  },
+  {
+    "name": "Waterloo University",
+    "country": "Canada"
+  },
+  {
+    "name": "Waterloo Institute of Technology",
+    "country": "Canada"
+  },
+  {
+    "name": "Waterloo University of Science and Technology",
+    "country": "Canada"
+  },
+  {
+    "name": "Waterloo Business School",
+    "country": "Canada"
+  },
+  {
+    "name": "Waterloo Medical University",
+    "country": "Canada"
+  },
+  {
+    "name": "National University of Waterloo",
+    "country": "Canada"
+  },
+  {
+    "name": "Waterloo Metropolitan University",
+    "country": "Canada"
+  },
+  {
+    "name": "Waterloo College of Engineering",
+    "country": "Canada"
+  },
+  {
+    "name": "Waterloo Academy of Arts and Sciences",
+    "country": "Canada"
+  },
+  {
+    "name": "University of Hamilton",
+    "country": "Canada"
+  },
+  {
+    "name": "Hamilton University",
+    "country": "Canada"
+  },
+  {
+    "name": "Hamilton Institute of Technology",
+    "country": "Canada"
+  },
+  {
+    "name": "Hamilton University of Science and Technology",
+    "country": "Canada"
+  },
+  {
+    "name": "Hamilton Business School",
+    "country": "Canada"
+  },
+  {
+    "name": "Hamilton Medical University",
+    "country": "Canada"
+  },
+  {
+    "name": "National University of Hamilton",
+    "country": "Canada"
+  },
+  {
+    "name": "Hamilton Metropolitan University",
+    "country": "Canada"
+  },
+  {
+    "name": "Hamilton College of Engineering",
+    "country": "Canada"
+  },
+  {
+    "name": "Hamilton Academy of Arts and Sciences",
+    "country": "Canada"
+  },
+  {
+    "name": "University of Kingston",
+    "country": "Canada"
+  },
+  {
+    "name": "Kingston University",
+    "country": "Canada"
+  },
+  {
+    "name": "Kingston Institute of Technology",
+    "country": "Canada"
+  },
+  {
+    "name": "Kingston University of Science and Technology",
+    "country": "Canada"
+  },
+  {
+    "name": "Kingston Business School",
+    "country": "Canada"
+  },
+  {
+    "name": "Kingston Medical University",
+    "country": "Canada"
+  },
+  {
+    "name": "National University of Kingston",
+    "country": "Canada"
+  },
+  {
+    "name": "Kingston Metropolitan University",
+    "country": "Canada"
+  },
+  {
+    "name": "Kingston College of Engineering",
+    "country": "Canada"
+  },
+  {
+    "name": "Kingston Academy of Arts and Sciences",
+    "country": "Canada"
+  },
+  {
+    "name": "University of Victoria",
+    "country": "Canada"
+  },
+  {
+    "name": "Victoria University",
+    "country": "Canada"
+  },
+  {
+    "name": "Victoria Institute of Technology",
+    "country": "Canada"
+  },
+  {
+    "name": "Victoria University of Science and Technology",
+    "country": "Canada"
+  },
+  {
+    "name": "Victoria Business School",
+    "country": "Canada"
+  },
+  {
+    "name": "Victoria Medical University",
+    "country": "Canada"
+  },
+  {
+    "name": "National University of Victoria",
+    "country": "Canada"
+  },
+  {
+    "name": "Victoria Metropolitan University",
+    "country": "Canada"
+  },
+  {
+    "name": "Victoria College of Engineering",
+    "country": "Canada"
+  },
+  {
+    "name": "Victoria Academy of Arts and Sciences",
+    "country": "Canada"
+  },
+  {
+    "name": "University of Quebec",
+    "country": "Canada"
+  },
+  {
+    "name": "Quebec University",
+    "country": "Canada"
+  },
+  {
+    "name": "Quebec Institute of Technology",
+    "country": "Canada"
+  },
+  {
+    "name": "Quebec University of Science and Technology",
+    "country": "Canada"
+  },
+  {
+    "name": "Quebec Business School",
+    "country": "Canada"
+  },
+  {
+    "name": "Quebec Medical University",
+    "country": "Canada"
+  },
+  {
+    "name": "National University of Quebec",
+    "country": "Canada"
+  },
+  {
+    "name": "Quebec Metropolitan University",
+    "country": "Canada"
+  },
+  {
+    "name": "Quebec College of Engineering",
+    "country": "Canada"
+  },
+  {
+    "name": "Quebec Academy of Arts and Sciences",
+    "country": "Canada"
+  },
+  {
+    "name": "University of Winnipeg",
+    "country": "Canada"
+  },
+  {
+    "name": "Winnipeg University",
+    "country": "Canada"
+  },
+  {
+    "name": "Winnipeg Institute of Technology",
+    "country": "Canada"
+  },
+  {
+    "name": "Winnipeg University of Science and Technology",
+    "country": "Canada"
+  },
+  {
+    "name": "Winnipeg Business School",
+    "country": "Canada"
+  },
+  {
+    "name": "Winnipeg Medical University",
+    "country": "Canada"
+  },
+  {
+    "name": "National University of Winnipeg",
+    "country": "Canada"
+  },
+  {
+    "name": "Winnipeg Metropolitan University",
+    "country": "Canada"
+  },
+  {
+    "name": "Winnipeg College of Engineering",
+    "country": "Canada"
+  },
+  {
+    "name": "Winnipeg Academy of Arts and Sciences",
+    "country": "Canada"
+  },
+  {
+    "name": "Melbourne University",
+    "country": "Australia"
+  },
+  {
+    "name": "Melbourne Institute of Technology",
+    "country": "Australia"
+  },
+  {
+    "name": "Melbourne University of Science and Technology",
+    "country": "Australia"
+  },
+  {
+    "name": "Melbourne Business School",
+    "country": "Australia"
+  },
+  {
+    "name": "Melbourne Medical University",
+    "country": "Australia"
+  },
+  {
+    "name": "National University of Melbourne",
+    "country": "Australia"
+  },
+  {
+    "name": "Melbourne Metropolitan University",
+    "country": "Australia"
+  },
+  {
+    "name": "Melbourne College of Engineering",
+    "country": "Australia"
+  },
+  {
+    "name": "Melbourne Academy of Arts and Sciences",
+    "country": "Australia"
+  },
+  {
+    "name": "Sydney University",
+    "country": "Australia"
+  },
+  {
+    "name": "Sydney Institute of Technology",
+    "country": "Australia"
+  },
+  {
+    "name": "Sydney University of Science and Technology",
+    "country": "Australia"
+  },
+  {
+    "name": "Sydney Business School",
+    "country": "Australia"
+  },
+  {
+    "name": "Sydney Medical University",
+    "country": "Australia"
+  },
+  {
+    "name": "National University of Sydney",
+    "country": "Australia"
+  },
+  {
+    "name": "Sydney Metropolitan University",
+    "country": "Australia"
+  },
+  {
+    "name": "Sydney College of Engineering",
+    "country": "Australia"
+  },
+  {
+    "name": "Sydney Academy of Arts and Sciences",
+    "country": "Australia"
+  },
+  {
+    "name": "University of Brisbane",
+    "country": "Australia"
+  },
+  {
+    "name": "Brisbane University",
+    "country": "Australia"
+  },
+  {
+    "name": "Brisbane Institute of Technology",
+    "country": "Australia"
+  },
+  {
+    "name": "Brisbane University of Science and Technology",
+    "country": "Australia"
+  },
+  {
+    "name": "Brisbane Business School",
+    "country": "Australia"
+  },
+  {
+    "name": "Brisbane Medical University",
+    "country": "Australia"
+  },
+  {
+    "name": "National University of Brisbane",
+    "country": "Australia"
+  },
+  {
+    "name": "Brisbane Metropolitan University",
+    "country": "Australia"
+  },
+  {
+    "name": "Brisbane College of Engineering",
+    "country": "Australia"
+  },
+  {
+    "name": "Brisbane Academy of Arts and Sciences",
+    "country": "Australia"
+  },
+  {
+    "name": "University of Perth",
+    "country": "Australia"
+  },
+  {
+    "name": "Perth University",
+    "country": "Australia"
+  },
+  {
+    "name": "Perth Institute of Technology",
+    "country": "Australia"
+  },
+  {
+    "name": "Perth University of Science and Technology",
+    "country": "Australia"
+  },
+  {
+    "name": "Perth Business School",
+    "country": "Australia"
+  },
+  {
+    "name": "Perth Medical University",
+    "country": "Australia"
+  },
+  {
+    "name": "National University of Perth",
+    "country": "Australia"
+  },
+  {
+    "name": "Perth Metropolitan University",
+    "country": "Australia"
+  },
+  {
+    "name": "Perth College of Engineering",
+    "country": "Australia"
+  },
+  {
+    "name": "Perth Academy of Arts and Sciences",
+    "country": "Australia"
+  },
+  {
+    "name": "Adelaide University",
+    "country": "Australia"
+  },
+  {
+    "name": "Adelaide Institute of Technology",
+    "country": "Australia"
+  },
+  {
+    "name": "Adelaide University of Science and Technology",
+    "country": "Australia"
+  },
+  {
+    "name": "Adelaide Business School",
+    "country": "Australia"
+  },
+  {
+    "name": "Adelaide Medical University",
+    "country": "Australia"
+  },
+  {
+    "name": "National University of Adelaide",
+    "country": "Australia"
+  },
+  {
+    "name": "Adelaide Metropolitan University",
+    "country": "Australia"
+  },
+  {
+    "name": "Adelaide College of Engineering",
+    "country": "Australia"
+  },
+  {
+    "name": "Adelaide Academy of Arts and Sciences",
+    "country": "Australia"
+  },
+  {
+    "name": "University of Canberra",
+    "country": "Australia"
+  },
+  {
+    "name": "Canberra University",
+    "country": "Australia"
+  },
+  {
+    "name": "Canberra Institute of Technology",
+    "country": "Australia"
+  },
+  {
+    "name": "Canberra University of Science and Technology",
+    "country": "Australia"
+  },
+  {
+    "name": "Canberra Business School",
+    "country": "Australia"
+  },
+  {
+    "name": "Canberra Medical University",
+    "country": "Australia"
+  },
+  {
+    "name": "National University of Canberra",
+    "country": "Australia"
+  },
+  {
+    "name": "Canberra Metropolitan University",
+    "country": "Australia"
+  },
+  {
+    "name": "Canberra College of Engineering",
+    "country": "Australia"
+  },
+  {
+    "name": "Canberra Academy of Arts and Sciences",
+    "country": "Australia"
+  },
+  {
+    "name": "University of Newcastle",
+    "country": "Australia"
+  },
+  {
+    "name": "Newcastle University",
+    "country": "Australia"
+  },
+  {
+    "name": "Newcastle Institute of Technology",
+    "country": "Australia"
+  },
+  {
+    "name": "Newcastle University of Science and Technology",
+    "country": "Australia"
+  },
+  {
+    "name": "Newcastle Business School",
+    "country": "Australia"
+  },
+  {
+    "name": "Newcastle Medical University",
+    "country": "Australia"
+  },
+  {
+    "name": "National University of Newcastle",
+    "country": "Australia"
+  },
+  {
+    "name": "Newcastle Metropolitan University",
+    "country": "Australia"
+  },
+  {
+    "name": "Newcastle College of Engineering",
+    "country": "Australia"
+  },
+  {
+    "name": "Newcastle Academy of Arts and Sciences",
+    "country": "Australia"
+  },
+  {
+    "name": "University of Wollongong",
+    "country": "Australia"
+  },
+  {
+    "name": "Wollongong University",
+    "country": "Australia"
+  },
+  {
+    "name": "Wollongong Institute of Technology",
+    "country": "Australia"
+  },
+  {
+    "name": "Wollongong University of Science and Technology",
+    "country": "Australia"
+  },
+  {
+    "name": "Wollongong Business School",
+    "country": "Australia"
+  },
+  {
+    "name": "Wollongong Medical University",
+    "country": "Australia"
+  },
+  {
+    "name": "National University of Wollongong",
+    "country": "Australia"
+  },
+  {
+    "name": "Wollongong Metropolitan University",
+    "country": "Australia"
+  },
+  {
+    "name": "Wollongong College of Engineering",
+    "country": "Australia"
+  },
+  {
+    "name": "Wollongong Academy of Arts and Sciences",
+    "country": "Australia"
+  },
+  {
+    "name": "University of Hobart",
+    "country": "Australia"
+  },
+  {
+    "name": "Hobart University",
+    "country": "Australia"
+  },
+  {
+    "name": "Hobart Institute of Technology",
+    "country": "Australia"
+  },
+  {
+    "name": "Hobart University of Science and Technology",
+    "country": "Australia"
+  },
+  {
+    "name": "Hobart Business School",
+    "country": "Australia"
+  },
+  {
+    "name": "Hobart Medical University",
+    "country": "Australia"
+  },
+  {
+    "name": "National University of Hobart",
+    "country": "Australia"
+  },
+  {
+    "name": "Hobart Metropolitan University",
+    "country": "Australia"
+  },
+  {
+    "name": "Hobart College of Engineering",
+    "country": "Australia"
+  },
+  {
+    "name": "Hobart Academy of Arts and Sciences",
+    "country": "Australia"
+  },
+  {
+    "name": "University of Gold Coast",
+    "country": "Australia"
+  },
+  {
+    "name": "Gold Coast University",
+    "country": "Australia"
+  },
+  {
+    "name": "Gold Coast Institute of Technology",
+    "country": "Australia"
+  },
+  {
+    "name": "Gold Coast University of Science and Technology",
+    "country": "Australia"
+  },
+  {
+    "name": "Gold Coast Business School",
+    "country": "Australia"
+  },
+  {
+    "name": "Gold Coast Medical University",
+    "country": "Australia"
+  },
+  {
+    "name": "National University of Gold Coast",
+    "country": "Australia"
+  },
+  {
+    "name": "Gold Coast Metropolitan University",
+    "country": "Australia"
+  },
+  {
+    "name": "Gold Coast College of Engineering",
+    "country": "Australia"
+  },
+  {
+    "name": "Gold Coast Academy of Arts and Sciences",
+    "country": "Australia"
+  },
+  {
+    "name": "Delhi University",
+    "country": "India"
+  },
+  {
+    "name": "Delhi Institute of Technology",
+    "country": "India"
+  },
+  {
+    "name": "Delhi University of Science and Technology",
+    "country": "India"
+  },
+  {
+    "name": "Delhi Business School",
+    "country": "India"
+  },
+  {
+    "name": "Delhi Medical University",
+    "country": "India"
+  },
+  {
+    "name": "National University of Delhi",
+    "country": "India"
+  },
+  {
+    "name": "Delhi Metropolitan University",
+    "country": "India"
+  },
+  {
+    "name": "Delhi College of Engineering",
+    "country": "India"
+  },
+  {
+    "name": "Delhi Academy of Arts and Sciences",
+    "country": "India"
+  },
+  {
+    "name": "University of Mumbai",
+    "country": "India"
+  },
+  {
+    "name": "Mumbai University",
+    "country": "India"
+  },
+  {
+    "name": "Mumbai Institute of Technology",
+    "country": "India"
+  },
+  {
+    "name": "Mumbai University of Science and Technology",
+    "country": "India"
+  },
+  {
+    "name": "Mumbai Business School",
+    "country": "India"
+  },
+  {
+    "name": "Mumbai Medical University",
+    "country": "India"
+  },
+  {
+    "name": "National University of Mumbai",
+    "country": "India"
+  },
+  {
+    "name": "Mumbai Metropolitan University",
+    "country": "India"
+  },
+  {
+    "name": "Mumbai College of Engineering",
+    "country": "India"
+  },
+  {
+    "name": "Mumbai Academy of Arts and Sciences",
+    "country": "India"
+  },
+  {
+    "name": "University of Bengaluru",
+    "country": "India"
+  },
+  {
+    "name": "Bengaluru University",
+    "country": "India"
+  },
+  {
+    "name": "Bengaluru Institute of Technology",
+    "country": "India"
+  },
+  {
+    "name": "Bengaluru University of Science and Technology",
+    "country": "India"
+  },
+  {
+    "name": "Bengaluru Business School",
+    "country": "India"
+  },
+  {
+    "name": "Bengaluru Medical University",
+    "country": "India"
+  },
+  {
+    "name": "National University of Bengaluru",
+    "country": "India"
+  },
+  {
+    "name": "Bengaluru Metropolitan University",
+    "country": "India"
+  },
+  {
+    "name": "Bengaluru College of Engineering",
+    "country": "India"
+  },
+  {
+    "name": "Bengaluru Academy of Arts and Sciences",
+    "country": "India"
+  },
+  {
+    "name": "University of Chennai",
+    "country": "India"
+  },
+  {
+    "name": "Chennai University",
+    "country": "India"
+  },
+  {
+    "name": "Chennai Institute of Technology",
+    "country": "India"
+  },
+  {
+    "name": "Chennai University of Science and Technology",
+    "country": "India"
+  },
+  {
+    "name": "Chennai Business School",
+    "country": "India"
+  },
+  {
+    "name": "Chennai Medical University",
+    "country": "India"
+  },
+  {
+    "name": "National University of Chennai",
+    "country": "India"
+  },
+  {
+    "name": "Chennai Metropolitan University",
+    "country": "India"
+  },
+  {
+    "name": "Chennai College of Engineering",
+    "country": "India"
+  },
+  {
+    "name": "Chennai Academy of Arts and Sciences",
+    "country": "India"
+  },
+  {
+    "name": "University of Hyderabad",
+    "country": "India"
+  },
+  {
+    "name": "Hyderabad University",
+    "country": "India"
+  },
+  {
+    "name": "Hyderabad Institute of Technology",
+    "country": "India"
+  },
+  {
+    "name": "Hyderabad University of Science and Technology",
+    "country": "India"
+  },
+  {
+    "name": "Hyderabad Business School",
+    "country": "India"
+  },
+  {
+    "name": "Hyderabad Medical University",
+    "country": "India"
+  },
+  {
+    "name": "National University of Hyderabad",
+    "country": "India"
+  },
+  {
+    "name": "Hyderabad Metropolitan University",
+    "country": "India"
+  },
+  {
+    "name": "Hyderabad College of Engineering",
+    "country": "India"
+  },
+  {
+    "name": "Hyderabad Academy of Arts and Sciences",
+    "country": "India"
+  },
+  {
+    "name": "University of Pune",
+    "country": "India"
+  },
+  {
+    "name": "Pune University",
+    "country": "India"
+  },
+  {
+    "name": "Pune Institute of Technology",
+    "country": "India"
+  },
+  {
+    "name": "Pune University of Science and Technology",
+    "country": "India"
+  },
+  {
+    "name": "Pune Business School",
+    "country": "India"
+  },
+  {
+    "name": "Pune Medical University",
+    "country": "India"
+  },
+  {
+    "name": "National University of Pune",
+    "country": "India"
+  },
+  {
+    "name": "Pune Metropolitan University",
+    "country": "India"
+  },
+  {
+    "name": "Pune College of Engineering",
+    "country": "India"
+  },
+  {
+    "name": "Pune Academy of Arts and Sciences",
+    "country": "India"
+  },
+  {
+    "name": "University of Kolkata",
+    "country": "India"
+  },
+  {
+    "name": "Kolkata University",
+    "country": "India"
+  },
+  {
+    "name": "Kolkata Institute of Technology",
+    "country": "India"
+  },
+  {
+    "name": "Kolkata University of Science and Technology",
+    "country": "India"
+  },
+  {
+    "name": "Kolkata Business School",
+    "country": "India"
+  },
+  {
+    "name": "Kolkata Medical University",
+    "country": "India"
+  },
+  {
+    "name": "National University of Kolkata",
+    "country": "India"
+  },
+  {
+    "name": "Kolkata Metropolitan University",
+    "country": "India"
+  },
+  {
+    "name": "Kolkata College of Engineering",
+    "country": "India"
+  },
+  {
+    "name": "Kolkata Academy of Arts and Sciences",
+    "country": "India"
+  },
+  {
+    "name": "University of Ahmedabad",
+    "country": "India"
+  },
+  {
+    "name": "Ahmedabad University",
+    "country": "India"
+  },
+  {
+    "name": "Ahmedabad Institute of Technology",
+    "country": "India"
+  },
+  {
+    "name": "Ahmedabad University of Science and Technology",
+    "country": "India"
+  },
+  {
+    "name": "Ahmedabad Business School",
+    "country": "India"
+  },
+  {
+    "name": "Ahmedabad Medical University",
+    "country": "India"
+  },
+  {
+    "name": "National University of Ahmedabad",
+    "country": "India"
+  },
+  {
+    "name": "Ahmedabad Metropolitan University",
+    "country": "India"
+  },
+  {
+    "name": "Ahmedabad College of Engineering",
+    "country": "India"
+  },
+  {
+    "name": "Ahmedabad Academy of Arts and Sciences",
+    "country": "India"
+  },
+  {
+    "name": "University of Kochi",
+    "country": "India"
+  },
+  {
+    "name": "Kochi University",
+    "country": "India"
+  },
+  {
+    "name": "Kochi Institute of Technology",
+    "country": "India"
+  },
+  {
+    "name": "Kochi University of Science and Technology",
+    "country": "India"
+  },
+  {
+    "name": "Kochi Business School",
+    "country": "India"
+  },
+  {
+    "name": "Kochi Medical University",
+    "country": "India"
+  },
+  {
+    "name": "National University of Kochi",
+    "country": "India"
+  },
+  {
+    "name": "Kochi Metropolitan University",
+    "country": "India"
+  },
+  {
+    "name": "Kochi College of Engineering",
+    "country": "India"
+  },
+  {
+    "name": "Kochi Academy of Arts and Sciences",
+    "country": "India"
+  },
+  {
+    "name": "University of Jaipur",
+    "country": "India"
+  },
+  {
+    "name": "Jaipur University",
+    "country": "India"
+  },
+  {
+    "name": "Jaipur Institute of Technology",
+    "country": "India"
+  },
+  {
+    "name": "Jaipur University of Science and Technology",
+    "country": "India"
+  },
+  {
+    "name": "Jaipur Business School",
+    "country": "India"
+  },
+  {
+    "name": "Jaipur Medical University",
+    "country": "India"
+  },
+  {
+    "name": "National University of Jaipur",
+    "country": "India"
+  },
+  {
+    "name": "Jaipur Metropolitan University",
+    "country": "India"
+  },
+  {
+    "name": "Jaipur College of Engineering",
+    "country": "India"
+  },
+  {
+    "name": "Jaipur Academy of Arts and Sciences",
+    "country": "India"
+  },
+  {
+    "name": "University of Lucknow",
+    "country": "India"
+  },
+  {
+    "name": "Lucknow University",
+    "country": "India"
+  },
+  {
+    "name": "Lucknow Institute of Technology",
+    "country": "India"
+  },
+  {
+    "name": "Lucknow University of Science and Technology",
+    "country": "India"
+  },
+  {
+    "name": "Lucknow Business School",
+    "country": "India"
+  },
+  {
+    "name": "Lucknow Medical University",
+    "country": "India"
+  },
+  {
+    "name": "National University of Lucknow",
+    "country": "India"
+  },
+  {
+    "name": "Lucknow Metropolitan University",
+    "country": "India"
+  },
+  {
+    "name": "Lucknow College of Engineering",
+    "country": "India"
+  },
+  {
+    "name": "Lucknow Academy of Arts and Sciences",
+    "country": "India"
+  },
+  {
+    "name": "University of Coimbatore",
+    "country": "India"
+  },
+  {
+    "name": "Coimbatore University",
+    "country": "India"
+  },
+  {
+    "name": "Coimbatore Institute of Technology",
+    "country": "India"
+  },
+  {
+    "name": "Coimbatore University of Science and Technology",
+    "country": "India"
+  },
+  {
+    "name": "Coimbatore Business School",
+    "country": "India"
+  },
+  {
+    "name": "Coimbatore Medical University",
+    "country": "India"
+  },
+  {
+    "name": "National University of Coimbatore",
+    "country": "India"
+  },
+  {
+    "name": "Coimbatore Metropolitan University",
+    "country": "India"
+  },
+  {
+    "name": "Coimbatore College of Engineering",
+    "country": "India"
+  },
+  {
+    "name": "Coimbatore Academy of Arts and Sciences",
+    "country": "India"
+  },
+  {
+    "name": "University of Bhopal",
+    "country": "India"
+  },
+  {
+    "name": "Bhopal University",
+    "country": "India"
+  },
+  {
+    "name": "Bhopal Institute of Technology",
+    "country": "India"
+  },
+  {
+    "name": "Bhopal University of Science and Technology",
+    "country": "India"
+  },
+  {
+    "name": "Bhopal Business School",
+    "country": "India"
+  },
+  {
+    "name": "Bhopal Medical University",
+    "country": "India"
+  },
+  {
+    "name": "National University of Bhopal",
+    "country": "India"
+  },
+  {
+    "name": "Bhopal Metropolitan University",
+    "country": "India"
+  },
+  {
+    "name": "Bhopal College of Engineering",
+    "country": "India"
+  },
+  {
+    "name": "Bhopal Academy of Arts and Sciences",
+    "country": "India"
+  },
+  {
+    "name": "University of Chandigarh",
+    "country": "India"
+  },
+  {
+    "name": "Chandigarh University",
+    "country": "India"
+  },
+  {
+    "name": "Chandigarh Institute of Technology",
+    "country": "India"
+  },
+  {
+    "name": "Chandigarh University of Science and Technology",
+    "country": "India"
+  },
+  {
+    "name": "Chandigarh Business School",
+    "country": "India"
+  },
+  {
+    "name": "Chandigarh Medical University",
+    "country": "India"
+  },
+  {
+    "name": "National University of Chandigarh",
+    "country": "India"
+  },
+  {
+    "name": "Chandigarh Metropolitan University",
+    "country": "India"
+  },
+  {
+    "name": "Chandigarh College of Engineering",
+    "country": "India"
+  },
+  {
+    "name": "Chandigarh Academy of Arts and Sciences",
+    "country": "India"
+  },
+  {
+    "name": "University of Varanasi",
+    "country": "India"
+  },
+  {
+    "name": "Varanasi University",
+    "country": "India"
+  },
+  {
+    "name": "Varanasi Institute of Technology",
+    "country": "India"
+  },
+  {
+    "name": "Varanasi University of Science and Technology",
+    "country": "India"
+  },
+  {
+    "name": "Varanasi Business School",
+    "country": "India"
+  },
+  {
+    "name": "Varanasi Medical University",
+    "country": "India"
+  },
+  {
+    "name": "National University of Varanasi",
+    "country": "India"
+  },
+  {
+    "name": "Varanasi Metropolitan University",
+    "country": "India"
+  },
+  {
+    "name": "Varanasi College of Engineering",
+    "country": "India"
+  },
+  {
+    "name": "Varanasi Academy of Arts and Sciences",
+    "country": "India"
+  },
+  {
+    "name": "University of Mysuru",
+    "country": "India"
+  },
+  {
+    "name": "Mysuru University",
+    "country": "India"
+  },
+  {
+    "name": "Mysuru Institute of Technology",
+    "country": "India"
+  },
+  {
+    "name": "Mysuru University of Science and Technology",
+    "country": "India"
+  },
+  {
+    "name": "Mysuru Business School",
+    "country": "India"
+  },
+  {
+    "name": "Mysuru Medical University",
+    "country": "India"
+  },
+  {
+    "name": "National University of Mysuru",
+    "country": "India"
+  },
+  {
+    "name": "Mysuru Metropolitan University",
+    "country": "India"
+  },
+  {
+    "name": "Mysuru College of Engineering",
+    "country": "India"
+  },
+  {
+    "name": "Mysuru Academy of Arts and Sciences",
+    "country": "India"
+  },
+  {
+    "name": "University of Thiruvananthapuram",
+    "country": "India"
+  },
+  {
+    "name": "Thiruvananthapuram University",
+    "country": "India"
+  },
+  {
+    "name": "Thiruvananthapuram Institute of Technology",
+    "country": "India"
+  },
+  {
+    "name": "Thiruvananthapuram University of Science and Technology",
+    "country": "India"
+  },
+  {
+    "name": "Thiruvananthapuram Business School",
+    "country": "India"
+  },
+  {
+    "name": "Thiruvananthapuram Medical University",
+    "country": "India"
+  },
+  {
+    "name": "National University of Thiruvananthapuram",
+    "country": "India"
+  },
+  {
+    "name": "Thiruvananthapuram Metropolitan University",
+    "country": "India"
+  },
+  {
+    "name": "Thiruvananthapuram College of Engineering",
+    "country": "India"
+  },
+  {
+    "name": "Thiruvananthapuram Academy of Arts and Sciences",
+    "country": "India"
+  },
+  {
+    "name": "University of Indore",
+    "country": "India"
+  },
+  {
+    "name": "Indore University",
+    "country": "India"
+  },
+  {
+    "name": "Indore Institute of Technology",
+    "country": "India"
+  },
+  {
+    "name": "Indore University of Science and Technology",
+    "country": "India"
+  },
+  {
+    "name": "Indore Business School",
+    "country": "India"
+  },
+  {
+    "name": "Indore Medical University",
+    "country": "India"
+  },
+  {
+    "name": "National University of Indore",
+    "country": "India"
+  },
+  {
+    "name": "Indore Metropolitan University",
+    "country": "India"
+  },
+  {
+    "name": "Indore College of Engineering",
+    "country": "India"
+  },
+  {
+    "name": "Indore Academy of Arts and Sciences",
+    "country": "India"
+  },
+  {
+    "name": "University of Beijing",
+    "country": "China"
+  },
+  {
+    "name": "Beijing University",
+    "country": "China"
+  },
+  {
+    "name": "Beijing Institute of Technology",
+    "country": "China"
+  },
+  {
+    "name": "Beijing University of Science and Technology",
+    "country": "China"
+  },
+  {
+    "name": "Beijing Business School",
+    "country": "China"
+  },
+  {
+    "name": "Beijing Medical University",
+    "country": "China"
+  },
+  {
+    "name": "National University of Beijing",
+    "country": "China"
+  },
+  {
+    "name": "Beijing Metropolitan University",
+    "country": "China"
+  },
+  {
+    "name": "Beijing College of Engineering",
+    "country": "China"
+  },
+  {
+    "name": "Beijing Academy of Arts and Sciences",
+    "country": "China"
+  },
+  {
+    "name": "University of Shanghai",
+    "country": "China"
+  },
+  {
+    "name": "Shanghai University",
+    "country": "China"
+  },
+  {
+    "name": "Shanghai Institute of Technology",
+    "country": "China"
+  },
+  {
+    "name": "Shanghai University of Science and Technology",
+    "country": "China"
+  },
+  {
+    "name": "Shanghai Business School",
+    "country": "China"
+  },
+  {
+    "name": "Shanghai Medical University",
+    "country": "China"
+  },
+  {
+    "name": "National University of Shanghai",
+    "country": "China"
+  },
+  {
+    "name": "Shanghai Metropolitan University",
+    "country": "China"
+  },
+  {
+    "name": "Shanghai College of Engineering",
+    "country": "China"
+  },
+  {
+    "name": "Shanghai Academy of Arts and Sciences",
+    "country": "China"
+  },
+  {
+    "name": "University of Guangzhou",
+    "country": "China"
+  },
+  {
+    "name": "Guangzhou University",
+    "country": "China"
+  },
+  {
+    "name": "Guangzhou Institute of Technology",
+    "country": "China"
+  },
+  {
+    "name": "Guangzhou University of Science and Technology",
+    "country": "China"
+  },
+  {
+    "name": "Guangzhou Business School",
+    "country": "China"
+  },
+  {
+    "name": "Guangzhou Medical University",
+    "country": "China"
+  },
+  {
+    "name": "National University of Guangzhou",
+    "country": "China"
+  },
+  {
+    "name": "Guangzhou Metropolitan University",
+    "country": "China"
+  },
+  {
+    "name": "Guangzhou College of Engineering",
+    "country": "China"
+  },
+  {
+    "name": "Guangzhou Academy of Arts and Sciences",
+    "country": "China"
+  },
+  {
+    "name": "University of Shenzhen",
+    "country": "China"
+  },
+  {
+    "name": "Shenzhen University",
+    "country": "China"
+  },
+  {
+    "name": "Shenzhen Institute of Technology",
+    "country": "China"
+  },
+  {
+    "name": "Shenzhen University of Science and Technology",
+    "country": "China"
+  },
+  {
+    "name": "Shenzhen Business School",
+    "country": "China"
+  },
+  {
+    "name": "Shenzhen Medical University",
+    "country": "China"
+  },
+  {
+    "name": "National University of Shenzhen",
+    "country": "China"
+  },
+  {
+    "name": "Shenzhen Metropolitan University",
+    "country": "China"
+  },
+  {
+    "name": "Shenzhen College of Engineering",
+    "country": "China"
+  },
+  {
+    "name": "Shenzhen Academy of Arts and Sciences",
+    "country": "China"
+  },
+  {
+    "name": "University of Nanjing",
+    "country": "China"
+  },
+  {
+    "name": "Nanjing University",
+    "country": "China"
+  },
+  {
+    "name": "Nanjing Institute of Technology",
+    "country": "China"
+  },
+  {
+    "name": "Nanjing University of Science and Technology",
+    "country": "China"
+  },
+  {
+    "name": "Nanjing Business School",
+    "country": "China"
+  },
+  {
+    "name": "Nanjing Medical University",
+    "country": "China"
+  },
+  {
+    "name": "National University of Nanjing",
+    "country": "China"
+  },
+  {
+    "name": "Nanjing Metropolitan University",
+    "country": "China"
+  },
+  {
+    "name": "Nanjing College of Engineering",
+    "country": "China"
+  },
+  {
+    "name": "Nanjing Academy of Arts and Sciences",
+    "country": "China"
+  },
+  {
+    "name": "University of Hangzhou",
+    "country": "China"
+  },
+  {
+    "name": "Hangzhou University",
+    "country": "China"
+  },
+  {
+    "name": "Hangzhou Institute of Technology",
+    "country": "China"
+  },
+  {
+    "name": "Hangzhou University of Science and Technology",
+    "country": "China"
+  },
+  {
+    "name": "Hangzhou Business School",
+    "country": "China"
+  },
+  {
+    "name": "Hangzhou Medical University",
+    "country": "China"
+  },
+  {
+    "name": "National University of Hangzhou",
+    "country": "China"
+  },
+  {
+    "name": "Hangzhou Metropolitan University",
+    "country": "China"
+  },
+  {
+    "name": "Hangzhou College of Engineering",
+    "country": "China"
+  },
+  {
+    "name": "Hangzhou Academy of Arts and Sciences",
+    "country": "China"
+  },
+  {
+    "name": "University of Wuhan",
+    "country": "China"
+  },
+  {
+    "name": "Wuhan University",
+    "country": "China"
+  },
+  {
+    "name": "Wuhan Institute of Technology",
+    "country": "China"
+  },
+  {
+    "name": "Wuhan University of Science and Technology",
+    "country": "China"
+  },
+  {
+    "name": "Wuhan Business School",
+    "country": "China"
+  },
+  {
+    "name": "Wuhan Medical University",
+    "country": "China"
+  },
+  {
+    "name": "National University of Wuhan",
+    "country": "China"
+  },
+  {
+    "name": "Wuhan Metropolitan University",
+    "country": "China"
+  },
+  {
+    "name": "Wuhan College of Engineering",
+    "country": "China"
+  },
+  {
+    "name": "Wuhan Academy of Arts and Sciences",
+    "country": "China"
+  },
+  {
+    "name": "University of Xi'an",
+    "country": "China"
+  },
+  {
+    "name": "Xi'an University",
+    "country": "China"
+  },
+  {
+    "name": "Xi'an Institute of Technology",
+    "country": "China"
+  },
+  {
+    "name": "Xi'an University of Science and Technology",
+    "country": "China"
+  },
+  {
+    "name": "Xi'an Business School",
+    "country": "China"
+  },
+  {
+    "name": "Xi'an Medical University",
+    "country": "China"
+  },
+  {
+    "name": "National University of Xi'an",
+    "country": "China"
+  },
+  {
+    "name": "Xi'an Metropolitan University",
+    "country": "China"
+  },
+  {
+    "name": "Xi'an College of Engineering",
+    "country": "China"
+  },
+  {
+    "name": "Xi'an Academy of Arts and Sciences",
+    "country": "China"
+  },
+  {
+    "name": "University of Chengdu",
+    "country": "China"
+  },
+  {
+    "name": "Chengdu University",
+    "country": "China"
+  },
+  {
+    "name": "Chengdu Institute of Technology",
+    "country": "China"
+  },
+  {
+    "name": "Chengdu University of Science and Technology",
+    "country": "China"
+  },
+  {
+    "name": "Chengdu Business School",
+    "country": "China"
+  },
+  {
+    "name": "Chengdu Medical University",
+    "country": "China"
+  },
+  {
+    "name": "National University of Chengdu",
+    "country": "China"
+  },
+  {
+    "name": "Chengdu Metropolitan University",
+    "country": "China"
+  },
+  {
+    "name": "Chengdu College of Engineering",
+    "country": "China"
+  },
+  {
+    "name": "Chengdu Academy of Arts and Sciences",
+    "country": "China"
+  },
+  {
+    "name": "University of Tianjin",
+    "country": "China"
+  },
+  {
+    "name": "Tianjin University",
+    "country": "China"
+  },
+  {
+    "name": "Tianjin Institute of Technology",
+    "country": "China"
+  },
+  {
+    "name": "Tianjin University of Science and Technology",
+    "country": "China"
+  },
+  {
+    "name": "Tianjin Business School",
+    "country": "China"
+  },
+  {
+    "name": "Tianjin Medical University",
+    "country": "China"
+  },
+  {
+    "name": "National University of Tianjin",
+    "country": "China"
+  },
+  {
+    "name": "Tianjin Metropolitan University",
+    "country": "China"
+  },
+  {
+    "name": "Tianjin College of Engineering",
+    "country": "China"
+  },
+  {
+    "name": "Tianjin Academy of Arts and Sciences",
+    "country": "China"
+  },
+  {
+    "name": "University of Harbin",
+    "country": "China"
+  },
+  {
+    "name": "Harbin University",
+    "country": "China"
+  },
+  {
+    "name": "Harbin Institute of Technology",
+    "country": "China"
+  },
+  {
+    "name": "Harbin University of Science and Technology",
+    "country": "China"
+  },
+  {
+    "name": "Harbin Business School",
+    "country": "China"
+  },
+  {
+    "name": "Harbin Medical University",
+    "country": "China"
+  },
+  {
+    "name": "National University of Harbin",
+    "country": "China"
+  },
+  {
+    "name": "Harbin Metropolitan University",
+    "country": "China"
+  },
+  {
+    "name": "Harbin College of Engineering",
+    "country": "China"
+  },
+  {
+    "name": "Harbin Academy of Arts and Sciences",
+    "country": "China"
+  },
+  {
+    "name": "University of Jinan",
+    "country": "China"
+  },
+  {
+    "name": "Jinan University",
+    "country": "China"
+  },
+  {
+    "name": "Jinan Institute of Technology",
+    "country": "China"
+  },
+  {
+    "name": "Jinan University of Science and Technology",
+    "country": "China"
+  },
+  {
+    "name": "Jinan Business School",
+    "country": "China"
+  },
+  {
+    "name": "Jinan Medical University",
+    "country": "China"
+  },
+  {
+    "name": "National University of Jinan",
+    "country": "China"
+  },
+  {
+    "name": "Jinan Metropolitan University",
+    "country": "China"
+  },
+  {
+    "name": "Jinan College of Engineering",
+    "country": "China"
+  },
+  {
+    "name": "Jinan Academy of Arts and Sciences",
+    "country": "China"
+  },
+  {
+    "name": "University of Dalian",
+    "country": "China"
+  },
+  {
+    "name": "Dalian University",
+    "country": "China"
+  },
+  {
+    "name": "Dalian Institute of Technology",
+    "country": "China"
+  },
+  {
+    "name": "Dalian University of Science and Technology",
+    "country": "China"
+  },
+  {
+    "name": "Dalian Business School",
+    "country": "China"
+  },
+  {
+    "name": "Dalian Medical University",
+    "country": "China"
+  },
+  {
+    "name": "National University of Dalian",
+    "country": "China"
+  },
+  {
+    "name": "Dalian Metropolitan University",
+    "country": "China"
+  },
+  {
+    "name": "Dalian College of Engineering",
+    "country": "China"
+  },
+  {
+    "name": "Dalian Academy of Arts and Sciences",
+    "country": "China"
+  },
+  {
+    "name": "University of Suzhou",
+    "country": "China"
+  },
+  {
+    "name": "Suzhou University",
+    "country": "China"
+  },
+  {
+    "name": "Suzhou Institute of Technology",
+    "country": "China"
+  },
+  {
+    "name": "Suzhou University of Science and Technology",
+    "country": "China"
+  },
+  {
+    "name": "Suzhou Business School",
+    "country": "China"
+  },
+  {
+    "name": "Suzhou Medical University",
+    "country": "China"
+  },
+  {
+    "name": "National University of Suzhou",
+    "country": "China"
+  },
+  {
+    "name": "Suzhou Metropolitan University",
+    "country": "China"
+  },
+  {
+    "name": "Suzhou College of Engineering",
+    "country": "China"
+  },
+  {
+    "name": "Suzhou Academy of Arts and Sciences",
+    "country": "China"
+  },
+  {
+    "name": "Tokyo University",
+    "country": "Japan"
+  },
+  {
+    "name": "Tokyo University of Science and Technology",
+    "country": "Japan"
+  },
+  {
+    "name": "Tokyo Business School",
+    "country": "Japan"
+  },
+  {
+    "name": "Tokyo Medical University",
+    "country": "Japan"
+  },
+  {
+    "name": "National University of Tokyo",
+    "country": "Japan"
+  },
+  {
+    "name": "Tokyo Metropolitan University",
+    "country": "Japan"
+  },
+  {
+    "name": "Tokyo College of Engineering",
+    "country": "Japan"
+  },
+  {
+    "name": "Tokyo Academy of Arts and Sciences",
+    "country": "Japan"
+  },
+  {
+    "name": "University of Kyoto",
+    "country": "Japan"
+  },
+  {
+    "name": "Kyoto Institute of Technology",
+    "country": "Japan"
+  },
+  {
+    "name": "Kyoto University of Science and Technology",
+    "country": "Japan"
+  },
+  {
+    "name": "Kyoto Business School",
+    "country": "Japan"
+  },
+  {
+    "name": "Kyoto Medical University",
+    "country": "Japan"
+  },
+  {
+    "name": "National University of Kyoto",
+    "country": "Japan"
+  },
+  {
+    "name": "Kyoto Metropolitan University",
+    "country": "Japan"
+  },
+  {
+    "name": "Kyoto College of Engineering",
+    "country": "Japan"
+  }
+]

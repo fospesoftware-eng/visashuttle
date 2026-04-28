@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { SearchableSelect, MultiSearchableSelect } from "@/components/searchable-select";
+import { getUniversitiesForCountry } from "@/data/universities";
 import { useToast } from "@/hooks/use-toast";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -809,9 +810,22 @@ export default function CheckPage() {
                 {form.visaType === "Student Visa" && (
                   <div className="border-t border-slate-100 pt-4 grid sm:grid-cols-2 gap-4">
                     <p className="sm:col-span-2 text-xs font-semibold text-slate-400 uppercase tracking-wide">Student Visa Details</p>
-                    <div>
-                      <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Institution / University Name</Label>
-                      <Input value={form.institutionName} onChange={e => set("institutionName")(e.target.value)} placeholder="e.g. University of Toronto" className="border-slate-200 bg-slate-50 focus:bg-white focus:border-[#4055FF]" data-testid="input-institution" />
+                    <div className="sm:col-span-2">
+                      <SearchableSelect
+                        label="Institution / University Name"
+                        value={form.institutionName}
+                        onChange={set("institutionName")}
+                        options={getUniversitiesForCountry(form.destinationCountry)}
+                        placeholder={form.destinationCountry ? "Search or type institution name..." : "Select destination country first"}
+                        allowCustom
+                        data-testid="input-institution"
+                      />
+                      {!form.destinationCountry && (
+                        <p className="text-xs text-slate-400 mt-1">Institution suggestions will appear after you select a destination country.</p>
+                      )}
+                      {form.destinationCountry && getUniversitiesForCountry(form.destinationCountry).length === 0 && (
+                        <p className="text-xs text-slate-400 mt-1">No suggestions for {form.destinationCountry} — type your institution name directly.</p>
+                      )}
                     </div>
                     <Sel label="Study Level" val={form.studyLevel} onChange={set("studyLevel")} opts={OPTS.studyLevel} />
                   </div>
