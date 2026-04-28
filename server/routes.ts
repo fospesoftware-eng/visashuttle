@@ -77,7 +77,9 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  
+  // Seed demo B2C users into PostgreSQL on startup
+  await (storage as any).seedDemoUsersToDb?.();
+
   // === Site Password Protection ===
   app.post("/api/site-auth/verify", (req, res) => {
     const { password } = req.body;

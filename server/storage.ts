@@ -877,6 +877,45 @@ export class MemStorage implements IStorage {
 
 // HybridStorage: uses MemStorage for agency/seed data, PostgreSQL for B2C user data
 class HybridStorage extends MemStorage {
+  // Seed demo users into PostgreSQL on startup so they persist reliably
+  async seedDemoUsersToDb(): Promise<void> {
+    const demoAccounts = [
+      {
+        id: "b2c-demo",
+        email: "demo@visashuttle.com",
+        password: bcrypt.hashSync("Demo@12345", 10),
+        fullName: "Demo User",
+        phone: null,
+        phoneVerified: false,
+        freeChecksUsed: 0,
+        subscriptionPlan: "free" as const,
+        checkLimit: 1,
+        deepCheckAccess: false,
+        stripeCustomerId: null,
+      },
+      {
+        id: "b2c-test",
+        email: "test@visashuttle.com",
+        password: bcrypt.hashSync("Test@12345", 10),
+        fullName: "Test Account",
+        phone: null,
+        phoneVerified: false,
+        freeChecksUsed: 0,
+        subscriptionPlan: "pro" as const,
+        checkLimit: 9999,
+        deepCheckAccess: true,
+        stripeCustomerId: null,
+      },
+    ];
+
+    for (const account of demoAccounts) {
+      const existing = await db.select({ id: b2cUsers.id }).from(b2cUsers).where(eq(b2cUsers.email, account.email)).limit(1);
+      if (!existing[0]) {
+        await db.insert(b2cUsers).values(account);
+      }
+    }
+  }
+
   // B2C Users — persisted to DB, with in-memory fallback for seeded demo/test accounts
   async getB2cUser(id: string): Promise<B2cUser | undefined> {
     const rows = await db.select().from(b2cUsers).where(eq(b2cUsers.id, id)).limit(1);
