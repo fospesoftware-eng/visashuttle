@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { SearchableSelect, MultiSearchableSelect } from "@/components/searchable-select";
 import { getUniversitiesForCountry } from "@/data/universities";
+import { getCountryVisaConfig } from "@/data/country-visa-types";
 import { useToast } from "@/hooks/use-toast";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -66,18 +67,6 @@ const COUNTRIES = [
   "Yemen",
   "Zambia","Zimbabwe",
 ];
-
-// US Visa Category → Types map
-const US_VISA_CATEGORIES: Record<string, { types: string[]; purposeDefault: string; genericType: string }> = {
-  "Visitor":        { types: ["B1/B2 – Business / Pleasure", "B1 – Business Only", "B2 – Tourism / Pleasure", "C – Transit", "D – Crewmember"], purposeDefault: "Tourism & Sightseeing", genericType: "Tourist Visa" },
-  "Student":        { types: ["F-1 – Academic Student", "F-2 – Dependent of F-1", "M-1 – Vocational Student", "M-2 – Dependent of M-1"], purposeDefault: "Study / Education", genericType: "Student Visa" },
-  "Work":           { types: ["H-1B – Specialty Occupation", "H-1B1 – Free Trade Agreement", "H-2A – Agricultural Worker", "H-2B – Non-Agricultural Temp Worker", "H-3 – Trainee / Special Education", "L-1A – Intracompany Manager/Exec", "L-1B – Intracompany Specialized Knowledge", "O-1A – Extraordinary Ability (Science/Business)", "O-1B – Extraordinary Achievement (Arts/Film/TV)", "O-2 – Essential Support for O-1", "P-1A – Internationally Recognized Athlete", "P-1B – Entertainment Group Member", "P-2 – Artist / Entertainer (Exchange Program)", "P-3 – Culturally Unique Performer", "Q – Cultural Exchange Worker", "R-1 – Religious Worker"], purposeDefault: "Employment", genericType: "Work Visa" },
-  "Exchange":       { types: ["J-1 – Exchange Visitor", "J-2 – Dependent of J-1"], purposeDefault: "Study / Education", genericType: "Student Visa" },
-  "Diplomatic":     { types: ["A-1 – Ambassador / Diplomat", "A-2 – Other Foreign Government Official", "A-3 – Attendant / Servant of A-1/A-2", "G-1 – Designated Principal Resident Representative", "G-2 – Other Accredited Representative", "G-3 – Representative (Non-Recognized Government)", "G-4 – International Organisation Officer / Employee", "G-5 – Personal Employee of G-1 through G-4", "NATO-1 – NATO Principal Permanent Representative", "NATO-2 – Other NATO Representative / Personnel", "NATO-3 – NATO Official's Official Staff"], purposeDefault: "Business Meeting", genericType: "Business Visa" },
-  "Special":        { types: ["K-1 – Fiancé(e) of US Citizen", "K-2 – Minor Child of K-1", "K-3 – Spouse of US Citizen (Pending I-130)", "K-4 – Minor Child of K-3", "S-5 – Informant / Witness", "S-6 – Informant of Terrorist Organisation", "T-1 – Human Trafficking Victim", "U-1 – Crime Victim"], purposeDefault: "Family Visit", genericType: "Spouse / Family Visa" },
-  "Immigrant Work": { types: ["EB-1 – Priority Workers (Extraordinary Ability / Outstanding)", "EB-2 – Advanced Degree / Exceptional Ability", "EB-3 – Skilled Workers / Professionals / Other Workers", "EB-4 – Special Immigrants (Religious Workers / Broadcasters, etc.)", "EB-5 – Immigrant Investor"], purposeDefault: "Employment", genericType: "Work Visa" },
-  "Immigrant Family":{ types: ["IR-1 – Spouse of US Citizen", "IR-2 – Unmarried Child (under 21) of US Citizen", "IR-5 – Parent of Adult US Citizen", "F-1 – Unmarried Adult Son / Daughter of US Citizen", "F-2A – Spouse / Child of Permanent Resident", "F-2B – Unmarried Adult Son / Daughter of Permanent Resident", "F-3 – Married Son / Daughter of US Citizen", "F-4 – Sibling of Adult US Citizen"], purposeDefault: "Family Visit", genericType: "Spouse / Family Visa" },
-};
 
 const OPTS = {
   gender: ["Male","Female","Non-binary","Prefer not to say"],
@@ -387,8 +376,8 @@ export default function CheckPage() {
 
   function validateStep(): boolean {
     if (step === 1) {
-      const usOk = form.destinationCountry !== "United States" || !!form.usVisaCategory;
-      return !!(form.nationality && form.destinationCountry && form.visaType && form.purposeOfTravel && form.tripDuration && usOk);
+      const structuredOk = !getCountryVisaConfig(form.destinationCountry) || !!form.usVisaCategory;
+      return !!(form.nationality && form.destinationCountry && form.visaType && form.purposeOfTravel && form.tripDuration && structuredOk);
     }
     if (step === 2) return !!(form.employmentStatus && form.monthlyIncome && form.bankBalance && form.previousVisaRefusals);
     return true;
@@ -753,7 +742,7 @@ export default function CheckPage() {
               <div className="space-y-4">
                 <div className="grid sm:grid-cols-2 gap-4">
                   <SearchableSelect label="Your Nationality *" required value={form.nationality} onChange={set("nationality")} options={COUNTRIES} placeholder="Search your passport country..." data-testid="select-nationality" />
-                  <SearchableSelect label="Destination Country *" required value={form.destinationCountry} onChange={val => { set("destinationCountry")(val); if (val !== "United States") { set("usVisaCategory")(""); set("visaType")(""); } }} options={COUNTRIES} placeholder="Where are you going?" data-testid="select-destination" />
+                  <SearchableSelect label="Destination Country *" required value={form.destinationCountry} onChange={val => { set("destinationCountry")(val); set("usVisaCategory")(""); set("visaType")(""); }} options={COUNTRIES} placeholder="Where are you going?" data-testid="select-destination" />
                 </div>
 
                 {/* Visa-free / VOA banner */}
@@ -785,54 +774,61 @@ export default function CheckPage() {
                   </div>
                 )}
 
-                {form.destinationCountry === "United States" ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 border border-blue-200">
-                      <span className="text-lg">🇺🇸</span>
-                      <p className="text-xs text-blue-700 font-medium">US visa selection — choose your category then specific visa type</p>
-                    </div>
-                    <div className="grid sm:grid-cols-2 gap-4">
-                      <Sel
-                        label="Visa Category *"
-                        val={form.usVisaCategory}
-                        onChange={val => {
-                          set("usVisaCategory")(val);
-                          set("visaType")("");
-                          const cat = US_VISA_CATEGORIES[val];
-                          if (cat) set("purposeOfTravel")(cat.purposeDefault);
-                        }}
-                        opts={Object.keys(US_VISA_CATEGORIES)}
-                        required
-                        testId="select-us-visa-category"
-                      />
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                          Visa Type *{!form.usVisaCategory && <span className="text-slate-400 font-normal ml-1">(select category first)</span>}
-                        </label>
-                        <select
-                          data-testid="select-us-visa-type"
-                          disabled={!form.usVisaCategory}
-                          value={form.visaType}
-                          onChange={e => set("visaType")(e.target.value)}
-                          className="w-full h-10 px-3 text-sm border rounded-lg bg-white border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#4055FF] disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <option value="">Select visa type…</option>
-                          {(US_VISA_CATEGORIES[form.usVisaCategory]?.types || []).map(t => (
-                            <option key={t} value={t}>{t}</option>
-                          ))}
-                        </select>
+                {(() => {
+                  const visaConf = getCountryVisaConfig(form.destinationCountry);
+                  if (visaConf) {
+                    const catData = visaConf.categories[form.usVisaCategory];
+                    return (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 border border-blue-200">
+                          <span className="text-lg">{visaConf.flag}</span>
+                          <p className="text-xs text-blue-700 font-medium">{visaConf.regionLabel} — select a category then the specific visa type</p>
+                        </div>
+                        <div className="grid sm:grid-cols-2 gap-4">
+                          <Sel
+                            label="Visa Category *"
+                            val={form.usVisaCategory}
+                            onChange={val => {
+                              set("usVisaCategory")(val);
+                              set("visaType")("");
+                              const cat = visaConf.categories[val];
+                              if (cat) set("purposeOfTravel")(cat.purposeDefault);
+                            }}
+                            opts={Object.keys(visaConf.categories)}
+                            required
+                            testId="select-visa-category"
+                          />
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                              Visa Type *{!form.usVisaCategory && <span className="text-slate-400 font-normal ml-1">(select category first)</span>}
+                            </label>
+                            <select
+                              data-testid="select-visa-type-specific"
+                              disabled={!form.usVisaCategory}
+                              value={form.visaType}
+                              onChange={e => set("visaType")(e.target.value)}
+                              className="w-full h-10 px-3 text-sm border rounded-lg bg-white border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#4055FF] disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <option value="">Select visa type…</option>
+                              {(catData?.types || []).map(t => (
+                                <option key={t} value={t}>{t}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                        <div className="grid sm:grid-cols-2 gap-4">
+                          <Sel label="Purpose of Travel *" val={form.purposeOfTravel} onChange={set("purposeOfTravel")} opts={OPTS.purposeOfTravel} required />
+                        </div>
                       </div>
-                    </div>
+                    );
+                  }
+                  return (
                     <div className="grid sm:grid-cols-2 gap-4">
+                      <Sel label="Visa Type *" val={form.visaType} onChange={val => { set("visaType")(val); set("usVisaCategory")(""); }} opts={OPTS.visaType} required testId="select-visa-type" />
                       <Sel label="Purpose of Travel *" val={form.purposeOfTravel} onChange={set("purposeOfTravel")} opts={OPTS.purposeOfTravel} required />
                     </div>
-                  </div>
-                ) : (
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <Sel label="Visa Type *" val={form.visaType} onChange={val => { set("visaType")(val); set("usVisaCategory")(""); }} opts={OPTS.visaType} required testId="select-visa-type" />
-                    <Sel label="Purpose of Travel *" val={form.purposeOfTravel} onChange={set("purposeOfTravel")} opts={OPTS.purposeOfTravel} required />
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Mismatch warning */}
                 {(() => {
