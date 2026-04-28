@@ -74,7 +74,6 @@ const OPTS = {
   numberOfChildren: ["0","1","2","3","4","5+"],
   dependents: ["None","1","2","3","4","5+"],
   visaType: ["Tourist Visa","Business Visa","Student Visa","Work Visa","Visit Visa","Transit Visa","Investor Visa","Spouse / Family Visa","Conference / Event Visa","Medical Visa"],
-  purposeOfTravel: ["Tourism & Sightseeing","Business Meeting","Study / Education","Employment","Family Visit","Medical Treatment","Conference / Event","Transit","Wedding / Social Event","Investment / Business Setup"],
   tripDuration: ["1–3 days","4–7 days","8–14 days","15–30 days","1–3 months","More than 3 months"],
   entryType: ["Single Entry","Multiple Entry","Double Entry"],
   yesNo: ["Yes","No"],
@@ -94,34 +93,13 @@ const OPTS = {
   studyLevel: ["High School / Secondary","Undergraduate / Bachelor's","Postgraduate / Master's","PhD / Doctoral","Certificate / Diploma","Language Course","Short Course / Training"],
 };
 
-// Maps each visa type to: { allowed purposes, recommended default }
-const VISA_PURPOSE_MAP: Record<string, { allowed: string[]; default: string }> = {
-  "Tourist Visa":          { allowed: ["Tourism & Sightseeing","Wedding / Social Event","Medical Treatment"], default: "Tourism & Sightseeing" },
-  "Business Visa":         { allowed: ["Business Meeting","Conference / Event","Investment / Business Setup"], default: "Business Meeting" },
-  "Student Visa":          { allowed: ["Study / Education"], default: "Study / Education" },
-  "Work Visa":             { allowed: ["Employment"], default: "Employment" },
-  "Visit Visa":            { allowed: ["Family Visit","Tourism & Sightseeing","Wedding / Social Event"], default: "Family Visit" },
-  "Transit Visa":          { allowed: ["Transit"], default: "Transit" },
-  "Investor Visa":         { allowed: ["Investment / Business Setup","Business Meeting"], default: "Investment / Business Setup" },
-  "Spouse / Family Visa":  { allowed: ["Family Visit","Wedding / Social Event"], default: "Family Visit" },
-  "Conference / Event Visa":{ allowed: ["Conference / Event","Business Meeting"], default: "Conference / Event" },
-  "Medical Visa":          { allowed: ["Medical Treatment"], default: "Medical Treatment" },
-};
-
-function getPurposeMismatch(visaType: string, purpose: string): string | null {
-  if (!visaType || !purpose) return null;
-  const map = VISA_PURPOSE_MAP[visaType];
-  if (!map) return null;
-  if (map.allowed.includes(purpose)) return null;
-  return `"${purpose}" is not a typical purpose for a ${visaType}. Expected: ${map.allowed.join(", ")}.`;
-}
 
 interface FormData {
   // Step 1 - Personal Profile
   nationality: string; passportCountry: string; dateOfBirth: string; gender: string;
   maritalStatus: string; numberOfChildren: string; countryOfResidence: string; dependentsHomeCountry: string;
   // Step 2 - Travel Plan
-  destinationCountry: string; visaType: string; usVisaCategory: string; purposeOfTravel: string;
+  destinationCountry: string; visaType: string; usVisaCategory: string;
   plannedTravelDate: string; tripDuration: string; entryType: string; firstTimeVisitor: string;
   // Visa-type conditional
   institutionName: string; studyLevel: string; hasAcceptanceLetter: string;
@@ -154,7 +132,7 @@ interface FormData {
 const EMPTY: FormData = {
   nationality: "", passportCountry: "", dateOfBirth: "", gender: "",
   maritalStatus: "", numberOfChildren: "", countryOfResidence: "", dependentsHomeCountry: "",
-  destinationCountry: "", visaType: "", usVisaCategory: "", purposeOfTravel: "",
+  destinationCountry: "", visaType: "", usVisaCategory: "",
   plannedTravelDate: "", tripDuration: "", entryType: "", firstTimeVisitor: "",
   institutionName: "", studyLevel: "", hasAcceptanceLetter: "",
   hasJobOffer: "", hiringCompanyName: "",
@@ -330,16 +308,6 @@ export default function CheckPage() {
     }
   }, [form.nationality, form.destinationCountry, form.passportCountry, form.countryOfResidence]);
 
-  // Auto-set purpose of travel when visa type changes
-  useEffect(() => {
-    if (!form.visaType) return;
-    const map = VISA_PURPOSE_MAP[form.visaType];
-    if (!map) return;
-    // Only auto-set if purpose is empty OR it's now a mismatch
-    if (!form.purposeOfTravel || !map.allowed.includes(form.purposeOfTravel)) {
-      setForm(f => ({ ...f, purposeOfTravel: map.default }));
-    }
-  }, [form.visaType]);
 
   function applyProfile() {
     if (!savedProfile) return;
@@ -377,7 +345,7 @@ export default function CheckPage() {
   function validateStep(): boolean {
     if (step === 1) {
       const structuredOk = !getCountryVisaConfig(form.destinationCountry) || !!form.usVisaCategory;
-      return !!(form.nationality && form.destinationCountry && form.visaType && form.purposeOfTravel && form.tripDuration && structuredOk);
+      return !!(form.nationality && form.destinationCountry && form.visaType && form.tripDuration && structuredOk);
     }
     if (step === 2) return !!(form.employmentStatus && form.monthlyIncome && form.bankBalance && form.previousVisaRefusals);
     return true;
@@ -518,8 +486,6 @@ export default function CheckPage() {
                     <span>{form.nationality}</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                     <span className="font-semibold">{form.destinationCountry}</span>
-                    <span>•</span>
-                    <span>{form.purposeOfTravel}</span>
                   </div>
                   {aiProvider && aiProvider !== "mock" && (
                     <Badge className="bg-white/20 text-white border-0 text-xs">
@@ -791,8 +757,6 @@ export default function CheckPage() {
                             onChange={val => {
                               set("usVisaCategory")(val);
                               set("visaType")("");
-                              const cat = visaConf.categories[val];
-                              if (cat) set("purposeOfTravel")(cat.purposeDefault);
                             }}
                             opts={Object.keys(visaConf.categories)}
                             required
@@ -816,39 +780,14 @@ export default function CheckPage() {
                             </select>
                           </div>
                         </div>
-                        <div className="grid sm:grid-cols-2 gap-4">
-                          <Sel label="Purpose of Travel *" val={form.purposeOfTravel} onChange={set("purposeOfTravel")} opts={OPTS.purposeOfTravel} required />
-                        </div>
                       </div>
                     );
                   }
                   return (
                     <div className="grid sm:grid-cols-2 gap-4">
                       <Sel label="Visa Type *" val={form.visaType} onChange={val => { set("visaType")(val); set("usVisaCategory")(""); }} opts={OPTS.visaType} required testId="select-visa-type" />
-                      <Sel label="Purpose of Travel *" val={form.purposeOfTravel} onChange={set("purposeOfTravel")} opts={OPTS.purposeOfTravel} required />
                     </div>
                   );
-                })()}
-
-                {/* Mismatch warning */}
-                {(() => {
-                  const mismatch = getPurposeMismatch(form.visaType, form.purposeOfTravel);
-                  return mismatch ? (
-                    <div className="flex items-start gap-3 p-3.5 rounded-xl bg-amber-50 border border-amber-200">
-                      <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-sm font-semibold text-amber-800">Purpose & visa type mismatch</p>
-                        <p className="text-xs text-amber-700 mt-0.5">{mismatch}</p>
-                        <button
-                          type="button"
-                          className="mt-1.5 text-xs font-semibold text-amber-800 underline underline-offset-2"
-                          onClick={() => setForm(f => ({ ...f, purposeOfTravel: VISA_PURPOSE_MAP[f.visaType]?.default || f.purposeOfTravel }))}
-                        >
-                          Auto-fix to "{VISA_PURPOSE_MAP[form.visaType]?.default}"
-                        </button>
-                      </div>
-                    </div>
-                  ) : null;
                 })()}
 
                 <div className="grid sm:grid-cols-2 gap-4">
@@ -1002,7 +941,7 @@ export default function CheckPage() {
                 )}
 
                 <div className="grid sm:grid-cols-2 gap-3">
-                  <ReviewSection title="Travel Details" icon={PlaneTakeoff} items={[["Nationality", form.nationality], ["Destination", form.destinationCountry], ["Visa Type", form.visaType], ["Purpose", form.purposeOfTravel], ["Duration", form.tripDuration], ["Travel Date", form.plannedTravelDate], ["Residence", form.countryOfResidence], ["Marital Status", form.maritalStatus]]} />
+                  <ReviewSection title="Travel Details" icon={PlaneTakeoff} items={[["Nationality", form.nationality], ["Destination", form.destinationCountry], ["Visa Type", form.visaType], ["Duration", form.tripDuration], ["Travel Date", form.plannedTravelDate], ["Residence", form.countryOfResidence], ["Marital Status", form.maritalStatus]]} />
                   <ReviewSection title="About You" icon={User} items={[["Employment", form.employmentStatus], ["Job Title", form.jobTitle], ["Company", form.companyName], ["Monthly Income", form.monthlyIncome], ["Bank Balance", form.bankBalance], ["Trip Funded By", form.tripFunding], ["Refusals", form.previousVisaRefusals]]} />
                   <ReviewSection title="Documents" icon={FileText} items={[["Bank Statement", form.hasBankStatement], ["Return Ticket", form.hasReturnTicket], ["Travel Insurance", form.hasTravelInsurance], ["Hotel Booking", form.hasHotelBooking], ["Salary Slips", form.hasSalarySlips], ["Leave Approval", form.hasLeaveApproval], ["Family Home", form.familyInHomeCountry]]} />
                 </div>

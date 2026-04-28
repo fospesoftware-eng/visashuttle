@@ -161,24 +161,6 @@ function getAge(dob: string): number | null {
 }
 
 // ── Visa-purpose compatibility ─────────────────────────────────────────────
-const VISA_PURPOSE_MAP: Record<string, string[]> = {
-  "Tourist Visa": ["Tourism & Sightseeing", "Wedding / Social Event", "Medical Treatment"],
-  "Business Visa": ["Business Meeting", "Conference / Event", "Investment / Business Setup"],
-  "Student Visa": ["Study / Education"],
-  "Work Visa": ["Employment"],
-  "Visit Visa": ["Family Visit", "Tourism & Sightseeing", "Wedding / Social Event", "Medical Treatment"],
-  "Transit Visa": ["Transit"],
-  "Investor Visa": ["Investment / Business Setup", "Business Meeting"],
-  "Spouse / Family Visa": ["Family Visit"],
-  "Conference / Event Visa": ["Conference / Event", "Business Meeting"],
-  "Medical Visa": ["Medical Treatment"],
-};
-
-function purposeMismatch(visaType: string, purpose: string): boolean {
-  if (!visaType || !purpose) return false;
-  const allowed = VISA_PURPOSE_MAP[visaType];
-  return !!allowed && !allowed.includes(purpose);
-}
 
 const TRANSIT_LONG_DURATIONS = ["15–30 days", "1–3 months", "More than 3 months"];
 const EMPLOYED_STATUSES = ["Employed (Full-time)", "Employed (Part-time)", "Government Employee"];
@@ -673,7 +655,6 @@ export default function DeepCheckPage() {
     2: [
       { key: "destinationCountry", label: "Destination Country" },
       { key: "visaType", label: "Visa Type" },
-      { key: "purposeOfTravel", label: "Purpose of Travel" },
       { key: "tripDuration", label: "Trip Duration" },
     ],
     3: [{ key: "employmentStatus", label: "Employment Status" }],
@@ -1044,8 +1025,6 @@ export default function DeepCheckPage() {
                             onChange={val => {
                               set("usVisaCategory")(val);
                               set("visaType")("");
-                              const cat = visaConf.categories[val];
-                              if (cat) set("purposeOfTravel")(cat.purposeDefault);
                             }}
                             opts={Object.keys(visaConf.categories)}
                           />
@@ -1068,7 +1047,7 @@ export default function DeepCheckPage() {
                         </div>
                       );
                     }
-                    return <Sel label="Visa Type *" val={form.visaType || ""} onChange={val => { set("visaType")(val); set("usVisaCategory")(""); set("purposeOfTravel")(""); set("tripDuration")(""); }} opts={["Tourist Visa","Business Visa","Student Visa","Work Visa","Visit Visa","Transit Visa","Investor Visa","Spouse / Family Visa","Conference / Event Visa","Medical Visa"]} />;
+                    return <Sel label="Visa Type *" val={form.visaType || ""} onChange={val => { set("visaType")(val); set("usVisaCategory")(""); set("tripDuration")(""); }} opts={["Tourist Visa","Business Visa","Student Visa","Work Visa","Visit Visa","Transit Visa","Investor Visa","Spouse / Family Visa","Conference / Event Visa","Medical Visa"]} />;
                   })()}
                   {form.visaType && (() => {
                     const age = getAge(form.dateOfBirth);
@@ -1092,14 +1071,6 @@ export default function DeepCheckPage() {
                   {form.visaType === "Spouse / Family Visa" && form.maritalStatus === "Single" && (
                     <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
                       <AlertTriangle className="w-3 h-3" /> Spouse / Family Visa typically requires proof of marriage or legal partnership. Your marital status is "Single".
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <Sel label="Purpose of Travel *" val={form.purposeOfTravel || ""} onChange={set("purposeOfTravel")} opts={["Tourism & Sightseeing","Business Meeting","Study / Education","Employment","Family Visit","Medical Treatment","Conference / Event","Transit","Wedding / Social Event","Investment / Business Setup"]} />
-                  {purposeMismatch(form.visaType, form.purposeOfTravel) && (
-                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                      <AlertTriangle className="w-3 h-3" /> Travel purpose doesn't match visa type — embassies will likely question this.
                     </p>
                   )}
                 </div>
