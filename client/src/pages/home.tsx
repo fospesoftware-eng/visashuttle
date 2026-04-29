@@ -16,7 +16,9 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
 
 // ── Large pool of country-pair visa data ──────────────────────────────────────
-const POOL: { from: string; to: string; type: string; score: number }[] = [
+type VisaScoreSample = { from: string; to: string; type: string; score: number };
+
+const POOL: VisaScoreSample[] = [
   { from: "India", to: "UAE", type: "Tourist Visa", score: 88 },
   { from: "India", to: "Schengen", type: "Tourist Visa", score: 61 },
   { from: "India", to: "United Kingdom", type: "Visit Visa", score: 55 },
@@ -129,61 +131,39 @@ const STEPS = [
 export default function HomePage() {
   const { user } = useB2cAuth();
   const [, setLocation] = useLocation();
-  const [samples, setSamples] = useState<typeof POOL>([]);
+  const [samples, setSamples] = useState<VisaScoreSample[]>([]);
   const [userCountry, setUserCountry] = useState<string | null>(null);
   const [pulse, setPulse] = useState(0); // increments to trigger subtle "live" animation
   const [contactForm, setContactForm] = useState({ name: "", email: "", message: "" });
   const pulseRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Detect user's country via IP geolocation, then build randomized list
+  // Build a fresh, visitor-country-aware list on every page visit.
   useEffect(() => {
-    async function buildSamples(detected: string | null) {
-      const rest = shuffle(POOL);
+    const fallback = () => setSamples(shuffle(POOL).slice(0, 4));
+    const controller = new AbortController();
 
-      let list: typeof POOL = [];
-
-      if (detected) {
-        // Find entries where `from` matches the detected country
-        const fromUser = rest.filter(p => p.from.toLowerCase() === detected.toLowerCase());
-        // Find entries for popular destinations in that country
-        const popular = NATIONALITY_DESTINATIONS[detected];
-        const fromPopular = popular
-          ? popular.flatMap(dest => rest.filter(p => p.from === detected && p.to === dest)).slice(0, 1)
-          : [];
-
-        const userEntry = (fromUser.length > 0 ? fromUser : fromPopular)[0] ?? null;
-
-        if (userEntry) {
-          // User's country first, then 3 random different entries
-          const others = rest.filter(p => p.from !== detected).slice(0, 3);
-          list = [userEntry, ...others];
-        } else {
-          // Fallback: synthetic entry for user's country with a typical destination
-          const synthDest = NATIONALITY_DESTINATIONS[detected]?.[0] ?? "Schengen";
-          const base = 50 + Math.floor(Math.random() * 30);
-          const synth = { from: detected, to: synthDest, type: "Tourist Visa", score: base };
-          const others = rest.slice(0, 3);
-          list = [synth, ...others];
-        }
-      } else {
-        list = rest.slice(0, 4);
-      }
-
-      setSamples(list);
-    }
-
-    fetch("https://ipapi.co/json/")
-      .then(r => r.json())
-      .then(d => {
-        const country: string = d?.country_name ?? "";
-        setUserCountry(country || null);
-        buildSamples(country || null);
+    fetch("/api/public/live-visa-scores", {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then(r => {
+        if (!r.ok) throw new Error("Unable to load live scores");
+        return r.json();
       })
-      .catch(() => buildSamples(null));
+      .then((data: { country?: string | null; scores?: VisaScoreSample[] }) => {
+        setUserCountry(data.country || null);
+        setSamples(data.scores?.length ? data.scores : shuffle(POOL).slice(0, 4));
+      })
+      .catch(err => {
+        if (err.name !== "AbortError") fallback();
+      });
 
     // Pulse every 4s to simulate "live" updates (just a visual tick, no refetch)
     pulseRef.current = setInterval(() => setPulse(p => p + 1), 4000);
-    return () => { if (pulseRef.current) clearInterval(pulseRef.current); };
+    return () => {
+      controller.abort();
+      if (pulseRef.current) clearInterval(pulseRef.current);
+    };
   }, []);
 
   function handleCheckCTA() {

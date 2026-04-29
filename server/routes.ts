@@ -73,6 +73,154 @@ function generateReferenceId(): string {
   return result;
 }
 
+type LiveVisaScore = {
+  from: string;
+  to: string;
+  type: string;
+  score: number;
+};
+
+const COUNTRY_BY_CODE: Record<string, string> = {
+  AE: "United Arab Emirates",
+  AU: "Australia",
+  BD: "Bangladesh",
+  BR: "Brazil",
+  CA: "Canada",
+  CN: "China",
+  CO: "Colombia",
+  DE: "Germany",
+  EG: "Egypt",
+  ES: "Spain",
+  ET: "Ethiopia",
+  FR: "France",
+  GB: "United Kingdom",
+  GH: "Ghana",
+  ID: "Indonesia",
+  IN: "India",
+  IR: "Iran",
+  IQ: "Iraq",
+  JO: "Jordan",
+  JP: "Japan",
+  KE: "Kenya",
+  LB: "Lebanon",
+  LK: "Sri Lanka",
+  MA: "Morocco",
+  MX: "Mexico",
+  NG: "Nigeria",
+  NP: "Nepal",
+  PH: "Philippines",
+  PK: "Pakistan",
+  RU: "Russia",
+  SA: "Saudi Arabia",
+  TH: "Thailand",
+  TR: "Turkey",
+  UA: "Ukraine",
+  US: "United States",
+  UZ: "Uzbekistan",
+  VN: "Vietnam",
+  ZA: "South Africa",
+};
+
+const ORIGIN_DESTINATIONS: Record<string, string[]> = {
+  India: ["Nepal", "Bhutan", "Australia", "UAE", "United Kingdom", "Canada", "United States", "Schengen"],
+  Pakistan: ["UAE", "Saudi Arabia", "United Kingdom", "Turkey", "Canada", "United States", "Schengen"],
+  Bangladesh: ["UAE", "Malaysia", "United Kingdom", "Canada", "Australia", "United States"],
+  Nepal: ["India", "UAE", "Australia", "Canada", "United Kingdom", "United States"],
+  "Sri Lanka": ["UAE", "Australia", "United Kingdom", "Canada", "Schengen"],
+  Philippines: ["Japan", "UAE", "Australia", "Canada", "United Kingdom", "Schengen"],
+  "United States": ["Schengen", "United Kingdom", "Australia", "Japan", "Canada"],
+  "United Kingdom": ["Schengen", "United States", "Australia", "Canada", "UAE"],
+  Canada: ["Schengen", "United States", "United Kingdom", "Australia", "Japan"],
+  Australia: ["United States", "Schengen", "United Kingdom", "Japan", "Canada"],
+  "United Arab Emirates": ["United Kingdom", "Schengen", "United States", "Canada", "Australia"],
+  "Saudi Arabia": ["Schengen", "United Kingdom", "United States", "UAE", "Australia"],
+};
+
+const FALLBACK_DESTINATIONS = [
+  "United States",
+  "United Kingdom",
+  "Schengen",
+  "Canada",
+  "Australia",
+  "UAE",
+  "Japan",
+  "New Zealand",
+  "Singapore",
+  "Turkey",
+];
+
+const HIGH_MOBILITY_ORIGINS = new Set(["United States", "United Kingdom", "Canada", "Australia", "Germany", "France", "Japan"]);
+const REGIONAL_EASY_DESTINATIONS = new Set(["Nepal", "Bhutan", "UAE", "Singapore", "Japan", "Turkey"]);
+const HIGH_SCRUTINY_DESTINATIONS = new Set(["United States", "United Kingdom", "Canada", "Australia", "Schengen", "New Zealand"]);
+
+function shuffle<T>(arr: T[]): T[] {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+function clampScore(score: number): number {
+  return Math.max(24, Math.min(94, score));
+}
+
+function visaTypeForDestination(to: string): string {
+  if (["UAE", "Saudi Arabia", "Malaysia"].includes(to)) return Math.random() > 0.65 ? "Work Visa" : "Tourist Visa";
+  if (["United Kingdom", "Canada", "Australia"].includes(to)) return Math.random() > 0.75 ? "Student Visa" : "Visit Visa";
+  return "Tourist Visa";
+}
+
+function liveScoreForRoute(from: string, to: string): number {
+  let score = HIGH_MOBILITY_ORIGINS.has(from) ? 82 : 56;
+
+  if (REGIONAL_EASY_DESTINATIONS.has(to)) score += 14;
+  if (HIGH_SCRUTINY_DESTINATIONS.has(to)) score -= HIGH_MOBILITY_ORIGINS.has(from) ? 0 : 10;
+  if (from === "India" && ["Nepal", "Bhutan"].includes(to)) score = 88 + Math.floor(Math.random() * 5);
+  if (from === "India" && to === "Australia") score = 56 + Math.floor(Math.random() * 8);
+  if (from === to) score -= 30;
+
+  return clampScore(score + Math.floor(Math.random() * 11) - 5);
+}
+
+function getCountryCodeFromRequest(req: Request): string | null {
+  const raw =
+    req.header("cf-ipcountry") ||
+    req.header("x-vercel-ip-country") ||
+    req.header("cloudfront-viewer-country") ||
+    req.header("x-country-code") ||
+    req.header("x-appengine-country");
+
+  if (!raw || raw.toUpperCase() === "XX") return null;
+  return raw.split(",")[0].trim().toUpperCase();
+}
+
+function getCountryFromRequest(req: Request): string | null {
+  const explicitCountry = req.header("x-country-name");
+  if (explicitCountry && explicitCountry.length > 2) return explicitCountry.trim();
+
+  const code = getCountryCodeFromRequest(req);
+  return code ? COUNTRY_BY_CODE[code] ?? null : null;
+}
+
+function buildLiveVisaScores(origin: string | null): { country: string | null; scores: LiveVisaScore[] } {
+  const from = origin || shuffle(Object.values(COUNTRY_BY_CODE))[0] || "India";
+  const destinations = shuffle([...(ORIGIN_DESTINATIONS[from] || FALLBACK_DESTINATIONS)])
+    .filter(destination => destination !== from)
+    .slice(0, 4);
+
+  return {
+    country: origin,
+    scores: destinations.map(to => ({
+      from,
+      to,
+      type: visaTypeForDestination(to),
+      score: liveScoreForRoute(from, to),
+    })),
+  };
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -101,6 +249,11 @@ export async function registerRoutes(
       return res.json({ authenticated: true });
     }
     res.json({ authenticated: !!req.session.siteAuthenticated });
+  });
+
+  app.get("/api/public/live-visa-scores", (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    res.json(buildLiveVisaScores(getCountryFromRequest(req)));
   });
 
   // === Auth Routes ===
