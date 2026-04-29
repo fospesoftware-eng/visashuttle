@@ -196,22 +196,46 @@ function getCountryCodeFromRequest(req: Request): string | null {
   return raw.split(",")[0].trim().toUpperCase();
 }
 
-function getCountryFromRequest(req: Request): string | null {
+function getClientIp(req: Request): string | null {
+  const forwarded = req.header("x-forwarded-for")?.split(",")[0]?.trim();
+  const raw = forwarded || req.header("x-real-ip") || req.socket.remoteAddress || "";
+  const ip = raw.replace(/^::ffff:/, "").trim();
+
+  if (!ip || ip === "::1" || ip === "127.0.0.1") return null;
+  if (/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(ip)) return null;
+  return ip;
+}
+
+async function lookupCountryByIp(ip: string): Promise<string | null> {
+  try {
+    const response = await fetch(`https://ipapi.co/${encodeURIComponent(ip)}/json/`);
+    if (!response.ok) return null;
+    const data = await response.json() as { country_name?: string };
+    return data.country_name || null;
+  } catch {
+    return null;
+  }
+}
+
+async function getCountryFromRequest(req: Request): Promise<string | null> {
   const explicitCountry = req.header("x-country-name");
   if (explicitCountry && explicitCountry.length > 2) return explicitCountry.trim();
 
   const code = getCountryCodeFromRequest(req);
-  return code ? COUNTRY_BY_CODE[code] ?? null : null;
+  if (code && COUNTRY_BY_CODE[code]) return COUNTRY_BY_CODE[code];
+
+  const ip = getClientIp(req);
+  return ip ? lookupCountryByIp(ip) : null;
 }
 
 function buildLiveVisaScores(origin: string | null): { country: string | null; scores: LiveVisaScore[] } {
-  const from = origin || shuffle(Object.values(COUNTRY_BY_CODE))[0] || "India";
+  const from = origin || "India";
   const destinations = shuffle([...(ORIGIN_DESTINATIONS[from] || FALLBACK_DESTINATIONS)])
     .filter(destination => destination !== from)
     .slice(0, 4);
 
   return {
-    country: origin,
+    country: from,
     scores: destinations.map(to => ({
       from,
       to,
@@ -251,9 +275,9 @@ export async function registerRoutes(
     res.json({ authenticated: !!req.session.siteAuthenticated });
   });
 
-  app.get("/api/public/live-visa-scores", (req, res) => {
+  app.get("/api/public/live-visa-scores", async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
-    res.json(buildLiveVisaScores(getCountryFromRequest(req)));
+    res.json(buildLiveVisaScores(await getCountryFromRequest(req)));
   });
 
   // === Auth Routes ===

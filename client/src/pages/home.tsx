@@ -122,6 +122,17 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
+function fallbackSamples(): VisaScoreSample[] {
+  const fallbackFrom = "India";
+  const destinations = shuffle(["Nepal", "Bhutan", "Australia", "UAE", "United Kingdom", "Canada", "United States", "Schengen"]).slice(0, 4);
+  return destinations.map(to => ({
+    from: fallbackFrom,
+    to,
+    type: to === "United Kingdom" ? "Visit Visa" : "Tourist Visa",
+    score: to === "Nepal" || to === "Bhutan" ? 90 : 50 + Math.floor(Math.random() * 32),
+  }));
+}
+
 const STEPS = [
   { step: "01", icon: FileText, title: "Enter Your Travel Details", desc: "Share 14 key details about your nationality, visa type, finances, travel history, and trip plans." },
   { step: "02", icon: Brain, title: "AI Analyzes Your Profile", desc: "Our AI compares your profile against real approval patterns across thousands of visa cases globally." },
@@ -139,7 +150,10 @@ export default function HomePage() {
 
   // Build a fresh, visitor-country-aware list on every page visit.
   useEffect(() => {
-    const fallback = () => setSamples(shuffle(POOL).slice(0, 4));
+    const fallback = () => {
+      setUserCountry("India");
+      setSamples(fallbackSamples());
+    };
     const controller = new AbortController();
 
     fetch("/api/public/live-visa-scores", {
@@ -151,8 +165,10 @@ export default function HomePage() {
         return r.json();
       })
       .then((data: { country?: string | null; scores?: VisaScoreSample[] }) => {
-        setUserCountry(data.country || null);
-        setSamples(data.scores?.length ? data.scores : shuffle(POOL).slice(0, 4));
+        const scores = data.scores?.length ? data.scores : fallbackSamples();
+        const fromCountry = data.country || scores[0]?.from || "India";
+        setUserCountry(fromCountry);
+        setSamples(scores.map(score => ({ ...score, from: fromCountry })));
       })
       .catch(err => {
         if (err.name !== "AbortError") fallback();
