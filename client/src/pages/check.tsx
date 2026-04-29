@@ -93,6 +93,14 @@ const OPTS = {
   studyLevel: ["High School / Secondary","Undergraduate / Bachelor's","Postgraduate / Master's","PhD / Doctoral","Certificate / Diploma","Language Course","Short Course / Training"],
 };
 
+const BASIC_PROGRESS_STEPS = [
+  "Reviewing your travel details…",
+  "Assessing financial strength…",
+  "Checking document readiness…",
+  "Comparing against embassy requirements…",
+  "Calculating your approval estimate…",
+];
+
 
 interface FormData {
   // Step 1 - Personal Profile
@@ -271,6 +279,7 @@ export default function CheckPage() {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<FormData>(EMPTY);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [analysisStep, setAnalysisStep] = useState(0);
   const [consentChecked, setConsentChecked] = useState(false);
   const [consentError, setConsentError] = useState("");
   const [result, setResult] = useState<AIResult | null>(null);
@@ -363,6 +372,21 @@ export default function CheckPage() {
   function back() { setStep(s => Math.max(1, s - 1)); }
 
   const MIN_PROGRESS_MS = 12000; // always show progress for at least 12 seconds
+  const STEP_PROGRESS_MS = Math.floor(MIN_PROGRESS_MS / BASIC_PROGRESS_STEPS.length);
+
+  useEffect(() => {
+    if (!isSubmitting) {
+      setAnalysisStep(0);
+      return;
+    }
+
+    setAnalysisStep(0);
+    const tick = setInterval(() => {
+      setAnalysisStep(current => Math.min(BASIC_PROGRESS_STEPS.length - 1, current + 1));
+    }, STEP_PROGRESS_MS);
+
+    return () => clearInterval(tick);
+  }, [isSubmitting, STEP_PROGRESS_MS]);
 
   async function handleSubmit() {
     if (!canCheck) { setLocation("/pricing"); return; }
@@ -431,13 +455,6 @@ export default function CheckPage() {
 
   // ===== PROGRESS SCREEN (basic check analyzing) =====
   if (isSubmitting) {
-    const steps = [
-      "Reviewing your travel details…",
-      "Assessing financial strength…",
-      "Checking document readiness…",
-      "Comparing against embassy requirements…",
-      "Calculating your approval estimate…",
-    ];
     return (
       <DashboardLayout title="Analyzing Your Visa Profile" subtitle="Basic Check — please wait">
         <div className="w-full max-w-md mx-auto flex flex-col items-center justify-center min-h-[60vh] gap-8">
@@ -455,9 +472,28 @@ export default function CheckPage() {
 
           {/* Step checklist */}
           <div className="w-full space-y-2.5">
-            {steps.map((s, i) => (
-              <div key={i} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white border border-slate-100 shadow-sm">
-                <span className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 border-2 border-[#4055FF] border-t-transparent animate-spin" style={{ animationDuration: `${1.2 + i * 0.3}s` }} />
+            {BASIC_PROGRESS_STEPS.map((s, i) => (
+              <div
+                key={i}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl border shadow-sm transition-all duration-300 ${
+                  i < analysisStep
+                    ? "bg-emerald-50/70 border-emerald-100"
+                    : i === analysisStep
+                      ? "bg-white border-[#4055FF]/20"
+                      : "bg-white border-slate-100 opacity-75"
+                }`}
+              >
+                {i < analysisStep ? (
+                  <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                    <CheckCircle className="w-4 h-4" />
+                  </span>
+                ) : i === analysisStep ? (
+                  <span className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 border-2 border-[#4055FF] border-t-transparent animate-spin" />
+                ) : (
+                  <span className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 border border-slate-200 bg-slate-50 text-[10px] font-semibold text-slate-400">
+                    {i + 1}
+                  </span>
+                )}
                 <span className="text-sm text-slate-600">{s}</span>
               </div>
             ))}

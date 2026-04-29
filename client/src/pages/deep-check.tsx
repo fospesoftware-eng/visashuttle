@@ -179,6 +179,17 @@ const LOAD_MESSAGES = [
   "Finalizing your Deep Check report…",
 ];
 
+const DEEP_PROGRESS_STEPS = [
+  "Reviewing your personal profile…",
+  "Assessing employment and financial strength…",
+  "Evaluating travel history and visa record…",
+  "Checking home ties and document readiness…",
+  "Generating your AI Analysis report…",
+];
+
+const DEEP_MIN_PROGRESS_MS = 20000;
+const DEEP_STEP_PROGRESS_MS = Math.floor(DEEP_MIN_PROGRESS_MS / DEEP_PROGRESS_STEPS.length);
+
 type VisaHolding = { region: string; status: string };
 
 // Countries that officially do not allow dual nationality
@@ -219,6 +230,7 @@ export default function DeepCheckPage() {
   const [consentError, setConsentError] = useState("");
   const [visaHoldings, setVisaHoldings] = useState<VisaHolding[]>([]);
   const [loadMessage, setLoadMessage] = useState(LOAD_MESSAGES[0]);
+  const [analysisStep, setAnalysisStep] = useState(0);
   const [profileApplied, setProfileApplied] = useState(false);
 
   // Load saved profile
@@ -269,6 +281,20 @@ export default function DeepCheckPage() {
       i = (i + 1) % LOAD_MESSAGES.length;
       setLoadMessage(LOAD_MESSAGES[i]);
     }, 2800);
+    return () => clearInterval(tick);
+  }, [isSubmitting]);
+
+  useEffect(() => {
+    if (!isSubmitting) {
+      setAnalysisStep(0);
+      return;
+    }
+
+    setAnalysisStep(0);
+    const tick = setInterval(() => {
+      setAnalysisStep(current => Math.min(DEEP_PROGRESS_STEPS.length - 1, current + 1));
+    }, DEEP_STEP_PROGRESS_MS);
+
     return () => clearInterval(tick);
   }, [isSubmitting]);
 
@@ -684,9 +710,11 @@ export default function DeepCheckPage() {
     };
     setIsSubmitting(true);
     try {
-      const res = await apiRequest("POST", "/api/b2c/deep-check", { formData: enrichedForm });
+      const [res] = await Promise.all([
+        apiRequest("POST", "/api/b2c/deep-check", { formData: enrichedForm }),
+        new Promise(resolve => setTimeout(resolve, DEEP_MIN_PROGRESS_MS)),
+      ]);
       const data = await res.json();
-      await new Promise(r => setTimeout(r, 600));
       setResult(data.result);
       await queryClient.invalidateQueries({ queryKey: ["/api/b2c/checks"] });
 
@@ -728,13 +756,6 @@ export default function DeepCheckPage() {
 
   // ===================== PROGRESS SCREEN =====================
   if (isSubmitting) {
-    const steps = [
-      "Reviewing your personal profile…",
-      "Assessing employment and financial strength…",
-      "Evaluating travel history and visa record…",
-      "Checking home ties and document readiness…",
-      "Generating your AI Analysis report…",
-    ];
     return (
       <DashboardLayout title="Analyzing Your Visa Profile" subtitle="Deep Check — please wait">
         <div className="w-full max-w-md mx-auto flex flex-col items-center justify-center min-h-[60vh] gap-8">
@@ -750,9 +771,28 @@ export default function DeepCheckPage() {
           </div>
 
           <div className="w-full space-y-2.5">
-            {steps.map((s, i) => (
-              <div key={i} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white border border-slate-100 shadow-sm">
-                <span className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 border-2 border-[#4055FF] border-t-transparent animate-spin" style={{ animationDuration: `${1.2 + i * 0.3}s` }} />
+            {DEEP_PROGRESS_STEPS.map((s, i) => (
+              <div
+                key={i}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl border shadow-sm transition-all duration-300 ${
+                  i < analysisStep
+                    ? "bg-emerald-50/70 border-emerald-100"
+                    : i === analysisStep
+                      ? "bg-white border-[#4055FF]/20"
+                      : "bg-white border-slate-100 opacity-75"
+                }`}
+              >
+                {i < analysisStep ? (
+                  <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                    <CheckCircle className="w-4 h-4" />
+                  </span>
+                ) : i === analysisStep ? (
+                  <span className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 border-2 border-[#4055FF] border-t-transparent animate-spin" />
+                ) : (
+                  <span className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 border border-slate-200 bg-slate-50 text-[10px] font-semibold text-slate-400">
+                    {i + 1}
+                  </span>
+                )}
                 <span className="text-sm text-slate-600">{s}</span>
               </div>
             ))}
