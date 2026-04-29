@@ -211,7 +211,6 @@ export default function HomePage() {
             <Link href="/visa-check" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Visa Check</Link>
             <Link href="/pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Pricing</Link>
             <Link href="/business" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">For Business</Link>
-            <Link href="/schengen-slots" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Schengen Slots</Link>
             <a href="#contact" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Contact</a>
           </nav>
           <div className="flex items-center gap-3">
@@ -657,7 +656,6 @@ export default function HomePage() {
             <div className="flex items-center gap-6 text-sm text-muted-foreground">
               <Link href="/pricing" className="hover:text-foreground transition-colors">Pricing</Link>
               <Link href="/business" className="hover:text-foreground transition-colors">For Business</Link>
-              <Link href="/schengen-slots" className="hover:text-foreground transition-colors">Schengen Slots</Link>
               <a href="#contact" className="hover:text-foreground transition-colors">Contact</a>
               <Link href="/privacy-policy" className="hover:text-foreground transition-colors">Privacy & Cookies</Link>
               <Link href="/privacy-policy" className="hover:text-foreground transition-colors">Terms</Link>
