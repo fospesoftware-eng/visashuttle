@@ -124,12 +124,13 @@ function shuffle<T>(arr: T[]): T[] {
 
 function fallbackSamples(): VisaScoreSample[] {
   const fallbackFrom = "India";
-  const destinations = shuffle(["Nepal", "Bhutan", "Australia", "UAE", "United Kingdom", "Canada", "United States", "Schengen"]).slice(0, 4);
-  return destinations.map(to => ({
+  const destinations = shuffle(["Australia", "UAE", "United Kingdom", "Canada", "United States", "Schengen", "New Zealand", "Singapore"]).slice(0, 4);
+  const visaTypes = shuffle(["Tourist Visa", "Visit Visa", "Work Visa", "Student Visa", "Business Visa"]);
+  return destinations.map((to, index) => ({
     from: fallbackFrom,
     to,
-    type: to === "United Kingdom" ? "Visit Visa" : "Tourist Visa",
-    score: to === "Nepal" || to === "Bhutan" ? 90 : 50 + Math.floor(Math.random() * 32),
+    type: visaTypes[index % visaTypes.length],
+    score: 50 + Math.floor(Math.random() * 32),
   }));
 }
 

@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { runVisaCheck, runDeepCheck } from "./ai";
 import { sendOtp, verifyOtp, getSmsProviderStatus } from "./sms";
+import { getEntryRequirement } from "@shared/visa-free";
 import bcrypt from "bcryptjs";
 
 // Site-wide password for protecting the entire application
@@ -152,6 +153,7 @@ const FALLBACK_DESTINATIONS = [
 const HIGH_MOBILITY_ORIGINS = new Set(["United States", "United Kingdom", "Canada", "Australia", "Germany", "France", "Japan"]);
 const REGIONAL_EASY_DESTINATIONS = new Set(["Nepal", "Bhutan", "UAE", "Singapore", "Japan", "Turkey"]);
 const HIGH_SCRUTINY_DESTINATIONS = new Set(["United States", "United Kingdom", "Canada", "Australia", "Schengen", "New Zealand"]);
+const LIVE_VISA_TYPES = ["Tourist Visa", "Visit Visa", "Work Visa", "Student Visa", "Business Visa"];
 
 function shuffle<T>(arr: T[]): T[] {
   const copy = [...arr];
@@ -166,10 +168,10 @@ function clampScore(score: number): number {
   return Math.max(24, Math.min(94, score));
 }
 
-function visaTypeForDestination(to: string): string {
-  if (["UAE", "Saudi Arabia", "Malaysia"].includes(to)) return Math.random() > 0.65 ? "Work Visa" : "Tourist Visa";
-  if (["United Kingdom", "Canada", "Australia"].includes(to)) return Math.random() > 0.75 ? "Student Visa" : "Visit Visa";
-  return "Tourist Visa";
+function visaTypeForDestination(to: string, index: number, mixedTypes: string[]): string {
+  if (["UAE", "Saudi Arabia", "Malaysia"].includes(to) && Math.random() > 0.45) return "Work Visa";
+  if (["United Kingdom", "Canada", "Australia", "United States"].includes(to) && Math.random() > 0.55) return Math.random() > 0.5 ? "Student Visa" : "Visit Visa";
+  return mixedTypes[index % mixedTypes.length];
 }
 
 function liveScoreForRoute(from: string, to: string): number {
@@ -230,16 +232,28 @@ async function getCountryFromRequest(req: Request): Promise<string | null> {
 
 function buildLiveVisaScores(origin: string | null): { country: string | null; scores: LiveVisaScore[] } {
   const from = origin || "India";
-  const destinations = shuffle([...(ORIGIN_DESTINATIONS[from] || FALLBACK_DESTINATIONS)])
+  let destinations = shuffle([...(ORIGIN_DESTINATIONS[from] || FALLBACK_DESTINATIONS)])
     .filter(destination => destination !== from)
+    .filter(destination => getEntryRequirement(from, destination) !== "visa_free")
     .slice(0, 4);
+
+  if (destinations.length < 4) {
+    const extras = shuffle(FALLBACK_DESTINATIONS)
+      .filter(destination => destination !== from)
+      .filter(destination => !destinations.includes(destination))
+      .filter(destination => getEntryRequirement(from, destination) !== "visa_free")
+      .slice(0, 4 - destinations.length);
+    destinations = [...destinations, ...extras];
+  }
+
+  const visaTypes = shuffle(LIVE_VISA_TYPES);
 
   return {
     country: from,
-    scores: destinations.map(to => ({
+    scores: destinations.map((to, index) => ({
       from,
       to,
-      type: visaTypeForDestination(to),
+      type: visaTypeForDestination(to, index, visaTypes),
       score: liveScoreForRoute(from, to),
     })),
   };
