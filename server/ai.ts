@@ -3,6 +3,11 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-5";
 const AI_PROVIDER = process.env.AI_PROVIDER || "openai";
 
+export interface AnthropicRuntimeConfig {
+  anthropicApiKey?: string | null;
+  anthropicModel?: string | null;
+}
+
 export interface VisaCheckFormData {
   // Step 1 - Personal Profile
   nationality: string;
@@ -273,16 +278,20 @@ async function callOpenAI(form: VisaCheckFormData): Promise<AIVisaResult> {
   return JSON.parse(content) as AIVisaResult;
 }
 
-async function callClaude(form: VisaCheckFormData): Promise<AIVisaResult> {
+async function callClaude(form: VisaCheckFormData, config?: AnthropicRuntimeConfig): Promise<AIVisaResult> {
+  const apiKey = config?.anthropicApiKey || ANTHROPIC_API_KEY;
+  const model = config?.anthropicModel || "claude-3-haiku-20240307";
+  if (!apiKey) throw new Error("Anthropic API key not configured");
+
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY!,
+      "x-api-key": apiKey,
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "claude-3-haiku-20240307",
+      model,
       max_tokens: 1500,
       system: buildSystemPrompt(),
       messages: [{ role: "user", content: buildUserPrompt(form) }],
@@ -729,18 +738,20 @@ function buildDeepCheckUserPrompt(form: DeepCheckFormData): string {
   return [base, extra.filter(Boolean).join("\n"), rawAnswers].join("\n");
 }
 
-async function callClaudeDeepCheck(form: DeepCheckFormData): Promise<DeepCheckResult> {
-  if (!ANTHROPIC_API_KEY) throw new Error("Anthropic API key not configured");
+async function callClaudeDeepCheck(form: DeepCheckFormData, config?: AnthropicRuntimeConfig): Promise<DeepCheckResult> {
+  const apiKey = config?.anthropicApiKey || ANTHROPIC_API_KEY;
+  const model = config?.anthropicModel || ANTHROPIC_MODEL;
+  if (!apiKey) throw new Error("Anthropic API key not configured");
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
+      "x-api-key": apiKey,
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: ANTHROPIC_MODEL,
+      model,
       max_tokens: 4000,
       system: buildDeepCheckSystemPrompt(),
       messages: [{ role: "user", content: buildDeepCheckUserPrompt(form) }],
@@ -795,15 +806,16 @@ function mockDeepCheckResult(form: DeepCheckFormData): DeepCheckResult {
   };
 }
 
-export async function runDeepCheck(form: DeepCheckFormData): Promise<{ result: DeepCheckResult; provider: string }> {
-  const result = await callClaudeDeepCheck(form);
+export async function runDeepCheck(form: DeepCheckFormData, config?: AnthropicRuntimeConfig): Promise<{ result: DeepCheckResult; provider: string }> {
+  const result = await callClaudeDeepCheck(form, config);
   return { result, provider: "claude" };
 }
 
-export async function runVisaCheck(form: VisaCheckFormData): Promise<{ result: AIVisaResult; provider: string }> {
-  if (AI_PROVIDER === "anthropic" && ANTHROPIC_API_KEY) {
+export async function runVisaCheck(form: VisaCheckFormData, config?: AnthropicRuntimeConfig): Promise<{ result: AIVisaResult; provider: string }> {
+  const hasAnthropicConfig = !!(config?.anthropicApiKey || ANTHROPIC_API_KEY);
+  if ((AI_PROVIDER === "anthropic" || !OPENAI_API_KEY) && hasAnthropicConfig) {
     try {
-      const result = await callClaude(form);
+      const result = await callClaude(form, config);
       result.statusLabel = getStatusLabel(result.approvalChance);
       return { result, provider: "claude" };
     } catch (e) {

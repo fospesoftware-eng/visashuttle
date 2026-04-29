@@ -37,6 +37,144 @@ interface SmsConfigResponse {
   };
 }
 
+interface AiConfigResponse {
+  anthropicApiKey: string;
+  anthropicModel: string;
+  hasAnthropicApiKey: boolean;
+  usingDb: boolean;
+  usingEnvFallback: boolean;
+}
+
+function AiProviderCard() {
+  const { toast } = useToast();
+  const [showKey, setShowKey] = useState(false);
+  const [form, setForm] = useState({
+    anthropicApiKey: "",
+    anthropicModel: "claude-opus-4-5",
+  });
+
+  const { data: cfg, isLoading } = useQuery<AiConfigResponse>({
+    queryKey: ["/api/admin/ai-config"],
+  });
+
+  useEffect(() => {
+    if (cfg) {
+      setForm({
+        anthropicApiKey: cfg.anthropicApiKey || "",
+        anthropicModel: cfg.anthropicModel || "claude-opus-4-5",
+      });
+    }
+  }, [cfg]);
+
+  const saveMutation = useMutation({
+    mutationFn: (data: typeof form) => apiRequest("POST", "/api/admin/ai-config", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/ai-config"] });
+      toast({ title: "AI settings saved", description: "Anthropic credentials have been updated." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Save failed", description: err.message || "Could not save AI settings", variant: "destructive" });
+    },
+  });
+
+  const statusLabel = cfg?.usingDb
+    ? "Database Key Active"
+    : cfg?.usingEnvFallback
+      ? "Env Key Active"
+      : "Not Configured";
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Key className="w-4 h-4" />
+              Anthropic API Credentials
+            </CardTitle>
+            <CardDescription>Configure Claude credentials used by Deep Check AI Analysis</CardDescription>
+          </div>
+          {isLoading ? (
+            <div className="w-5 h-5 border-2 border-muted border-t-foreground rounded-full animate-spin" />
+          ) : (
+            <Badge
+              variant={cfg?.hasAnthropicApiKey ? "default" : "secondary"}
+              className={cfg?.hasAnthropicApiKey ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : ""}
+            >
+              {statusLabel}
+            </Badge>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="anthropicApiKey">
+            Anthropic API Key / Token <span className="text-red-500">*</span>
+          </Label>
+          <div className="relative">
+            <Input
+              id="anthropicApiKey"
+              type={showKey ? "text" : "password"}
+              placeholder={cfg?.hasAnthropicApiKey ? "Key saved — enter new value to update" : "Paste your Anthropic API key"}
+              value={form.anthropicApiKey}
+              onChange={e => setForm(f => ({ ...f, anthropicApiKey: e.target.value }))}
+              className="pr-10 font-mono text-sm"
+              data-testid="input-anthropic-api-key"
+            />
+            <button
+              type="button"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              onClick={() => setShowKey(s => !s)}
+              aria-label={showKey ? "Hide Anthropic API key" : "Show Anthropic API key"}
+            >
+              {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Saved securely in the platform database. Existing keys are masked; paste a new key only when rotating credentials.
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="anthropicModel">Claude Model</Label>
+          <Input
+            id="anthropicModel"
+            value={form.anthropicModel}
+            onChange={e => setForm(f => ({ ...f, anthropicModel: e.target.value }))}
+            placeholder="claude-opus-4-5"
+            className="font-mono text-sm"
+            data-testid="input-anthropic-model"
+          />
+          <p className="text-xs text-muted-foreground">Used for Deep Check requests. Leave as default unless you are intentionally changing Claude model versions.</p>
+        </div>
+
+        {!cfg?.hasAnthropicApiKey && (
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+            <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-amber-700 dark:text-amber-300">
+              Deep Check requires an Anthropic API key. Add a key here or configure ANTHROPIC_API_KEY in the environment.
+            </p>
+          </div>
+        )}
+
+        <div className="flex justify-end">
+          <Button
+            onClick={() => saveMutation.mutate(form)}
+            disabled={saveMutation.isPending}
+            className="gap-2"
+            data-testid="button-save-ai-config"
+          >
+            {saveMutation.isPending
+              ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              : <Save className="w-4 h-4" />}
+            Save AI Credentials
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ── SMS Gateway Card ────────────────────────────────────────────────────────
 function SmsGatewayCard() {
   const { toast } = useToast();
@@ -614,7 +752,6 @@ export default function AdminSettingsPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {[
-                  { label: "Anthropic API Key", hint: "Used for AI visa assessment checks" },
                   { label: "SendGrid API Key", hint: "Used for email delivery" },
                   { label: "Stripe Secret Key", hint: "Used for subscription billing" },
                 ].map(k => (
@@ -626,6 +763,8 @@ export default function AdminSettingsPage() {
                 ))}
               </CardContent>
             </Card>
+
+            <AiProviderCard />
 
             <Button className="gap-2" onClick={handleSave} disabled={saving}>
               <Save className="w-4 h-4" />

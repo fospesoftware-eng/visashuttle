@@ -295,3 +295,15 @@ export const smsConfig = pgTable("sms_config", {
 export const insertSmsConfigSchema = createInsertSchema(smsConfig).omit({ id: true, updatedAt: true });
 export type InsertSmsConfig = z.infer<typeof insertSmsConfigSchema>;
 export type SmsConfig = typeof smsConfig.$inferSelect;
+
+// ── Platform AI Provider Config ───────────────────────────────────────────────
+export const platformAiConfig = pgTable("platform_ai_config", {
+  id: serial("id").primaryKey(),
+  anthropicApiKey: text("anthropic_api_key"),
+  anthropicModel: text("anthropic_model").default("claude-opus-4-5"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPlatformAiConfigSchema = createInsertSchema(platformAiConfig).omit({ id: true, updatedAt: true });
+export type InsertPlatformAiConfig = z.infer<typeof insertPlatformAiConfigSchema>;
+export type PlatformAiConfig = typeof platformAiConfig.$inferSelect;

@@ -851,6 +851,36 @@ export async function registerRoutes(
     res.json({ success: true, message: `Test OTP sent to ${phone}` });
   });
 
+  // ── Admin: Platform AI Config ─────────────────────────────────────────────
+  app.get("/api/admin/ai-config", requireAdminAuth, async (_req, res) => {
+    const cfg = await storage.getPlatformAiConfig();
+    const envKeyConfigured = !!process.env.ANTHROPIC_API_KEY;
+    const dbKeyConfigured = !!cfg?.anthropicApiKey;
+    res.json({
+      anthropicApiKey: cfg?.anthropicApiKey ? maskKey(cfg.anthropicApiKey) : "",
+      anthropicModel: cfg?.anthropicModel || process.env.ANTHROPIC_MODEL || "claude-opus-4-5",
+      hasAnthropicApiKey: dbKeyConfigured || envKeyConfigured,
+      usingDb: dbKeyConfigured,
+      usingEnvFallback: !dbKeyConfigured && envKeyConfigured,
+    });
+  });
+
+  app.post("/api/admin/ai-config", requireAdminAuth, async (req, res) => {
+    const { anthropicApiKey, anthropicModel } = req.body;
+    const patch: Record<string, any> = {};
+    if (anthropicApiKey && !anthropicApiKey.includes("•")) patch.anthropicApiKey = anthropicApiKey;
+    if (anthropicModel !== undefined) patch.anthropicModel = anthropicModel || "claude-opus-4-5";
+    const updated = await storage.upsertPlatformAiConfig(patch);
+    res.json({
+      success: true,
+      anthropicApiKey: updated.anthropicApiKey ? maskKey(updated.anthropicApiKey) : "",
+      anthropicModel: updated.anthropicModel || "claude-opus-4-5",
+      hasAnthropicApiKey: !!updated.anthropicApiKey,
+      usingDb: !!updated.anthropicApiKey,
+      usingEnvFallback: !updated.anthropicApiKey && !!process.env.ANTHROPIC_API_KEY,
+    });
+  });
+
   // ── B2C Register ──────────────────────────────────────────────────────────
   app.post("/api/b2c/auth/register", async (req, res) => {
     const { email, password, fullName, phone } = req.body;
@@ -1024,7 +1054,8 @@ export async function registerRoutes(
         };
         provider = "visa-free-db";
       } else {
-        const aiResult = await runVisaCheck(formData);
+        const aiConfig = await storage.getPlatformAiConfig();
+        const aiResult = await runVisaCheck(formData, aiConfig);
         result = aiResult.result;
         provider = aiResult.provider;
       }
@@ -1069,7 +1100,8 @@ export async function registerRoutes(
     }
 
     try {
-      const deepResult = await runDeepCheck(formData);
+      const aiConfig = await storage.getPlatformAiConfig();
+      const deepResult = await runDeepCheck(formData, aiConfig);
       const result = deepResult.result;
       const provider = deepResult.provider;
 

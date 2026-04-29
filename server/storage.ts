@@ -14,7 +14,9 @@ import {
   type VisaCheck, type InsertVisaCheck,
   type SavedProfile, type InsertSavedProfile,
   type SmsConfig, type InsertSmsConfig,
+  type PlatformAiConfig, type InsertPlatformAiConfig,
   b2cUsers, visaChecks, savedProfiles, smsConfig as smsConfigTable,
+  platformAiConfig as platformAiConfigTable,
 } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -105,6 +107,10 @@ export interface IStorage {
   // SMS Config
   getSmsConfig(): Promise<SmsConfig | undefined>;
   upsertSmsConfig(data: Partial<InsertSmsConfig>): Promise<SmsConfig>;
+
+  // Platform AI Config
+  getPlatformAiConfig(): Promise<PlatformAiConfig | undefined>;
+  upsertPlatformAiConfig(data: Partial<InsertPlatformAiConfig>): Promise<PlatformAiConfig>;
 }
 
 export class MemStorage implements IStorage {
@@ -873,6 +879,10 @@ export class MemStorage implements IStorage {
   async upsertSmsConfig(data: Partial<InsertSmsConfig>): Promise<SmsConfig> {
     throw new Error("SMS config only available in HybridStorage");
   }
+  async getPlatformAiConfig(): Promise<PlatformAiConfig | undefined> { return undefined; }
+  async upsertPlatformAiConfig(data: Partial<InsertPlatformAiConfig>): Promise<PlatformAiConfig> {
+    throw new Error("Platform AI config only available in HybridStorage");
+  }
 }
 
 // HybridStorage: uses MemStorage for agency/seed data, PostgreSQL for B2C user data
@@ -1003,6 +1013,27 @@ class HybridStorage extends MemStorage {
     }
     const rows = await db.insert(smsConfigTable).values({
       provider: "msg91",
+      ...data,
+    }).returning();
+    return rows[0];
+  }
+
+  // Platform AI Config — single-row config stored in DB
+  async getPlatformAiConfig(): Promise<PlatformAiConfig | undefined> {
+    const rows = await db.select().from(platformAiConfigTable).limit(1);
+    return rows[0];
+  }
+
+  async upsertPlatformAiConfig(data: Partial<InsertPlatformAiConfig>): Promise<PlatformAiConfig> {
+    const existing = await this.getPlatformAiConfig();
+    if (existing) {
+      const rows = await db.update(platformAiConfigTable)
+        .set({ ...data, updatedAt: new Date() })
+        .returning();
+      return rows[0];
+    }
+    const rows = await db.insert(platformAiConfigTable).values({
+      anthropicModel: "claude-opus-4-5",
       ...data,
     }).returning();
     return rows[0];
