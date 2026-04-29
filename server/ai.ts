@@ -1,5 +1,6 @@
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-5";
 const AI_PROVIDER = process.env.AI_PROVIDER || "openai";
 
 export interface VisaCheckFormData {
@@ -714,7 +715,18 @@ function buildDeepCheckUserPrompt(form: DeepCheckFormData): string {
     form.hasSocialMedia ? `Active Social Media Presence: ${form.hasSocialMedia}` : "",
   ];
 
-  return base + extra.filter(Boolean).join("\n");
+  const answeredFields = Object.entries(form)
+    .filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== "")
+    .map(([key, value]) => `- ${key}: ${String(value)}`);
+
+  const rawAnswers = [
+    "",
+    "=== ALL PROVIDED QUESTION ANSWERS — RAW FORM PAYLOAD ===",
+    "Use this complete key/value list as the source of truth. It includes every answer submitted by the Deep Check form, including conditional fields.",
+    ...answeredFields,
+  ].join("\n");
+
+  return [base, extra.filter(Boolean).join("\n"), rawAnswers].join("\n");
 }
 
 async function callClaudeDeepCheck(form: DeepCheckFormData): Promise<DeepCheckResult> {
@@ -728,8 +740,8 @@ async function callClaudeDeepCheck(form: DeepCheckFormData): Promise<DeepCheckRe
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "claude-opus-4-5",
-      max_tokens: 3000,
+      model: ANTHROPIC_MODEL,
+      max_tokens: 4000,
       system: buildDeepCheckSystemPrompt(),
       messages: [{ role: "user", content: buildDeepCheckUserPrompt(form) }],
     }),
@@ -784,16 +796,8 @@ function mockDeepCheckResult(form: DeepCheckFormData): DeepCheckResult {
 }
 
 export async function runDeepCheck(form: DeepCheckFormData): Promise<{ result: DeepCheckResult; provider: string }> {
-  if (ANTHROPIC_API_KEY) {
-    try {
-      const result = await callClaudeDeepCheck(form);
-      return { result, provider: "claude" };
-    } catch (e) {
-      console.error("[DeepCheck] Claude failed:", e);
-    }
-  }
-  console.warn("[DeepCheck] Falling back to mock (no Anthropic key or Claude failed)");
-  return { result: mockDeepCheckResult(form), provider: "mock" };
+  const result = await callClaudeDeepCheck(form);
+  return { result, provider: "claude" };
 }
 
 export async function runVisaCheck(form: VisaCheckFormData): Promise<{ result: AIVisaResult; provider: string }> {

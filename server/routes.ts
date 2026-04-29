@@ -1069,56 +1069,9 @@ export async function registerRoutes(
     }
 
     try {
-      // ── Same visa-free / resident short-circuit as basic check ─────────────
-      const { getEntryRequirement } = await import("../shared/visa-free.js");
-      const entryReq = getEntryRequirement(
-        formData.nationality,
-        formData.destinationCountry,
-        { passportCountry: formData.passportCountry, countryOfResidence: formData.countryOfResidence }
-      );
-
-      let result: any;
-      let provider: string;
-
-      if (entryReq === "visa_free") {
-        result = {
-          approvalChance: 100,
-          statusLabel: "Visa Free",
-          summary: formData.passportCountry === formData.destinationCountry
-            ? `You hold a ${formData.destinationCountry} passport. No visa required to enter your own country.`
-            : `${formData.nationality} citizens have visa-free access to ${formData.destinationCountry}.`,
-          strengths: ["Visa-free bilateral agreement in place", "No visa application required", "No fees applicable"],
-          riskFactors: [],
-          missingDocuments: [],
-          requiredDocuments: ["Valid passport (6+ months validity)", "Return/onward ticket", "Proof of accommodation"],
-          countrySpecificConcerns: [`Check maximum stay allowance for ${formData.destinationCountry}`],
-          improvementTips: [],
-          nextSteps: ["Book flights", "Ensure passport validity", "Carry accommodation proof"],
-          finalRecommendation: `No visa required. Simply travel with your valid passport.`,
-          disclaimer: "Always verify entry requirements before travel as rules can change.",
-        };
-        provider = "visa-free-db";
-      } else if (entryReq === "resident") {
-        result = {
-          approvalChance: 100,
-          statusLabel: "Already Resident",
-          summary: `You are a legal resident of ${formData.destinationCountry}. No new visa is required — re-enter on your existing residence permit.`,
-          strengths: ["Valid residence status in destination country", "No new visa application required"],
-          riskFactors: ["Verify residence permit has not expired", "Check re-entry validity if abroad for extended period"],
-          missingDocuments: [],
-          requiredDocuments: ["Valid passport", `Valid ${formData.destinationCountry} residence permit or ID card`],
-          countrySpecificConcerns: [`Check re-entry conditions on your ${formData.destinationCountry} residence permit`],
-          improvementTips: [],
-          nextSteps: ["Verify permit expiry", "Confirm re-entry rules if away for 6+ months"],
-          finalRecommendation: `As a ${formData.destinationCountry} resident, no new visa is required. Present your residence permit at the border.`,
-          disclaimer: "Residency re-entry rules vary. Confirm with local immigration authority before travel.",
-        };
-        provider = "visa-free-db";
-      } else {
-        const deepResult = await runDeepCheck(formData);
-        result = deepResult.result;
-        provider = deepResult.provider;
-      }
+      const deepResult = await runDeepCheck(formData);
+      const result = deepResult.result;
+      const provider = deepResult.provider;
 
       const visaCheck = await storage.createVisaCheck({
         userId,
@@ -1131,9 +1084,12 @@ export async function registerRoutes(
       });
 
       res.json({ check: visaCheck, result });
-    } catch (err) {
+    } catch (err: any) {
       console.error("[Deep Check] Error:", err);
-      res.status(500).json({ error: "Failed to run deep check. Please try again." });
+      const message = err?.message === "Anthropic API key not configured"
+        ? "Deep Check AI service is not configured. Please set ANTHROPIC_API_KEY."
+        : "Failed to run deep check through Claude API. Please try again.";
+      res.status(500).json({ error: message });
     }
   });
 
