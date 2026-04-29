@@ -1,0 +1,4589 @@
+{
+  "dataset_name": "India outbound visa approval chance estimates by country and visa type",
+  "version": "2026-04-29",
+  "important_note": "These are estimated probability ranges for Indian ordinary passport holders and are not official approval rates. Actual outcome depends on applicant profile, documents, travel history, sponsor, funds, ties to India, and current consular policy.",
+  "excluded_access_type": "visa_free_countries_removed_where_identified",
+  "excluded_countries_sorted": [
+    "Barbados",
+    "Bhutan",
+    "Dominica",
+    "Fiji",
+    "Gambia",
+    "Grenada",
+    "Haiti",
+    "Hong Kong",
+    "Jamaica",
+    "Kazakhstan",
+    "Macao",
+    "Malaysia",
+    "Maldives",
+    "Mauritius",
+    "Micronesia",
+    "Nepal",
+    "Oman",
+    "Philippines",
+    "Rwanda",
+    "Senegal",
+    "Thailand",
+    "Trinidad and Tobago",
+    "Vanuatu"
+  ],
+  "visa_types": [
+    "visit",
+    "business",
+    "work",
+    "study"
+  ],
+  "countries": [
+    {
+      "country": "Afghanistan",
+      "iso2": "AF",
+      "region": "Asia",
+      "tier": "high_scrutiny_or_limited_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 35,
+          "max": 65
+        },
+        "business": {
+          "min": 40,
+          "max": 70
+        },
+        "work": {
+          "min": 35,
+          "max": 70
+        },
+        "study": {
+          "min": 35,
+          "max": 65
+        }
+      }
+    },
+    {
+      "country": "Albania",
+      "iso2": "AL",
+      "region": "Europe",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Algeria",
+      "iso2": "DZ",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Andorra",
+      "iso2": "AD",
+      "region": "Europe",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Angola",
+      "iso2": "AO",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Antigua and Barbuda",
+      "iso2": "AG",
+      "region": "Americas",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Argentina",
+      "iso2": "AR",
+      "region": "Americas",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Armenia",
+      "iso2": "AM",
+      "region": "Asia",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Australia",
+      "iso2": "AU",
+      "region": "Oceania",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 85
+        },
+        "business": {
+          "min": 70,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 85
+        },
+        "study": {
+          "min": 50,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Austria",
+      "iso2": "AT",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Azerbaijan",
+      "iso2": "AZ",
+      "region": "Asia",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Bahamas",
+      "iso2": "BS",
+      "region": "Americas",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Bahrain",
+      "iso2": "BH",
+      "region": "Asia",
+      "tier": "high_approval",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 85,
+          "max": 95
+        },
+        "business": {
+          "min": 85,
+          "max": 95
+        },
+        "work": {
+          "min": 75,
+          "max": 95
+        },
+        "study": {
+          "min": 70,
+          "max": 90
+        }
+      }
+    },
+    {
+      "country": "Bangladesh",
+      "iso2": "BD",
+      "region": "Asia",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Belarus",
+      "iso2": "BY",
+      "region": "Europe",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Belgium",
+      "iso2": "BE",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Belize",
+      "iso2": "BZ",
+      "region": "Americas",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Benin",
+      "iso2": "BJ",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Bolivia",
+      "iso2": "BO",
+      "region": "Americas",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Bosnia and Herzegovina",
+      "iso2": "BA",
+      "region": "Europe",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Botswana",
+      "iso2": "BW",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Brazil",
+      "iso2": "BR",
+      "region": "Americas",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Brunei",
+      "iso2": null,
+      "region": "Asia",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Bulgaria",
+      "iso2": "BG",
+      "region": "Europe",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Burkina Faso",
+      "iso2": "BF",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Burundi",
+      "iso2": "BI",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Cabo Verde",
+      "iso2": "CV",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Cambodia",
+      "iso2": "KH",
+      "region": "Asia",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Cameroon",
+      "iso2": "CM",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Canada",
+      "iso2": "CA",
+      "region": "Americas",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 75
+        },
+        "business": {
+          "min": 60,
+          "max": 80
+        },
+        "work": {
+          "min": 65,
+          "max": 90
+        },
+        "study": {
+          "min": 25,
+          "max": 60
+        }
+      }
+    },
+    {
+      "country": "Central African Republic",
+      "iso2": "CF",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Chad",
+      "iso2": "TD",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Chile",
+      "iso2": "CL",
+      "region": "Americas",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "China",
+      "iso2": "CN",
+      "region": "Asia",
+      "tier": "moderate_high",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 75,
+          "max": 90
+        },
+        "business": {
+          "min": 75,
+          "max": 90
+        },
+        "work": {
+          "min": 65,
+          "max": 85
+        },
+        "study": {
+          "min": 65,
+          "max": 85
+        }
+      }
+    },
+    {
+      "country": "Colombia",
+      "iso2": "CO",
+      "region": "Americas",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Comoros",
+      "iso2": "KM",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Costa Rica",
+      "iso2": "CR",
+      "region": "Americas",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Cote d'Ivoire",
+      "iso2": "CI",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Croatia",
+      "iso2": "HR",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Cuba",
+      "iso2": "CU",
+      "region": "Americas",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Cyprus",
+      "iso2": "CY",
+      "region": "Europe",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Czechia",
+      "iso2": "CZ",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Democratic Republic of the Congo",
+      "iso2": "CD",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Denmark",
+      "iso2": "DK",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Djibouti",
+      "iso2": "DJ",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Dominican Republic",
+      "iso2": "DO",
+      "region": "Americas",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Ecuador",
+      "iso2": "EC",
+      "region": "Americas",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Egypt",
+      "iso2": "EG",
+      "region": "Africa",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "El Salvador",
+      "iso2": "SV",
+      "region": "Americas",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Equatorial Guinea",
+      "iso2": "GQ",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Eritrea",
+      "iso2": "ER",
+      "region": "Africa",
+      "tier": "high_scrutiny_or_limited_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 35,
+          "max": 65
+        },
+        "business": {
+          "min": 40,
+          "max": 70
+        },
+        "work": {
+          "min": 35,
+          "max": 70
+        },
+        "study": {
+          "min": 35,
+          "max": 65
+        }
+      }
+    },
+    {
+      "country": "Estonia",
+      "iso2": "EE",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Eswatini",
+      "iso2": "SZ",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Ethiopia",
+      "iso2": "ET",
+      "region": "Africa",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Finland",
+      "iso2": "FI",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "France",
+      "iso2": "FR",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Gabon",
+      "iso2": "GA",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Georgia",
+      "iso2": "GE",
+      "region": "Asia",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Germany",
+      "iso2": "DE",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Ghana",
+      "iso2": "GH",
+      "region": "Africa",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Greece",
+      "iso2": "GR",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Guatemala",
+      "iso2": "GT",
+      "region": "Americas",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Guinea",
+      "iso2": "GN",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Guinea-Bissau",
+      "iso2": "GW",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Guyana",
+      "iso2": "GY",
+      "region": "Americas",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Honduras",
+      "iso2": "HN",
+      "region": "Americas",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Hungary",
+      "iso2": "HU",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Iceland",
+      "iso2": "IS",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Indonesia",
+      "iso2": "ID",
+      "region": "Asia",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Iran",
+      "iso2": "IR",
+      "region": "Asia",
+      "tier": "high_scrutiny_or_limited_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 35,
+          "max": 65
+        },
+        "business": {
+          "min": 40,
+          "max": 70
+        },
+        "work": {
+          "min": 35,
+          "max": 70
+        },
+        "study": {
+          "min": 35,
+          "max": 65
+        }
+      }
+    },
+    {
+      "country": "Iraq",
+      "iso2": "IQ",
+      "region": "Asia",
+      "tier": "high_scrutiny_or_limited_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 35,
+          "max": 65
+        },
+        "business": {
+          "min": 40,
+          "max": 70
+        },
+        "work": {
+          "min": 35,
+          "max": 70
+        },
+        "study": {
+          "min": 35,
+          "max": 65
+        }
+      }
+    },
+    {
+      "country": "Ireland",
+      "iso2": "IE",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Israel",
+      "iso2": "IL",
+      "region": "Asia",
+      "tier": "moderate_high",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 75,
+          "max": 90
+        },
+        "business": {
+          "min": 75,
+          "max": 90
+        },
+        "work": {
+          "min": 65,
+          "max": 85
+        },
+        "study": {
+          "min": 65,
+          "max": 85
+        }
+      }
+    },
+    {
+      "country": "Italy",
+      "iso2": "IT",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Japan",
+      "iso2": "JP",
+      "region": "Asia",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 75,
+          "max": 90
+        },
+        "business": {
+          "min": 75,
+          "max": 90
+        },
+        "work": {
+          "min": 65,
+          "max": 85
+        },
+        "study": {
+          "min": 65,
+          "max": 85
+        }
+      }
+    },
+    {
+      "country": "Jordan",
+      "iso2": "JO",
+      "region": "Asia",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Kenya",
+      "iso2": "KE",
+      "region": "Africa",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Kiribati",
+      "iso2": "KI",
+      "region": "Oceania",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Kosovo",
+      "iso2": "XK",
+      "region": "Europe",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Kuwait",
+      "iso2": "KW",
+      "region": "Asia",
+      "tier": "high_approval",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 85,
+          "max": 95
+        },
+        "business": {
+          "min": 85,
+          "max": 95
+        },
+        "work": {
+          "min": 75,
+          "max": 95
+        },
+        "study": {
+          "min": 70,
+          "max": 90
+        }
+      }
+    },
+    {
+      "country": "Kyrgyzstan",
+      "iso2": "KG",
+      "region": "Asia",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Laos",
+      "iso2": "LA",
+      "region": "Asia",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Latvia",
+      "iso2": "LV",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Lebanon",
+      "iso2": "LB",
+      "region": "Asia",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Lesotho",
+      "iso2": "LS",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Liberia",
+      "iso2": "LR",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Libya",
+      "iso2": "LY",
+      "region": "Africa",
+      "tier": "high_scrutiny_or_limited_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 35,
+          "max": 65
+        },
+        "business": {
+          "min": 40,
+          "max": 70
+        },
+        "work": {
+          "min": 35,
+          "max": 70
+        },
+        "study": {
+          "min": 35,
+          "max": 65
+        }
+      }
+    },
+    {
+      "country": "Liechtenstein",
+      "iso2": "LI",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Lithuania",
+      "iso2": "LT",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Luxembourg",
+      "iso2": "LU",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Madagascar",
+      "iso2": "MG",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Malawi",
+      "iso2": "MW",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Mali",
+      "iso2": "ML",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Malta",
+      "iso2": "MT",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Marshall Islands",
+      "iso2": "MH",
+      "region": "Oceania",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Mauritania",
+      "iso2": "MR",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Mexico",
+      "iso2": "MX",
+      "region": "Americas",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Moldova",
+      "iso2": "MD",
+      "region": "Europe",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Monaco",
+      "iso2": "MC",
+      "region": "Europe",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Mongolia",
+      "iso2": "MN",
+      "region": "Unknown",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Montenegro",
+      "iso2": "ME",
+      "region": "Europe",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Morocco",
+      "iso2": "MA",
+      "region": "Africa",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Mozambique",
+      "iso2": "MZ",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Myanmar",
+      "iso2": "MM",
+      "region": "Asia",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Namibia",
+      "iso2": "NA",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Nauru",
+      "iso2": "NR",
+      "region": "Oceania",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Netherlands",
+      "iso2": "NL",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "New Zealand",
+      "iso2": "NZ",
+      "region": "Oceania",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 85
+        },
+        "business": {
+          "min": 70,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 85
+        },
+        "study": {
+          "min": 50,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Nicaragua",
+      "iso2": "NI",
+      "region": "Americas",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Niger",
+      "iso2": "NE",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Nigeria",
+      "iso2": "NG",
+      "region": "Africa",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "North Korea",
+      "iso2": "KP",
+      "region": "Asia",
+      "tier": "high_scrutiny_or_limited_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 35,
+          "max": 65
+        },
+        "business": {
+          "min": 40,
+          "max": 70
+        },
+        "work": {
+          "min": 35,
+          "max": 70
+        },
+        "study": {
+          "min": 35,
+          "max": 65
+        }
+      }
+    },
+    {
+      "country": "North Macedonia",
+      "iso2": "MK",
+      "region": "Europe",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Norway",
+      "iso2": "NO",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Pakistan",
+      "iso2": "PK",
+      "region": "Asia",
+      "tier": "high_scrutiny_or_limited_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 35,
+          "max": 65
+        },
+        "business": {
+          "min": 40,
+          "max": 70
+        },
+        "work": {
+          "min": 35,
+          "max": 70
+        },
+        "study": {
+          "min": 35,
+          "max": 65
+        }
+      }
+    },
+    {
+      "country": "Palau",
+      "iso2": "PW",
+      "region": "Oceania",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Palestine",
+      "iso2": "PS",
+      "region": "Asia",
+      "tier": "high_scrutiny_or_limited_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 35,
+          "max": 65
+        },
+        "business": {
+          "min": 40,
+          "max": 70
+        },
+        "work": {
+          "min": 35,
+          "max": 70
+        },
+        "study": {
+          "min": 35,
+          "max": 65
+        }
+      }
+    },
+    {
+      "country": "Panama",
+      "iso2": "PA",
+      "region": "Americas",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Papua New Guinea",
+      "iso2": "PG",
+      "region": "Oceania",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Paraguay",
+      "iso2": "PY",
+      "region": "Americas",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Peru",
+      "iso2": "PE",
+      "region": "Americas",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Poland",
+      "iso2": "PL",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Portugal",
+      "iso2": "PT",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Qatar",
+      "iso2": "QA",
+      "region": "Asia",
+      "tier": "high_approval",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 85,
+          "max": 95
+        },
+        "business": {
+          "min": 85,
+          "max": 95
+        },
+        "work": {
+          "min": 75,
+          "max": 95
+        },
+        "study": {
+          "min": 70,
+          "max": 90
+        }
+      }
+    },
+    {
+      "country": "Republic of the Congo",
+      "iso2": "CG",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Romania",
+      "iso2": "RO",
+      "region": "Europe",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Russia",
+      "iso2": "RU",
+      "region": "Europe",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Saint Kitts and Nevis",
+      "iso2": "KN",
+      "region": "Americas",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Saint Lucia",
+      "iso2": "LC",
+      "region": "Americas",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Saint Vincent and the Grenadines",
+      "iso2": "VC",
+      "region": "Americas",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Samoa",
+      "iso2": "WS",
+      "region": "Oceania",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "San Marino",
+      "iso2": "SM",
+      "region": "Europe",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Sao Tome and Principe",
+      "iso2": "ST",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Saudi Arabia",
+      "iso2": "SA",
+      "region": "Asia",
+      "tier": "high_approval",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 85,
+          "max": 95
+        },
+        "business": {
+          "min": 85,
+          "max": 95
+        },
+        "work": {
+          "min": 75,
+          "max": 95
+        },
+        "study": {
+          "min": 70,
+          "max": 90
+        }
+      }
+    },
+    {
+      "country": "Serbia",
+      "iso2": "RS",
+      "region": "Europe",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Seychelles",
+      "iso2": "SC",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Sierra Leone",
+      "iso2": "SL",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Singapore",
+      "iso2": "SG",
+      "region": "Asia",
+      "tier": "moderate_high",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 85,
+          "max": 95
+        },
+        "business": {
+          "min": 85,
+          "max": 95
+        },
+        "work": {
+          "min": 70,
+          "max": 90
+        },
+        "study": {
+          "min": 70,
+          "max": 90
+        }
+      }
+    },
+    {
+      "country": "Slovakia",
+      "iso2": "SK",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Slovenia",
+      "iso2": "SI",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Solomon Islands",
+      "iso2": "SB",
+      "region": "Oceania",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Somalia",
+      "iso2": "SO",
+      "region": "Africa",
+      "tier": "high_scrutiny_or_limited_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 35,
+          "max": 65
+        },
+        "business": {
+          "min": 40,
+          "max": 70
+        },
+        "work": {
+          "min": 35,
+          "max": 70
+        },
+        "study": {
+          "min": 35,
+          "max": 65
+        }
+      }
+    },
+    {
+      "country": "South Africa",
+      "iso2": "ZA",
+      "region": "Africa",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "South Korea",
+      "iso2": "KR",
+      "region": "Asia",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 75,
+          "max": 90
+        },
+        "business": {
+          "min": 75,
+          "max": 90
+        },
+        "work": {
+          "min": 65,
+          "max": 85
+        },
+        "study": {
+          "min": 65,
+          "max": 85
+        }
+      }
+    },
+    {
+      "country": "South Sudan",
+      "iso2": "SS",
+      "region": "Africa",
+      "tier": "high_scrutiny_or_limited_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 35,
+          "max": 65
+        },
+        "business": {
+          "min": 40,
+          "max": 70
+        },
+        "work": {
+          "min": 35,
+          "max": 70
+        },
+        "study": {
+          "min": 35,
+          "max": 65
+        }
+      }
+    },
+    {
+      "country": "Spain",
+      "iso2": "ES",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Sri Lanka",
+      "iso2": "LK",
+      "region": "Asia",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Sudan",
+      "iso2": "SD",
+      "region": "Africa",
+      "tier": "high_scrutiny_or_limited_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 35,
+          "max": 65
+        },
+        "business": {
+          "min": 40,
+          "max": 70
+        },
+        "work": {
+          "min": 35,
+          "max": 70
+        },
+        "study": {
+          "min": 35,
+          "max": 65
+        }
+      }
+    },
+    {
+      "country": "Suriname",
+      "iso2": "SR",
+      "region": "Americas",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Sweden",
+      "iso2": "SE",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Switzerland",
+      "iso2": "CH",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 85
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 60,
+          "max": 90
+        },
+        "study": {
+          "min": 45,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "Syria",
+      "iso2": "SY",
+      "region": "Asia",
+      "tier": "high_scrutiny_or_limited_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 35,
+          "max": 65
+        },
+        "business": {
+          "min": 40,
+          "max": 70
+        },
+        "work": {
+          "min": 35,
+          "max": 70
+        },
+        "study": {
+          "min": 35,
+          "max": 65
+        }
+      }
+    },
+    {
+      "country": "Taiwan",
+      "iso2": "TW",
+      "region": "Asia",
+      "tier": "moderate_high",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 75,
+          "max": 90
+        },
+        "business": {
+          "min": 75,
+          "max": 90
+        },
+        "work": {
+          "min": 65,
+          "max": 85
+        },
+        "study": {
+          "min": 65,
+          "max": 85
+        }
+      }
+    },
+    {
+      "country": "Tajikistan",
+      "iso2": "TJ",
+      "region": "Asia",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Tanzania",
+      "iso2": "TZ",
+      "region": "Africa",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Timor-Leste",
+      "iso2": "TL",
+      "region": "Asia",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Togo",
+      "iso2": "TG",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Tonga",
+      "iso2": "TO",
+      "region": "Oceania",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Tunisia",
+      "iso2": "TN",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Turkey",
+      "iso2": null,
+      "region": "Asia",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Turkmenistan",
+      "iso2": "TM",
+      "region": "Asia",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Tuvalu",
+      "iso2": "TV",
+      "region": "Oceania",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Uganda",
+      "iso2": "UG",
+      "region": "Africa",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Ukraine",
+      "iso2": "UA",
+      "region": "Europe",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "United Arab Emirates",
+      "iso2": "AE",
+      "region": "Asia",
+      "tier": "high_approval",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 90,
+          "max": 98
+        },
+        "business": {
+          "min": 90,
+          "max": 98
+        },
+        "work": {
+          "min": 80,
+          "max": 95
+        },
+        "study": {
+          "min": 70,
+          "max": 90
+        }
+      }
+    },
+    {
+      "country": "United Kingdom",
+      "iso2": "GB",
+      "region": "Europe",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 85
+        },
+        "business": {
+          "min": 70,
+          "max": 85
+        },
+        "work": {
+          "min": 65,
+          "max": 90
+        },
+        "study": {
+          "min": 50,
+          "max": 75
+        }
+      }
+    },
+    {
+      "country": "United States",
+      "iso2": "US",
+      "region": "Americas",
+      "tier": "strict_documentation",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 60,
+          "max": 80
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 80,
+          "max": 97
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Uruguay",
+      "iso2": "UY",
+      "region": "Americas",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Uzbekistan",
+      "iso2": "UZ",
+      "region": "Asia",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Vatican City",
+      "iso2": "VA",
+      "region": "Europe",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Venezuela",
+      "iso2": "VE",
+      "region": "Americas",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Vietnam",
+      "iso2": "VN",
+      "region": "Asia",
+      "tier": "emerging_moderate",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 65,
+          "max": 90
+        },
+        "business": {
+          "min": 65,
+          "max": 85
+        },
+        "work": {
+          "min": 55,
+          "max": 80
+        },
+        "study": {
+          "min": 55,
+          "max": 80
+        }
+      }
+    },
+    {
+      "country": "Yemen",
+      "iso2": "YE",
+      "region": "Asia",
+      "tier": "high_scrutiny_or_limited_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 35,
+          "max": 65
+        },
+        "business": {
+          "min": 40,
+          "max": 70
+        },
+        "work": {
+          "min": 35,
+          "max": 70
+        },
+        "study": {
+          "min": 35,
+          "max": 65
+        }
+      }
+    },
+    {
+      "country": "Zambia",
+      "iso2": "ZM",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    },
+    {
+      "country": "Zimbabwe",
+      "iso2": "ZW",
+      "region": "Africa",
+      "tier": "variable_low_data",
+      "from_country": "India",
+      "passport_type": "ordinary",
+      "approval_chance_percent": {
+        "visit": {
+          "min": 55,
+          "max": 80
+        },
+        "business": {
+          "min": 55,
+          "max": 80
+        },
+        "work": {
+          "min": 45,
+          "max": 75
+        },
+        "study": {
+          "min": 45,
+          "max": 70
+        }
+      }
+    }
+  ]
+}

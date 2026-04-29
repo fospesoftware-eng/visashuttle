@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { runVisaCheck, runDeepCheck } from "./ai";
 import { sendOtp, verifyOtp, getSmsProviderStatus } from "./sms";
 import { getEntryRequirement } from "@shared/visa-free";
+import indiaVisaChanceDataset from "@shared/india_visa_chance_dataset_non_visa_free_2026.json";
 import bcrypt from "bcryptjs";
 
 // Site-wide password for protecting the entire application
@@ -81,6 +82,13 @@ type LiveVisaScore = {
   score: number;
 };
 
+type IndiaVisaChanceKey = "visit" | "business" | "work" | "study";
+
+type IndiaVisaChanceCountry = {
+  country: string;
+  approval_chance_percent: Record<IndiaVisaChanceKey, { min: number; max: number }>;
+};
+
 const COUNTRY_BY_CODE: Record<string, string> = {
   AE: "United Arab Emirates",
   AU: "Australia",
@@ -154,6 +162,13 @@ const HIGH_MOBILITY_ORIGINS = new Set(["United States", "United Kingdom", "Canad
 const REGIONAL_EASY_DESTINATIONS = new Set(["Nepal", "Bhutan", "UAE", "Singapore", "Japan", "Turkey"]);
 const HIGH_SCRUTINY_DESTINATIONS = new Set(["United States", "United Kingdom", "Canada", "Australia", "Schengen", "New Zealand"]);
 const LIVE_VISA_TYPES = ["Tourist Visa", "Visit Visa", "Work Visa", "Student Visa", "Business Visa"];
+const INDIA_DATASET_VISA_TYPES: Array<{ key: IndiaVisaChanceKey; label: string }> = [
+  { key: "visit", label: "Visit Visa" },
+  { key: "business", label: "Business Visa" },
+  { key: "work", label: "Work Visa" },
+  { key: "study", label: "Student Visa" },
+];
+const INDIA_VISA_CHANCE_COUNTRIES = (indiaVisaChanceDataset as { countries: IndiaVisaChanceCountry[] }).countries;
 
 function shuffle<T>(arr: T[]): T[] {
   const copy = [...arr];
@@ -166,6 +181,10 @@ function shuffle<T>(arr: T[]): T[] {
 
 function clampScore(score: number): number {
   return Math.max(24, Math.min(94, score));
+}
+
+function randomInRange(min: number, max: number): number {
+  return Math.floor(min + Math.random() * (max - min + 1));
 }
 
 function visaTypeForDestination(to: string, index: number, mixedTypes: string[]): string {
@@ -184,6 +203,28 @@ function liveScoreForRoute(from: string, to: string): number {
   if (from === to) score -= 30;
 
   return clampScore(score + Math.floor(Math.random() * 11) - 5);
+}
+
+function buildIndiaLiveVisaScores(): { country: string; scores: LiveVisaScore[] } {
+  const countries = shuffle(INDIA_VISA_CHANCE_COUNTRIES)
+    .filter(item => getEntryRequirement("India", item.country) !== "visa_free")
+    .slice(0, 4);
+  const visaTypes = shuffle(INDIA_DATASET_VISA_TYPES);
+
+  return {
+    country: "India",
+    scores: countries.map((item, index) => {
+      const visaType = visaTypes[index % visaTypes.length];
+      const range = item.approval_chance_percent[visaType.key];
+
+      return {
+        from: "India",
+        to: item.country,
+        type: visaType.label,
+        score: clampScore(randomInRange(range.min, range.max)),
+      };
+    }),
+  };
 }
 
 function getCountryCodeFromRequest(req: Request): string | null {
@@ -232,6 +273,8 @@ async function getCountryFromRequest(req: Request): Promise<string | null> {
 
 function buildLiveVisaScores(origin: string | null): { country: string | null; scores: LiveVisaScore[] } {
   const from = origin || "India";
+  if (from.toLowerCase() === "india") return buildIndiaLiveVisaScores();
+
   let destinations = shuffle([...(ORIGIN_DESTINATIONS[from] || FALLBACK_DESTINATIONS)])
     .filter(destination => destination !== from)
     .filter(destination => getEntryRequirement(from, destination) !== "visa_free")
