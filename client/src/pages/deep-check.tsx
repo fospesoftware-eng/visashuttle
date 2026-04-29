@@ -13,13 +13,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { SearchableSelect, MultiSearchableSelect } from "@/components/searchable-select";
 import { getUniversitiesForCountry } from "@/data/universities";
 import { getCountryVisaConfig } from "@/data/country-visa-types";
-import { Logo, LogoMark } from "@/components/logo";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
@@ -219,9 +217,7 @@ export default function DeepCheckPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [consentChecked, setConsentChecked] = useState(false);
   const [consentError, setConsentError] = useState("");
-  const [provider, setProvider] = useState("");
   const [visaHoldings, setVisaHoldings] = useState<VisaHolding[]>([]);
-  const [loadProgress, setLoadProgress] = useState(0);
   const [loadMessage, setLoadMessage] = useState(LOAD_MESSAGES[0]);
   const [profileApplied, setProfileApplied] = useState(false);
 
@@ -264,19 +260,6 @@ export default function DeepCheckPage() {
     toast({ title: "Profile loaded", description: "Your saved profile has been pre-filled. Review and adjust as needed." });
   }, [savedProfile]);
 
-  // Animated progress bar while submitting
-  useEffect(() => {
-    if (!isSubmitting) { setLoadProgress(0); return; }
-    setLoadProgress(0);
-    let p = 0;
-    const tick = setInterval(() => {
-      p += Math.random() * 2.5 + 0.3;
-      if (p >= 90) { clearInterval(tick); p = 90; }
-      setLoadProgress(p);
-    }, 220);
-    return () => clearInterval(tick);
-  }, [isSubmitting]);
-
   // Rotating status messages while submitting
   useEffect(() => {
     if (!isSubmitting) return;
@@ -316,12 +299,12 @@ export default function DeepCheckPage() {
     return (
       <DashboardLayout title="Deep Check Results" subtitle="AI-powered embassy-style visa analysis">
         <div className="max-w-4xl space-y-6">
-          {/* Powered by Claude badge */}
+          {/* AI Analysis badge */}
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 text-xs font-semibold text-purple-700 dark:text-purple-300">
                 <Brain className="w-3.5 h-3.5" />
-                Powered by Claude AI
+                AI Analysis
               </div>
               {confidence && (
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted text-xs font-medium text-muted-foreground border">
@@ -617,7 +600,7 @@ export default function DeepCheckPage() {
             </div>
           </div>
           {[
-            { icon: Brain, title: "Claude AI Analysis", desc: "Every deep check runs exclusively on Claude — Anthropic's frontier model trained on embassy evaluation patterns and consular officer decision criteria." },
+            { icon: Brain, title: "AI Analysis", desc: "Every deep check uses advanced AI to review embassy evaluation patterns, consular decision criteria, and your full applicant profile." },
             { icon: BarChart3, title: "5-Dimension Scoring", desc: "Scores across Financial Strength, Document Completeness, Travel History, Home Country Ties, and Visa Profile Match." },
             { icon: AlertTriangle, title: "Severity-Tagged Risk Flags", desc: "Each risk factor is tagged Critical / High / Medium / Low with specific mitigation advice — exactly how a consular officer would weigh it." },
             { icon: ClipboardList, title: "Personalized Action Plan", desc: "Prioritized action items (Immediate / Before Applying / Optional) with estimated approval chance improvement for each action." },
@@ -703,10 +686,8 @@ export default function DeepCheckPage() {
     try {
       const res = await apiRequest("POST", "/api/b2c/deep-check", { formData: enrichedForm });
       const data = await res.json();
-      setLoadProgress(100);
       await new Promise(r => setTimeout(r, 600));
       setResult(data.result);
-      setProvider(data.check?.aiProvider || "");
       await queryClient.invalidateQueries({ queryKey: ["/api/b2c/checks"] });
 
       // Auto-save profile from form data
@@ -745,86 +726,50 @@ export default function DeepCheckPage() {
     }
   };
 
-  // ===================== ANIMATED PROGRESS SCREEN =====================
+  // ===================== PROGRESS SCREEN =====================
   if (isSubmitting) {
+    const steps = [
+      "Reviewing your personal profile…",
+      "Assessing employment and financial strength…",
+      "Evaluating travel history and visa record…",
+      "Checking home ties and document readiness…",
+      "Generating your AI Analysis report…",
+    ];
     return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center"
-        style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 40%, #0f172a 100%)" }}>
-        {/* Subtle radial glow */}
-        <div className="absolute inset-0 pointer-events-none"
-          style={{ background: "radial-gradient(ellipse 60% 40% at 50% 40%, rgba(64,85,255,0.18) 0%, transparent 70%)" }} />
-
-        <div className="relative z-10 flex flex-col items-center gap-8 px-6 max-w-md w-full">
-          {/* Logo */}
-          <div className="flex flex-col items-center gap-3">
-            <Logo variant="white" size="lg" showText={true} />
-            <p className="text-blue-300 text-xs font-medium tracking-widest uppercase -mt-1">Deep Check</p>
-          </div>
-
-          {/* Brain pulse animation */}
+      <DashboardLayout title="Analyzing Your Visa Profile" subtitle="Deep Check — please wait">
+        <div className="w-full max-w-md mx-auto flex flex-col items-center justify-center min-h-[60vh] gap-8">
           <div className="relative">
-            <div className="w-24 h-24 rounded-full flex items-center justify-center"
-              style={{ background: "rgba(64,85,255,0.15)", boxShadow: "0 0 0 0 rgba(64,85,255,0.4)", animation: "pulse-ring 2s ease-out infinite" }}>
-              <div className="w-16 h-16 rounded-full flex items-center justify-center"
-                style={{ background: "rgba(64,85,255,0.25)" }}>
-                <Brain className="w-8 h-8 text-blue-300" />
+            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-[#4055FF]/20 to-[#FF2060]/10 blur-2xl scale-150" />
+            <img src="/logo-loading.gif" alt="Analyzing..." className="relative w-32 h-32 object-contain drop-shadow-xl" />
+          </div>
+
+          <div className="text-center space-y-2">
+            <h2 className="text-xl font-bold text-slate-800">AI is running your deep analysis</h2>
+            <p className="text-sm text-slate-500">{form.nationality} → {form.destinationCountry} · {form.visaType}</p>
+            <p className="text-xs text-slate-400 transition-all duration-500">{loadMessage}</p>
+          </div>
+
+          <div className="w-full space-y-2.5">
+            {steps.map((s, i) => (
+              <div key={i} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white border border-slate-100 shadow-sm">
+                <span className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 border-2 border-[#4055FF] border-t-transparent animate-spin" style={{ animationDuration: `${1.2 + i * 0.3}s` }} />
+                <span className="text-sm text-slate-600">{s}</span>
               </div>
-            </div>
-            <style>{`
-              @keyframes pulse-ring {
-                0% { box-shadow: 0 0 0 0 rgba(64,85,255,0.5); }
-                70% { box-shadow: 0 0 0 24px rgba(64,85,255,0); }
-                100% { box-shadow: 0 0 0 0 rgba(64,85,255,0); }
-              }
-            `}</style>
+            ))}
           </div>
 
-          {/* Status message */}
-          <div className="text-center min-h-[2.5rem]">
-            <p className="text-white font-semibold text-base transition-all duration-500">{loadMessage}</p>
-            <p className="text-blue-400 text-xs mt-1">Claude AI is processing your visa profile</p>
-          </div>
-
-          {/* Progress bar */}
-          <div className="w-full space-y-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-blue-300 font-medium">Analysis Progress</span>
-              <span className="text-blue-200 font-bold">{Math.round(loadProgress)}%</span>
-            </div>
-            <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-              <div className="h-full rounded-full transition-all duration-300 ease-out"
-                style={{ width: `${loadProgress}%`, background: "linear-gradient(90deg,#4055FF,#7033F0,#FF2060)" }} />
-            </div>
-          </div>
-
-          {/* Steps indicator */}
-          <div className="flex gap-2 flex-wrap justify-center">
-            {["Profile","Travel","Finance","History","Documents","Analysis"].map((label, i) => {
-              const frac = loadProgress / 100;
-              const done = frac > (i + 1) / 6;
-              const active = !done && frac > i / 6;
-              return (
-                <div key={label} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-500 ${done ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : active ? "bg-blue-500/20 text-blue-200 border border-blue-400/40" : "bg-white/5 text-white/30 border border-white/10"}`}>
-                  {done ? <CheckCircle className="w-3 h-3" /> : <div className={`w-3 h-3 rounded-full border-2 ${active ? "border-blue-400 border-t-transparent animate-spin" : "border-white/20"}`} />}
-                  {label}
-                </div>
-              );
-            })}
-          </div>
-
-          <p className="text-blue-400/60 text-xs text-center">This usually takes 20–40 seconds</p>
+          <p className="text-xs text-slate-400 text-center">This usually takes 20–40 seconds</p>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
-
   return (
     <DashboardLayout title="New Deep Check" subtitle={`Step ${step} of ${STEPS.length} — ${currentStep.title}`}>
       <div className="max-w-3xl">
         {/* Pro badge */}
         <div className="mb-4 flex items-center gap-2 px-3 py-2 rounded-xl bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800">
           <Crown className="w-4 h-4 text-purple-600 dark:text-purple-400 flex-shrink-0" />
-          <span className="text-sm text-purple-700 dark:text-purple-300 font-medium">Deep Check — Claude AI Powered Analysis</span>
+          <span className="text-sm text-purple-700 dark:text-purple-300 font-medium">Deep Check — AI Analysis</span>
           <span className="ml-auto text-xs text-purple-500">More thorough than basic check</span>
         </div>
 
@@ -1398,9 +1343,9 @@ export default function DeepCheckPage() {
                   <div className="flex items-start gap-3">
                     <Brain className="w-5 h-5 text-purple-600 dark:text-purple-400 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-semibold text-purple-800 dark:text-purple-200 text-sm">Ready for Claude AI Analysis</p>
+                      <p className="font-semibold text-purple-800 dark:text-purple-200 text-sm">Ready for AI Analysis</p>
                       <p className="text-xs text-purple-600 dark:text-purple-400 mt-0.5 leading-relaxed">
-                        Your answers across all {STEPS.length} dimensions will be sent to Claude to generate a comprehensive embassy-style visa risk report with dimension scores, severity-tagged risk flags, and a personalized action plan.
+                        Your answers across all {STEPS.length} dimensions will be analyzed to generate a comprehensive embassy-style visa risk report with dimension scores, severity-tagged risk flags, and a personalized action plan.
                       </p>
                       {form.nationality && form.destinationCountry && (
                         <p className="text-xs text-purple-700 dark:text-purple-300 mt-2 font-medium">
@@ -1440,7 +1385,7 @@ export default function DeepCheckPage() {
                   {isSubmitting ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                      Analyzing with Claude…
+                      Running AI Analysis…
                     </>
                   ) : (
                     <>
