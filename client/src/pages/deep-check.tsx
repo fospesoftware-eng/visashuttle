@@ -765,7 +765,7 @@ export default function DeepCheckPage() {
   }
   return (
     <DashboardLayout title="New Deep Check" subtitle={`Step ${step} of ${STEPS.length} — ${currentStep.title}`}>
-      <div className="max-w-3xl">
+      <div className="max-w-5xl">
         {/* Pro badge */}
         <div className="mb-4 flex items-center gap-2 px-3 py-2 rounded-xl bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800">
           <Crown className="w-4 h-4 text-purple-600 dark:text-purple-400 flex-shrink-0" />
@@ -775,7 +775,7 @@ export default function DeepCheckPage() {
 
         {/* Step pills */}
         <div className="mb-5">
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-3">
+          <div className="flex flex-nowrap md:flex-wrap items-center gap-1.5 overflow-x-auto md:overflow-visible pb-2 mb-3">
             {STEPS.map(s => {
               const SIcon = s.icon;
               const done = s.n < step;

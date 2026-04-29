@@ -83,6 +83,7 @@ export default function AccountPage() {
   const recentChecks = checks.slice(0, 3);
   const profComp = profileCompletion(profile ?? null);
   const lastCheck = checks[0];
+  const checksLeftLabel = Number.isFinite(checksRemaining) ? checksRemaining : "Unlimited";
 
   const notifications = [
     !canCheck && { type: "warn", msg: "You've used your free check. Upgrade to run more checks." },
@@ -98,7 +99,7 @@ export default function AccountPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             { label: "Total Checks", value: checks.length, icon: BarChart3, color: "text-[#4055FF]", bg: "bg-[#4055FF]/10" },
-            { label: "Checks Left", value: checksRemaining, icon: Zap, color: canCheck ? "text-emerald-600" : "text-amber-600", bg: canCheck ? "bg-emerald-50" : "bg-amber-50" },
+            { label: "Checks Left", value: checksLeftLabel, icon: Zap, color: canCheck ? "text-emerald-600" : "text-amber-600", bg: canCheck ? "bg-emerald-50" : "bg-amber-50" },
             { label: "Profile Complete", value: `${profComp}%`, icon: User, color: profComp >= 70 ? "text-emerald-600" : "text-slate-500", bg: "bg-slate-50" },
             { label: "Plan", value: user.subscriptionPlan.charAt(0).toUpperCase() + user.subscriptionPlan.slice(1), icon: Crown, color: user.subscriptionPlan === "pro" ? "text-purple-600" : "text-slate-500", bg: user.subscriptionPlan === "pro" ? "bg-purple-50" : "bg-slate-50" },
           ].map(({ label, value, icon: Icon, color, bg }) => (

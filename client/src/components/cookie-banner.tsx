@@ -46,7 +46,7 @@ export function CookieBanner() {
 
   return (
     <div
-      className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-2rem)] max-w-2xl"
+      className="fixed bottom-14 sm:bottom-4 left-1/2 -translate-x-1/2 z-[100] w-[calc(100%-1rem)] sm:w-[calc(100%-2rem)] max-w-2xl"
       style={{ animation: "cookie-slide-up 0.35s ease-out both" }}
       data-testid="cookie-banner"
     >
@@ -57,10 +57,10 @@ export function CookieBanner() {
         }
       `}</style>
 
-      <div className="rounded-2xl border bg-card shadow-2xl overflow-hidden">
-        <div className="p-5">
-          <div className="flex items-start gap-4">
-            <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-[#4055FF]/10 flex items-center justify-center">
+      <div className="rounded-2xl border bg-white dark:bg-slate-950 shadow-2xl overflow-hidden">
+        <div className="p-4 sm:p-5">
+          <div className="flex items-start gap-3 sm:gap-4">
+            <div className="hidden sm:flex flex-shrink-0 w-10 h-10 rounded-xl bg-[#4055FF]/10 items-center justify-center">
               <Cookie className="w-5 h-5 text-[#4055FF]" />
             </div>
 
