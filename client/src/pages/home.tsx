@@ -113,47 +113,58 @@ function scoreToLabel(score: number): { label: string; color: string } {
   return { label: "Low Chance", color: "text-red-600 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800" };
 }
 
-const COUNTRY_FLAGS: Record<string, string> = {
-  Australia: "🇦🇺",
-  Bangladesh: "🇧🇩",
-  Brazil: "🇧🇷",
-  Canada: "🇨🇦",
-  China: "🇨🇳",
-  Colombia: "🇨🇴",
-  France: "🇫🇷",
-  Germany: "🇩🇪",
-  Ghana: "🇬🇭",
-  India: "🇮🇳",
-  Indonesia: "🇮🇩",
-  Japan: "🇯🇵",
-  Jordan: "🇯🇴",
-  Kenya: "🇰🇪",
-  Mexico: "🇲🇽",
-  Morocco: "🇲🇦",
-  Nepal: "🇳🇵",
-  "New Zealand": "🇳🇿",
-  Nigeria: "🇳🇬",
-  Pakistan: "🇵🇰",
-  Philippines: "🇵🇭",
-  Russia: "🇷🇺",
-  "Saudi Arabia": "🇸🇦",
-  Schengen: "🇪🇺",
-  Singapore: "🇸🇬",
-  "South Africa": "🇿🇦",
-  "South Korea": "🇰🇷",
-  "Sri Lanka": "🇱🇰",
-  Thailand: "🇹🇭",
-  Turkey: "🇹🇷",
-  Ukraine: "🇺🇦",
-  "United Kingdom": "🇬🇧",
-  "United States": "🇺🇸",
-  Vietnam: "🇻🇳",
+const COUNTRY_FLAG_CODES: Record<string, string> = {
+  Australia: "au",
+  Bangladesh: "bd",
+  Brazil: "br",
+  Canada: "ca",
+  China: "cn",
+  Colombia: "co",
+  France: "fr",
+  Germany: "de",
+  Ghana: "gh",
+  India: "in",
+  Indonesia: "id",
+  Japan: "jp",
+  Jordan: "jo",
+  Kenya: "ke",
+  Mexico: "mx",
+  Morocco: "ma",
+  Nepal: "np",
+  "New Zealand": "nz",
+  Nigeria: "ng",
+  Pakistan: "pk",
+  Philippines: "ph",
+  Russia: "ru",
+  "Saudi Arabia": "sa",
+  Schengen: "eu",
+  Singapore: "sg",
+  "South Africa": "za",
+  "South Korea": "kr",
+  "Sri Lanka": "lk",
+  Thailand: "th",
+  Turkey: "tr",
+  Ukraine: "ua",
+  "United Kingdom": "gb",
+  "United States": "us",
+  Vietnam: "vn",
 };
 
 function CountryWithFlag({ name }: { name: string }) {
+  const code = COUNTRY_FLAG_CODES[name];
   return (
     <span className="inline-flex items-center gap-1 min-w-0">
-      <span className="text-base leading-none flex-shrink-0" aria-hidden="true">{COUNTRY_FLAGS[name] || "🌐"}</span>
+      {code ? (
+        <img
+          src={`https://flagcdn.com/24x18/${code}.png`}
+          srcSet={`https://flagcdn.com/48x36/${code}.png 2x`}
+          alt=""
+          className="w-5 h-3.5 rounded-[3px] object-cover flex-shrink-0 shadow-sm ring-1 ring-black/5"
+          loading="lazy"
+        />
+      ) : (
+        <Globe className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+      )}
       <span className="truncate">{name}</span>
     </span>
   );
@@ -277,62 +288,14 @@ export default function HomePage() {
 
       {/* Hero */}
       <section className="relative overflow-hidden pt-14 pb-10 md:pt-24 md:pb-20">
-        {/* Minimal travel-themed background */}
-        <div className="absolute inset-0 bg-[linear-gradient(140deg,rgba(64,85,255,0.08),rgba(255,255,255,0.98)_46%,rgba(255,32,96,0.06))] dark:bg-[linear-gradient(140deg,rgba(64,85,255,0.16),rgba(10,15,30,0.98)_48%,rgba(255,32,96,0.12))]" />
-        <div className="absolute inset-x-0 top-10 h-56 bg-[radial-gradient(ellipse_at_center,rgba(64,85,255,0.10),transparent_66%)] dark:bg-[radial-gradient(ellipse_at_center,rgba(64,85,255,0.20),transparent_66%)]" />
-        <div className="absolute right-[7%] top-[14%] h-24 w-24 rounded-full border border-[#4055FF]/10 dark:border-[#4055FF]/20" style={{ animation: "hero-travel-float 12s ease-in-out infinite" }} />
-        <div className="absolute left-[9%] bottom-[14%] h-16 w-16 rounded-full border border-[#FF2060]/10 dark:border-[#FF2060]/20" style={{ animation: "hero-travel-float 14s ease-in-out infinite reverse" }} />
-
-        {/* Premium animated travel objects */}
-        <div className="hero-travel-layer absolute inset-0 pointer-events-none" aria-hidden="true">
-          <div className="hero-cloud-object hero-cloud-object-a">
-            <span />
-            <span />
-            <span />
-          </div>
-          <div className="hero-cloud-object hero-cloud-object-b">
-            <span />
-            <span />
-            <span />
-          </div>
-
-          <div className="hero-paper-plane hero-paper-plane-primary">
-            <Send className="w-9 h-9" />
-          </div>
-          <div className="hero-paper-plane hero-paper-plane-secondary">
-            <Send className="w-7 h-7" />
-          </div>
-
-          <div className="hero-glass-object hero-boarding-pass">
-            <div className="h-2 w-16 rounded-full bg-[#4055FF]/20" />
-            <div className="mt-4 flex items-end justify-between gap-5">
-              <div className="space-y-2 flex-1">
-                <div className="h-2 w-24 rounded-full bg-slate-400/18" />
-                <div className="h-2 w-14 rounded-full bg-slate-400/14" />
-              </div>
-              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-[#4055FF]/14 to-[#FF2060]/12 flex items-center justify-center">
-                <Send className="h-5 w-5 text-[#4055FF]/45" />
-              </div>
-            </div>
-          </div>
-
-          <div className="hero-glass-object hero-passport-object">
-            <Globe className="h-9 w-9 text-[#9033F5]/40" />
-            <div className="mt-5 h-2 w-16 rounded-full bg-[#9033F5]/18" />
-            <div className="mt-2 h-2 w-11 rounded-full bg-[#9033F5]/12" />
-          </div>
-
-          <div className="hero-suitcase-object">
-            <div className="hero-suitcase-handle" />
-            <div className="hero-suitcase-body">
-              <div />
-            </div>
-          </div>
-
-          <div className="hero-stamp-object">
-            <div className="h-2 w-20 rounded-full bg-[#FF2060]/16" />
-            <div className="mt-3 h-2 w-12 rounded-full bg-[#FF2060]/12" />
-          </div>
+        {/* Minimal premium aurora background */}
+        <div className="hero-aurora-bg absolute inset-0 pointer-events-none" aria-hidden="true">
+          <div className="hero-aurora-base" />
+          <div className="hero-aurora-ribbon hero-aurora-ribbon-a" />
+          <div className="hero-aurora-ribbon hero-aurora-ribbon-b" />
+          <div className="hero-aurora-ribbon hero-aurora-ribbon-c" />
+          <div className="hero-aurora-sheen" />
+          <div className="hero-aurora-vignette" />
         </div>
 
         <div className="relative max-w-7xl mx-auto px-4">
