@@ -255,6 +255,12 @@ export const savedProfiles = pgTable("saved_profiles", {
   hasProperty: boolean("has_property").default(false),
   familyInHomeCountry: boolean("family_in_home_country").default(false),
   propertyInHomeCountry: boolean("property_in_home_country").default(false),
+  monthsInCurrentResidence: text("months_in_current_residence"),
+  monthlyExpenses: text("monthly_expenses"),
+  criminalRecord: text("criminal_record"),
+  immigrationViolation: text("immigration_violation"),
+  financialCommitmentsHome: text("financial_commitments_home"),
+  dependentsHomeCountry: text("dependents_home_country"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

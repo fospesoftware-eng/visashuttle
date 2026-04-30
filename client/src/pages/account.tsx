@@ -1,15 +1,20 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   PlaneTakeoff, Crown, User, Clock, TrendingUp, CheckCircle, AlertCircle,
-  ArrowRight, Plus, Brain, BarChart3, Zap, FileText, Bell, ChevronRight
+  ArrowRight, Plus, Brain, BarChart3, Zap, FileText, Bell, ChevronRight, BookUser
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useQuery } from "@tanstack/react-query";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard-layout";
+import { SearchableSelect } from "@/components/searchable-select";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface VisaCheck {
   id: string;
@@ -56,6 +61,124 @@ function ScoreDisplay({ score, label }: { score: number | null; label: string | 
   );
 }
 
+const OB_COUNTRIES = ["Afghanistan","Albania","Algeria","Argentina","Australia","Austria","Azerbaijan","Bahrain","Bangladesh","Belgium","Brazil","Bulgaria","Cambodia","Canada","Chile","China","Colombia","Croatia","Cyprus","Czech Republic","Denmark","Egypt","Estonia","Ethiopia","Finland","France","Georgia","Germany","Ghana","Greece","Hungary","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy","Japan","Jordan","Kazakhstan","Kenya","Kuwait","Latvia","Lebanon","Lithuania","Luxembourg","Malaysia","Malta","Mexico","Morocco","Myanmar","Nepal","Netherlands","New Zealand","Nigeria","Norway","Oman","Pakistan","Philippines","Poland","Portugal","Qatar","Romania","Russia","Saudi Arabia","Serbia","Singapore","Slovakia","Slovenia","South Africa","South Korea","Spain","Sri Lanka","Sweden","Switzerland","Syria","Taiwan","Thailand","Tunisia","Turkey","Ukraine","United Arab Emirates","United Kingdom","United States","Uzbekistan","Venezuela","Vietnam","Yemen","Zimbabwe"];
+const OB_GENDER = ["Male","Female","Non-binary","Prefer not to say"];
+
+interface OnboardingForm { fullName: string; nationality: string; countryOfResidence: string; dateOfBirth: string; gender: string; }
+
+function OnboardingModal({ onDone }: { onDone: () => void }) {
+  const { toast } = useToast();
+  const [form, setForm] = useState<OnboardingForm>({ fullName: "", nationality: "", countryOfResidence: "", dateOfBirth: "", gender: "" });
+
+  const mutation = useMutation({
+    mutationFn: async (data: OnboardingForm) => {
+      const res = await apiRequest("PUT", "/api/b2c/profile", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/b2c/profile"] });
+      onDone();
+    },
+    onError: () => toast({ title: "Save failed", description: "Please try again.", variant: "destructive" }),
+  });
+
+  const canSubmit = form.fullName.trim() && form.nationality && form.countryOfResidence && form.dateOfBirth && form.gender;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+        <div className="bg-gradient-to-r from-[#4055FF] to-[#9033F5] px-6 pt-6 pb-5 text-white">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
+              <BookUser className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold leading-tight">Complete your profile</h2>
+              <p className="text-white/75 text-xs">Required before your first visa check</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
+          <div>
+            <Label className="text-sm font-medium text-slate-700 mb-1.5 block">
+              Full Name <span className="text-slate-400 font-normal">(as per Passport)</span>
+            </Label>
+            <Input
+              value={form.fullName}
+              onChange={e => setForm(f => ({ ...f, fullName: e.target.value }))}
+              placeholder="e.g. John Michael Smith"
+              className="border-slate-200 bg-slate-50 focus:bg-white"
+              data-testid="onboarding-fullname"
+            />
+          </div>
+
+          <SearchableSelect
+            label="Nationality"
+            value={form.nationality}
+            onChange={(v: string) => setForm(f => ({ ...f, nationality: v }))}
+            options={OB_COUNTRIES}
+            placeholder="Search nationality..."
+          />
+
+          <SearchableSelect
+            label="Country of Residence"
+            value={form.countryOfResidence}
+            onChange={(v: string) => setForm(f => ({ ...f, countryOfResidence: v }))}
+            options={OB_COUNTRIES}
+            placeholder="Search country..."
+          />
+
+          <div>
+            <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Date of Birth</Label>
+            <Input
+              type="date"
+              value={form.dateOfBirth}
+              onChange={e => setForm(f => ({ ...f, dateOfBirth: e.target.value }))}
+              className="border-slate-200 bg-slate-50"
+              data-testid="onboarding-dob"
+            />
+          </div>
+
+          <div>
+            <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Gender</Label>
+            <div className="relative">
+              <select
+                className="w-full h-10 pl-3 pr-8 text-sm border border-slate-200 rounded-lg bg-slate-50 appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#4055FF]"
+                value={form.gender}
+                onChange={e => setForm(f => ({ ...f, gender: e.target.value }))}
+                data-testid="onboarding-gender"
+              >
+                <option value="">Select gender...</option>
+                {OB_GENDER.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+              <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 pb-6">
+          <Button
+            className="w-full h-11 text-base font-semibold border-0 text-white hover:opacity-90"
+            style={{ background: "linear-gradient(135deg,#4055FF,#9033F5)" }}
+            disabled={!canSubmit || mutation.isPending}
+            onClick={() => mutation.mutate(form)}
+            data-testid="onboarding-submit"
+          >
+            {mutation.isPending ? (
+              <span className="flex items-center gap-2">
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Saving...
+              </span>
+            ) : "Save & Continue to Profile"}
+          </Button>
+          <p className="text-center text-xs text-slate-400 mt-3">You can update these anytime from your profile page.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AccountPage() {
   const { user, isLoading: authLoading, checksRemaining, canCheck } = useB2cAuth();
   const [, setLocation] = useLocation();
@@ -69,7 +192,7 @@ export default function AccountPage() {
     enabled: !!user,
   });
 
-  const { data: profile } = useQuery<SavedProfile | null>({
+  const { data: profile, isLoading: profileLoading } = useQuery<SavedProfile | null>({
     queryKey: ["/api/b2c/profile"],
     enabled: !!user,
   });
@@ -79,6 +202,8 @@ export default function AccountPage() {
       <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
     </div>
   );
+
+  const showOnboarding = !profileLoading && profile !== undefined && !profile?.fullName;
 
   const recentChecks = checks.slice(0, 3);
   const profComp = profileCompletion(profile ?? null);
@@ -92,7 +217,9 @@ export default function AccountPage() {
   ].filter(Boolean) as { type: string; msg: string }[];
 
   return (
-    <DashboardLayout title={`Welcome back, ${user.fullName.split(" ")[0]}`} subtitle="Your visa intelligence dashboard">
+    <>
+    {showOnboarding && <OnboardingModal onDone={() => setLocation("/saved-profile")} />}
+    <DashboardLayout title={`Welcome back, ${(user.fullName || "there").split(" ")[0]}`} subtitle="Your visa intelligence dashboard">
       <div className="max-w-5xl space-y-6">
 
         {/* Stats row */}
@@ -360,5 +487,6 @@ export default function AccountPage() {
         </div>
       </div>
     </DashboardLayout>
+    </>
   );
 }

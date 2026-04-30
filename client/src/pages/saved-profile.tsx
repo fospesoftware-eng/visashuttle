@@ -24,26 +24,36 @@ const YEARS_OPTS = ["Less than 1 year","1–2 years","2–5 years","5–10 years
 const SOURCE_OPTS = ["Employment Salary","Business Revenue","Freelance / Consultancy","Investment Returns","Rental Income","Pension / Retirement","Family Support","Government Benefits"];
 const FUNDING_OPTS = ["Self-funded","Employer / Company","Family member","Sponsor / Host","Scholarship / Grant","Business funds"];
 const REFUSAL_OPTS = ["No","Yes – once","Yes – multiple times"];
+const RESIDENCE_OPTS = ["Less than 6 months","6–12 months","1–3 years","3–5 years","5+ years"];
+const EXPENSE_OPTS = ["Less than $500","$500 – $1,500","$1,500 – $3,000","More than $3,000"];
+const YESNO_OPTS = ["No","Yes"];
+const DEPENDENTS_OPTS = ["None","1","2","3","4","5+"];
 
 interface ProfileForm {
   fullName: string; nationality: string; dateOfBirth: string; gender: string;
   maritalStatus: string; countryOfResidence: string; passportCountry: string;
+  monthsInCurrentResidence: string;
   employmentStatus: string; jobTitle: string; companyName: string; yearsInJob: string;
-  monthlyIncome: string; sourceOfIncome: string; bankBalance: string; tripFunding: string;
+  monthlyIncome: string; sourceOfIncome: string; monthlyExpenses: string;
+  bankBalance: string; tripFunding: string;
   countriesVisited: string; previousVisaRefusals: string;
+  criminalRecord: string; immigrationViolation: string;
   hasPassport: boolean; hasBankStatement: boolean; hasIncomeProof: boolean;
   hasTaxReturn: boolean; hasSalarySlips: boolean; hasCreditCard: boolean; hasProperty: boolean;
   familyInHomeCountry: boolean; propertyInHomeCountry: boolean;
+  financialCommitmentsHome: string; dependentsHomeCountry: string;
 }
 
 const EMPTY: ProfileForm = {
   fullName: "", nationality: "", dateOfBirth: "", gender: "", maritalStatus: "",
-  countryOfResidence: "", passportCountry: "", employmentStatus: "", jobTitle: "",
-  companyName: "", yearsInJob: "", monthlyIncome: "", sourceOfIncome: "", bankBalance: "",
-  tripFunding: "", countriesVisited: "", previousVisaRefusals: "",
+  countryOfResidence: "", passportCountry: "", monthsInCurrentResidence: "",
+  employmentStatus: "", jobTitle: "", companyName: "", yearsInJob: "",
+  monthlyIncome: "", sourceOfIncome: "", monthlyExpenses: "", bankBalance: "", tripFunding: "",
+  countriesVisited: "", previousVisaRefusals: "", criminalRecord: "", immigrationViolation: "",
   hasPassport: false, hasBankStatement: false, hasIncomeProof: false, hasTaxReturn: false,
   hasSalarySlips: false, hasCreditCard: false, hasProperty: false,
   familyInHomeCountry: false, propertyInHomeCountry: false,
+  financialCommitmentsHome: "", dependentsHomeCountry: "",
 };
 
 function Sel({ label, val, onChange, opts }: { label: string; val: string; onChange: (v: string) => void; opts: string[] }) {
@@ -112,16 +122,20 @@ export default function SavedProfilePage() {
         maritalStatus: profile.maritalStatus || "",
         countryOfResidence: profile.countryOfResidence || "",
         passportCountry: profile.passportCountry || "",
+        monthsInCurrentResidence: profile.monthsInCurrentResidence || "",
         employmentStatus: profile.employmentStatus || "",
         jobTitle: profile.jobTitle || "",
         companyName: profile.companyName || "",
         yearsInJob: profile.yearsInJob || "",
         monthlyIncome: profile.monthlyIncome || "",
         sourceOfIncome: profile.sourceOfIncome || "",
+        monthlyExpenses: profile.monthlyExpenses || "",
         bankBalance: profile.bankBalance || "",
         tripFunding: profile.tripFunding || "",
         countriesVisited: profile.countriesVisited || "",
         previousVisaRefusals: profile.previousVisaRefusals || "",
+        criminalRecord: profile.criminalRecord || "",
+        immigrationViolation: profile.immigrationViolation || "",
         hasPassport: profile.hasPassport || false,
         hasBankStatement: profile.hasBankStatement || false,
         hasIncomeProof: profile.hasIncomeProof || false,
@@ -131,6 +145,8 @@ export default function SavedProfilePage() {
         hasProperty: profile.hasProperty || false,
         familyInHomeCountry: profile.familyInHomeCountry || false,
         propertyInHomeCountry: profile.propertyInHomeCountry || false,
+        financialCommitmentsHome: profile.financialCommitmentsHome || "",
+        dependentsHomeCountry: profile.dependentsHomeCountry || "",
       });
     }
   }, [profile]);
@@ -225,6 +241,7 @@ export default function SavedProfilePage() {
               <Sel label="Gender" val={form.gender} onChange={set("gender") as (v: string) => void} opts={GENDER_OPTS} />
               <Sel label="Marital Status" val={form.maritalStatus} onChange={set("maritalStatus") as (v: string) => void} opts={MARITAL_OPTS} />
               <SearchableSelect label="Country of Residence" value={form.countryOfResidence} onChange={set("countryOfResidence") as (v: string) => void} options={COUNTRIES} placeholder="Search country..." />
+              <Sel label="Duration in Current Residence" val={form.monthsInCurrentResidence} onChange={set("monthsInCurrentResidence") as (v: string) => void} opts={RESIDENCE_OPTS} />
             </CardContent>
           </Card>
 
@@ -251,6 +268,7 @@ export default function SavedProfilePage() {
               <Sel label="Years in Current Role" val={form.yearsInJob} onChange={set("yearsInJob") as (v: string) => void} opts={YEARS_OPTS} />
               <Sel label="Monthly Income (USD)" val={form.monthlyIncome} onChange={set("monthlyIncome") as (v: string) => void} opts={INCOME_OPTS} />
               <Sel label="Source of Income" val={form.sourceOfIncome} onChange={set("sourceOfIncome") as (v: string) => void} opts={SOURCE_OPTS} />
+              <Sel label="Monthly Living Expenses (USD)" val={form.monthlyExpenses} onChange={set("monthlyExpenses") as (v: string) => void} opts={EXPENSE_OPTS} />
             </CardContent>
           </Card>
 
@@ -283,6 +301,24 @@ export default function SavedProfilePage() {
             <CardContent className="px-5 pb-5 space-y-3">
               <MultiSearchableSelect label="Countries Visited (last 3 years)" value={form.countriesVisited} onChange={set("countriesVisited") as (v: string) => void} options={COUNTRIES} placeholder="Search and select countries..." />
               <Sel label="Previous Visa Refusals" val={form.previousVisaRefusals} onChange={set("previousVisaRefusals") as (v: string) => void} opts={REFUSAL_OPTS} />
+              <Sel label="Any criminal record?" val={form.criminalRecord} onChange={set("criminalRecord") as (v: string) => void} opts={YESNO_OPTS} />
+              <Sel label="Any immigration violations?" val={form.immigrationViolation} onChange={set("immigrationViolation") as (v: string) => void} opts={YESNO_OPTS} />
+            </CardContent>
+          </Card>
+
+          {/* Home Ties */}
+          <Card className="bg-white border-slate-100 shadow-sm">
+            <CardHeader className="pb-2 pt-4 px-5">
+              <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-teal-100 flex items-center justify-center">
+                  <svg className="w-3.5 h-3.5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                </div>
+                Home Ties & Background
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-5 pb-5 grid sm:grid-cols-2 gap-3">
+              <Sel label="Financial commitments at home?" val={form.financialCommitmentsHome} onChange={set("financialCommitmentsHome") as (v: string) => void} opts={YESNO_OPTS} />
+              <Sel label="Dependents in home country" val={form.dependentsHomeCountry} onChange={set("dependentsHomeCountry") as (v: string) => void} opts={DEPENDENTS_OPTS} />
             </CardContent>
           </Card>
 
