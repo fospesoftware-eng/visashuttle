@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { Clock, Sparkles, CheckCircle, AlertCircle, TrendingUp, FileText, ChevronRight, Brain, Info } from "lucide-react";
+import { Clock, Sparkles, CheckCircle, AlertCircle, FileText, ChevronRight, Brain, Info } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -93,7 +93,17 @@ export default function HistoryPage() {
               const fd = check.formData;
               const response = check.aiResponse as any;
               return (
-                <Card key={check.id} className="hover:shadow-md transition-all bg-white" data-testid={`card-check-${check.id}`}>
+                <Card
+                  key={check.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setLocation(`/history/${check.id}`)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") setLocation(`/history/${check.id}`);
+                  }}
+                  className="hover:shadow-md hover:border-blue-200 transition-all bg-white cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                  data-testid={`card-check-${check.id}`}
+                >
                   <CardContent className="p-5">
                     <div className="flex items-start gap-4">
                       {/* Score circle */}
@@ -161,6 +171,7 @@ export default function HistoryPage() {
                           </div>
                         )}
                       </div>
+                      <ChevronRight className="w-5 h-5 text-slate-300 flex-shrink-0 mt-4" />
                     </div>
                   </CardContent>
                 </Card>

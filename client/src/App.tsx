@@ -19,6 +19,7 @@ import CheckPage from "@/pages/check";
 import AccountPage from "@/pages/account";
 import PricingPage from "@/pages/pricing";
 import HistoryPage from "@/pages/history";
+import HistoryDetailPage from "@/pages/history-detail";
 import DeepCheckPage from "@/pages/deep-check";
 import SavedProfilePage from "@/pages/saved-profile";
 import SettingsPage from "@/pages/settings";
@@ -91,6 +92,7 @@ function Router() {
       <Route path="/check" component={CheckPage} />
       <Route path="/account" component={AccountPage} />
       <Route path="/pricing" component={PricingPage} />
+      <Route path="/history/:id" component={HistoryDetailPage} />
       <Route path="/history" component={HistoryPage} />
       <Route path="/deep-check" component={DeepCheckPage} />
       <Route path="/saved-profile" component={SavedProfilePage} />
