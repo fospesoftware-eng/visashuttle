@@ -1193,8 +1193,8 @@ export async function registerRoutes(
 
   // Logout
   app.post("/api/b2c/auth/logout", (req, res) => {
-    req.session.destroy((err) => {
-      res.clearCookie("connect.sid");
+    delete (req.session as any).b2cUserId;
+    req.session.save((err) => {
       res.json({ success: true });
     });
   });
