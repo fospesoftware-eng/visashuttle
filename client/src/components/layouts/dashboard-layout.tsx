@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { 
   Home, Users, Briefcase, FileText, BarChart3, Settings, 
@@ -57,9 +57,23 @@ export function DashboardLayout({ children, type }: DashboardLayoutProps) {
   const [location, setLocation] = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { data: authData } = useCurrentUser();
+  const { data: authData, isLoading: authLoading } = useCurrentUser();
 
   const navItems = type === "admin" ? adminNavItems : agencyNavItems;
+
+  // Redirect to login if not authenticated or wrong role for this layout type
+  useEffect(() => {
+    if (authLoading || authData === undefined) return;
+    if (!authData.authenticated) {
+      setLocation("/login");
+      return;
+    }
+    if (type === "admin" && authData.user?.role !== "saas_admin") {
+      setLocation("/login");
+    } else if (type === "agency" && authData.user?.role === "saas_admin") {
+      setLocation("/admin");
+    }
+  }, [authLoading, authData, type]);
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
