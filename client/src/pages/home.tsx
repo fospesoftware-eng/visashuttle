@@ -237,54 +237,57 @@ export default function HomePage() {
         <div className="absolute right-[7%] top-[14%] h-24 w-24 rounded-full border border-[#4055FF]/10 dark:border-[#4055FF]/20" style={{ animation: "hero-travel-float 12s ease-in-out infinite" }} />
         <div className="absolute left-[9%] bottom-[14%] h-16 w-16 rounded-full border border-[#FF2060]/10 dark:border-[#FF2060]/20" style={{ animation: "hero-travel-float 14s ease-in-out infinite reverse" }} />
 
-        {/* Creative travel scene: paper planes, clouds, suitcase, passport, and boarding pass */}
-        <svg
-          className="absolute inset-0 w-full h-full pointer-events-none"
-          viewBox="0 0 1280 580"
-          preserveAspectRatio="xMidYMid slice"
-          aria-hidden="true"
-        >
-          <g opacity="0.36" style={{ animation: "hero-cloud-a 24s ease-in-out infinite" }}>
-            <path d="M118 270c0-19 15-34 34-34 7 0 14 2 19 6 9-20 29-34 53-34 31 0 56 24 58 55h9c24 0 43 19 43 42s-19 42-43 42H154c-20 0-36-16-36-36 0-18 13-33 30-36-18-2-30-3-30-5z" fill="#4055FF" fillOpacity="0.08" />
-          </g>
+        {/* Premium animated travel objects */}
+        <div className="hero-travel-layer absolute inset-0 pointer-events-none" aria-hidden="true">
+          <div className="hero-cloud-object hero-cloud-object-a">
+            <span />
+            <span />
+            <span />
+          </div>
+          <div className="hero-cloud-object hero-cloud-object-b">
+            <span />
+            <span />
+            <span />
+          </div>
 
-          <g opacity="0.34" style={{ animation: "hero-cloud-b 28s ease-in-out infinite" }}>
-            <path d="M930 108c0-17 14-31 31-31 6 0 12 2 17 5 8-17 25-28 45-28 27 0 49 21 51 48h8c21 0 37 16 37 36s-16 36-37 36H962c-18 0-32-14-32-32 0-15 10-28 24-31-14-1-24-2-24-3z" fill="#FF2060" fillOpacity="0.07" />
-          </g>
+          <div className="hero-paper-plane hero-paper-plane-primary">
+            <Send className="w-9 h-9" />
+          </div>
+          <div className="hero-paper-plane hero-paper-plane-secondary">
+            <Send className="w-7 h-7" />
+          </div>
 
-          <g style={{ animation: "hero-paper-plane-a 13s ease-in-out infinite" }}>
-            <path d="M0 0 L42 15 L0 30 L8 17 L21 15 L8 13 Z" fill="#4055FF" opacity="0.22" />
-            <path d="M8 17 L0 30 L18 20" fill="none" stroke="#4055FF" strokeOpacity="0.18" strokeWidth="1" />
-          </g>
+          <div className="hero-glass-object hero-boarding-pass">
+            <div className="h-2 w-16 rounded-full bg-[#4055FF]/20" />
+            <div className="mt-4 flex items-end justify-between gap-5">
+              <div className="space-y-2 flex-1">
+                <div className="h-2 w-24 rounded-full bg-slate-400/18" />
+                <div className="h-2 w-14 rounded-full bg-slate-400/14" />
+              </div>
+              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-[#4055FF]/14 to-[#FF2060]/12 flex items-center justify-center">
+                <Send className="h-5 w-5 text-[#4055FF]/45" />
+              </div>
+            </div>
+          </div>
 
-          <g style={{ animation: "hero-paper-plane-b 16s ease-in-out infinite" }}>
-            <path d="M0 0 L34 12 L0 24 L7 14 L18 12 L7 10 Z" fill="#FF2060" opacity="0.17" />
-          </g>
+          <div className="hero-glass-object hero-passport-object">
+            <Globe className="h-9 w-9 text-[#9033F5]/40" />
+            <div className="mt-5 h-2 w-16 rounded-full bg-[#9033F5]/18" />
+            <div className="mt-2 h-2 w-11 rounded-full bg-[#9033F5]/12" />
+          </div>
 
-          <g opacity="0.34" style={{ animation: "hero-boarding-pass-float 13s ease-in-out infinite" }}>
-            <rect x="702" y="78" width="154" height="78" rx="18" fill="white" fillOpacity="0.34" stroke="#4055FF" strokeOpacity="0.24" />
-            <path d="M808 78 v78" stroke="#4055FF" strokeOpacity="0.14" strokeWidth="1.5" strokeDasharray="5 6" />
-            <path d="M728 106 h50 M728 128 h34 M826 112 h14 M826 132 h18" stroke="#4055FF" strokeOpacity="0.24" strokeWidth="3" strokeLinecap="round" />
-            <circle cx="827" cy="116" r="2" fill="#FF2060" fillOpacity="0.35" />
-          </g>
+          <div className="hero-suitcase-object">
+            <div className="hero-suitcase-handle" />
+            <div className="hero-suitcase-body">
+              <div />
+            </div>
+          </div>
 
-          <g opacity="0.33" style={{ animation: "hero-suitcase-float 12s ease-in-out infinite" }}>
-            <rect x="910" y="342" width="82" height="62" rx="13" fill="white" fillOpacity="0.18" stroke="#4055FF" strokeOpacity="0.32" />
-            <path d="M937 342 v-12 c0-7 6-12 13-12 h3 c7 0 13 5 13 12 v12" fill="none" stroke="#4055FF" strokeOpacity="0.28" strokeWidth="3" strokeLinecap="round" />
-            <path d="M932 372 h40" stroke="#4055FF" strokeOpacity="0.18" strokeWidth="2" strokeLinecap="round" />
-          </g>
-
-          <g opacity="0.3" style={{ animation: "hero-passport-float 14s ease-in-out infinite" }}>
-            <rect x="176" y="88" width="70" height="92" rx="12" fill="white" fillOpacity="0.2" stroke="#9033F5" strokeOpacity="0.3" />
-            <circle cx="211" cy="128" r="16" fill="none" stroke="#9033F5" strokeOpacity="0.22" />
-            <path d="M195 154 h32 M200 164 h22" stroke="#9033F5" strokeOpacity="0.2" strokeWidth="2" strokeLinecap="round" />
-          </g>
-
-          <g opacity="0.28" style={{ animation: "hero-stamp-pop 11s ease-in-out infinite" }}>
-            <rect x="338" y="390" width="118" height="58" rx="13" fill="none" stroke="#FF2060" strokeOpacity="0.28" strokeWidth="1.5" />
-            <path d="M362 414 h70 M373 429 h48" stroke="#FF2060" strokeOpacity="0.2" strokeWidth="3" strokeLinecap="round" />
-          </g>
-        </svg>
+          <div className="hero-stamp-object">
+            <div className="h-2 w-20 rounded-full bg-[#FF2060]/16" />
+            <div className="mt-3 h-2 w-12 rounded-full bg-[#FF2060]/12" />
+          </div>
+        </div>
 
         <div className="relative max-w-7xl mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
