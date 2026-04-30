@@ -124,7 +124,7 @@ function shuffle<T>(arr: T[]): T[] {
 
 function fallbackSamples(): VisaScoreSample[] {
   const fallbackFrom = "India";
-  const destinations = shuffle(["Australia", "UAE", "United Kingdom", "Canada", "United States", "Schengen", "New Zealand", "Singapore"]).slice(0, 4);
+  const destinations = shuffle(["Australia", "United Kingdom", "Canada", "United States", "Schengen", "New Zealand", "Japan", "South Korea", "Singapore"]).slice(0, 4);
   const visaTypes = shuffle(["Tourist Visa", "Visit Visa", "Work Visa", "Student Visa", "Business Visa"]);
   return destinations.map((to, index) => ({
     from: fallbackFrom,

@@ -86,6 +86,7 @@ type IndiaVisaChanceKey = "visit" | "business" | "work" | "study";
 
 type IndiaVisaChanceCountry = {
   country: string;
+  region: string;
   approval_chance_percent: Record<IndiaVisaChanceKey, { min: number; max: number }>;
 };
 
@@ -131,18 +132,18 @@ const COUNTRY_BY_CODE: Record<string, string> = {
 };
 
 const ORIGIN_DESTINATIONS: Record<string, string[]> = {
-  India: ["Nepal", "Bhutan", "Australia", "UAE", "United Kingdom", "Canada", "United States", "Schengen"],
-  Pakistan: ["UAE", "Saudi Arabia", "United Kingdom", "Turkey", "Canada", "United States", "Schengen"],
-  Bangladesh: ["UAE", "Malaysia", "United Kingdom", "Canada", "Australia", "United States"],
-  Nepal: ["India", "UAE", "Australia", "Canada", "United Kingdom", "United States"],
-  "Sri Lanka": ["UAE", "Australia", "United Kingdom", "Canada", "Schengen"],
-  Philippines: ["Japan", "UAE", "Australia", "Canada", "United Kingdom", "Schengen"],
+  India: ["Australia", "United Kingdom", "Canada", "United States", "Schengen", "New Zealand", "Japan", "South Korea", "Singapore"],
+  Pakistan: ["United Kingdom", "Canada", "United States", "Schengen", "Australia", "New Zealand", "Japan", "South Korea", "Singapore"],
+  Bangladesh: ["United Kingdom", "Canada", "Australia", "United States", "Schengen", "New Zealand", "Japan", "South Korea", "Singapore"],
+  Nepal: ["Australia", "Canada", "United Kingdom", "United States", "Schengen", "New Zealand", "Japan", "South Korea", "Singapore"],
+  "Sri Lanka": ["Australia", "United Kingdom", "Canada", "Schengen", "United States", "New Zealand", "Japan", "South Korea", "Singapore"],
+  Philippines: ["Japan", "Australia", "Canada", "United Kingdom", "Schengen", "United States", "New Zealand", "South Korea", "Singapore"],
   "United States": ["Schengen", "United Kingdom", "Australia", "Japan", "Canada"],
-  "United Kingdom": ["Schengen", "United States", "Australia", "Canada", "UAE"],
+  "United Kingdom": ["Schengen", "United States", "Australia", "Canada", "Japan", "South Korea", "Singapore", "New Zealand"],
   Canada: ["Schengen", "United States", "United Kingdom", "Australia", "Japan"],
   Australia: ["United States", "Schengen", "United Kingdom", "Japan", "Canada"],
-  "United Arab Emirates": ["United Kingdom", "Schengen", "United States", "Canada", "Australia"],
-  "Saudi Arabia": ["Schengen", "United Kingdom", "United States", "UAE", "Australia"],
+  "United Arab Emirates": ["United Kingdom", "Schengen", "United States", "Canada", "Australia", "New Zealand", "Japan", "South Korea", "Singapore"],
+  "Saudi Arabia": ["Schengen", "United Kingdom", "United States", "Australia", "Canada", "New Zealand", "Japan", "South Korea", "Singapore"],
 };
 
 const FALLBACK_DESTINATIONS = [
@@ -151,12 +152,13 @@ const FALLBACK_DESTINATIONS = [
   "Schengen",
   "Canada",
   "Australia",
-  "UAE",
   "Japan",
   "New Zealand",
+  "South Korea",
   "Singapore",
-  "Turkey",
 ];
+const ALLOWED_LIVE_DESTINATIONS = new Set(FALLBACK_DESTINATIONS);
+const ALLOWED_LIVE_REGIONS = new Set(["Europe", "North America"]);
 
 const HIGH_MOBILITY_ORIGINS = new Set(["United States", "United Kingdom", "Canada", "Australia", "Germany", "France", "Japan"]);
 const REGIONAL_EASY_DESTINATIONS = new Set(["Nepal", "Bhutan", "UAE", "Singapore", "Japan", "Turkey"]);
@@ -207,6 +209,7 @@ function liveScoreForRoute(from: string, to: string): number {
 
 function buildIndiaLiveVisaScores(): { country: string; scores: LiveVisaScore[] } {
   const countries = shuffle(INDIA_VISA_CHANCE_COUNTRIES)
+    .filter(item => ALLOWED_LIVE_REGIONS.has(item.region) || ALLOWED_LIVE_DESTINATIONS.has(item.country))
     .filter(item => getEntryRequirement("India", item.country) !== "visa_free")
     .slice(0, 4);
   const visaTypes = shuffle(INDIA_DATASET_VISA_TYPES);
@@ -276,12 +279,14 @@ function buildLiveVisaScores(origin: string | null): { country: string | null; s
   if (from.toLowerCase() === "india") return buildIndiaLiveVisaScores();
 
   let destinations = shuffle([...(ORIGIN_DESTINATIONS[from] || FALLBACK_DESTINATIONS)])
+    .filter(destination => ALLOWED_LIVE_DESTINATIONS.has(destination))
     .filter(destination => destination !== from)
     .filter(destination => getEntryRequirement(from, destination) !== "visa_free")
     .slice(0, 4);
 
   if (destinations.length < 4) {
     const extras = shuffle(FALLBACK_DESTINATIONS)
+      .filter(destination => ALLOWED_LIVE_DESTINATIONS.has(destination))
       .filter(destination => destination !== from)
       .filter(destination => !destinations.includes(destination))
       .filter(destination => getEntryRequirement(from, destination) !== "visa_free")
