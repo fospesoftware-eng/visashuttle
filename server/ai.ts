@@ -752,7 +752,7 @@ async function callClaudeDeepCheck(form: DeepCheckFormData, config?: AnthropicRu
     },
     body: JSON.stringify({
       model,
-      max_tokens: 4000,
+      max_tokens: 8192,
       system: buildDeepCheckSystemPrompt(),
       messages: [{ role: "user", content: buildDeepCheckUserPrompt(form) }],
     }),
@@ -767,12 +767,35 @@ async function callClaudeDeepCheck(form: DeepCheckFormData, config?: AnthropicRu
   const content = data.content[0]?.text;
   if (!content) throw new Error("No content from Claude");
 
-  const jsonMatch = content.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("No JSON in Claude response");
+  // Extract the outermost complete JSON object (brace-depth tracking avoids greedy-regex truncation issues)
+  const jsonStr = extractOutermostJson(content);
+  if (!jsonStr) throw new Error("No JSON in Claude response");
 
-  const parsed = JSON.parse(jsonMatch[0]) as DeepCheckResult;
+  const parsed = JSON.parse(jsonStr) as DeepCheckResult;
   parsed.statusLabel = getStatusLabel(parsed.approvalChance);
   return parsed;
+}
+
+/** Finds the first complete top-level JSON object in a string using brace-depth tracking. */
+function extractOutermostJson(text: string): string | null {
+  const start = text.indexOf("{");
+  if (start === -1) return null;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (escape) { escape = false; continue; }
+    if (ch === "\\" && inString) { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
 }
 
 function mockDeepCheckResult(form: DeepCheckFormData): DeepCheckResult {

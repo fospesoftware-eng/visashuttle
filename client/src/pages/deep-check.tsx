@@ -710,11 +710,17 @@ export default function DeepCheckPage() {
     };
     setIsSubmitting(true);
     try {
+      // Start Claude API call immediately — runs in parallel with the animation timer
       const [res] = await Promise.all([
         apiRequest("POST", "/api/b2c/deep-check", { formData: enrichedForm }),
         new Promise(resolve => setTimeout(resolve, DEEP_MIN_PROGRESS_MS)),
       ]);
       const data = await res.json();
+
+      // Flash all steps as completed for 900ms before revealing the result
+      setAnalysisStep(DEEP_PROGRESS_STEPS.length);
+      await new Promise(resolve => setTimeout(resolve, 900));
+
       setResult(data.result);
       await queryClient.invalidateQueries({ queryKey: ["/api/b2c/checks"] });
 
