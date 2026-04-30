@@ -1158,8 +1158,13 @@ export async function registerRoutes(
     });
     req.session.b2cUserId = user.id;
     req.session.otpVerifiedPhone = undefined;
-    const { password: _, ...safeUser } = user;
-    res.status(201).json({ user: safeUser });
+    req.session.save((err) => {
+      if (err) {
+        return res.status(500).json({ error: "Session error, please try again" });
+      }
+      const { password: _, ...safeUser } = user;
+      res.status(201).json({ user: safeUser });
+    });
   });
 
   // Login
@@ -1168,7 +1173,7 @@ export async function registerRoutes(
     if (!email || !password) {
       return res.status(400).json({ error: "Email and password are required" });
     }
-    const user = await storage.getB2cUserByEmail(email);
+    const user = await storage.getB2cUserByEmail(email.trim());
     if (!user) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
@@ -1177,14 +1182,21 @@ export async function registerRoutes(
       return res.status(401).json({ error: "Invalid email or password" });
     }
     req.session.b2cUserId = user.id;
-    const { password: _, ...safeUser } = user;
-    res.json({ user: safeUser });
+    req.session.save((err) => {
+      if (err) {
+        return res.status(500).json({ error: "Session error, please try again" });
+      }
+      const { password: _, ...safeUser } = user;
+      res.json({ user: safeUser });
+    });
   });
 
   // Logout
   app.post("/api/b2c/auth/logout", (req, res) => {
-    req.session.b2cUserId = undefined;
-    res.json({ success: true });
+    req.session.destroy((err) => {
+      res.clearCookie("connect.sid");
+      res.json({ success: true });
+    });
   });
 
   // Get current user
