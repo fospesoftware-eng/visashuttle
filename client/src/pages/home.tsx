@@ -234,27 +234,22 @@ export default function HomePage() {
         {/* Minimal travel-themed background */}
         <div className="absolute inset-0 bg-[linear-gradient(140deg,rgba(64,85,255,0.08),rgba(255,255,255,0.98)_46%,rgba(255,32,96,0.06))] dark:bg-[linear-gradient(140deg,rgba(64,85,255,0.16),rgba(10,15,30,0.98)_48%,rgba(255,32,96,0.12))]" />
         <div className="absolute inset-x-0 top-10 h-56 bg-[radial-gradient(ellipse_at_center,rgba(64,85,255,0.10),transparent_66%)] dark:bg-[radial-gradient(ellipse_at_center,rgba(64,85,255,0.20),transparent_66%)]" />
-        <div className="absolute right-[6%] top-[12%] h-24 w-24 rounded-full border border-[#4055FF]/10 dark:border-[#4055FF]/20" style={{ animation: "hero-travel-float 12s ease-in-out infinite" }} />
-        <div className="absolute left-[8%] bottom-[16%] h-16 w-16 rounded-full border border-[#FF2060]/10 dark:border-[#FF2060]/20" style={{ animation: "hero-travel-float 14s ease-in-out infinite reverse" }} />
+        <div className="absolute right-[7%] top-[14%] h-24 w-24 rounded-full border border-[#4055FF]/10 dark:border-[#4055FF]/20" style={{ animation: "hero-travel-float 12s ease-in-out infinite" }} />
+        <div className="absolute left-[9%] bottom-[14%] h-16 w-16 rounded-full border border-[#FF2060]/10 dark:border-[#FF2060]/20" style={{ animation: "hero-travel-float 14s ease-in-out infinite reverse" }} />
 
-        {/* Creative travel scene: paper planes, suitcase/passport outlines, and route dots */}
+        {/* Creative travel scene: paper planes, clouds, suitcase, passport, and boarding pass */}
         <svg
           className="absolute inset-0 w-full h-full pointer-events-none"
           viewBox="0 0 1280 580"
           preserveAspectRatio="xMidYMid slice"
           aria-hidden="true"
         >
-          <defs>
-            <linearGradient id="softRoute" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#4055FF" stopOpacity="0.04" />
-              <stop offset="55%" stopColor="#4055FF" stopOpacity="0.18" />
-              <stop offset="100%" stopColor="#FF2060" stopOpacity="0.08" />
-            </linearGradient>
-          </defs>
+          <g opacity="0.36" style={{ animation: "hero-cloud-a 24s ease-in-out infinite" }}>
+            <path d="M118 270c0-19 15-34 34-34 7 0 14 2 19 6 9-20 29-34 53-34 31 0 56 24 58 55h9c24 0 43 19 43 42s-19 42-43 42H154c-20 0-36-16-36-36 0-18 13-33 30-36-18-2-30-3-30-5z" fill="#4055FF" fillOpacity="0.08" />
+          </g>
 
-          <g opacity="0.74">
-            <path d="M-80 420 C180 225 365 470 585 260 C780 74 990 185 1370 70" fill="none" stroke="url(#softRoute)" strokeWidth="1.4" strokeDasharray="4 15" strokeLinecap="round" style={{ animation: "hero-route-dash 7s linear infinite" }} />
-            <path d="M-40 175 C230 285 370 95 590 190 C790 280 1040 225 1320 395" fill="none" stroke="#9033F5" strokeOpacity="0.11" strokeWidth="1.1" strokeDasharray="4 16" strokeLinecap="round" style={{ animation: "hero-route-dash 9s linear infinite reverse" }} />
+          <g opacity="0.34" style={{ animation: "hero-cloud-b 28s ease-in-out infinite" }}>
+            <path d="M930 108c0-17 14-31 31-31 6 0 12 2 17 5 8-17 25-28 45-28 27 0 49 21 51 48h8c21 0 37 16 37 36s-16 36-37 36H962c-18 0-32-14-32-32 0-15 10-28 24-31-14-1-24-2-24-3z" fill="#FF2060" fillOpacity="0.07" />
           </g>
 
           <g style={{ animation: "hero-paper-plane-a 13s ease-in-out infinite" }}>
@@ -264,6 +259,13 @@ export default function HomePage() {
 
           <g style={{ animation: "hero-paper-plane-b 16s ease-in-out infinite" }}>
             <path d="M0 0 L34 12 L0 24 L7 14 L18 12 L7 10 Z" fill="#FF2060" opacity="0.17" />
+          </g>
+
+          <g opacity="0.34" style={{ animation: "hero-boarding-pass-float 13s ease-in-out infinite" }}>
+            <rect x="702" y="78" width="154" height="78" rx="18" fill="white" fillOpacity="0.34" stroke="#4055FF" strokeOpacity="0.24" />
+            <path d="M808 78 v78" stroke="#4055FF" strokeOpacity="0.14" strokeWidth="1.5" strokeDasharray="5 6" />
+            <path d="M728 106 h50 M728 128 h34 M826 112 h14 M826 132 h18" stroke="#4055FF" strokeOpacity="0.24" strokeWidth="3" strokeLinecap="round" />
+            <circle cx="827" cy="116" r="2" fill="#FF2060" fillOpacity="0.35" />
           </g>
 
           <g opacity="0.33" style={{ animation: "hero-suitcase-float 12s ease-in-out infinite" }}>
@@ -278,15 +280,10 @@ export default function HomePage() {
             <path d="M195 154 h32 M200 164 h22" stroke="#9033F5" strokeOpacity="0.2" strokeWidth="2" strokeLinecap="round" />
           </g>
 
-          {[
-            [262, 370, "#4055FF", "0s"],
-            [456, 214, "#FF2060", "1.1s"],
-            [668, 270, "#9033F5", "2.2s"],
-            [858, 168, "#4055FF", ".6s"],
-            [1078, 316, "#FF2060", "1.7s"],
-          ].map(([cx, cy, color, delay]) => (
-            <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="4" fill={color} opacity="0.28" style={{ animation: `hero-dot-pulse 4.5s ease-in-out infinite ${delay}` }} />
-          ))}
+          <g opacity="0.28" style={{ animation: "hero-stamp-pop 11s ease-in-out infinite" }}>
+            <rect x="338" y="390" width="118" height="58" rx="13" fill="none" stroke="#FF2060" strokeOpacity="0.28" strokeWidth="1.5" />
+            <path d="M362 414 h70 M373 429 h48" stroke="#FF2060" strokeOpacity="0.2" strokeWidth="3" strokeLinecap="round" />
+          </g>
         </svg>
 
         <div className="relative max-w-7xl mx-auto px-4">
