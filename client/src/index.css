@@ -242,49 +242,43 @@
 
 /* ── Hero background animations ───────────────────────────────────────────── */
 
-/* A slow-moving intelligence grid gives the hero a quiet systems feel. */
-@keyframes hero-grid-drift {
-  from { background-position: 0 0; }
-  to { background-position: 144px 72px; }
+@keyframes hero-route-dash {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -76; }
 }
 
-@keyframes hero-scan {
-  0%, 14% { transform: translateX(0); opacity: 0; }
-  32% { opacity: 0.8; }
-  58% { opacity: 0.3; }
-  78%, 100% { transform: translateX(360%); opacity: 0; }
+@keyframes hero-travel-float {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.65; }
+  50% { transform: translate3d(16px, -18px, 0) scale(1.05); opacity: 0.9; }
 }
 
-@keyframes hero-signal-sweep {
-  0%, 100% { background-position: 0% 50%; opacity: 0.55; }
-  50% { background-position: 100% 50%; opacity: 0.9; }
+@keyframes hero-paper-plane-a {
+  0% { transform: translate3d(82px, 402px, 0) rotate(-24deg); opacity: 0; }
+  12% { opacity: 0.42; }
+  54% { transform: translate3d(560px, 234px, 0) rotate(-12deg); opacity: 0.34; }
+  88% { opacity: 0.32; }
+  100% { transform: translate3d(1110px, 112px, 0) rotate(-20deg); opacity: 0; }
 }
 
-/* Flight path dashes march continuously along the SVG path */
-@keyframes hero-flight-march {
-  from { stroke-dashoffset: 35; }
-  to   { stroke-dashoffset: 0; }
+@keyframes hero-paper-plane-b {
+  0% { transform: translate3d(1170px, 452px, 0) rotate(205deg); opacity: 0; }
+  15% { opacity: 0.34; }
+  56% { transform: translate3d(680px, 312px, 0) rotate(196deg); opacity: 0.28; }
+  90% { opacity: 0.25; }
+  100% { transform: translate3d(186px, 184px, 0) rotate(208deg); opacity: 0; }
 }
 
-@keyframes hero-route-drift {
-  0%, 100% { transform: translate3d(0, 0, 0); }
-  50% { transform: translate3d(-18px, 12px, 0); }
+@keyframes hero-suitcase-float {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(-4deg); }
+  50% { transform: translate3d(-12px, -16px, 0) rotate(2deg); }
 }
 
-@keyframes hero-waypoint-pulse {
-  0%, 100% { opacity: 0.35; transform: scale(0.92); transform-origin: center; }
-  50% { opacity: 0.8; transform: scale(1.08); transform-origin: center; }
+@keyframes hero-passport-float {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(8deg); }
+  50% { transform: translate3d(14px, 18px, 0) rotate(2deg); }
 }
 
-@keyframes hero-stamp-float {
-  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); opacity: 0.34; }
-  50% { transform: translate3d(20px, -14px, 0) rotate(-1deg); opacity: 0.58; }
-}
-
-@keyframes hero-plane-glide {
-  0% { transform: translate3d(110px, 475px, 0) rotate(-35deg); opacity: 0; }
-  12% { opacity: 0.5; }
-  52% { transform: translate3d(680px, 255px, 0) rotate(-8deg); opacity: 0.42; }
-  88% { opacity: 0.38; }
-  100% { transform: translate3d(1190px, 120px, 0) rotate(-25deg); opacity: 0; }
+@keyframes hero-dot-pulse {
+  0%, 100% { transform: scale(0.88); transform-origin: center; opacity: 0.18; }
+  50% { transform: scale(1.3); transform-origin: center; opacity: 0.48; }
 }
