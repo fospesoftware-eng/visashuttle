@@ -984,26 +984,37 @@ export default function DeepCheckPage() {
 
             {/* ===== STEP 2: Travel Plan ===== */}
             {step === 2 && (
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div>
-                  <SearchableSelect label="Destination Country *" required value={form.destinationCountry || ""} onChange={val => { set("destinationCountry")(val); set("usVisaCategory")(""); set("visaType")(""); }} options={COUNTRIES} placeholder="Search destination..." />
-                  {form.destinationCountry && form.nationality && form.destinationCountry === form.nationality && (
-                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                      <AlertTriangle className="w-3 h-3" /> You are a citizen of {form.nationality} — you do not need a visa to enter your own country.
-                    </p>
-                  )}
-                </div>
-                <div>
-                  {(() => {
-                    const visaConf = getCountryVisaConfig(form.destinationCountry);
-                    if (visaConf) {
-                      const catData = visaConf.categories[form.usVisaCategory || ""];
-                      return (
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 border border-blue-200">
-                            <span className="text-lg">{visaConf.flag}</span>
-                            <p className="text-xs text-blue-700 font-medium">{visaConf.regionLabel} — select a category then specific type</p>
-                          </div>
+              <div className="space-y-4">
+                {(() => {
+                  const visaConf = getCountryVisaConfig(form.destinationCountry);
+                  const catData = visaConf ? visaConf.categories[form.usVisaCategory || ""] : null;
+                  return (
+                    <>
+                      {/* Row 1: Destination Country + info banner (structured) or Visa Type (simple) */}
+                      <div className="grid sm:grid-cols-2 gap-4">
+                        <div>
+                          <SearchableSelect label="Destination Country *" required value={form.destinationCountry || ""} onChange={val => { set("destinationCountry")(val); set("usVisaCategory")(""); set("visaType")(""); }} options={COUNTRIES} placeholder="Search destination..." />
+                          {form.destinationCountry && form.nationality && form.destinationCountry === form.nationality && (
+                            <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3" /> You are a citizen of {form.nationality} — you do not need a visa to enter your own country.
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          {visaConf ? (
+                            <div className="flex items-center gap-2 h-full px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+                              <span className="text-lg">{visaConf.flag}</span>
+                              <p className="text-xs text-blue-700 dark:text-blue-300 font-medium">{visaConf.regionLabel} — select a category then specific type</p>
+                            </div>
+                          ) : (
+                            <Sel label="Visa Type *" val={form.visaType || ""} onChange={val => { set("visaType")(val); set("usVisaCategory")(""); set("tripDuration")(""); }} opts={["Tourist Visa","Business Visa","Student Visa","Work Visa","Visit Visa","Transit Visa","Investor Visa","Spouse / Family Visa","Conference / Event Visa","Medical Visa"]} />
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Row 2 (structured countries only): Visa Category + Visa Type side by side */}
+                      {visaConf && (
+                        <div className="grid sm:grid-cols-2 gap-4">
                           <Sel
                             label="Visa Category *"
                             val={form.usVisaCategory || ""}
@@ -1030,36 +1041,40 @@ export default function DeepCheckPage() {
                             </select>
                           </div>
                         </div>
-                      );
-                    }
-                    return <Sel label="Visa Type *" val={form.visaType || ""} onChange={val => { set("visaType")(val); set("usVisaCategory")(""); set("tripDuration")(""); }} opts={["Tourist Visa","Business Visa","Student Visa","Work Visa","Visit Visa","Transit Visa","Investor Visa","Spouse / Family Visa","Conference / Event Visa","Medical Visa"]} />;
-                  })()}
-                  {form.visaType && (() => {
-                    const age = getAge(form.dateOfBirth);
-                    if (age !== null && age < 3 && ["Student Visa","Work Visa","Business Visa","Investor Visa"].includes(form.visaType)) return (
-                      <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                        <AlertTriangle className="w-3 h-3" /> A child under 3 cannot independently apply for a {form.visaType}.
-                      </p>
-                    );
-                    if (age !== null && age < 18 && form.visaType === "Work Visa") return (
-                      <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-                        <AlertTriangle className="w-3 h-3" /> Most countries do not issue Work Visas to minors (under 18).
-                      </p>
-                    );
-                    if (age !== null && age < 16 && form.visaType === "Student Visa") return (
-                      <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-                        <AlertTriangle className="w-3 h-3" /> Student visa for a child under 16 requires additional guardian/parental documentation.
-                      </p>
-                    );
-                    return null;
-                  })()}
-                  {form.visaType === "Spouse / Family Visa" && form.maritalStatus === "Single" && (
-                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                      <AlertTriangle className="w-3 h-3" /> Spouse / Family Visa typically requires proof of marriage or legal partnership. Your marital status is "Single".
-                    </p>
-                  )}
-                </div>
-                <div>
+                      )}
+
+                      {/* Visa type applicability warnings */}
+                      {form.visaType && (() => {
+                        const age = getAge(form.dateOfBirth);
+                        if (age !== null && age < 3 && ["Student Visa","Work Visa","Business Visa","Investor Visa"].includes(form.visaType)) return (
+                          <p className="text-xs text-red-600 flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3" /> A child under 3 cannot independently apply for a {form.visaType}.
+                          </p>
+                        );
+                        if (age !== null && age < 18 && form.visaType === "Work Visa") return (
+                          <p className="text-xs text-amber-600 flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3" /> Most countries do not issue Work Visas to minors (under 18).
+                          </p>
+                        );
+                        if (age !== null && age < 16 && form.visaType === "Student Visa") return (
+                          <p className="text-xs text-amber-600 flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3" /> Student visa for a child under 16 requires additional guardian/parental documentation.
+                          </p>
+                        );
+                        return null;
+                      })()}
+                      {form.visaType === "Spouse / Family Visa" && form.maritalStatus === "Single" && (
+                        <p className="text-xs text-red-600 flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" /> Spouse / Family Visa typically requires proof of marriage or legal partnership. Your marital status is "Single".
+                        </p>
+                      )}
+                    </>
+                  );
+                })()}
+
+                {/* Remaining Travel Plan fields */}
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
                   <Sel label="Trip Duration *" val={form.tripDuration || ""} onChange={set("tripDuration")}
                     opts={form.visaType === "Transit Visa"
                       ? ["1–3 days","4–7 days"]
@@ -1141,6 +1156,7 @@ export default function DeepCheckPage() {
                   <DocToggle label="First-time visitor to this destination?" val={form.firstTimeVisitor || ""} onChange={set("firstTimeVisitor")} />
                 </div>
               </div>
+            </div>
             )}
 
             {/* ===== STEP 3: Employment & Income ===== */}
