@@ -50,7 +50,7 @@ function AiProviderCard() {
   const [showKey, setShowKey] = useState(false);
   const [form, setForm] = useState({
     anthropicApiKey: "",
-    anthropicModel: "claude-opus-4-5",
+    anthropicModel: "claude-opus-4-5-20251101",
   });
 
   const { data: cfg, isLoading } = useQuery<AiConfigResponse>({
@@ -61,7 +61,7 @@ function AiProviderCard() {
     if (cfg) {
       setForm({
         anthropicApiKey: cfg.anthropicApiKey || "",
-        anthropicModel: cfg.anthropicModel || "claude-opus-4-5",
+        anthropicModel: cfg.anthropicModel || "claude-opus-4-5-20251101",
       });
     }
   }, [cfg]);
@@ -137,15 +137,24 @@ function AiProviderCard() {
 
         <div className="space-y-1.5">
           <Label htmlFor="anthropicModel">Claude Model</Label>
-          <Input
+          <select
             id="anthropicModel"
             value={form.anthropicModel}
             onChange={e => setForm(f => ({ ...f, anthropicModel: e.target.value }))}
-            placeholder="claude-opus-4-5"
-            className="font-mono text-sm"
+            className="w-full h-10 px-3 text-sm border rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary font-mono"
             data-testid="input-anthropic-model"
-          />
-          <p className="text-xs text-muted-foreground">Used for Deep Check requests. Leave as default unless you are intentionally changing Claude model versions.</p>
+          >
+            <optgroup label="Latest">
+              <option value="claude-opus-4-7">claude-opus-4-7 — Opus 4.7 (Strongest)</option>
+              <option value="claude-sonnet-4-6">claude-sonnet-4-6 — Sonnet 4.6 (Balanced)</option>
+            </optgroup>
+            <optgroup label="Stable">
+              <option value="claude-opus-4-5-20251101">claude-opus-4-5-20251101 — Opus 4.5 (Stable · Strongest)</option>
+              <option value="claude-sonnet-4-5-20250929">claude-sonnet-4-5-20250929 — Sonnet 4.5 (Stable · Balanced)</option>
+              <option value="claude-haiku-4-5-20251001">claude-haiku-4-5-20251001 — Haiku 4.5 (Fastest · Affordable)</option>
+            </optgroup>
+          </select>
+          <p className="text-xs text-muted-foreground">Used for Deep Check requests. Opus is most thorough; Haiku is fastest. All models are Claude 4 generation.</p>
         </div>
 
         {!cfg?.hasAnthropicApiKey && (
