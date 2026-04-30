@@ -187,7 +187,7 @@ function AiProviderCard() {
 // ── SMS Gateway Card ────────────────────────────────────────────────────────
 function SmsGatewayCard() {
   const { toast } = useToast();
-  const [provider, setProvider] = useState("msg91");
+  const [provider, setProvider] = useState("messagecentral");
   const [showMsg91Key, setShowMsg91Key] = useState(false);
   const [showZavuKey, setShowZavuKey] = useState(false);
   const [showMcAuthToken, setShowMcAuthToken] = useState(false);
@@ -257,7 +257,7 @@ function SmsGatewayCard() {
   const isMsg91Ready = cfg?.status?.msg91Ready;
   const isZavuReady = cfg?.status?.zavuReady;
   const isMcReady = cfg?.status?.mcReady;
-  const activeProvider = cfg?.status?.provider ?? "msg91";
+  const activeProvider = cfg?.status?.provider ?? "messagecentral";
 
   function getProviderLabel(p: string) {
     if (p === "msg91") return isMsg91Ready ? "MSG91 Active" : "MSG91 Not Configured";
