@@ -162,13 +162,7 @@ function CountryWithFlag({ name, code }: { name: string; code?: string | null })
   return (
     <span className="inline-flex items-center gap-1 min-w-0">
       {flagCode ? (
-        <img
-          src={`https://flagcdn.com/24x18/${flagCode}.png`}
-          srcSet={`https://flagcdn.com/48x36/${flagCode}.png 2x`}
-          alt=""
-          className="w-5 h-3.5 rounded-[3px] object-cover flex-shrink-0 shadow-sm ring-1 ring-black/5"
-          loading="lazy"
-        />
+        <span className={`fi fi-${flagCode} visa-country-flag`} aria-hidden="true" />
       ) : (
         <Globe className="w-4 h-4 text-muted-foreground flex-shrink-0" />
       )}

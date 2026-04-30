@@ -240,6 +240,18 @@
   }
 }
 
+/* Bundled country flags used by the live score rows. */
+.visa-country-flag {
+  width: 1.25rem;
+  height: 0.875rem;
+  line-height: 0.875rem;
+  border-radius: 3px;
+  flex-shrink: 0;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.12);
+  outline: 1px solid rgb(15 23 42 / 0.08);
+}
+
 /* ── Hero background animations ───────────────────────────────────────────── */
 
 .hero-aurora-bg {
