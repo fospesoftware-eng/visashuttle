@@ -1095,7 +1095,10 @@ export default function DeepCheckPage() {
                     </p>
                   )}
                 </div>
-                <Sel label="Entry Type" val={form.entryType || ""} onChange={set("entryType")} opts={["Single Entry","Multiple Entry","Double Entry"]} />
+                {/* Entry Type — hidden for countries where it doesn't apply (structured visa systems + Ireland) */}
+                {!getCountryVisaConfig(form.destinationCountry) && form.destinationCountry !== "Ireland" && (
+                  <Sel label="Entry Type" val={form.entryType || ""} onChange={set("entryType")} opts={["Single Entry","Multiple Entry","Double Entry"]} />
+                )}
                 <div className="sm:col-span-2">
                   <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Specific Cities / Regions Planned</Label>
                   <Input value={form.specificCitiesPlanned || ""} onChange={e => set("specificCitiesPlanned")(e.target.value)} placeholder="e.g. Paris, Lyon, Nice" />
