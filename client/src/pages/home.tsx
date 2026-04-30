@@ -16,7 +16,14 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
 
 // ── Large pool of country-pair visa data ──────────────────────────────────────
-type VisaScoreSample = { from: string; to: string; type: string; score: number };
+type VisaScoreSample = {
+  from: string;
+  to: string;
+  type: string;
+  score: number;
+  fromCode?: string | null;
+  toCode?: string | null;
+};
 
 // Allowed live score destinations: Europe, North America, Australia, NZ, Japan, South Korea, Singapore
 const LIVE_SCORE_DESTINATIONS = new Set([
@@ -150,14 +157,14 @@ const COUNTRY_FLAG_CODES: Record<string, string> = {
   Vietnam: "vn",
 };
 
-function CountryWithFlag({ name }: { name: string }) {
-  const code = COUNTRY_FLAG_CODES[name];
+function CountryWithFlag({ name, code }: { name: string; code?: string | null }) {
+  const flagCode = (code || COUNTRY_FLAG_CODES[name] || "").toLowerCase();
   return (
     <span className="inline-flex items-center gap-1 min-w-0">
-      {code ? (
+      {flagCode ? (
         <img
-          src={`https://flagcdn.com/24x18/${code}.png`}
-          srcSet={`https://flagcdn.com/48x36/${code}.png 2x`}
+          src={`https://flagcdn.com/24x18/${flagCode}.png`}
+          srcSet={`https://flagcdn.com/48x36/${flagCode}.png 2x`}
           alt=""
           className="w-5 h-3.5 rounded-[3px] object-cover flex-shrink-0 shadow-sm ring-1 ring-black/5"
           loading="lazy"
@@ -188,6 +195,8 @@ function fallbackSamples(): VisaScoreSample[] {
     to,
     type: visaTypes[index % visaTypes.length],
     score: 50 + Math.floor(Math.random() * 32),
+    fromCode: "in",
+    toCode: COUNTRY_FLAG_CODES[to] || null,
   }));
 }
 
@@ -413,9 +422,9 @@ export default function HomePage() {
                             >
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1.5 text-sm font-medium mb-0.5">
-                                  <CountryWithFlag name={s.from} />
+                                  <CountryWithFlag name={s.from} code={s.fromCode} />
                                   <ArrowRight className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                                  <CountryWithFlag name={s.to} />
+                                  <CountryWithFlag name={s.to} code={s.toCode} />
                                 </div>
                                 <p className="text-xs text-muted-foreground">{s.type}</p>
                               </div>

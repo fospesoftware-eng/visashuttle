@@ -80,12 +80,15 @@ type LiveVisaScore = {
   to: string;
   type: string;
   score: number;
+  fromCode?: string | null;
+  toCode?: string | null;
 };
 
 type IndiaVisaChanceKey = "visit" | "business" | "work" | "study";
 
 type IndiaVisaChanceCountry = {
   country: string;
+  iso2: string;
   region: string;
   approval_chance_percent: Record<IndiaVisaChanceKey, { min: number; max: number }>;
 };
@@ -159,6 +162,20 @@ const FALLBACK_DESTINATIONS = [
 ];
 const ALLOWED_LIVE_DESTINATIONS = new Set(FALLBACK_DESTINATIONS);
 const ALLOWED_LIVE_REGIONS = new Set(["Europe", "North America"]);
+const COUNTRY_CODE_BY_NAME = Object.fromEntries(
+  Object.entries(COUNTRY_BY_CODE).map(([code, country]) => [country, code.toLowerCase()])
+) as Record<string, string>;
+const LIVE_DESTINATION_CODES: Record<string, string> = {
+  Australia: "au",
+  Canada: "ca",
+  Japan: "jp",
+  "New Zealand": "nz",
+  Schengen: "eu",
+  Singapore: "sg",
+  "South Korea": "kr",
+  "United Kingdom": "gb",
+  "United States": "us",
+};
 
 const HIGH_MOBILITY_ORIGINS = new Set(["United States", "United Kingdom", "Canada", "Australia", "Germany", "France", "Japan"]);
 const REGIONAL_EASY_DESTINATIONS = new Set(["Nepal", "Bhutan", "Singapore", "Japan"]);
@@ -187,6 +204,10 @@ function clampScore(score: number): number {
 
 function randomInRange(min: number, max: number): number {
   return Math.floor(min + Math.random() * (max - min + 1));
+}
+
+function flagCodeForCountry(country: string, iso2?: string | null): string | null {
+  return (iso2 || LIVE_DESTINATION_CODES[country] || COUNTRY_CODE_BY_NAME[country] || "").toLowerCase() || null;
 }
 
 function visaTypeForDestination(to: string, index: number, mixedTypes: string[]): string {
@@ -225,6 +246,8 @@ function buildIndiaLiveVisaScores(): { country: string; scores: LiveVisaScore[] 
         to: item.country,
         type: visaType.label,
         score: clampScore(randomInRange(range.min, range.max)),
+        fromCode: "in",
+        toCode: flagCodeForCountry(item.country, item.iso2),
       };
     }),
   };
@@ -303,6 +326,8 @@ function buildLiveVisaScores(origin: string | null): { country: string | null; s
       to,
       type: visaTypeForDestination(to, index, visaTypes),
       score: liveScoreForRoute(from, to),
+      fromCode: flagCodeForCountry(from),
+      toCode: flagCodeForCountry(to),
     })),
   };
 }
