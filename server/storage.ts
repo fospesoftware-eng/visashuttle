@@ -955,9 +955,24 @@ class HybridStorage extends MemStorage {
     return rows[0];
   }
 
+  async getAllB2cUsers(): Promise<B2cUser[]> {
+    const rows = await db.select().from(b2cUsers).orderBy(desc(b2cUsers.createdAt));
+    const memoryUsers = await super.getAllB2cUsers();
+    const existingIds = new Set(rows.map(user => user.id));
+    const fallbackUsers = memoryUsers.filter(user => !existingIds.has(user.id));
+    return [...rows, ...fallbackUsers];
+  }
+
   async updateB2cUser(id: string, data: Partial<Omit<B2cUser, 'id' | 'createdAt'>>): Promise<B2cUser | undefined> {
     const rows = await db.update(b2cUsers).set(data).where(eq(b2cUsers.id, id)).returning();
-    return rows[0];
+    if (rows[0]) return rows[0];
+    return super.updateB2cUser(id, data);
+  }
+
+  async deleteB2cUser(id: string): Promise<boolean> {
+    const rows = await db.delete(b2cUsers).where(eq(b2cUsers.id, id)).returning({ id: b2cUsers.id });
+    if (rows.length > 0) return true;
+    return super.deleteB2cUser(id);
   }
 
   // Visa Checks — persisted to DB
