@@ -161,7 +161,7 @@ const ALLOWED_LIVE_DESTINATIONS = new Set(FALLBACK_DESTINATIONS);
 const ALLOWED_LIVE_REGIONS = new Set(["Europe", "North America"]);
 
 const HIGH_MOBILITY_ORIGINS = new Set(["United States", "United Kingdom", "Canada", "Australia", "Germany", "France", "Japan"]);
-const REGIONAL_EASY_DESTINATIONS = new Set(["Nepal", "Bhutan", "UAE", "Singapore", "Japan", "Turkey"]);
+const REGIONAL_EASY_DESTINATIONS = new Set(["Nepal", "Bhutan", "Singapore", "Japan"]);
 const HIGH_SCRUTINY_DESTINATIONS = new Set(["United States", "United Kingdom", "Canada", "Australia", "Schengen", "New Zealand"]);
 const LIVE_VISA_TYPES = ["Tourist Visa", "Visit Visa", "Work Visa", "Student Visa", "Business Visa"];
 const INDIA_DATASET_VISA_TYPES: Array<{ key: IndiaVisaChanceKey; label: string }> = [
@@ -190,7 +190,7 @@ function randomInRange(min: number, max: number): number {
 }
 
 function visaTypeForDestination(to: string, index: number, mixedTypes: string[]): string {
-  if (["UAE", "Saudi Arabia", "Malaysia"].includes(to) && Math.random() > 0.45) return "Work Visa";
+  if (["Malaysia"].includes(to) && Math.random() > 0.45) return "Work Visa";
   if (["United Kingdom", "Canada", "Australia", "United States"].includes(to) && Math.random() > 0.55) return Math.random() > 0.5 ? "Student Visa" : "Visit Visa";
   return mixedTypes[index % mixedTypes.length];
 }
