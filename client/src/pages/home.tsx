@@ -113,6 +113,52 @@ function scoreToLabel(score: number): { label: string; color: string } {
   return { label: "Low Chance", color: "text-red-600 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800" };
 }
 
+const COUNTRY_FLAGS: Record<string, string> = {
+  Australia: "🇦🇺",
+  Bangladesh: "🇧🇩",
+  Brazil: "🇧🇷",
+  Canada: "🇨🇦",
+  China: "🇨🇳",
+  Colombia: "🇨🇴",
+  France: "🇫🇷",
+  Germany: "🇩🇪",
+  Ghana: "🇬🇭",
+  India: "🇮🇳",
+  Indonesia: "🇮🇩",
+  Japan: "🇯🇵",
+  Jordan: "🇯🇴",
+  Kenya: "🇰🇪",
+  Mexico: "🇲🇽",
+  Morocco: "🇲🇦",
+  Nepal: "🇳🇵",
+  "New Zealand": "🇳🇿",
+  Nigeria: "🇳🇬",
+  Pakistan: "🇵🇰",
+  Philippines: "🇵🇭",
+  Russia: "🇷🇺",
+  "Saudi Arabia": "🇸🇦",
+  Schengen: "🇪🇺",
+  Singapore: "🇸🇬",
+  "South Africa": "🇿🇦",
+  "South Korea": "🇰🇷",
+  "Sri Lanka": "🇱🇰",
+  Thailand: "🇹🇭",
+  Turkey: "🇹🇷",
+  Ukraine: "🇺🇦",
+  "United Kingdom": "🇬🇧",
+  "United States": "🇺🇸",
+  Vietnam: "🇻🇳",
+};
+
+function CountryWithFlag({ name }: { name: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 min-w-0">
+      <span className="text-base leading-none flex-shrink-0" aria-hidden="true">{COUNTRY_FLAGS[name] || "🌐"}</span>
+      <span className="truncate">{name}</span>
+    </span>
+  );
+}
+
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -404,9 +450,9 @@ export default function HomePage() {
                             >
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1.5 text-sm font-medium mb-0.5">
-                                  <span className="truncate">{s.from}</span>
+                                  <CountryWithFlag name={s.from} />
                                   <ArrowRight className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                                  <span className="truncate">{s.to}</span>
+                                  <CountryWithFlag name={s.to} />
                                 </div>
                                 <p className="text-xs text-muted-foreground">{s.type}</p>
                               </div>
