@@ -170,7 +170,7 @@ function OnboardingModal({ onDone }: { onDone: () => void }) {
                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 Saving...
               </span>
-            ) : "Save & Continue to Profile"}
+            ) : "Save & Go to Dashboard"}
           </Button>
           <p className="text-center text-xs text-slate-400 mt-3">You can update these anytime from your profile page.</p>
         </div>
@@ -218,7 +218,7 @@ export default function AccountPage() {
 
   return (
     <>
-    {showOnboarding && <OnboardingModal onDone={() => setLocation("/saved-profile")} />}
+    {showOnboarding && <OnboardingModal onDone={() => {}} />}
     <DashboardLayout title={`Welcome back, ${(user.fullName || "there").split(" ")[0]}`} subtitle="Your visa intelligence dashboard">
       <div className="max-w-5xl space-y-6">
 
