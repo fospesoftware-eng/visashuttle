@@ -10,6 +10,7 @@ import { randomUUID } from "crypto";
 
 // Site-wide password for protecting the entire application
 const SITE_PASSWORD = process.env.SITE_PASSWORD;
+const DEMO_B2C_OTP = process.env.DEMO_B2C_OTP || "1234";
 
 function maskKey(key: string): string {
   if (key.length <= 8) return "••••••••";
@@ -1094,6 +1095,11 @@ export async function registerRoutes(
     if (existingPhone) {
       return res.status(409).json({ error: "An account with this phone number already exists" });
     }
+    if (DEMO_B2C_OTP) {
+      req.session.mcVerificationId = undefined;
+      return res.json({ success: true, message: `Demo OTP is ${DEMO_B2C_OTP}` });
+    }
+
     const dbConfig = await storage.getSmsConfig();
     const result = await sendOtp(phone, dbConfig);
     if (!result.success) {
@@ -1111,6 +1117,11 @@ export async function registerRoutes(
     const { phone, otp } = req.body;
     if (!phone || !otp) {
       return res.status(400).json({ error: "Phone number and OTP code are required" });
+    }
+    if (DEMO_B2C_OTP && String(otp) === DEMO_B2C_OTP) {
+      req.session.otpVerifiedPhone = phone;
+      req.session.mcVerificationId = undefined;
+      return res.json({ success: true });
     }
     const dbConfig = await storage.getSmsConfig();
     const result = await verifyOtp(phone, otp, dbConfig, req.session.mcVerificationId);

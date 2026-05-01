@@ -614,6 +614,9 @@ export default function JoinPage() {
                     We sent a 4-digit code to{" "}
                     <span className="font-medium text-foreground">{getFullPhone()}</span>
                   </p>
+                  <p className="mt-2 inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                    Demo OTP: 1234
+                  </p>
                 </div>
 
                 <div className="space-y-6">
@@ -637,7 +640,7 @@ export default function JoinPage() {
                         />
                       ))}
                     </div>
-                    <p className="text-xs text-muted-foreground text-center mt-2">Tip: you can paste the full code at once</p>
+                    <p className="text-xs text-muted-foreground text-center mt-2">For demo signup, enter 1234</p>
                   </div>
 
                   <Button
