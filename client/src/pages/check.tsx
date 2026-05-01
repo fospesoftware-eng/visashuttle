@@ -389,7 +389,7 @@ export default function CheckPage() {
   }, [isSubmitting, STEP_PROGRESS_MS]);
 
   async function handleSubmit() {
-    if (!canCheck) { setLocation("/pricing"); return; }
+    if (!canCheck) { setLocation("/payment/deep-check"); return; }
     if (!consentChecked) { setConsentError("Please agree to the Terms & Conditions before submitting"); return; }
     setConsentError("");
     setIsSubmitting(true);
@@ -435,7 +435,7 @@ export default function CheckPage() {
       } catch (_) {}
     } catch (err: any) {
       if (err.message?.includes("limit") || err.message?.includes("upgrade")) {
-        setLocation("/pricing");
+        setLocation("/payment/deep-check");
       } else {
         toast({ title: "Check failed", description: err.message || "Please try again.", variant: "destructive" });
       }
@@ -644,7 +644,7 @@ export default function CheckPage() {
                   <Button variant="outline" className="gap-2"><Clock className="w-4 h-4" /> View History</Button>
                 </Link>
                 {!user.deepCheckAccess && (
-                  <Link href="/deep-check">
+                  <Link href="/payment/deep-check">
                     <Button variant="outline" className="gap-2 border-purple-200 text-purple-700 hover:bg-purple-50">
                       <Crown className="w-4 h-4" /> Try Deep Check
                     </Button>
@@ -676,7 +676,7 @@ export default function CheckPage() {
             <Lock className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
             <div>
               <p className="font-semibold text-amber-800 text-sm">Check limit reached</p>
-              <p className="text-sm text-amber-700"><Link href="/pricing" className="underline font-medium">Upgrade your plan</Link> to run more visa checks.</p>
+              <p className="text-sm text-amber-700"><Link href="/payment/deep-check" className="underline font-medium">Get Deep Check</Link> to run more visa checks.</p>
             </div>
           </div>
         )}

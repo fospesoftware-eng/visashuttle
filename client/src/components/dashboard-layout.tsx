@@ -94,7 +94,7 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
       {/* Bottom */}
       <div className="flex-shrink-0 p-3 border-t border-slate-100">
         {!canCheck && user?.subscriptionPlan === "free" && !isDemo && (
-          <Link href="/pricing">
+          <Link href="/payment/deep-check">
             <div className="mb-2 p-3 rounded-xl text-white cursor-pointer transition-all hover:opacity-90" style={{background:"linear-gradient(135deg,#4055FF,#FF2060)"}}>
               <div className="flex items-center gap-1.5 mb-1">
                 <Crown className="w-3.5 h-3.5 text-amber-300" />
@@ -160,7 +160,7 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               {user && !canCheck && (
-                <Link href="/pricing">
+                <Link href="/payment/deep-check">
                   <Button size="sm" className="hidden sm:flex gap-1.5 border-0 text-xs h-8 px-3 text-white hover:opacity-90" style={{background:"linear-gradient(135deg,#4055FF,#FF2060)"}}>
                     <Crown className="w-3 h-3" />
                     Deep Check ₹500

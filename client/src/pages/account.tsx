@@ -255,7 +255,7 @@ export default function AccountPage() {
                 <Bell className="w-4 h-4 flex-shrink-0" />
                 <span className="flex-1">{msg}</span>
                 {type === "warn" && (
-                  <Link href="/pricing">
+                  <Link href="/payment/deep-check">
                     <span className="font-semibold underline cursor-pointer ml-2">Upgrade</span>
                   </Link>
                 )}
@@ -460,7 +460,7 @@ export default function AccountPage() {
                     </Link>
                   )}
                   {!canCheck && (
-                    <Link href="/pricing">
+                    <Link href="/payment/deep-check">
                       <div className="flex items-center gap-2 p-2.5 rounded-lg hover:bg-amber-50 cursor-pointer group">
                         <div className="w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center flex-shrink-0">
                           <Zap className="w-3.5 h-3.5 text-amber-600" />
