@@ -1252,7 +1252,7 @@ export async function registerRoutes(
 
     // Enforce limits
     if (!isDemo && checkType === "deep" && !user.deepCheckAccess) {
-      return res.status(403).json({ error: "Deep Check requires a Pro plan", upgrade: true });
+      return res.status(403).json({ error: "Deep Check requires paid access", upgrade: true });
     }
     if (!isDemo && checkType === "basic") {
       const checksUsed = user.freeChecksUsed || 0;
@@ -1367,7 +1367,7 @@ export async function registerRoutes(
     if (!user) return res.status(401).json({ error: "User not found" });
 
     if (!user.deepCheckAccess) {
-      return res.status(403).json({ error: "Deep Check requires Pro plan access", upgrade: true });
+      return res.status(403).json({ error: "Deep Check requires paid access", upgrade: true });
     }
 
     const formData = req.body.formData;

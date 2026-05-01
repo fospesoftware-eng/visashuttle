@@ -282,7 +282,7 @@ export default function HomePage() {
             ) : (
               <>
                 <Link href="/sign-in"><Button variant="ghost" size="sm" data-testid="button-signin">Sign In</Button></Link>
-                <Link href="/join"><Button size="sm" className="border-0 text-white hover:opacity-90" style={{background:"linear-gradient(135deg,#4055FF,#FF2060)"}} data-testid="button-join">Get Started Free</Button></Link>
+                <Link href="/join"><Button size="sm" className="border-0 text-white hover:opacity-90" style={{background:"linear-gradient(135deg,#4055FF,#FF2060)"}} data-testid="button-join">Start Basic Check ₹0</Button></Link>
               </>
             )}
           </div>
@@ -329,7 +329,7 @@ export default function HomePage() {
                   data-testid="button-hero-cta"
                 >
                   <Sparkles className="w-5 h-5" />
-                  {user ? "Run a Visa Check" : "Check My Visa Chances — Free"}
+                  {user ? "Run a Visa Check" : "Check My Visa Chances — ₹0"}
                 </Button>
                 <Link href="/pricing">
                   <Button size="lg" variant="outline" className="gap-2 text-base" data-testid="button-pricing">
@@ -341,7 +341,7 @@ export default function HomePage() {
 
               <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                 {[
-                  { icon: CheckCircle, text: "1 free check — no card needed" },
+                  { icon: CheckCircle, text: "Basic Check at ₹0 — no card needed" },
                   { icon: Shield, text: "Private & secure" },
                   { icon: Zap, text: "Results in seconds" },
                 ].map(({ icon: Icon, text }) => (
@@ -440,7 +440,7 @@ export default function HomePage() {
                       data-testid="button-card-cta"
                     >
                       <Sparkles className="w-4 h-4 mr-2" />
-                      {user ? "Check Your Visa" : "Get My Score — It's Free"}
+                      {user ? "Check Your Visa" : "Get My Score — ₹0"}
                     </Button>
                     {!user && (
                       <p className="text-xs text-center text-muted-foreground mt-2 flex items-center justify-center gap-1">
@@ -556,7 +556,7 @@ export default function HomePage() {
                 data-testid="button-cta-final"
               >
                 <Sparkles className="w-4 h-4 mr-2" />
-                {user ? "Run a Visa Check" : "Start Free Visa Check"}
+                {user ? "Run a Visa Check" : "Start Basic Check ₹0"}
               </Button>
             </div>
           </div>

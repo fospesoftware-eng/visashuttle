@@ -209,11 +209,12 @@ export default function AccountPage() {
   const profComp = profileCompletion(profile ?? null);
   const lastCheck = checks[0];
   const checksLeftLabel = Number.isFinite(checksRemaining) ? checksRemaining : "Unlimited";
+  const planLabel = user.subscriptionPlan === "pro" ? "Deep Check" : user.subscriptionPlan.charAt(0).toUpperCase() + user.subscriptionPlan.slice(1);
 
   const notifications = [
-    !canCheck && { type: "warn", msg: "You've used your free check. Upgrade to run more checks." },
+    !canCheck && { type: "warn", msg: "You've used your Basic Check. Get Deep Check for ₹500 only." },
     profComp < 50 && { type: "info", msg: "Complete your saved profile to speed up future checks." },
-    !user.deepCheckAccess && { type: "tip", msg: "Deep Check reveals embassy-style risk analysis. Try it on Pro." },
+    !user.deepCheckAccess && { type: "tip", msg: "Deep Check reveals embassy-style risk analysis. 50% off now — ₹500 only." },
   ].filter(Boolean) as { type: string; msg: string }[];
 
   return (
@@ -228,7 +229,7 @@ export default function AccountPage() {
             { label: "Total Checks", value: checks.length, icon: BarChart3, color: "text-[#4055FF]", bg: "bg-[#4055FF]/10" },
             { label: "Checks Left", value: checksLeftLabel, icon: Zap, color: canCheck ? "text-emerald-600" : "text-amber-600", bg: canCheck ? "bg-emerald-50" : "bg-amber-50" },
             { label: "Profile Complete", value: `${profComp}%`, icon: User, color: profComp >= 70 ? "text-emerald-600" : "text-slate-500", bg: "bg-slate-50" },
-            { label: "Plan", value: user.subscriptionPlan.charAt(0).toUpperCase() + user.subscriptionPlan.slice(1), icon: Crown, color: user.subscriptionPlan === "pro" ? "text-purple-600" : "text-slate-500", bg: user.subscriptionPlan === "pro" ? "bg-purple-50" : "bg-slate-50" },
+            { label: "Plan", value: planLabel, icon: Crown, color: user.subscriptionPlan === "pro" ? "text-purple-600" : "text-slate-500", bg: user.subscriptionPlan === "pro" ? "bg-purple-50" : "bg-slate-50" },
           ].map(({ label, value, icon: Icon, color, bg }) => (
             <Card key={label} className="bg-white shadow-sm border-slate-100">
               <CardContent className="p-4 md:p-5">
@@ -274,8 +275,8 @@ export default function AccountPage() {
                     <PlaneTakeoff className="w-5 h-5 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-slate-800 text-sm">Free Visa Check</p>
-                    <p className="text-xs text-slate-500">AI approval analysis</p>
+                    <p className="font-semibold text-slate-800 text-sm">Basic Check</p>
+                    <p className="text-xs text-slate-500">₹0 AI approval analysis</p>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-500 transition-colors" />
                 </CardContent>
@@ -291,7 +292,7 @@ export default function AccountPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <p className="font-semibold text-slate-800 text-sm">Deep Check</p>
-                      {!user.deepCheckAccess && <Badge className="text-[10px] px-1.5 py-0 bg-amber-100 text-amber-700 border-0">Pro</Badge>}
+                      {!user.deepCheckAccess && <Badge className="text-[10px] px-1.5 py-0 bg-amber-100 text-amber-700 border-0">₹500</Badge>}
                     </div>
                     <p className="text-xs text-slate-500">Embassy-style analysis</p>
                   </div>
@@ -338,11 +339,11 @@ export default function AccountPage() {
                 <CardContent className="py-10 text-center">
                   <Brain className="w-10 h-10 text-slate-300 mx-auto mb-3" />
                   <p className="font-medium text-slate-600 mb-1">No checks yet</p>
-                  <p className="text-sm text-slate-400 mb-4">Your first check is free — no card needed</p>
+                  <p className="text-sm text-slate-400 mb-4">Your Basic Check is ₹0 — no card needed</p>
                   <Link href="/check">
                     <Button size="sm" className="border-0 text-white hover:opacity-90" style={{background:"linear-gradient(135deg,#4055FF,#FF2060)"}} data-testid="button-first-check">
                       <PlaneTakeoff className="w-3.5 h-3.5 mr-1.5" />
-                      Start Free Check
+                      Start Basic Check
                     </Button>
                   </Link>
                 </CardContent>
@@ -442,7 +443,7 @@ export default function AccountPage() {
                         <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center flex-shrink-0">
                           <Crown className="w-3.5 h-3.5 text-purple-600" />
                         </div>
-                        <span className="text-xs text-slate-600 group-hover:text-slate-900">Try Deep Check (Pro)</span>
+                        <span className="text-xs text-slate-600 group-hover:text-slate-900">Try Deep Check — ₹500 only</span>
                         <ChevronRight className="w-3 h-3 text-slate-300 ml-auto" />
                       </div>
                     </Link>
@@ -475,7 +476,7 @@ export default function AccountPage() {
                         <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
                           <PlaneTakeoff className="w-3.5 h-3.5 text-blue-600" />
                         </div>
-                        <span className="text-xs text-slate-600 group-hover:text-slate-900">Run your first free check</span>
+                        <span className="text-xs text-slate-600 group-hover:text-slate-900">Run your Basic Check at ₹0</span>
                         <ChevronRight className="w-3 h-3 text-slate-300 ml-auto" />
                       </div>
                     </Link>

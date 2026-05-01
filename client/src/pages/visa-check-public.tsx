@@ -102,7 +102,7 @@ export default function VisaCheckPublicPage() {
             <Link href="/sign-in"><Button variant="ghost" size="sm" data-testid="button-signin">Sign In</Button></Link>
             <Link href="/join">
               <Button size="sm" className="border-0 text-white hover:opacity-90" style={{ background: "linear-gradient(135deg,#4055FF,#FF2060)" }} data-testid="button-join">
-                Get Started Free
+                Start Basic Check ₹0
               </Button>
             </Link>
           </div>

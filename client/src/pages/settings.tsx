@@ -27,7 +27,7 @@ export default function SettingsPage() {
     toast({ title: "Settings saved", description: "Your preferences have been updated." });
   }
 
-  const planLabel = user.subscriptionPlan === "pro" ? "Pro" : user.subscriptionPlan === "starter" ? "Starter" : "Free";
+  const planLabel = user.subscriptionPlan === "pro" ? "Deep Check" : user.subscriptionPlan === "starter" ? "Starter" : "Basic";
 
   return (
     <DashboardLayout title="Settings" subtitle="Manage your account and preferences">
@@ -90,7 +90,7 @@ export default function SettingsPage() {
                 </p>
               </div>
               <Button variant="outline" size="sm" onClick={() => setLocation("/pricing")}>
-                {user.subscriptionPlan === "free" ? "Upgrade" : "Manage"}
+                {user.subscriptionPlan === "free" ? "Deep Check ₹500" : "Manage"}
               </Button>
             </div>
           </CardContent>

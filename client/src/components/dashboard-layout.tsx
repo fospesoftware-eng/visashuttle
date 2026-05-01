@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 
 const NAV_ITEMS = [
   { icon: Compass, label: "Dashboard", href: "/account" },
-  { icon: PlaneTakeoff, label: "Free Visa Check", href: "/check" },
+  { icon: PlaneTakeoff, label: "Basic Check", href: "/check" },
   { icon: ScanSearch, label: "Deep Check", href: "/deep-check", premium: true },
   { icon: Luggage, label: "Saved Profile", href: "/saved-profile" },
   { icon: ScrollText, label: "Check History", href: "/history" },
@@ -28,6 +28,7 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
   const [location] = useLocation();
   const { user, logout, checksRemaining, canCheck, isDemo } = useB2cAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const planLabel = user?.subscriptionPlan === "pro" ? "Deep Check" : user?.subscriptionPlan || "free";
 
   useEffect(() => { setSidebarOpen(false); }, [location]);
 
@@ -56,7 +57,7 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
               user.subscriptionPlan === "pro" ? "bg-purple-100 text-purple-700" :
               user.subscriptionPlan === "starter" ? "bg-[#4055FF]/10 text-[#4055FF]" :
               "bg-slate-100 text-slate-600"
-            }`}>{isDemo ? "Demo" : user.subscriptionPlan}</span>
+            }`}>{isDemo ? "Demo" : planLabel}</span>
             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${canCheck ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"}`}>
               {isDemo ? "Unlimited checks" : `${checksRemaining} check${checksRemaining !== 1 ? "s" : ""} left`}
             </span>
@@ -97,9 +98,9 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
             <div className="mb-2 p-3 rounded-xl text-white cursor-pointer transition-all hover:opacity-90" style={{background:"linear-gradient(135deg,#4055FF,#FF2060)"}}>
               <div className="flex items-center gap-1.5 mb-1">
                 <Crown className="w-3.5 h-3.5 text-amber-300" />
-                <span className="text-xs font-semibold">Upgrade Plan</span>
+                <span className="text-xs font-semibold">Get Deep Check</span>
               </div>
-              <p className="text-[11px] text-blue-100 leading-snug">Get more checks + Deep Check access</p>
+              <p className="text-[11px] text-blue-100 leading-snug">50% off — ₹500 only</p>
             </div>
           </Link>
         )}
@@ -162,7 +163,7 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
                 <Link href="/pricing">
                   <Button size="sm" className="hidden sm:flex gap-1.5 border-0 text-xs h-8 px-3 text-white hover:opacity-90" style={{background:"linear-gradient(135deg,#4055FF,#FF2060)"}}>
                     <Crown className="w-3 h-3" />
-                    Upgrade
+                    Deep Check ₹500
                   </Button>
                 </Link>
               )}
