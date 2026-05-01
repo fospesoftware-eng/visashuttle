@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/lib/theme";
 import { PasswordGate } from "@/components/password-gate";
 import { CookieBanner } from "@/components/cookie-banner";
+import { SiteFooter } from "@/components/site-footer";
 
 import NotFound from "@/pages/not-found";
 import HomePage from "@/pages/home";
@@ -154,6 +155,7 @@ function App() {
             <Toaster />
             <SubdomainRedirect />
             <Router />
+            <SiteFooter />
             <CookieBanner />
           </PasswordGate>
         </TooltipProvider>
