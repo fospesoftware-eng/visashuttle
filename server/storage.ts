@@ -15,8 +15,10 @@ import {
   type SavedProfile, type InsertSavedProfile,
   type SmsConfig, type InsertSmsConfig,
   type PlatformAiConfig, type InsertPlatformAiConfig,
+  type PaymentGatewayConfig, type InsertPaymentGatewayConfig,
   b2cUsers, visaChecks, savedProfiles, smsConfig as smsConfigTable,
   platformAiConfig as platformAiConfigTable,
+  paymentGatewayConfig as paymentGatewayConfigTable,
 } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -111,6 +113,10 @@ export interface IStorage {
   // Platform AI Config
   getPlatformAiConfig(): Promise<PlatformAiConfig | undefined>;
   upsertPlatformAiConfig(data: Partial<InsertPlatformAiConfig>): Promise<PlatformAiConfig>;
+
+  // Payment Gateway Config
+  getPaymentGatewayConfig(): Promise<PaymentGatewayConfig | undefined>;
+  upsertPaymentGatewayConfig(data: Partial<InsertPaymentGatewayConfig>): Promise<PaymentGatewayConfig>;
 }
 
 export class MemStorage implements IStorage {
@@ -883,6 +889,10 @@ export class MemStorage implements IStorage {
   async upsertPlatformAiConfig(data: Partial<InsertPlatformAiConfig>): Promise<PlatformAiConfig> {
     throw new Error("Platform AI config only available in HybridStorage");
   }
+  async getPaymentGatewayConfig(): Promise<PaymentGatewayConfig | undefined> { return undefined; }
+  async upsertPaymentGatewayConfig(data: Partial<InsertPaymentGatewayConfig>): Promise<PaymentGatewayConfig> {
+    throw new Error("Payment gateway config only available in HybridStorage");
+  }
 }
 
 // HybridStorage: uses MemStorage for agency/seed data, PostgreSQL for B2C user data
@@ -1049,6 +1059,29 @@ class HybridStorage extends MemStorage {
     }
     const rows = await db.insert(platformAiConfigTable).values({
       anthropicModel: "claude-opus-4-5",
+      ...data,
+    }).returning();
+    return rows[0];
+  }
+
+  // Payment Gateway Config — single-row config stored in DB
+  async getPaymentGatewayConfig(): Promise<PaymentGatewayConfig | undefined> {
+    const rows = await db.select().from(paymentGatewayConfigTable).limit(1);
+    return rows[0];
+  }
+
+  async upsertPaymentGatewayConfig(data: Partial<InsertPaymentGatewayConfig>): Promise<PaymentGatewayConfig> {
+    const existing = await this.getPaymentGatewayConfig();
+    if (existing) {
+      const rows = await db.update(paymentGatewayConfigTable)
+        .set({ ...data, updatedAt: new Date() })
+        .returning();
+      return rows[0];
+    }
+    const rows = await db.insert(paymentGatewayConfigTable).values({
+      provider: "cashfree",
+      mode: "test",
+      apiVersion: "2023-08-01",
       ...data,
     }).returning();
     return rows[0];

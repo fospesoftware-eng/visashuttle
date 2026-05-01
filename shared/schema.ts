@@ -313,3 +313,21 @@ export const platformAiConfig = pgTable("platform_ai_config", {
 export const insertPlatformAiConfigSchema = createInsertSchema(platformAiConfig).omit({ id: true, updatedAt: true });
 export type InsertPlatformAiConfig = z.infer<typeof insertPlatformAiConfigSchema>;
 export type PlatformAiConfig = typeof platformAiConfig.$inferSelect;
+
+// ── Payment Gateway Config ───────────────────────────────────────────────────
+export const paymentGatewayConfig = pgTable("payment_gateway_config", {
+  id: serial("id").primaryKey(),
+  provider: text("provider").notNull().default("cashfree"),
+  mode: text("mode").notNull().default("test"),
+  apiVersion: text("api_version").notNull().default("2023-08-01"),
+  testClientId: text("test_client_id"),
+  testClientSecret: text("test_client_secret"),
+  liveClientId: text("live_client_id"),
+  liveClientSecret: text("live_client_secret"),
+  webhookSecret: text("webhook_secret"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPaymentGatewayConfigSchema = createInsertSchema(paymentGatewayConfig).omit({ id: true, updatedAt: true });
+export type InsertPaymentGatewayConfig = z.infer<typeof insertPaymentGatewayConfigSchema>;
+export type PaymentGatewayConfig = typeof paymentGatewayConfig.$inferSelect;

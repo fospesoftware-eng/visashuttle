@@ -1145,6 +1145,64 @@ export async function registerRoutes(
     });
   });
 
+  // ── Admin: Payment Gateway Config ────────────────────────────────────────
+  app.get("/api/admin/payment-gateway-config", requireAdminAuth, async (_req, res) => {
+    const cfg = await storage.getPaymentGatewayConfig();
+    const mode = cfg?.mode === "live" ? "live" : "test";
+    const testReady = !!(cfg?.testClientId && cfg?.testClientSecret);
+    const liveReady = !!(cfg?.liveClientId && cfg?.liveClientSecret);
+    res.json({
+      provider: cfg?.provider || "cashfree",
+      mode,
+      apiVersion: cfg?.apiVersion || "2023-08-01",
+      testClientId: cfg?.testClientId ? maskKey(cfg.testClientId) : "",
+      testClientSecret: cfg?.testClientSecret ? maskKey(cfg.testClientSecret) : "",
+      liveClientId: cfg?.liveClientId ? maskKey(cfg.liveClientId) : "",
+      liveClientSecret: cfg?.liveClientSecret ? maskKey(cfg.liveClientSecret) : "",
+      webhookSecret: cfg?.webhookSecret ? maskKey(cfg.webhookSecret) : "",
+      sandboxBaseUrl: "https://sandbox.cashfree.com/pg",
+      productionBaseUrl: "https://api.cashfree.com/pg",
+      activeBaseUrl: mode === "live" ? "https://api.cashfree.com/pg" : "https://sandbox.cashfree.com/pg",
+      hasTestCredentials: testReady,
+      hasLiveCredentials: liveReady,
+      hasWebhookSecret: !!cfg?.webhookSecret,
+      activeReady: mode === "live" ? liveReady : testReady,
+    });
+  });
+
+  app.post("/api/admin/payment-gateway-config", requireAdminAuth, async (req, res) => {
+    const {
+      mode,
+      apiVersion,
+      testClientId,
+      testClientSecret,
+      liveClientId,
+      liveClientSecret,
+      webhookSecret,
+    } = req.body;
+    const patch: Record<string, any> = { provider: "cashfree" };
+    if (mode !== undefined) patch.mode = mode === "live" ? "live" : "test";
+    if (apiVersion !== undefined) patch.apiVersion = apiVersion || "2023-08-01";
+    if (testClientId !== undefined && !String(testClientId).includes("•")) patch.testClientId = testClientId || null;
+    if (testClientSecret !== undefined && !String(testClientSecret).includes("•")) patch.testClientSecret = testClientSecret || null;
+    if (liveClientId !== undefined && !String(liveClientId).includes("•")) patch.liveClientId = liveClientId || null;
+    if (liveClientSecret !== undefined && !String(liveClientSecret).includes("•")) patch.liveClientSecret = liveClientSecret || null;
+    if (webhookSecret !== undefined && !String(webhookSecret).includes("•")) patch.webhookSecret = webhookSecret || null;
+
+    const updated = await storage.upsertPaymentGatewayConfig(patch);
+    const activeMode = updated.mode === "live" ? "live" : "test";
+    res.json({
+      success: true,
+      provider: updated.provider || "cashfree",
+      mode: activeMode,
+      apiVersion: updated.apiVersion || "2023-08-01",
+      hasTestCredentials: !!(updated.testClientId && updated.testClientSecret),
+      hasLiveCredentials: !!(updated.liveClientId && updated.liveClientSecret),
+      hasWebhookSecret: !!updated.webhookSecret,
+      activeBaseUrl: activeMode === "live" ? "https://api.cashfree.com/pg" : "https://sandbox.cashfree.com/pg",
+    });
+  });
+
   // ── B2C Register ──────────────────────────────────────────────────────────
   app.post("/api/b2c/auth/register", async (req, res) => {
     const { email, password, fullName, phone } = req.body;

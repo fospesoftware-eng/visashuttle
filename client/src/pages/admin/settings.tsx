@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Globe, Mail, Shield, Database, Save, Key, Bell, Lock, MessageSquare, CheckCircle, AlertCircle, Eye, EyeOff, Send, ChevronDown, ChevronUp } from "lucide-react";
+import { Globe, Mail, Shield, Database, Save, Key, Bell, Lock, MessageSquare, CheckCircle, AlertCircle, Eye, EyeOff, Send, ChevronDown, ChevronUp, CreditCard, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,6 +43,24 @@ interface AiConfigResponse {
   hasAnthropicApiKey: boolean;
   usingDb: boolean;
   usingEnvFallback: boolean;
+}
+
+interface PaymentGatewayConfigResponse {
+  provider: string;
+  mode: "test" | "live";
+  apiVersion: string;
+  testClientId: string;
+  testClientSecret: string;
+  liveClientId: string;
+  liveClientSecret: string;
+  webhookSecret: string;
+  sandboxBaseUrl: string;
+  productionBaseUrl: string;
+  activeBaseUrl: string;
+  hasTestCredentials: boolean;
+  hasLiveCredentials: boolean;
+  hasWebhookSecret: boolean;
+  activeReady: boolean;
 }
 
 function AiProviderCard() {
@@ -177,6 +195,255 @@ function AiProviderCard() {
               ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               : <Save className="w-4 h-4" />}
             Save AI Credentials
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Payment Gateway Card ───────────────────────────────────────────────────
+function PaymentGatewayCard() {
+  const { toast } = useToast();
+  const [showTestSecret, setShowTestSecret] = useState(false);
+  const [showLiveSecret, setShowLiveSecret] = useState(false);
+  const [showWebhookSecret, setShowWebhookSecret] = useState(false);
+  const [form, setForm] = useState({
+    mode: "test" as "test" | "live",
+    apiVersion: "2023-08-01",
+    testClientId: "",
+    testClientSecret: "",
+    liveClientId: "",
+    liveClientSecret: "",
+    webhookSecret: "",
+  });
+
+  const { data: cfg, isLoading } = useQuery<PaymentGatewayConfigResponse>({
+    queryKey: ["/api/admin/payment-gateway-config"],
+  });
+
+  useEffect(() => {
+    if (cfg) {
+      setForm({
+        mode: cfg.mode || "test",
+        apiVersion: cfg.apiVersion || "2023-08-01",
+        testClientId: cfg.testClientId || "",
+        testClientSecret: cfg.testClientSecret || "",
+        liveClientId: cfg.liveClientId || "",
+        liveClientSecret: cfg.liveClientSecret || "",
+        webhookSecret: cfg.webhookSecret || "",
+      });
+    }
+  }, [cfg]);
+
+  const saveMutation = useMutation({
+    mutationFn: (data: typeof form) => apiRequest("POST", "/api/admin/payment-gateway-config", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-gateway-config"] });
+      toast({ title: "Payment gateway saved", description: "Cashfree settings have been updated." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Save failed", description: err.message || "Could not save Cashfree settings", variant: "destructive" });
+    },
+  });
+
+  const activeBaseUrl = form.mode === "live" ? "https://api.cashfree.com/pg" : "https://sandbox.cashfree.com/pg";
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <CardTitle className="text-base flex items-center gap-2">
+              <CreditCard className="w-4 h-4" />
+              Cashfree Payment Gateway
+            </CardTitle>
+            <CardDescription>Configure Cashfree Payments credentials for test and live checkout</CardDescription>
+          </div>
+          {isLoading ? (
+            <div className="w-5 h-5 border-2 border-muted border-t-foreground rounded-full animate-spin" />
+          ) : (
+            <Badge
+              variant={cfg?.activeReady ? "default" : "secondary"}
+              className={cfg?.activeReady ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : ""}
+            >
+              {form.mode === "live" ? "Live" : "Test"} {cfg?.activeReady ? "Ready" : "Not Configured"}
+            </Badge>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label>Environment</Label>
+            <Select value={form.mode} onValueChange={(mode: "test" | "live") => setForm(f => ({ ...f, mode }))}>
+              <SelectTrigger data-testid="select-cashfree-mode">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="test">Test / Sandbox</SelectItem>
+                <SelectItem value="live">Live / Production</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">Use test while validating sandbox payments, then switch to live for production.</p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="cashfreeApiVersion">API Version</Label>
+            <Input
+              id="cashfreeApiVersion"
+              value={form.apiVersion}
+              onChange={e => setForm(f => ({ ...f, apiVersion: e.target.value }))}
+              className="font-mono text-sm"
+              data-testid="input-cashfree-api-version"
+            />
+            <p className="text-xs text-muted-foreground">Cashfree v2023-08-01 uses the `x-api-version` header.</p>
+          </div>
+        </div>
+
+        <div className="rounded-xl border bg-muted/30 p-4 text-sm">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <p className="font-medium">Sandbox Base URL</p>
+              <p className="text-xs text-muted-foreground font-mono break-all">https://sandbox.cashfree.com/pg</p>
+            </div>
+            <div>
+              <p className="font-medium">Production Base URL</p>
+              <p className="text-xs text-muted-foreground font-mono break-all">https://api.cashfree.com/pg</p>
+            </div>
+          </div>
+          <Separator className="my-3" />
+          <p className="text-xs text-muted-foreground">
+            Active endpoint: <span className="font-mono text-foreground">{activeBaseUrl}</span>
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold">Test Credentials</p>
+              <p className="text-xs text-muted-foreground">Used with Cashfree sandbox for checkout testing</p>
+            </div>
+            {cfg?.hasTestCredentials
+              ? <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+              : <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="cashfreeTestClientId">Test Client ID / App ID</Label>
+              <Input
+                id="cashfreeTestClientId"
+                value={form.testClientId}
+                onChange={e => setForm(f => ({ ...f, testClientId: e.target.value }))}
+                placeholder={cfg?.hasTestCredentials ? "Saved — enter new value to update" : "Cashfree test app ID"}
+                className="font-mono text-sm"
+                data-testid="input-cashfree-test-client-id"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="cashfreeTestClientSecret">Test Client Secret</Label>
+              <div className="relative">
+                <Input
+                  id="cashfreeTestClientSecret"
+                  type={showTestSecret ? "text" : "password"}
+                  value={form.testClientSecret}
+                  onChange={e => setForm(f => ({ ...f, testClientSecret: e.target.value }))}
+                  placeholder={cfg?.hasTestCredentials ? "Saved — enter new value to update" : "Cashfree test secret key"}
+                  className="pr-10 font-mono text-sm"
+                  data-testid="input-cashfree-test-client-secret"
+                />
+                <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowTestSecret(s => !s)}>
+                  {showTestSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold">Live Credentials</p>
+              <p className="text-xs text-muted-foreground">Used only after switching the environment to live</p>
+            </div>
+            {cfg?.hasLiveCredentials
+              ? <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+              : <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="cashfreeLiveClientId">Live Client ID / App ID</Label>
+              <Input
+                id="cashfreeLiveClientId"
+                value={form.liveClientId}
+                onChange={e => setForm(f => ({ ...f, liveClientId: e.target.value }))}
+                placeholder={cfg?.hasLiveCredentials ? "Saved — enter new value to update" : "Cashfree live app ID"}
+                className="font-mono text-sm"
+                data-testid="input-cashfree-live-client-id"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="cashfreeLiveClientSecret">Live Client Secret</Label>
+              <div className="relative">
+                <Input
+                  id="cashfreeLiveClientSecret"
+                  type={showLiveSecret ? "text" : "password"}
+                  value={form.liveClientSecret}
+                  onChange={e => setForm(f => ({ ...f, liveClientSecret: e.target.value }))}
+                  placeholder={cfg?.hasLiveCredentials ? "Saved — enter new value to update" : "Cashfree live secret key"}
+                  className="pr-10 font-mono text-sm"
+                  data-testid="input-cashfree-live-client-secret"
+                />
+                <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowLiveSecret(s => !s)}>
+                  {showLiveSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
+        <div className="space-y-1.5">
+          <Label htmlFor="cashfreeWebhookSecret">Webhook Secret <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+          <div className="relative">
+            <Input
+              id="cashfreeWebhookSecret"
+              type={showWebhookSecret ? "text" : "password"}
+              value={form.webhookSecret}
+              onChange={e => setForm(f => ({ ...f, webhookSecret: e.target.value }))}
+              placeholder={cfg?.hasWebhookSecret ? "Saved — enter new value to update" : "Cashfree webhook signing secret"}
+              className="pr-10 font-mono text-sm"
+              data-testid="input-cashfree-webhook-secret"
+            />
+            <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowWebhookSecret(s => !s)}>
+              {showWebhookSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground">Cashfree merchant APIs use `x-client-id`, `x-client-secret`, and `x-api-version` headers. Keep secrets server-side only.</p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <a
+            href="https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/overview"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline"
+          >
+            Cashfree v2023-08-01 docs <ExternalLink className="w-3 h-3" />
+          </a>
+          <Button
+            onClick={() => saveMutation.mutate(form)}
+            disabled={saveMutation.isPending}
+            className="gap-2"
+            data-testid="button-save-cashfree-config"
+          >
+            {saveMutation.isPending
+              ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              : <Save className="w-4 h-4" />}
+            Save Cashfree Settings
           </Button>
         </div>
       </CardContent>
@@ -825,6 +1092,7 @@ export default function AdminSettingsPage() {
 
           {/* ── Integrations Tab ──────────────────────────────────────────── */}
           <TabsContent value="integrations" className="space-y-4">
+            <PaymentGatewayCard />
             <SmsGatewayCard />
           </TabsContent>
 
