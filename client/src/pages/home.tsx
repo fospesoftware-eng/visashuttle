@@ -668,6 +668,7 @@ export default function HomePage() {
               <a href="#contact" className="hover:text-foreground transition-colors">Contact</a>
               <Link href="/privacy-policy" className="hover:text-foreground transition-colors">Privacy & Cookies</Link>
               <Link href="/terms-and-conditions" className="hover:text-foreground transition-colors">Terms</Link>
+              <Link href="/refund-policy" className="hover:text-foreground transition-colors">Refund Policy</Link>
             </div>
             <p className="text-xs text-muted-foreground text-center max-w-sm">
               AI-based estimation only. Does not guarantee visa approval.
