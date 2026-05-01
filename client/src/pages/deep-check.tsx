@@ -612,7 +612,7 @@ export default function DeepCheckPage() {
                 Go beyond a basic score. Our AI runs an embassy-style deep analysis — risk severity breakdown, dimension scoring, action plan, and embassy intelligence.
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
-                <Link href="/pricing">
+                <Link href="/payment/deep-check">
                   <Button className="bg-white text-blue-900 hover:bg-blue-50 font-semibold gap-2" data-testid="button-upgrade">
                     <Crown className="w-4 h-4 text-amber-500" /> Get Deep Check — ₹500 only <ArrowRight className="w-4 h-4" />
                   </Button>

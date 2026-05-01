@@ -283,7 +283,7 @@ export default function AccountPage() {
               </Card>
             </Link>
 
-            <Link href="/deep-check">
+            <Link href={user.deepCheckAccess ? "/deep-check" : "/payment/deep-check"}>
               <Card className={`cursor-pointer hover:shadow-md transition-all group bg-white ${user.deepCheckAccess ? "hover:border-purple-200" : "opacity-75"}`}>
                 <CardContent className="p-4 flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${user.deepCheckAccess ? "bg-purple-600" : "bg-slate-200"}`}>
@@ -438,7 +438,7 @@ export default function AccountPage() {
                     </Link>
                   )}
                   {!user.deepCheckAccess && (
-                    <Link href="/deep-check">
+                    <Link href="/payment/deep-check">
                       <div className="flex items-center gap-2 p-2.5 rounded-lg hover:bg-slate-50 cursor-pointer group">
                         <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center flex-shrink-0">
                           <Crown className="w-3.5 h-3.5 text-purple-600" />

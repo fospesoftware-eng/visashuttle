@@ -16,6 +16,8 @@ export default function SignInPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
+  const nextPath = new URLSearchParams(window.location.search).get("next");
+  const safeNextPath = nextPath?.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/account";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -25,7 +27,7 @@ export default function SignInPage() {
     try {
       await apiRequest("POST", "/api/b2c/auth/login", form);
       await queryClient.invalidateQueries({ queryKey: ["/api/b2c/auth/me"] });
-      setLocation("/account");
+      setLocation(safeNextPath);
     } catch (err: any) {
       setError(err.message || "Invalid email or password");
     } finally {
@@ -124,7 +126,7 @@ export default function SignInPage() {
 
             <p className="text-center text-sm text-muted-foreground mt-6">
               Don't have an account?{" "}
-              <Link href="/join" className="text-[#4055FF] font-medium hover:underline">
+              <Link href={`/join?next=${encodeURIComponent(safeNextPath)}`} className="text-[#4055FF] font-medium hover:underline">
                 Create one free
               </Link>
             </p>

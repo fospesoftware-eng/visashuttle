@@ -62,6 +62,7 @@ const plans = [
 
 export default function PricingPage() {
   const { user } = useB2cAuth();
+  const deepCheckHref = user ? "/payment/deep-check" : "/sign-in?next=/payment/deep-check";
 
   return (
     <div className="min-h-screen bg-background">
@@ -138,7 +139,7 @@ export default function PricingPage() {
                         Current Plan
                       </Button>
                     ) : (
-                      <Link href={user ? "/account" : plan.href}>
+                      <Link href={plan.key === "pro" ? deepCheckHref : user ? "/account" : plan.href}>
                         <Button
                           className={`w-full ${plan.badge ? "bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 border-0 text-white" : ""}`}
                           variant={plan.ctaVariant}

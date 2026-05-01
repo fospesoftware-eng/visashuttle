@@ -89,7 +89,7 @@ export default function SettingsPage() {
                   {user.deepCheckAccess && " • Deep Check enabled"}
                 </p>
               </div>
-              <Button variant="outline" size="sm" onClick={() => setLocation("/pricing")}>
+              <Button variant="outline" size="sm" onClick={() => setLocation(user.subscriptionPlan === "free" ? "/payment/deep-check" : "/pricing")}>
                 {user.subscriptionPlan === "free" ? "Deep Check ₹500" : "Manage"}
               </Button>
             </div>

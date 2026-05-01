@@ -262,6 +262,8 @@ export default function JoinPage() {
   const { toast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
   const [step, setStep] = useState<Step>("info");
+  const nextPath = new URLSearchParams(window.location.search).get("next");
+  const safeNextPath = nextPath?.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/account";
   const [isLoading, setIsLoading] = useState(false);
   const [resendCountdown, setResendCountdown] = useState(0);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -406,7 +408,7 @@ export default function JoinPage() {
         phone,
       });
       await queryClient.invalidateQueries({ queryKey: ["/api/b2c/auth/me"] });
-      setLocation("/account");
+      setLocation(safeNextPath);
     } catch (err: any) {
       toast({ title: "Verification failed", description: err.message || "Invalid or expired code", variant: "destructive" });
     } finally {

@@ -6,6 +6,7 @@ import { sendOtp, verifyOtp, getSmsProviderStatus } from "./sms";
 import { getEntryRequirement } from "@shared/visa-free";
 import indiaVisaChanceDataset from "@shared/india_visa_chance_dataset_non_visa_free_2026.json";
 import bcrypt from "bcryptjs";
+import { randomUUID } from "crypto";
 
 // Site-wide password for protecting the entire application
 const SITE_PASSWORD = process.env.SITE_PASSWORD;
@@ -13,6 +14,23 @@ const SITE_PASSWORD = process.env.SITE_PASSWORD;
 function maskKey(key: string): string {
   if (key.length <= 8) return "••••••••";
   return key.slice(0, 4) + "•".repeat(key.length - 8) + key.slice(-4);
+}
+
+function getRequestOrigin(req: Request): string {
+  const forwardedProto = req.headers["x-forwarded-proto"];
+  const proto = Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto;
+  return `${proto || req.protocol}://${req.get("host")}`;
+}
+
+function getCashfreeCredentials(cfg: Awaited<ReturnType<typeof storage.getPaymentGatewayConfig>>) {
+  const mode = cfg?.mode === "live" ? "live" : "test";
+  return {
+    mode,
+    baseUrl: mode === "live" ? "https://api.cashfree.com/pg" : "https://sandbox.cashfree.com/pg",
+    apiVersion: cfg?.apiVersion || "2023-08-01",
+    clientId: mode === "live" ? cfg?.liveClientId : cfg?.testClientId,
+    clientSecret: mode === "live" ? cfg?.liveClientSecret : cfg?.testClientSecret,
+  };
 }
 
 // Extend Express Session with white-label customer data AND agency/admin user data
@@ -1294,6 +1312,116 @@ export async function registerRoutes(
     }
     const { password: _, ...safeUser } = user;
     res.json({ user: safeUser });
+  });
+
+  // ── B2C Payments: Deep Check via Cashfree ────────────────────────────────
+  app.post("/api/b2c/payments/deep-check/order", requireB2cAuth, async (req, res) => {
+    const user = await storage.getB2cUser(req.session.b2cUserId!);
+    if (!user) return res.status(401).json({ error: "User not found" });
+
+    if (user.deepCheckAccess) {
+      return res.json({ alreadyActive: true, redirectUrl: "/deep-check" });
+    }
+
+    const cfg = await storage.getPaymentGatewayConfig();
+    const cashfree = getCashfreeCredentials(cfg);
+    if (!cashfree.clientId || !cashfree.clientSecret) {
+      return res.status(503).json({
+        error: `Cashfree ${cashfree.mode} credentials are not configured. Please add them in SaaS Admin > Integrations.`,
+      });
+    }
+
+    const orderId = `VS_DEEP_${Date.now()}_${randomUUID().slice(0, 8)}`;
+    const origin = getRequestOrigin(req);
+    const payload = {
+      order_id: orderId,
+      order_amount: 500,
+      order_currency: "INR",
+      order_note: "Visa Shuttle Deep Check",
+      customer_details: {
+        customer_id: user.id.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 45),
+        customer_email: user.email,
+        customer_name: user.fullName,
+        customer_phone: user.phone || "9999999999",
+      },
+      order_meta: {
+        return_url: `${origin}/payment/deep-check/return?order_id=${orderId}`,
+      },
+      order_tags: {
+        product: "deep_check",
+        user_id: user.id,
+      },
+    };
+
+    const response = await fetch(`${cashfree.baseUrl}/orders`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-version": cashfree.apiVersion,
+        "x-client-id": cashfree.clientId,
+        "x-client-secret": cashfree.clientSecret,
+        "x-idempotency-key": orderId,
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      console.error("[Cashfree] Create order failed:", data);
+      return res.status(response.status).json({ error: data?.message || "Unable to create Cashfree order" });
+    }
+
+    res.json({
+      orderId: data.order_id || orderId,
+      paymentSessionId: data.payment_session_id,
+      mode: cashfree.mode,
+      amount: 500,
+      currency: "INR",
+    });
+  });
+
+  app.get("/api/b2c/payments/deep-check/order/:orderId", requireB2cAuth, async (req, res) => {
+    const user = await storage.getB2cUser(req.session.b2cUserId!);
+    if (!user) return res.status(401).json({ error: "User not found" });
+
+    const orderId = req.params.orderId;
+    if (!/^VS_DEEP_[a-zA-Z0-9_-]+$/.test(orderId)) {
+      return res.status(400).json({ error: "Invalid order id" });
+    }
+
+    const cfg = await storage.getPaymentGatewayConfig();
+    const cashfree = getCashfreeCredentials(cfg);
+    if (!cashfree.clientId || !cashfree.clientSecret) {
+      return res.status(503).json({ error: "Cashfree credentials are not configured" });
+    }
+
+    const response = await fetch(`${cashfree.baseUrl}/orders/${encodeURIComponent(orderId)}`, {
+      headers: {
+        "x-api-version": cashfree.apiVersion,
+        "x-client-id": cashfree.clientId,
+        "x-client-secret": cashfree.clientSecret,
+      },
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      console.error("[Cashfree] Verify order failed:", data);
+      return res.status(response.status).json({ error: data?.message || "Unable to verify Cashfree order" });
+    }
+
+    const isPaid = data.order_status === "PAID";
+    if (isPaid && !user.deepCheckAccess) {
+      await storage.updateB2cUser(user.id, {
+        subscriptionPlan: "pro",
+        deepCheckAccess: true,
+        checkLimit: Math.max(user.checkLimit || 1, 1),
+      });
+    }
+
+    res.json({
+      orderId: data.order_id || orderId,
+      status: data.order_status,
+      paid: isPaid,
+      deepCheckAccess: isPaid || user.deepCheckAccess,
+    });
   });
 
   // === B2C Visa Check Routes ===

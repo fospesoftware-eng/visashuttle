@@ -23,6 +23,7 @@ import PricingPage from "@/pages/pricing";
 import HistoryPage from "@/pages/history";
 import HistoryDetailPage from "@/pages/history-detail";
 import DeepCheckPage from "@/pages/deep-check";
+import DeepCheckPaymentPage from "@/pages/deep-check-payment";
 import SavedProfilePage from "@/pages/saved-profile";
 import SettingsPage from "@/pages/settings";
 
@@ -99,6 +100,8 @@ function Router() {
       <Route path="/history/:id" component={HistoryDetailPage} />
       <Route path="/history" component={HistoryPage} />
       <Route path="/deep-check" component={DeepCheckPage} />
+      <Route path="/payment/deep-check/return" component={DeepCheckPaymentPage} />
+      <Route path="/payment/deep-check" component={DeepCheckPaymentPage} />
       <Route path="/saved-profile" component={SavedProfilePage} />
       <Route path="/settings" component={SettingsPage} />
       <Route path="/visa-check" component={VisaCheckPublicPage} />
@@ -151,6 +154,7 @@ const PRODUCT_SHELL_PREFIXES = [
   "/account",
   "/check",
   "/deep-check",
+  "/payment",
   "/history",
   "/saved-profile",
   "/settings",
