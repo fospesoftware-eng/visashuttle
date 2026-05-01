@@ -10,7 +10,7 @@ import { randomUUID } from "crypto";
 
 // Site-wide password for protecting the entire application
 const SITE_PASSWORD = process.env.SITE_PASSWORD;
-const DEMO_B2C_OTP = process.env.DEMO_B2C_OTP || "1234";
+const DEMO_B2C_OTP = "1234";
 
 function maskKey(key: string): string {
   if (key.length <= 8) return "••••••••";
@@ -1118,7 +1118,8 @@ export async function registerRoutes(
     if (!phone || !otp) {
       return res.status(400).json({ error: "Phone number and OTP code are required" });
     }
-    if (DEMO_B2C_OTP && String(otp) === DEMO_B2C_OTP) {
+    const enteredOtp = String(otp).replace(/\D/g, "");
+    if (enteredOtp === DEMO_B2C_OTP) {
       req.session.otpVerifiedPhone = phone;
       req.session.mcVerificationId = undefined;
       return res.json({ success: true });
@@ -1272,12 +1273,16 @@ export async function registerRoutes(
 
   // ── B2C Register ──────────────────────────────────────────────────────────
   app.post("/api/b2c/auth/register", async (req, res) => {
-    const { email, password, fullName, phone } = req.body;
+    const { email, password, fullName, phone, otp } = req.body;
     if (!email || !password || !fullName) {
       return res.status(400).json({ error: "Name, email and password are required" });
     }
     if (password.length < 8) {
       return res.status(400).json({ error: "Password must be at least 8 characters" });
+    }
+    const enteredOtp = String(otp || "").replace(/\D/g, "");
+    if (phone && enteredOtp === DEMO_B2C_OTP) {
+      req.session.otpVerifiedPhone = phone;
     }
     if (!phone || !req.session.otpVerifiedPhone) {
       return res.status(400).json({ error: "Phone number verification is required" });

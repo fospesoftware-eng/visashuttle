@@ -406,6 +406,7 @@ export default function JoinPage() {
         password: form.password,
         fullName: form.fullName,
         phone,
+        otp: code,
       });
       await queryClient.invalidateQueries({ queryKey: ["/api/b2c/auth/me"] });
       setLocation(safeNextPath);
