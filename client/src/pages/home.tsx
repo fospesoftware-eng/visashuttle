@@ -582,7 +582,8 @@ export default function HomePage() {
                 </div>
                 <div>
                   <p className="font-semibold">Visa Shuttle</p>
-                  <p className="text-sm text-muted-foreground">San Francisco</p>
+                  <p className="text-sm text-muted-foreground">Level 8, Tower I, UBB</p>
+                  <p className="text-sm text-muted-foreground">Cessna Business Park, ORR, Bangalore – 560 103</p>
                 </div>
               </div>
               <div className="flex items-start gap-3 rounded-xl border bg-background p-4">
