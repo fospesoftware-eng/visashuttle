@@ -38,24 +38,29 @@ app.use(
 app.use(express.urlencoded({ extended: false }));
 
 // Session middleware
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || "visa-shuttle-dev-secret",
-    resave: false,
-    saveUninitialized: false,
-    store: new PgStore({
+const sessionOptions: session.SessionOptions = {
+  secret: process.env.SESSION_SECRET || "visa-shuttle-dev-secret",
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === "production",
+    httpOnly: true,
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    sameSite: "lax",
+  },
+};
+
+if (pool) {
+  sessionOptions.store = new PgStore({
       pool,
       createTableIfMissing: true,
       tableName: "sessions",
-    }),
-    cookie: {
-      secure: process.env.NODE_ENV === "production",
-      httpOnly: true,
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      sameSite: "lax",
-    },
-  })
-);
+  });
+} else {
+  console.warn("[Session] Using default memory session store because DATABASE_URL is not set.");
+}
+
+app.use(session(sessionOptions));
 
 // Site-wide password protection middleware
 const SITE_PASSWORD = process.env.SITE_PASSWORD;

@@ -2,14 +2,17 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import * as schema from "@shared/schema";
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL is not set");
+export const hasDatabase = Boolean(process.env.DATABASE_URL);
+
+if (!hasDatabase) {
+  console.warn("[DB] DATABASE_URL is not set. Falling back to in-memory storage.");
 }
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
-});
+export const pool = hasDatabase
+  ? new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+    })
+  : undefined;
 
-export const db = drizzle(pool, { schema });
-export { pool };
+export const db = pool ? drizzle(pool, { schema }) : undefined as any;

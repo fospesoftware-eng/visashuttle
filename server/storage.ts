@@ -23,7 +23,7 @@ import {
 import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
-import { db } from "./db";
+import { db, hasDatabase } from "./db";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -1088,4 +1088,4 @@ class HybridStorage extends MemStorage {
   }
 }
 
-export const storage = new HybridStorage();
+export const storage: IStorage = hasDatabase ? new HybridStorage() : new MemStorage();
