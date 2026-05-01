@@ -33,6 +33,22 @@ function getCashfreeCredentials(cfg: Awaited<ReturnType<typeof storage.getPaymen
   };
 }
 
+function getCashfreePhone(phone?: string | null): string {
+  const digits = (phone || "").replace(/\D/g, "");
+  if (digits.length >= 10) return digits.slice(-10);
+  return "9999999999";
+}
+
+async function readCashfreeBody(response: Response) {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { message: text.slice(0, 300) };
+  }
+}
+
 // Extend Express Session with white-label customer data AND agency/admin user data
 declare module "express-session" {
   interface SessionData {
@@ -1332,6 +1348,7 @@ export async function registerRoutes(
     }
 
     const orderId = `VS_DEEP_${Date.now()}_${randomUUID().slice(0, 8)}`;
+    const requestId = randomUUID();
     const origin = getRequestOrigin(req);
     const payload = {
       order_id: orderId,
@@ -1342,7 +1359,7 @@ export async function registerRoutes(
         customer_id: user.id.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 45),
         customer_email: user.email,
         customer_name: user.fullName,
-        customer_phone: user.phone || "9999999999",
+        customer_phone: getCashfreePhone(user.phone),
       },
       order_meta: {
         return_url: `${origin}/payment/deep-check/return?order_id=${orderId}`,
@@ -1353,21 +1370,42 @@ export async function registerRoutes(
       },
     };
 
-    const response = await fetch(`${cashfree.baseUrl}/orders`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-version": cashfree.apiVersion,
-        "x-client-id": cashfree.clientId,
-        "x-client-secret": cashfree.clientSecret,
-        "x-idempotency-key": orderId,
-      },
-      body: JSON.stringify(payload),
-    });
-    const data = await response.json().catch(() => ({}));
+    let response: Response;
+    try {
+      response = await fetch(`${cashfree.baseUrl}/orders`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-version": cashfree.apiVersion,
+          "x-client-id": cashfree.clientId,
+          "x-client-secret": cashfree.clientSecret,
+          "x-request-id": requestId,
+          "x-idempotency-key": randomUUID(),
+        },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(20000),
+      });
+    } catch (err) {
+      console.error("[Cashfree] Create order network error:", err);
+      return res.status(503).json({
+        error: "Cashfree checkout is temporarily unreachable. Please try again in a few minutes.",
+      });
+    }
+
+    const data = await readCashfreeBody(response);
     if (!response.ok) {
-      console.error("[Cashfree] Create order failed:", data);
-      return res.status(response.status).json({ error: data?.message || "Unable to create Cashfree order" });
+      console.error("[Cashfree] Create order failed:", {
+        status: response.status,
+        requestId,
+        response: data,
+      });
+      const message = data?.message || data?.error || data?.type || "Unable to create Cashfree order";
+      const status = response.status >= 500 ? 503 : response.status;
+      return res.status(status).json({
+        error: response.status >= 500
+          ? "Cashfree gateway is temporarily unavailable. Please try again in a few minutes."
+          : message,
+      });
     }
 
     res.json({
@@ -1394,17 +1432,30 @@ export async function registerRoutes(
       return res.status(503).json({ error: "Cashfree credentials are not configured" });
     }
 
-    const response = await fetch(`${cashfree.baseUrl}/orders/${encodeURIComponent(orderId)}`, {
-      headers: {
-        "x-api-version": cashfree.apiVersion,
-        "x-client-id": cashfree.clientId,
-        "x-client-secret": cashfree.clientSecret,
-      },
-    });
-    const data = await response.json().catch(() => ({}));
+    let response: Response;
+    try {
+      response = await fetch(`${cashfree.baseUrl}/orders/${encodeURIComponent(orderId)}`, {
+        headers: {
+          "x-api-version": cashfree.apiVersion,
+          "x-client-id": cashfree.clientId,
+          "x-client-secret": cashfree.clientSecret,
+          "x-request-id": randomUUID(),
+        },
+        signal: AbortSignal.timeout(20000),
+      });
+    } catch (err) {
+      console.error("[Cashfree] Verify order network error:", err);
+      return res.status(503).json({ error: "Cashfree checkout is temporarily unreachable. Please try again in a few minutes." });
+    }
+
+    const data = await readCashfreeBody(response);
     if (!response.ok) {
       console.error("[Cashfree] Verify order failed:", data);
-      return res.status(response.status).json({ error: data?.message || "Unable to verify Cashfree order" });
+      return res.status(response.status >= 500 ? 503 : response.status).json({
+        error: response.status >= 500
+          ? "Cashfree gateway is temporarily unavailable. Please try again in a few minutes."
+          : data?.message || "Unable to verify Cashfree order",
+      });
     }
 
     const isPaid = data.order_status === "PAID";
