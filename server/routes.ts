@@ -23,13 +23,17 @@ function getRequestOrigin(req: Request): string {
 }
 
 function getCashfreeCredentials(cfg: Awaited<ReturnType<typeof storage.getPaymentGatewayConfig>>) {
-  const mode = cfg?.mode === "live" ? "live" : "test";
+  const mode = cfg?.mode === "live" || process.env.CASHFREE_MODE === "live" ? "live" : "test";
   return {
     mode,
     baseUrl: mode === "live" ? "https://api.cashfree.com/pg" : "https://sandbox.cashfree.com/pg",
-    apiVersion: cfg?.apiVersion || "2023-08-01",
-    clientId: mode === "live" ? cfg?.liveClientId : cfg?.testClientId,
-    clientSecret: mode === "live" ? cfg?.liveClientSecret : cfg?.testClientSecret,
+    apiVersion: cfg?.apiVersion || process.env.CASHFREE_API_VERSION || "2023-08-01",
+    clientId: mode === "live"
+      ? cfg?.liveClientId || process.env.CASHFREE_LIVE_CLIENT_ID
+      : cfg?.testClientId || process.env.CASHFREE_TEST_CLIENT_ID,
+    clientSecret: mode === "live"
+      ? cfg?.liveClientSecret || process.env.CASHFREE_LIVE_CLIENT_SECRET
+      : cfg?.testClientSecret || process.env.CASHFREE_TEST_CLIENT_SECRET,
   };
 }
 
@@ -1182,13 +1186,13 @@ export async function registerRoutes(
   // ── Admin: Payment Gateway Config ────────────────────────────────────────
   app.get("/api/admin/payment-gateway-config", requireAdminAuth, async (_req, res) => {
     const cfg = await storage.getPaymentGatewayConfig();
-    const mode = cfg?.mode === "live" ? "live" : "test";
-    const testReady = !!(cfg?.testClientId && cfg?.testClientSecret);
-    const liveReady = !!(cfg?.liveClientId && cfg?.liveClientSecret);
+    const mode = cfg?.mode === "live" || process.env.CASHFREE_MODE === "live" ? "live" : "test";
+    const testReady = !!((cfg?.testClientId || process.env.CASHFREE_TEST_CLIENT_ID) && (cfg?.testClientSecret || process.env.CASHFREE_TEST_CLIENT_SECRET));
+    const liveReady = !!((cfg?.liveClientId || process.env.CASHFREE_LIVE_CLIENT_ID) && (cfg?.liveClientSecret || process.env.CASHFREE_LIVE_CLIENT_SECRET));
     res.json({
       provider: cfg?.provider || "cashfree",
       mode,
-      apiVersion: cfg?.apiVersion || "2023-08-01",
+      apiVersion: cfg?.apiVersion || process.env.CASHFREE_API_VERSION || "2023-08-01",
       testClientId: cfg?.testClientId ? maskKey(cfg.testClientId) : "",
       testClientSecret: cfg?.testClientSecret ? maskKey(cfg.testClientSecret) : "",
       liveClientId: cfg?.liveClientId ? maskKey(cfg.liveClientId) : "",
@@ -1200,6 +1204,8 @@ export async function registerRoutes(
       hasTestCredentials: testReady,
       hasLiveCredentials: liveReady,
       hasWebhookSecret: !!cfg?.webhookSecret,
+      usingEnvTestCredentials: !cfg?.testClientId && !!process.env.CASHFREE_TEST_CLIENT_ID,
+      usingEnvLiveCredentials: !cfg?.liveClientId && !!process.env.CASHFREE_LIVE_CLIENT_ID,
       activeReady: mode === "live" ? liveReady : testReady,
     });
   });
