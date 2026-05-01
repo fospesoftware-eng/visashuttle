@@ -3,8 +3,6 @@ import { CheckCircle, Sparkles, Crown, ArrowRight, Info, Tag } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Logo } from "@/components/logo";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
 
 const plans = [
@@ -67,31 +65,6 @@ export default function PricingPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Logo size="md" />
-          <nav className="hidden md:flex items-center gap-6">
-            <Link href="/#how-it-works" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">How It Works</Link>
-            <Link href="/visa-check" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Visa Check</Link>
-            <Link href="/pricing" className="text-sm font-medium text-foreground transition-colors">Pricing</Link>
-            <Link href="/business" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">For Business</Link>
-          </nav>
-          <div className="flex items-center gap-3">
-            <ThemeToggle />
-            {user ? (
-              <Link href="/account">
-                <Button size="sm" data-testid="button-account">My Account</Button>
-              </Link>
-            ) : (
-              <>
-                <Link href="/sign-in"><Button variant="ghost" size="sm">Sign In</Button></Link>
-                <Link href="/join"><Button size="sm">Get Started</Button></Link>
-              </>
-            )}
-          </div>
-        </div>
-      </header>
-
       <section className="py-16 md:py-24 px-4">
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-14">
@@ -212,15 +185,6 @@ export default function PricingPage() {
         </div>
       </section>
 
-      <footer className="py-8 border-t px-4">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <Logo size="sm" />
-          <p className="text-sm text-muted-foreground text-center">
-            Visa Shuttle provides AI-based estimation only and does not guarantee visa approval.
-          </p>
-          <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} Visa Shuttle</p>
-        </div>
-      </footer>
     </div>
   );
 }

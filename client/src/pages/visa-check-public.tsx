@@ -18,8 +18,6 @@ import {
 import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Logo } from "@/components/logo";
-import { ThemeToggle } from "@/components/theme-toggle";
 import {
   ALL_DESTINATIONS, VALID_VISAS, VISA_GROUPS,
   findDestination, findBestConditionalRule, getEntryConfig, normalizeStatus,
@@ -87,28 +85,6 @@ export default function VisaCheckPublicPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Logo size="md" />
-          <nav className="hidden md:flex items-center gap-6">
-            <Link href="/#how-it-works" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">How It Works</Link>
-            <Link href="/visa-check" className="text-sm font-medium text-foreground transition-colors">Visa Check</Link>
-            <Link href="/pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Pricing</Link>
-            <Link href="/business" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">For Business</Link>
-          </nav>
-          <div className="flex items-center gap-3">
-            <ThemeToggle />
-            <Link href="/sign-in"><Button variant="ghost" size="sm" data-testid="button-signin">Sign In</Button></Link>
-            <Link href="/join">
-              <Button size="sm" className="border-0 text-white hover:opacity-90" style={{ background: "linear-gradient(135deg,#4055FF,#FF2060)" }} data-testid="button-join">
-                Start Basic Check ₹0
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </header>
-
       {/* Hero */}
       <section className="relative overflow-hidden pt-12 pb-6 md:pt-16 md:pb-8">
         <div className="absolute inset-0 bg-gradient-to-br from-[#4055FF]/5 via-background to-[#FF2060]/5" />

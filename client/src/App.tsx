@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/lib/theme";
 import { PasswordGate } from "@/components/password-gate";
 import { CookieBanner } from "@/components/cookie-banner";
+import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 
 import NotFound from "@/pages/not-found";
@@ -146,6 +147,32 @@ function Router() {
   );
 }
 
+const PRODUCT_SHELL_PREFIXES = [
+  "/account",
+  "/check",
+  "/deep-check",
+  "/history",
+  "/saved-profile",
+  "/settings",
+  "/app",
+  "/customer",
+  "/admin",
+  "/w/",
+];
+
+function SiteChrome() {
+  const [location] = useLocation();
+  const showSiteChrome = !PRODUCT_SHELL_PREFIXES.some((prefix) => location.startsWith(prefix));
+
+  return (
+    <>
+      {showSiteChrome && <SiteHeader />}
+      <Router />
+      {showSiteChrome && <SiteFooter />}
+    </>
+  );
+}
+
 function App() {
   return (
     <ThemeProvider>
@@ -154,8 +181,7 @@ function App() {
           <PasswordGate>
             <Toaster />
             <SubdomainRedirect />
-            <Router />
-            <SiteFooter />
+            <SiteChrome />
             <CookieBanner />
           </PasswordGate>
         </TooltipProvider>

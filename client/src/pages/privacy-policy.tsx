@@ -1,8 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
-import { ArrowLeft, Shield, Cookie, FileText } from "lucide-react";
-import { Logo } from "@/components/logo";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { Shield, Cookie, FileText } from "lucide-react";
 
 const LAST_UPDATED = "25 April 2025";
 const EMAIL = "legal@visashuttle.com";
@@ -12,20 +9,6 @@ export default function PrivacyPolicyPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-md">
-        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/">
-              <button className="text-muted-foreground hover:text-foreground transition-colors">
-                <ArrowLeft className="w-4 h-4" />
-              </button>
-            </Link>
-            <Logo size="sm" />
-          </div>
-          <ThemeToggle />
-        </div>
-      </header>
-
       <main className="max-w-4xl mx-auto px-4 py-10">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Legal</h1>

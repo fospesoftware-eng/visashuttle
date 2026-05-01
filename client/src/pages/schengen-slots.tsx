@@ -1,12 +1,9 @@
 import { useState, useEffect } from "react";
-import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { RefreshCw, ExternalLink, Search, MapPin, Globe, Calendar, Building2, ArrowLeft, Info } from "lucide-react";
+import { RefreshCw, ExternalLink, Search, MapPin, Globe, Calendar, Building2, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Logo } from "@/components/logo";
-import { ThemeToggle } from "@/components/theme-toggle";
 
 interface SchengenCountry {
   name: string;
@@ -104,22 +101,6 @@ export default function SchengenSlotsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Navbar */}
-      <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Link href="/">
-              <a className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors text-sm">
-                <ArrowLeft className="w-4 h-4" /> Back
-              </a>
-            </Link>
-            <span className="text-muted-foreground/40">|</span>
-            <Logo size="sm" />
-          </div>
-          <ThemeToggle />
-        </div>
-      </header>
-
       {/* Hero */}
       <div
         className="relative py-14 px-4 text-center overflow-hidden"

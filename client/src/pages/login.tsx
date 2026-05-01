@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Eye, EyeOff, ArrowLeft, Plane, Shield, Zap } from "lucide-react";
+import { Eye, EyeOff, Plane, Shield, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Logo } from "@/components/logo";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -84,16 +83,6 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex flex-col">
-      <header className="h-16 flex items-center justify-between px-6 border-b bg-background/80 backdrop-blur-sm">
-        <Link href="/">
-          <Button variant="ghost" size="sm" className="gap-2" data-testid="button-back">
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </Button>
-        </Link>
-        <ThemeToggle />
-      </header>
-
       <main className="flex-1 flex items-center justify-center p-4">
         <div className="w-full max-w-5xl grid lg:grid-cols-2 gap-8 items-center">
 

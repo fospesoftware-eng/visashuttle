@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { Eye, EyeOff, CheckCircle, Sparkles, Globe, Shield, Zap, Phone, ArrowLeft, RotateCcw, ChevronDown, Search, MapPin } from "lucide-react";
 import { ConsentCheckbox } from "@/components/consent-checkbox";
 import { Button } from "@/components/ui/button";
@@ -456,16 +456,6 @@ export default function JoinPage() {
 
       {/* Right panel */}
       <div className="flex-1 flex flex-col">
-        <header className="h-16 flex items-center justify-between px-6 border-b lg:border-none">
-          <div className="lg:hidden">
-            <Logo size="md" />
-          </div>
-          <div className="hidden lg:block" />
-          <Link href="/sign-in" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-            Already have an account? <span className="text-[#4055FF] font-medium">Sign in</span>
-          </Link>
-        </header>
-
         <main className="flex-1 flex items-center justify-center p-6">
           <div className="w-full max-w-md">
 

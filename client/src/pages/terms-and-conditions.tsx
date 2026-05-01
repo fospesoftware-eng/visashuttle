@@ -1,8 +1,5 @@
 import type { ReactNode } from "react";
-import { Link } from "wouter";
-import { ArrowLeft, FileText } from "lucide-react";
-import { Logo } from "@/components/logo";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { FileText } from "lucide-react";
 
 const SUPPORT_EMAIL = "support@visashuttle.com";
 
@@ -18,20 +15,6 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 export default function TermsAndConditionsPage() {
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur-md">
-        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/">
-              <button className="text-muted-foreground hover:text-foreground transition-colors" aria-label="Back to home">
-                <ArrowLeft className="w-4 h-4" />
-              </button>
-            </Link>
-            <Logo size="sm" />
-          </div>
-          <ThemeToggle />
-        </div>
-      </header>
-
       <main className="max-w-4xl mx-auto px-4 py-10 md:py-14">
         <div className="mb-10 rounded-2xl border bg-card p-6 md:p-8 shadow-sm">
           <div className="w-11 h-11 rounded-xl bg-[#4055FF]/10 text-[#4055FF] flex items-center justify-center mb-5">

@@ -55,16 +55,6 @@ export default function SignInPage() {
 
       {/* Right panel */}
       <div className="flex-1 flex flex-col">
-        <header className="h-16 flex items-center justify-between px-6 border-b lg:border-none">
-          <div className="lg:hidden">
-            <Logo size="md" />
-          </div>
-          <div className="hidden lg:block" />
-          <Link href="/join" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-            New here? <span className="text-[#4055FF] font-medium">Create free account</span>
-          </Link>
-        </header>
-
         <main className="flex-1 flex items-center justify-center p-6">
           <div className="w-full max-w-md">
             <div className="mb-8">
