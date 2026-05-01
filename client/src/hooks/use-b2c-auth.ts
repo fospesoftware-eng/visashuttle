@@ -20,6 +20,8 @@ export function useB2cAuth() {
   const { data, isLoading } = useQuery<{ user: B2cUser }>({
     queryKey: ["/api/b2c/auth/me"],
     retry: false,
+    staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: true,
   });
 
   const logoutMutation = useMutation({

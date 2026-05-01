@@ -754,7 +754,14 @@ export default function DeepCheckPage() {
         await queryClient.invalidateQueries({ queryKey: ["/api/b2c/profile"] });
       } catch (_) {}
     } catch (err: any) {
-      toast({ title: "Deep Check failed", description: err.message || "Please try again.", variant: "destructive" });
+      const msg: string = err.message || "";
+      if (msg.toLowerCase().includes("sign in") || msg.toLowerCase().includes("not authenticated") || msg.startsWith("401")) {
+        queryClient.setQueryData(["/api/b2c/auth/me"], null);
+        toast({ title: "Session expired", description: "Please sign in again to continue.", variant: "destructive" });
+        setLocation("/sign-in");
+      } else {
+        toast({ title: "Deep Check failed", description: msg || "Please try again.", variant: "destructive" });
+      }
     } finally {
       setIsSubmitting(false);
     }
