@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { CheckCircle2, CreditCard, Crown, Loader2, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, CheckCircle2, CreditCard, Crown, Loader2, ShieldCheck, Sparkles } from "lucide-react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +42,7 @@ export default function DeepCheckPaymentPage() {
   const { toast } = useToast();
   const [isStarting, setIsStarting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState("");
 
   const orderId = useMemo(() => new URLSearchParams(window.location.search).get("order_id"), []);
@@ -64,8 +66,8 @@ export default function DeepCheckPaymentPage() {
         if (cancelled) return;
         if (data.paid || data.deepCheckAccess) {
           await queryClient.invalidateQueries({ queryKey: ["/api/b2c/auth/me"] });
-          toast({ title: "Payment successful", description: "Deep Check is now unlocked." });
-          setLocation("/deep-check");
+          setIsSuccess(true);
+          toast({ title: "Deep Check activated", description: "Your Deep Check access is now ready." });
         } else {
           setError(`Payment status: ${data.status || "Pending"}. Please complete the payment to unlock Deep Check.`);
         }
@@ -105,6 +107,95 @@ export default function DeepCheckPaymentPage() {
   }
 
   if (authLoading || !user) return null;
+
+  if (isSuccess) {
+    return (
+      <DashboardLayout title="Deep Check Activated" subtitle="Your AI analysis access is ready">
+        <div className="max-w-4xl">
+          <motion.div
+            initial={{ opacity: 0, y: 18, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.45, ease: "easeOut" }}
+            className="relative overflow-hidden rounded-3xl border bg-white shadow-sm"
+          >
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(64,85,255,0.16),transparent_45%),radial-gradient(circle_at_90%_20%,rgba(255,32,96,0.10),transparent_35%)]" />
+            <div className="relative p-8 md:p-12 text-center">
+              <div className="relative mx-auto mb-7 w-28 h-28">
+                {[0, 1, 2].map((i) => (
+                  <motion.span
+                    key={i}
+                    className="absolute inset-0 rounded-full border border-emerald-400/30"
+                    initial={{ scale: 0.35, opacity: 0.75 }}
+                    animate={{ scale: 1.6 + i * 0.22, opacity: 0 }}
+                    transition={{ duration: 1.8, repeat: Infinity, delay: i * 0.28, ease: "easeOut" }}
+                  />
+                ))}
+                <motion.div
+                  initial={{ scale: 0.65, rotate: -10 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ type: "spring", stiffness: 180, damping: 12 }}
+                  className="absolute inset-0 rounded-full bg-gradient-to-br from-emerald-500 to-[#4055FF] flex items-center justify-center shadow-xl shadow-emerald-500/20"
+                >
+                  <CheckCircle2 className="w-14 h-14 text-white" />
+                </motion.div>
+                {[...Array(10)].map((_, i) => (
+                  <motion.span
+                    key={i}
+                    className="absolute left-1/2 top-1/2 w-1.5 h-1.5 rounded-full"
+                    style={{
+                      background: i % 2 === 0 ? "#4055FF" : "#FF2060",
+                    }}
+                    initial={{ x: 0, y: 0, opacity: 0, scale: 0.5 }}
+                    animate={{
+                      x: Math.cos((i / 10) * Math.PI * 2) * 88,
+                      y: Math.sin((i / 10) * Math.PI * 2) * 68,
+                      opacity: [0, 1, 0],
+                      scale: [0.5, 1, 0.6],
+                    }}
+                    transition={{ duration: 1.4, delay: 0.2 + i * 0.04, ease: "easeOut" }}
+                  />
+                ))}
+              </div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2, duration: 0.35 }}
+              >
+                <Badge className="mb-4 bg-emerald-100 text-emerald-700 border-0">Payment Successful</Badge>
+                <h1 className="text-3xl md:text-5xl font-black tracking-tight text-slate-950 mb-4">
+                  Congratulations!
+                </h1>
+                <p className="text-lg md:text-xl text-slate-600 max-w-2xl mx-auto leading-relaxed">
+                  You have successfully activated Deep Check. Your embassy-style AI visa analysis is ready to explore.
+                </p>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.38, duration: 0.35 }}
+                className="mt-8 flex flex-col sm:flex-row gap-3 justify-center"
+              >
+                <Button
+                  size="lg"
+                  onClick={() => setLocation("/deep-check")}
+                  className="gap-2 border-0 text-white bg-gradient-to-r from-[#4055FF] to-[#FF2060] hover:opacity-90"
+                  data-testid="button-explore-deep-check"
+                >
+                  Explore Deep Check
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+                <Button size="lg" variant="outline" onClick={() => setLocation("/account")}>
+                  Back to Dashboard
+                </Button>
+              </motion.div>
+            </div>
+          </motion.div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout title="Deep Check Payment" subtitle="Unlock embassy-style AI visa analysis">
