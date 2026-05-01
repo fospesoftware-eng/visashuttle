@@ -24,17 +24,33 @@ function getRequestOrigin(req: Request): string {
 
 function getCashfreeCredentials(cfg: Awaited<ReturnType<typeof storage.getPaymentGatewayConfig>>) {
   const mode = cfg?.mode === "live" || process.env.CASHFREE_MODE === "live" ? "live" : "test";
+  const clientId = mode === "live"
+    ? cfg?.liveClientId || process.env.CASHFREE_LIVE_CLIENT_ID
+    : cfg?.testClientId || process.env.CASHFREE_TEST_CLIENT_ID;
+  const clientSecret = mode === "live"
+    ? cfg?.liveClientSecret || process.env.CASHFREE_LIVE_CLIENT_SECRET
+    : cfg?.testClientSecret || process.env.CASHFREE_TEST_CLIENT_SECRET;
   return {
     mode,
     baseUrl: mode === "live" ? "https://api.cashfree.com/pg" : "https://sandbox.cashfree.com/pg",
-    apiVersion: cfg?.apiVersion || process.env.CASHFREE_API_VERSION || "2023-08-01",
-    clientId: mode === "live"
-      ? cfg?.liveClientId || process.env.CASHFREE_LIVE_CLIENT_ID
-      : cfg?.testClientId || process.env.CASHFREE_TEST_CLIENT_ID,
-    clientSecret: mode === "live"
-      ? cfg?.liveClientSecret || process.env.CASHFREE_LIVE_CLIENT_SECRET
-      : cfg?.testClientSecret || process.env.CASHFREE_TEST_CLIENT_SECRET,
+    apiVersion: (cfg?.apiVersion || process.env.CASHFREE_API_VERSION || "2023-08-01").trim(),
+    clientId: clientId?.trim(),
+    clientSecret: clientSecret?.trim(),
   };
+}
+
+function validateCashfreeMode(mode: "live" | "test", clientId?: string, clientSecret?: string): string | null {
+  const id = clientId || "";
+  const secret = clientSecret || "";
+  const hasTestMarker = id.toUpperCase().startsWith("TEST") || secret.includes("_test_");
+  const hasLiveMarker = id.toUpperCase().startsWith("PROD") || secret.includes("_prod_") || secret.includes("_live_");
+  if (mode === "live" && hasTestMarker) {
+    return "Cashfree is set to Live mode, but the configured credentials are Test credentials. Switch SaaS Admin > Integrations > Cashfree mode to Test.";
+  }
+  if (mode === "test" && hasLiveMarker) {
+    return "Cashfree is set to Test mode, but the configured credentials look like Live credentials. Switch mode to Live or use Test credentials.";
+  }
+  return null;
 }
 
 function getCashfreePhone(phone?: string | null): string {
@@ -1352,6 +1368,10 @@ export async function registerRoutes(
         error: `Cashfree ${cashfree.mode} credentials are not configured. Please add them in SaaS Admin > Integrations.`,
       });
     }
+    const modeError = validateCashfreeMode(cashfree.mode, cashfree.clientId, cashfree.clientSecret);
+    if (modeError) {
+      return res.status(400).json({ error: modeError });
+    }
 
     const orderId = `VS_DEEP_${Date.now()}_${randomUUID().slice(0, 8)}`;
     const requestId = randomUUID();
@@ -1406,11 +1426,14 @@ export async function registerRoutes(
         response: data,
       });
       const message = data?.message || data?.error || data?.type || "Unable to create Cashfree order";
+      const isAuthError = response.status === 401 || /auth|credential|client/i.test(String(message));
       const status = response.status >= 500 ? 503 : response.status;
       return res.status(status).json({
         error: response.status >= 500
           ? "Cashfree gateway is temporarily unavailable. Please try again in a few minutes."
-          : message,
+          : isAuthError
+            ? `Cashfree authentication failed in ${cashfree.mode.toUpperCase()} mode. Please verify the App ID and Secret Key in SaaS Admin > Integrations, and make sure Test credentials are used only with Test mode.`
+            : message,
       });
     }
 
