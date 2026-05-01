@@ -25,6 +25,10 @@ import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
 import { db, hasDatabase } from "./db";
 
+function isMissingRelationError(error: unknown): boolean {
+  return Boolean(error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "42P01");
+}
+
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
@@ -134,6 +138,9 @@ export class MemStorage implements IStorage {
   private b2cUsersMap: Map<string, B2cUser>;
   private visaChecksMap: Map<string, VisaCheck>;
   private savedProfilesMap: Map<string, SavedProfile>;
+  private smsConfigRecord?: SmsConfig;
+  private platformAiConfigRecord?: PlatformAiConfig;
+  private paymentGatewayConfigRecord?: PaymentGatewayConfig;
 
   constructor() {
     this.users = new Map();
@@ -881,17 +888,49 @@ export class MemStorage implements IStorage {
     return newProfile;
   }
 
-  async getSmsConfig(): Promise<SmsConfig | undefined> { return undefined; }
+  async getSmsConfig(): Promise<SmsConfig | undefined> { return this.smsConfigRecord; }
   async upsertSmsConfig(data: Partial<InsertSmsConfig>): Promise<SmsConfig> {
-    throw new Error("SMS config only available in HybridStorage");
+    const existing = this.smsConfigRecord;
+    this.smsConfigRecord = {
+      id: existing?.id ?? 1,
+      provider: data.provider !== undefined ? data.provider : existing?.provider ?? "msg91",
+      msg91AuthKey: data.msg91AuthKey !== undefined ? data.msg91AuthKey : existing?.msg91AuthKey ?? null,
+      msg91TemplateId: data.msg91TemplateId !== undefined ? data.msg91TemplateId : existing?.msg91TemplateId ?? null,
+      msg91SenderId: data.msg91SenderId !== undefined ? data.msg91SenderId : existing?.msg91SenderId ?? null,
+      zauvApiKey: data.zauvApiKey !== undefined ? data.zauvApiKey : existing?.zauvApiKey ?? null,
+      mcCustomerId: data.mcCustomerId !== undefined ? data.mcCustomerId : existing?.mcCustomerId ?? null,
+      mcAuthToken: data.mcAuthToken !== undefined ? data.mcAuthToken : existing?.mcAuthToken ?? null,
+      updatedAt: new Date(),
+    };
+    return this.smsConfigRecord;
   }
-  async getPlatformAiConfig(): Promise<PlatformAiConfig | undefined> { return undefined; }
+  async getPlatformAiConfig(): Promise<PlatformAiConfig | undefined> { return this.platformAiConfigRecord; }
   async upsertPlatformAiConfig(data: Partial<InsertPlatformAiConfig>): Promise<PlatformAiConfig> {
-    throw new Error("Platform AI config only available in HybridStorage");
+    const existing = this.platformAiConfigRecord;
+    this.platformAiConfigRecord = {
+      id: existing?.id ?? 1,
+      anthropicApiKey: data.anthropicApiKey !== undefined ? data.anthropicApiKey : existing?.anthropicApiKey ?? null,
+      anthropicModel: data.anthropicModel !== undefined ? data.anthropicModel : existing?.anthropicModel ?? "claude-opus-4-5",
+      updatedAt: new Date(),
+    };
+    return this.platformAiConfigRecord;
   }
-  async getPaymentGatewayConfig(): Promise<PaymentGatewayConfig | undefined> { return undefined; }
+  async getPaymentGatewayConfig(): Promise<PaymentGatewayConfig | undefined> { return this.paymentGatewayConfigRecord; }
   async upsertPaymentGatewayConfig(data: Partial<InsertPaymentGatewayConfig>): Promise<PaymentGatewayConfig> {
-    throw new Error("Payment gateway config only available in HybridStorage");
+    const existing = this.paymentGatewayConfigRecord;
+    this.paymentGatewayConfigRecord = {
+      id: existing?.id ?? 1,
+      provider: data.provider !== undefined ? data.provider : existing?.provider ?? "cashfree",
+      mode: data.mode !== undefined ? data.mode : existing?.mode ?? "test",
+      apiVersion: data.apiVersion !== undefined ? data.apiVersion : existing?.apiVersion ?? "2023-08-01",
+      testClientId: data.testClientId !== undefined ? data.testClientId : existing?.testClientId ?? null,
+      testClientSecret: data.testClientSecret !== undefined ? data.testClientSecret : existing?.testClientSecret ?? null,
+      liveClientId: data.liveClientId !== undefined ? data.liveClientId : existing?.liveClientId ?? null,
+      liveClientSecret: data.liveClientSecret !== undefined ? data.liveClientSecret : existing?.liveClientSecret ?? null,
+      webhookSecret: data.webhookSecret !== undefined ? data.webhookSecret : existing?.webhookSecret ?? null,
+      updatedAt: new Date(),
+    };
+    return this.paymentGatewayConfigRecord;
   }
 }
 
@@ -1024,67 +1063,115 @@ class HybridStorage extends MemStorage {
 
   // SMS Config — single-row config stored in DB
   async getSmsConfig(): Promise<SmsConfig | undefined> {
-    const rows = await db.select().from(smsConfigTable).limit(1);
-    return rows[0];
+    try {
+      const rows = await db.select().from(smsConfigTable).limit(1);
+      return rows[0];
+    } catch (error) {
+      if (isMissingRelationError(error)) {
+        console.warn("[DB] sms_config table is missing. Using in-memory SMS config fallback.");
+        return super.getSmsConfig();
+      }
+      throw error;
+    }
   }
 
   async upsertSmsConfig(data: Partial<InsertSmsConfig>): Promise<SmsConfig> {
-    const existing = await this.getSmsConfig();
-    if (existing) {
-      const rows = await db.update(smsConfigTable)
-        .set({ ...data, updatedAt: new Date() })
-        .returning();
+    try {
+      const existing = await this.getSmsConfig();
+      if (existing) {
+        const rows = await db.update(smsConfigTable)
+          .set({ ...data, updatedAt: new Date() })
+          .returning();
+        return rows[0];
+      }
+      const rows = await db.insert(smsConfigTable).values({
+        provider: "msg91",
+        ...data,
+      }).returning();
       return rows[0];
+    } catch (error) {
+      if (isMissingRelationError(error)) {
+        console.warn("[DB] sms_config table is missing. Saving SMS config in memory only.");
+        return super.upsertSmsConfig(data);
+      }
+      throw error;
     }
-    const rows = await db.insert(smsConfigTable).values({
-      provider: "msg91",
-      ...data,
-    }).returning();
-    return rows[0];
   }
 
   // Platform AI Config — single-row config stored in DB
   async getPlatformAiConfig(): Promise<PlatformAiConfig | undefined> {
-    const rows = await db.select().from(platformAiConfigTable).limit(1);
-    return rows[0];
+    try {
+      const rows = await db.select().from(platformAiConfigTable).limit(1);
+      return rows[0];
+    } catch (error) {
+      if (isMissingRelationError(error)) {
+        console.warn("[DB] platform_ai_config table is missing. Using in-memory AI config fallback.");
+        return super.getPlatformAiConfig();
+      }
+      throw error;
+    }
   }
 
   async upsertPlatformAiConfig(data: Partial<InsertPlatformAiConfig>): Promise<PlatformAiConfig> {
-    const existing = await this.getPlatformAiConfig();
-    if (existing) {
-      const rows = await db.update(platformAiConfigTable)
-        .set({ ...data, updatedAt: new Date() })
-        .returning();
+    try {
+      const existing = await this.getPlatformAiConfig();
+      if (existing) {
+        const rows = await db.update(platformAiConfigTable)
+          .set({ ...data, updatedAt: new Date() })
+          .returning();
+        return rows[0];
+      }
+      const rows = await db.insert(platformAiConfigTable).values({
+        anthropicModel: "claude-opus-4-5",
+        ...data,
+      }).returning();
       return rows[0];
+    } catch (error) {
+      if (isMissingRelationError(error)) {
+        console.warn("[DB] platform_ai_config table is missing. Saving AI config in memory only.");
+        return super.upsertPlatformAiConfig(data);
+      }
+      throw error;
     }
-    const rows = await db.insert(platformAiConfigTable).values({
-      anthropicModel: "claude-opus-4-5",
-      ...data,
-    }).returning();
-    return rows[0];
   }
 
   // Payment Gateway Config — single-row config stored in DB
   async getPaymentGatewayConfig(): Promise<PaymentGatewayConfig | undefined> {
-    const rows = await db.select().from(paymentGatewayConfigTable).limit(1);
-    return rows[0];
+    try {
+      const rows = await db.select().from(paymentGatewayConfigTable).limit(1);
+      return rows[0];
+    } catch (error) {
+      if (isMissingRelationError(error)) {
+        console.warn("[DB] payment_gateway_config table is missing. Using in-memory payment config fallback.");
+        return super.getPaymentGatewayConfig();
+      }
+      throw error;
+    }
   }
 
   async upsertPaymentGatewayConfig(data: Partial<InsertPaymentGatewayConfig>): Promise<PaymentGatewayConfig> {
-    const existing = await this.getPaymentGatewayConfig();
-    if (existing) {
-      const rows = await db.update(paymentGatewayConfigTable)
-        .set({ ...data, updatedAt: new Date() })
-        .returning();
+    try {
+      const existing = await this.getPaymentGatewayConfig();
+      if (existing) {
+        const rows = await db.update(paymentGatewayConfigTable)
+          .set({ ...data, updatedAt: new Date() })
+          .returning();
+        return rows[0];
+      }
+      const rows = await db.insert(paymentGatewayConfigTable).values({
+        provider: "cashfree",
+        mode: "test",
+        apiVersion: "2023-08-01",
+        ...data,
+      }).returning();
       return rows[0];
+    } catch (error) {
+      if (isMissingRelationError(error)) {
+        console.warn("[DB] payment_gateway_config table is missing. Saving payment config in memory only.");
+        return super.upsertPaymentGatewayConfig(data);
+      }
+      throw error;
     }
-    const rows = await db.insert(paymentGatewayConfigTable).values({
-      provider: "cashfree",
-      mode: "test",
-      apiVersion: "2023-08-01",
-      ...data,
-    }).returning();
-    return rows[0];
   }
 }
 
