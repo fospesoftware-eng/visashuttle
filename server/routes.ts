@@ -1097,7 +1097,7 @@ export async function registerRoutes(
     }
     if (DEMO_B2C_OTP) {
       req.session.mcVerificationId = undefined;
-      return res.json({ success: true, message: `Demo OTP is ${DEMO_B2C_OTP}` });
+      return res.json({ success: true, message: `Demo OTP is ${DEMO_B2C_OTP}. No SMS was sent.` });
     }
 
     const dbConfig = await storage.getSmsConfig();
@@ -1119,7 +1119,10 @@ export async function registerRoutes(
       return res.status(400).json({ error: "Phone number and OTP code are required" });
     }
     const enteredOtp = String(otp).replace(/\D/g, "");
-    if (enteredOtp === DEMO_B2C_OTP) {
+    if (DEMO_B2C_OTP) {
+      if (enteredOtp !== DEMO_B2C_OTP) {
+        return res.status(400).json({ error: `For demo signup, use OTP ${DEMO_B2C_OTP}` });
+      }
       req.session.otpVerifiedPhone = phone;
       req.session.mcVerificationId = undefined;
       return res.json({ success: true });

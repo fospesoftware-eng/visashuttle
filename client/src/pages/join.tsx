@@ -339,7 +339,7 @@ export default function JoinPage() {
       await apiRequest("POST", "/api/b2c/otp/send", { phone, email: form.email });
       setStep("otp");
       startResendCountdown();
-      toast({ title: "Code sent!", description: `A 4-digit code was sent to ${phone}` });
+      toast({ title: "Demo code ready", description: "Use 1234 to verify. No SMS was sent." });
       setTimeout(() => otpRefs.current[0]?.focus(), 200);
     } catch (err: any) {
       toast({ title: "Failed to send code", description: err.message || "Please try again", variant: "destructive" });
@@ -357,7 +357,7 @@ export default function JoinPage() {
       setOtp(["", "", "", ""]);
       startResendCountdown();
       otpRefs.current[0]?.focus();
-      toast({ title: "Code resent", description: "A new code was sent to your phone" });
+      toast({ title: "Demo code ready", description: "Use 1234 to verify. No SMS was sent." });
     } catch (err: any) {
       toast({ title: "Failed to resend", description: err.message || "Please try again", variant: "destructive" });
     } finally {
@@ -612,7 +612,7 @@ export default function JoinPage() {
                   </div>
                   <h2 className="text-2xl font-bold mb-1">Verify your phone</h2>
                   <p className="text-muted-foreground">
-                    We sent a 4-digit code to{" "}
+                    Use the demo verification code for{" "}
                     <span className="font-medium text-foreground">{getFullPhone()}</span>
                   </p>
                   <p className="mt-2 inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
@@ -665,7 +665,7 @@ export default function JoinPage() {
                   </Button>
 
                   <div className="text-center">
-                    <p className="text-sm text-muted-foreground mb-1">Didn't receive the code?</p>
+                    <p className="text-sm text-muted-foreground mb-1">No SMS is sent in demo mode.</p>
                     {resendCountdown > 0 ? (
                       <p className="text-sm text-muted-foreground">
                         Resend in <span className="font-medium text-foreground tabular-nums">{resendCountdown}s</span>
