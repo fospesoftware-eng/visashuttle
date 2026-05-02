@@ -6,7 +6,7 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, LogOut, Bell, Search,
   Menu, X, Building2, ShieldCheck, Database, Activity, Globe,
   CheckCircle, AlertCircle, Inbox, Receipt, Banknote, ClipboardList,
-  Send
+  Send, Stamp, Loader2, XCircle
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -57,6 +57,17 @@ const agencyNavItems: NavItem[] = [
     children: [
       { icon: ClipboardList, label: "Processing", href: "/app/cases/processing" },
       { icon: CheckCircle, label: "Completed", href: "/app/cases/completed" },
+    ],
+  },
+  {
+    // Post-submission visa workflow — once an application is lodged with
+    // the embassy / VFS / eVisa portal it surfaces here with a granular
+    // sub-status (waiting docs, biometric pending, passport received, etc).
+    icon: Stamp, label: "Visa", href: "/app/visa/processing",
+    children: [
+      { icon: Loader2,     label: "Processing", href: "/app/visa/processing" },
+      { icon: CheckCircle, label: "Approved",   href: "/app/visa/approved" },
+      { icon: XCircle,     label: "Rejected",   href: "/app/visa/rejected" },
     ],
   },
   { icon: FileText, label: "Documents", href: "/app/documents" },

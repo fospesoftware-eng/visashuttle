@@ -16,6 +16,32 @@ The application uses a monorepo structure with a React frontend and Express back
 
 Preferred communication style: Simple, everyday language.
 
+## Visa Workflow Module (May 2026)
+
+Once an application is submitted to the destination authority, it leaves the
+Applications pipeline and lives inside the **Visa** module under three pages:
+**Processing**, **Approved**, **Rejected**. This separates "we're still
+gathering documents" from "the embassy has the file" so the team has a clear
+post-submission tracker.
+
+- **Schema** (`shared/schema.ts`, cases table):
+  - `submissionMethod` — `evisa | embassy | vfs | null`. Picked on the wizard's last step.
+  - `visaStage` — `not_started | processing | approved | rejected` (default `not_started`).
+  - `visaProcessingStatus` — granular sub-status for the Processing page (10 values: submitted_evisa, submitted_embassy, vfs_appointment_pending/completed, biometric_pending/completed, waiting_documents, application_delayed, passport_sent_collection, passport_received).
+  - `visaStatusComment` — free-form note (required when status is `waiting_documents` or `application_delayed`).
+  - `visaStatusUpdatedAt` — bumped automatically on every status change.
+  - Constants exported as `SUBMISSION_METHODS`, `VISA_STAGES`, `VISA_PROCESSING_STATUSES`.
+- **Storage**: `IStorage.getCasesByTenantAndVisaStage(tenantId, stage)` returns cases at a given stage, sorted by `visaStatusUpdatedAt` desc.
+- **Backend routes** (`server/routes.ts`):
+  - `GET /api/cases/:id/pdf` — pdfkit-rendered A4 case summary (header w/ ref ID, applicant block, destination/visa, submission method, status, document checklist, notes). Mirrors the invoice PDF pattern.
+  - `POST /api/cases/:id/email` — sends the PDF via Resend if `RESEND_API_KEY` is set, otherwise returns `{ fallback: { mailto } }` so the client can open the user's mail app.
+  - `PATCH /api/cases/:id/visa-status` — accepts `{ visaStage?, visaProcessingStatus?, visaStatusComment? }`, auto-stamps `visaStatusUpdatedAt`, and mirrors `visaStage` to the main `status` field for `approved`/`rejected`.
+  - `GET /api/tenants/:tenantId/visa-cases?stage=processing|approved|rejected` — list endpoint for the Visa pages.
+- **Wizard** (`client/src/pages/agency/case-new.tsx`): Step 7 (Review) ends with a "How are you submitting this application?" picker (eVisa / Embassy / VFS). On submit, the case is created with `visaStage = "processing"` and an initial `visaProcessingStatus` derived from the method (eVisa → `submitted_evisa`, Embassy → `submitted_embassy`, VFS → `vfs_appointment_pending`). The user is redirected to `/app/cases/:id?submitted=1`.
+- **Case detail header** (`client/src/pages/agency/case-detail.tsx`): now shows **Download PDF** + **Email Applicant** buttons. The success banner appears on first load after submission with a deep link to Visa → Processing.
+- **Visa pages** (`client/src/pages/agency/visa.tsx`): one component shared by all three routes via a `stage` prop. Processing has Update Status / Approve / Reject actions. Approved + Rejected have a "Move back to Processing" action. Status-update dialog enforces a comment for `waiting_documents` and `application_delayed`.
+- **Sidebar nav** (`client/src/components/layouts/dashboard-layout.tsx`): "Visa" group with Stamp icon, between Applications and Documents, with Processing / Approved / Rejected children.
+
 ## Team Member Assignment & Permissions (May 2026)
 
 Every lead and case in the agency dashboard is owned by exactly one team member. The owner is shown on the lead card and case header, and only an agency owner / manager can re-assign work.

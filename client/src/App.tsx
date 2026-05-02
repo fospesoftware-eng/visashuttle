@@ -34,6 +34,7 @@ import LeadsPage from "@/pages/agency/leads";
 import ProposalsPage from "@/pages/agency/proposals";
 import ProposalApplyPage from "@/pages/proposal-apply";
 import CasesPage from "@/pages/agency/cases";
+import VisaStagePage from "@/pages/agency/visa";
 import NewCasePage from "@/pages/agency/case-new";
 import CaseDetailPage from "@/pages/agency/case-detail";
 import DocumentsPage from "@/pages/agency/documents";
@@ -138,6 +139,18 @@ function Router() {
         <CasesPage defaultStatusFilter="pending-completed" pageTitle="Pending & Completed" />
       </Route>
       <Route path="/app/cases/:id" component={CaseDetailPage} />
+
+      {/* Visa workflow module — post-submission tracking of cases by stage. */}
+      <Route path="/app/visa/processing">
+        <VisaStagePage stage="processing" />
+      </Route>
+      <Route path="/app/visa/approved">
+        <VisaStagePage stage="approved" />
+      </Route>
+      <Route path="/app/visa/rejected">
+        <VisaStagePage stage="rejected" />
+      </Route>
+
       <Route path="/app/documents" component={DocumentsPage} />
       <Route path="/app/accounting">
         <AccountingPage view="invoices" />

@@ -9,6 +9,7 @@ import indiaVisaChanceDataset from "@shared/india_visa_chance_dataset_non_visa_f
 import bcrypt from "bcryptjs";
 import { randomUUID, randomBytes } from "crypto";
 import type { Proposal } from "@shared/schema";
+import { VISA_STAGES, VISA_PROCESSING_STATUSES, SUBMISSION_METHODS } from "@shared/schema";
 import { VISA_TYPES } from "@shared/destinations";
 import { z } from "zod";
 import ExcelJS from "exceljs";
@@ -2144,6 +2145,18 @@ export async function registerRoutes(
     if (body?.priority !== undefined && body.priority !== null && !ALLOWED_CASE_PRIORITIES.has(body.priority)) {
       return `Invalid priority: must be one of ${Array.from(ALLOWED_CASE_PRIORITIES).join(", ")}`;
     }
+    if (body?.submissionMethod !== undefined && body.submissionMethod !== null) {
+      const ok = SUBMISSION_METHODS.some((m) => m.value === body.submissionMethod);
+      if (!ok) return `Invalid submissionMethod: must be one of ${SUBMISSION_METHODS.map((m) => m.value).join(", ")}`;
+    }
+    if (body?.visaStage !== undefined && body.visaStage !== null) {
+      const ok = VISA_STAGES.some((s) => s.value === body.visaStage);
+      if (!ok) return `Invalid visaStage: must be one of ${VISA_STAGES.map((s) => s.value).join(", ")}`;
+    }
+    if (body?.visaProcessingStatus !== undefined && body.visaProcessingStatus !== null) {
+      const ok = VISA_PROCESSING_STATUSES.some((s) => s.value === body.visaProcessingStatus);
+      if (!ok) return `Invalid visaProcessingStatus: must be one of ${VISA_PROCESSING_STATUSES.map((s) => s.value).join(", ")}`;
+    }
     return null;
   }
   function validateCoTraveller(body: any): string | null {
@@ -2301,6 +2314,273 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Case not found" });
     }
     res.json(caseData);
+  });
+
+  // ==========================================================================
+  // Case PDF + email + visa-stage update (Visa workflow module)
+  // ==========================================================================
+  // PDF mirrors the invoice pattern: pdfkit, accent strip, header w/ logo,
+  // applicant + passport block, destination/visa, current submission method
+  // and visa stage, fees if present, and document checklist if uploaded.
+  async function renderCasePdf(
+    c: any,
+    coTravellers: any[],
+    documents: any[],
+    settings: any,
+    out: NodeJS.WritableStream,
+  ): Promise<void> {
+    const PDFDocumentMod: any = await import("pdfkit");
+    const PDFDocument = PDFDocumentMod.default ?? PDFDocumentMod;
+    const doc = new PDFDocument({ size: "A4", margin: 48 });
+    doc.pipe(out);
+
+    const accent = settings?.invoiceAccentColor || "#1f2937";
+    const fmtDate = (d: Date | string | null | undefined) =>
+      d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+    const labelFor = <T extends { value: string; label: string }>(arr: readonly T[], v: string | null | undefined) =>
+      arr.find((x) => x.value === v)?.label ?? "—";
+
+    doc.rect(0, 0, doc.page.width, 6).fill(accent);
+
+    let logoHeight = 0;
+    const logoBuf = await fetchSafeImage(settings?.logoUrl);
+    if (logoBuf) {
+      try { doc.image(logoBuf, 48, 24, { fit: [120, 60] }); logoHeight = 60; } catch { /* skip */ }
+    }
+    const headerTop = Math.max(28 + logoHeight, 32);
+    doc.fillColor("#111827").fontSize(22).text("VISA APPLICATION", 48, headerTop, { align: "right" });
+    doc.fontSize(11).fillColor("#6b7280").text(c.caseNumber, { align: "right" });
+    doc.fontSize(9).fillColor("#9ca3af").text(`Ref: ${c.referenceId}`, { align: "right" });
+    doc.text(`Created: ${fmtDate(c.createdAt)}`, { align: "right" });
+
+    doc.moveDown(2);
+    const fromY = doc.y;
+
+    doc.fontSize(9).fillColor("#9ca3af").text("AGENCY", 48, fromY);
+    doc.fillColor("#111827").fontSize(11).text(settings?.companyName ?? "Your agency", 48);
+    doc.fontSize(9).fillColor("#374151");
+    if (settings?.companyEmail) doc.text(settings.companyEmail);
+    if (settings?.companyPhone) doc.text(settings.companyPhone);
+
+    doc.fontSize(9).fillColor("#9ca3af").text("APPLICANT", 320, fromY);
+    doc.fillColor("#111827").fontSize(11).text(c.applicantName ?? "—", 320);
+    doc.fontSize(9).fillColor("#374151");
+    if (c.applicantDob) doc.text(`DOB: ${c.applicantDob}`, 320, doc.y);
+    if (c.passportNumber) doc.text(`Passport: ${c.passportNumber}`, 320, doc.y);
+    if (c.passportNationality) doc.text(`Nationality: ${c.passportNationality}`, 320, doc.y);
+
+    doc.moveDown(2);
+    doc.y = Math.max(doc.y, fromY + 100);
+
+    // Application section
+    doc.fontSize(9).fillColor("#9ca3af").text("APPLICATION", 48);
+    doc.moveDown(0.3);
+    const appRows: Array<[string, string]> = [
+      ["Destination", c.destinationCountry ?? "—"],
+      ["Visa Type", c.visaType ?? "—"],
+      ["Travel Date", fmtDate(c.travelDate)],
+      ["Status", String(c.status ?? "—").toUpperCase()],
+      ["Priority", String(c.priority ?? "normal").toUpperCase()],
+      ["Submission Method", labelFor(SUBMISSION_METHODS, c.submissionMethod)],
+      ["Visa Stage", labelFor(VISA_STAGES, c.visaStage)],
+      ["Processing Status", labelFor(VISA_PROCESSING_STATUSES, c.visaProcessingStatus)],
+    ];
+    doc.fontSize(10).fillColor("#111827");
+    for (const [k, v] of appRows) {
+      const y = doc.y;
+      doc.fillColor("#6b7280").text(k, 48, y, { width: 140 });
+      doc.fillColor("#111827").text(v, 200, y, { width: 350 });
+      doc.moveDown(0.25);
+    }
+
+    if (c.visaStatusComment) {
+      doc.moveDown(0.5);
+      doc.fontSize(9).fillColor("#9ca3af").text("STATUS NOTE", 48);
+      doc.fontSize(10).fillColor("#374151").text(c.visaStatusComment, 48, doc.y, { width: 500 });
+    }
+
+    if (c.notes) {
+      doc.moveDown(0.8);
+      doc.fontSize(9).fillColor("#9ca3af").text("NOTES", 48);
+      doc.fontSize(10).fillColor("#374151").text(c.notes, 48, doc.y, { width: 500 });
+    }
+
+    if (Array.isArray(coTravellers) && coTravellers.length > 0) {
+      doc.moveDown(0.8);
+      doc.fontSize(9).fillColor("#9ca3af").text(`CO-TRAVELLERS (${coTravellers.length})`, 48);
+      doc.moveDown(0.2);
+      doc.fontSize(10).fillColor("#111827");
+      for (const t of coTravellers) {
+        const meta = [t.relationship, t.dob ? `DOB ${t.dob}` : null, t.passportNumber ? `Passport ${t.passportNumber}` : null]
+          .filter(Boolean).join(" · ");
+        doc.text(`• ${t.name ?? "—"}${meta ? ` (${meta})` : ""}`, 48, doc.y, { width: 500 });
+        doc.moveDown(0.2);
+      }
+    }
+
+    if (Array.isArray(documents) && documents.length > 0) {
+      doc.moveDown(0.8);
+      doc.fontSize(9).fillColor("#9ca3af").text(`DOCUMENTS (${documents.length})`, 48);
+      doc.moveDown(0.2);
+      doc.fontSize(10);
+      for (const d of documents) {
+        const status = String(d.status ?? "pending").toUpperCase();
+        doc.fillColor("#111827").text(`• ${d.name ?? d.type ?? "Document"}`, 48, doc.y, { width: 380, continued: true });
+        doc.fillColor(status === "APPROVED" ? "#059669" : status === "REJECTED" ? "#dc2626" : "#6b7280")
+          .text(`  [${status}]`, { align: "left" });
+        doc.moveDown(0.2);
+      }
+    }
+
+    if (settings?.footerText) {
+      doc.moveDown(2);
+      doc.fontSize(9).fillColor("#6b7280").text(settings.footerText, 48, doc.y, { align: "center", width: 500 });
+    }
+
+    doc.end();
+    await new Promise<void>((resolve, reject) => {
+      out.on("finish", () => resolve());
+      out.on("end", () => resolve());
+      out.on("error", reject);
+    });
+  }
+
+  async function renderCasePdfBuffer(c: any, coTravellers: any[], documents: any[], settings: any): Promise<Buffer> {
+    const { PassThrough } = await import("node:stream");
+    const stream = new PassThrough();
+    const chunks: Buffer[] = [];
+    stream.on("data", (b: Buffer) => chunks.push(Buffer.from(b)));
+    const done = new Promise<Buffer>((resolve, reject) => {
+      stream.on("end", () => resolve(Buffer.concat(chunks)));
+      stream.on("error", reject);
+    });
+    await renderCasePdf(c, coTravellers, documents, settings, stream);
+    return done;
+  }
+
+  app.get("/api/cases/:id/pdf", async (req, res) => {
+    try {
+      const c = await storage.getCase(req.params.id);
+      if (!c) return res.status(404).json({ error: "Not found" });
+      if (!requireTenantAccess(req, res, c.tenantId)) return;
+      const [coTravellers, documents, settings] = await Promise.all([
+        storage.getCoTravellersByCaseId(c.id).catch(() => []),
+        storage.getDocumentsByCaseId(c.id).catch(() => []),
+        storage.getInvoiceSettings(c.tenantId).catch(() => undefined),
+      ]);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename="${c.caseNumber}.pdf"`);
+      await renderCasePdf(c, coTravellers as any[], documents as any[], settings, res);
+    } catch (e: any) {
+      if (!res.headersSent) res.status(500).json({ error: e?.message ?? "Failed to generate PDF" });
+    }
+  });
+
+  app.post("/api/cases/:id/email", async (req, res) => {
+    try {
+      const c = await storage.getCase(req.params.id);
+      if (!c) return res.status(404).json({ error: "Not found" });
+      if (!requireTenantAccess(req, res, c.tenantId)) return;
+      const settings = await storage.getInvoiceSettings(c.tenantId).catch(() => undefined);
+      const to = String(req.body?.to ?? "").trim();
+      if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+        return res.status(400).json({ error: "A valid recipient email is required" });
+      }
+      const subject = String(req.body?.subject ?? `Your visa application ${c.caseNumber}`);
+      const stageLabel = VISA_STAGES.find((s) => s.value === c.visaStage)?.label ?? "—";
+      const methodLabel = SUBMISSION_METHODS.find((m) => m.value === c.submissionMethod)?.label ?? "—";
+      const defaultBody =
+        `Hi ${c.applicantName ?? "there"},\n\n` +
+        `Please find your visa application summary attached.\n\n` +
+        `Reference: ${c.referenceId}\n` +
+        `Destination: ${c.destinationCountry}\n` +
+        `Visa Type: ${c.visaType}\n` +
+        `Submission Method: ${methodLabel}\n` +
+        `Status: ${stageLabel}\n\n` +
+        `Thank you,\n${settings?.companyName ?? "Your agency"}`;
+      const body = String(req.body?.body ?? defaultBody);
+
+      const apiKey = process.env.RESEND_API_KEY;
+      if (apiKey) {
+        const fromAddress = process.env.RESEND_FROM ?? settings?.companyEmail ?? "onboarding@resend.dev";
+        try {
+          const [coTravellers, documents] = await Promise.all([
+            storage.getCoTravellersByCaseId(c.id).catch(() => []),
+            storage.getDocumentsByCaseId(c.id).catch(() => []),
+          ]);
+          const pdfBuf = await renderCasePdfBuffer(c, coTravellers as any[], documents as any[], settings);
+          const resp = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              from: fromAddress,
+              to: [to],
+              subject,
+              text: body,
+              attachments: [{ filename: `${c.caseNumber}.pdf`, content: pdfBuf.toString("base64") }],
+            }),
+          });
+          if (resp.ok) return res.json({ ok: true, sent: true, to, attached: true });
+        } catch { /* fall through */ }
+      }
+
+      const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      res.json({
+        ok: true,
+        sent: false,
+        fallback: {
+          mailto,
+          pdfUrl: `/api/cases/${c.id}/pdf`,
+          message: "Email sending isn't configured. Open this in your email client and attach the PDF download.",
+        },
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message ?? "Failed to send case email" });
+    }
+  });
+
+  // PATCH visa-stage / processing-status / comment in one go.
+  // Updates `visaStatusUpdatedAt` whenever any of these changes so the Visa
+  // module pages can show "Updated 2h ago" timestamps.
+  app.patch("/api/cases/:id/visa-status", async (req, res) => {
+    try {
+      const c = await storage.getCase(req.params.id);
+      if (!c) return res.status(404).json({ error: "Not found" });
+      if (!requireTenantAccess(req, res, c.tenantId)) return;
+      const enumError = validateCaseEnums(req.body);
+      if (enumError) return res.status(400).json({ error: enumError });
+
+      const patch: any = { visaStatusUpdatedAt: new Date() };
+      if (req.body?.visaStage !== undefined) patch.visaStage = req.body.visaStage;
+      if (req.body?.visaProcessingStatus !== undefined) patch.visaProcessingStatus = req.body.visaProcessingStatus;
+      if (req.body?.visaStatusComment !== undefined) patch.visaStatusComment = req.body.visaStatusComment;
+      // Mirror visa stage transitions up to the case's main `status` field so
+      // the Applications list + dashboards stay in sync with the Visa module
+      // in BOTH directions — including when a case is moved back to
+      // Processing from Approved/Rejected (otherwise the case lingers as
+      // "approved" in the Applications list while showing as "Processing"
+      // in the Visa module).
+      if (patch.visaStage === "approved") patch.status = "approved";
+      else if (patch.visaStage === "rejected") patch.status = "rejected";
+      else if (patch.visaStage === "processing") patch.status = "in_progress";
+      else if (patch.visaStage === "not_started") patch.status = "pending";
+
+      const updated = await storage.updateCase(c.id, patch);
+      res.json(updated);
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message ?? "Failed to update visa status" });
+    }
+  });
+
+  // === Visa stage list (used by the Visa → Processing/Approved/Rejected pages) ===
+  app.get("/api/tenants/:tenantId/visa-cases", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
+    const stage = String(req.query.stage ?? "processing");
+    if (!VISA_STAGES.some((s) => s.value === stage)) {
+      return res.status(400).json({ error: "Invalid stage" });
+    }
+    const list = await storage.getCasesByTenantAndVisaStage(req.params.tenantId, stage);
+    res.json(list);
   });
 
   // === Case Co-Travellers (companions) ===

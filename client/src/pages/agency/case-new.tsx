@@ -253,6 +253,9 @@ export default function NewCasePage() {
     passportDateOfExpiry: "",
     passportPlaceOfIssue: "",
     passportPlaceOfBirth: "",
+    // Last step (Review) — how this application is being lodged. Drives
+    // the initial visa-stage + sub-status when the case is created.
+    submissionMethod: "" as "" | "evisa" | "embassy" | "vfs",
   });
 
   // Default assignee to the signed-in user once auth resolves. Only seeds
@@ -768,32 +771,47 @@ export default function NewCasePage() {
     return null;
   };
 
-  const buildPayload = (status: "draft" | "pending") => ({
-    applicantName: form.applicantName.trim() || (status === "draft" ? "Untitled draft" : ""),
-    applicantDob: form.applicantDob || null,
-    customerEmail: form.customerEmail.trim() || null,
-    customerPhone: form.customerPhone.trim() || null,
-    passportSurname: form.passportSurname.trim() || null,
-    passportGivenName: form.passportGivenName.trim() || null,
-    passportMiddleName: form.passportMiddleName.trim() || null,
-    passportNumber: form.passportNumber.trim() || null,
-    passportNationality: form.passportNationality.trim() || null,
-    passportGender: form.passportGender || null,
-    passportDateOfIssue: form.passportDateOfIssue || null,
-    passportDateOfExpiry: form.passportDateOfExpiry || null,
-    passportPlaceOfIssue: form.passportPlaceOfIssue.trim() || null,
-    passportPlaceOfBirth: form.passportPlaceOfBirth.trim() || null,
-    visaType: form.visaType,
-    destinationCountry: form.destinationCountry,
-    travelDate: form.travelDate ? new Date(form.travelDate).toISOString() : null,
-    priority: form.priority,
-    notes: form.notes || null,
-    // Send the picked team member; the server still validates that the user
-    // belongs to this tenant and falls back to the session user if missing.
-    assignedTo: form.assignedTo || null,
-    status,
-    caseNumber: generateCaseNumber(),
-  });
+  const buildPayload = (status: "draft" | "pending") => {
+    // Drafts never enter the visa workflow yet — only fully-submitted
+    // applications get a submissionMethod + jump to the "processing" stage.
+    const isSubmitted = status === "pending" && !!form.submissionMethod;
+    const initialProcessingStatus = !isSubmitted ? null
+      : form.submissionMethod === "evisa"   ? "submitted_evisa"
+      : form.submissionMethod === "embassy" ? "submitted_embassy"
+      : form.submissionMethod === "vfs"     ? "vfs_appointment_pending"
+      : null;
+    return {
+      applicantName: form.applicantName.trim() || (status === "draft" ? "Untitled draft" : ""),
+      applicantDob: form.applicantDob || null,
+      customerEmail: form.customerEmail.trim() || null,
+      customerPhone: form.customerPhone.trim() || null,
+      passportSurname: form.passportSurname.trim() || null,
+      passportGivenName: form.passportGivenName.trim() || null,
+      passportMiddleName: form.passportMiddleName.trim() || null,
+      passportNumber: form.passportNumber.trim() || null,
+      passportNationality: form.passportNationality.trim() || null,
+      passportGender: form.passportGender || null,
+      passportDateOfIssue: form.passportDateOfIssue || null,
+      passportDateOfExpiry: form.passportDateOfExpiry || null,
+      passportPlaceOfIssue: form.passportPlaceOfIssue.trim() || null,
+      passportPlaceOfBirth: form.passportPlaceOfBirth.trim() || null,
+      visaType: form.visaType,
+      destinationCountry: form.destinationCountry,
+      travelDate: form.travelDate ? new Date(form.travelDate).toISOString() : null,
+      priority: form.priority,
+      notes: form.notes || null,
+      // Send the picked team member; the server still validates that the user
+      // belongs to this tenant and falls back to the session user if missing.
+      assignedTo: form.assignedTo || null,
+      status,
+      caseNumber: generateCaseNumber(),
+      // --- Visa workflow ---
+      submissionMethod: form.submissionMethod || null,
+      visaStage: isSubmitted ? "processing" : "not_started",
+      visaProcessingStatus: initialProcessingStatus,
+      visaStatusUpdatedAt: isSubmitted ? new Date().toISOString() : null,
+    };
+  };
 
   // Items currently checked for the active person (drives the count badge in
   // the step header + the "Documents Checklist" panel of the Review step).
@@ -1323,8 +1341,10 @@ export default function NewCasePage() {
     mutationFn: () => createCaseAndCompanions("pending"),
     onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "cases"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "visa-cases"] });
       toast({ title: "Application created", description: `Case ${created.caseNumber} is ready.` });
-      setLocation(`/app/cases/${created.id}`);
+      // Land on the case detail page — that's where the PDF + email actions live.
+      setLocation(`/app/cases/${created.id}?submitted=1`);
     },
     onError: (err: Error) => {
       toast({ title: "Could not create application", description: err.message, variant: "destructive" });
@@ -2931,6 +2951,46 @@ export default function NewCasePage() {
                       })}
                     </div>
                   )}
+                </div>
+
+                {/* Submission method — drives the initial visa-stage so this
+                    case shows up under Visa → Processing immediately on submit. */}
+                <div className="border rounded-xl p-4 bg-primary/5 border-primary/20">
+                  <p className="font-medium mb-1 flex items-center gap-2">
+                    <Send className="w-4 h-4 text-primary" /> How are you submitting this application?
+                  </p>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Required to submit. Drafts can skip this and pick later. The application will move to
+                    <span className="font-medium text-foreground"> Visa → Processing</span> once submitted.
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {[
+                      { value: "evisa",   label: "eVisa Portal",       hint: "Online application" },
+                      { value: "embassy", label: "Send to Embassy",    hint: "Direct lodgment" },
+                      { value: "vfs",     label: "Through VFS Center", hint: "Visa application centre" },
+                    ].map((opt) => {
+                      const active = form.submissionMethod === opt.value;
+                      return (
+                        <button
+                          type="button"
+                          key={opt.value}
+                          onClick={() => setForm((f) => ({ ...f, submissionMethod: opt.value as any }))}
+                          className={[
+                            "text-left rounded-lg border p-3 transition-colors hover-elevate",
+                            active
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border bg-background",
+                          ].join(" ")}
+                          data-testid={`button-submission-method-${opt.value}`}
+                        >
+                          <p className="font-medium text-sm">{opt.label}</p>
+                          <p className={`text-xs ${active ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
+                            {opt.hint}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </CardContent>
             </Card>

@@ -161,6 +161,21 @@ export const cases = pgTable("cases", {
   travelDate: timestamp("travel_date"),
   notes: text("notes"),
   readinessScore: integer("readiness_score").default(0),
+  // --- Visa workflow (post-submission) ---
+  // How the application is being lodged with the destination authority.
+  // null until the wizard's last step assigns one.
+  submissionMethod: text("submission_method"), // evisa | embassy | vfs
+  // Top-level visa-stage bucket the case sits in for the Visa module pages.
+  // "not_started" = still being prepared (drafts/pending); "processing"
+  // begins once the application is submitted to the embassy/VFS/eVisa portal.
+  visaStage: text("visa_stage").notNull().default("not_started"), // not_started | processing | approved | rejected
+  // Granular processing sub-status — only meaningful when visaStage = "processing".
+  visaProcessingStatus: text("visa_processing_status"),
+  // Free-form note (e.g. which documents are still needed) shown alongside
+  // the status in the Visa module list. Set whenever the agency updates the
+  // sub-status from the dropdown.
+  visaStatusComment: text("visa_status_comment"),
+  visaStatusUpdatedAt: timestamp("visa_status_updated_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -168,6 +183,38 @@ export const cases = pgTable("cases", {
 export const insertCaseSchema = createInsertSchema(cases).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertCase = z.infer<typeof insertCaseSchema>;
 export type Case = typeof cases.$inferSelect;
+
+// --- Visa workflow constants (shared between client + server) ---
+export const SUBMISSION_METHODS = [
+  { value: "evisa",   label: "eVisa (Online Portal)" },
+  { value: "embassy", label: "Send to Embassy" },
+  { value: "vfs",     label: "Through VFS Center" },
+] as const;
+export type SubmissionMethod = typeof SUBMISSION_METHODS[number]["value"];
+
+export const VISA_STAGES = [
+  { value: "not_started", label: "Not Started" },
+  { value: "processing",  label: "Processing" },
+  { value: "approved",    label: "Approved" },
+  { value: "rejected",    label: "Rejected" },
+] as const;
+export type VisaStage = typeof VISA_STAGES[number]["value"];
+
+// Granular processing-sub-status options shown in the Visa → Processing page.
+// Order matters — this is roughly the chronological flow.
+export const VISA_PROCESSING_STATUSES = [
+  { value: "submitted_evisa",            label: "Submitted to eVisa Portal" },
+  { value: "submitted_embassy",          label: "Submitted to Embassy" },
+  { value: "vfs_appointment_pending",    label: "VFS Appointment Pending" },
+  { value: "vfs_appointment_completed",  label: "VFS Appointment Completed" },
+  { value: "biometric_pending",          label: "Biometric Pending" },
+  { value: "biometric_completed",        label: "Biometric Completed" },
+  { value: "waiting_documents",          label: "Waiting for More Documents" },
+  { value: "application_delayed",        label: "Application Delayed" },
+  { value: "passport_sent_collection",   label: "Passport Sent for Collection" },
+  { value: "passport_received",          label: "Passport Received" },
+] as const;
+export type VisaProcessingStatus = typeof VISA_PROCESSING_STATUSES[number]["value"];
 
 // Case Co-Travellers (companions on the same application/trip)
 export const CO_TRAVELLER_RELATIONSHIPS = [

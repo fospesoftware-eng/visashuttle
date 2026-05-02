@@ -82,6 +82,7 @@ export interface IStorage {
   deleteProposal(id: string): Promise<boolean>;
   
   getCasesByTenantId(tenantId: string): Promise<Case[]>;
+  getCasesByTenantAndVisaStage(tenantId: string, stage: string): Promise<Case[]>;
   getCasesByCustomerId(customerId: string): Promise<Case[]>;
   getCasesByCustomerAccountId(customerAccountId: string, tenantId: string): Promise<Case[]>;
   getCaseByReferenceId(referenceId: string, tenantId: string): Promise<Case | undefined>;
@@ -510,6 +511,11 @@ export class MemStorage implements IStorage {
         travelDate: new Date("2024-03-15"), 
         notes: null, 
         readinessScore: 75, 
+        submissionMethod: null,
+        visaStage: "not_started",
+        visaProcessingStatus: null,
+        visaStatusComment: null,
+        visaStatusUpdatedAt: null,
         createdAt: new Date(), 
         updatedAt: new Date() 
       },
@@ -541,6 +547,11 @@ export class MemStorage implements IStorage {
         travelDate: new Date("2024-04-20"), 
         notes: null, 
         readinessScore: 45, 
+        submissionMethod: null,
+        visaStage: "not_started",
+        visaProcessingStatus: null,
+        visaStatusComment: null,
+        visaStatusUpdatedAt: null,
         createdAt: new Date(), 
         updatedAt: new Date() 
       },
@@ -1125,11 +1136,23 @@ export class MemStorage implements IStorage {
       travelDate: insertCase.travelDate ?? null,
       notes: insertCase.notes ?? null,
       readinessScore: insertCase.readinessScore ?? null,
-      createdAt: new Date(), 
-      updatedAt: new Date() 
+      // --- Visa workflow fields ---
+      submissionMethod: insertCase.submissionMethod ?? null,
+      visaStage: insertCase.visaStage ?? "not_started",
+      visaProcessingStatus: insertCase.visaProcessingStatus ?? null,
+      visaStatusComment: insertCase.visaStatusComment ?? null,
+      visaStatusUpdatedAt: insertCase.visaStatusUpdatedAt ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
     this.cases.set(id, caseData);
     return caseData;
+  }
+
+  async getCasesByTenantAndVisaStage(tenantId: string, stage: string): Promise<Case[]> {
+    return Array.from(this.cases.values()).filter(
+      c => c.tenantId === tenantId && (c.visaStage ?? "not_started") === stage
+    );
   }
 
   async updateCase(id: string, data: Partial<InsertCase>): Promise<Case | undefined> {

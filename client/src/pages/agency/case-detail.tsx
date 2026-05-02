@@ -5,7 +5,7 @@ import {
   ArrowLeft, User, Calendar, FileText, 
   CheckCircle, AlertCircle, Clock, Send, Paperclip, Download,
   Brain, Lightbulb, RefreshCw, Copy, Check, ExternalLink, Share2,
-  Loader2, MessageSquare, Flag, Users, Plus, Trash2, Pencil
+  Loader2, MessageSquare, Flag, Users, Plus, Trash2, Pencil, Mail, FileDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -355,11 +355,17 @@ function timeAgo(date: string | Date) {
 
 export default function CaseDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const [message, setMessage] = useState("");
   const [linkCopied, setLinkCopied] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // The wizard redirects here with `?submitted=1` after a successful create
+  // so we can show the post-submission success banner with PDF / Email actions.
+  // Wouter's location string excludes the search part, so read it off window.
+  const justSubmitted = typeof window !== "undefined"
+    && new URLSearchParams(window.location.search).get("submitted") === "1";
 
   const { data: authData } = useCurrentUser();
   const agencySlug = authData?.tenantSlug || localStorage.getItem("agency_tenant_slug") || "demo-agency";
@@ -649,6 +655,18 @@ export default function CaseDetailPage() {
             <Button
               variant="outline"
               size="sm"
+              asChild
+              data-testid="button-download-pdf"
+            >
+              <a href={`/api/cases/${id}/pdf`} target="_blank" rel="noopener noreferrer">
+                <FileDown className="w-4 h-4 mr-2" />
+                Download PDF
+              </a>
+            </Button>
+            <EmailCaseDialog caseData={caseData} />
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => updateCaseStatusMutation.mutate("under_review")}
               disabled={updateCaseStatusMutation.isPending}
               data-testid="button-mark-review"
@@ -667,6 +685,33 @@ export default function CaseDetailPage() {
             </Button>
           </div>
         </div>
+
+        {/* Post-submission success banner — shown when redirected here from
+            the wizard with ?submitted=1. Hidden after the user navigates away. */}
+        {justSubmitted && (
+          <Card className="border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/30">
+            <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="p-2 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 shrink-0">
+                <CheckCircle className="w-5 h-5" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-emerald-900 dark:text-emerald-100">Application submitted successfully</p>
+                <p className="text-sm text-emerald-800/80 dark:text-emerald-200/80">
+                  Download a PDF copy or email it directly to the applicant. The case is now in
+                  <Link href="/app/visa/processing" className="font-medium underline mx-1">Visa → Processing</Link>.
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setLocation(`/app/cases/${id}`, { replace: true })}
+                data-testid="button-dismiss-success"
+              >
+                Dismiss
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid gap-6 lg:grid-cols-4">
           {/* Left sidebar */}
@@ -1078,5 +1123,122 @@ export default function CaseDetailPage() {
         </div>
       </div>
     </DashboardLayout>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// EmailCaseDialog — sends the case-summary PDF to the applicant by email.
+// Mirrors the invoice email pattern: optimistically uses the configured
+// transport (Resend) on the server; if the server returns a `fallback.mailto`
+// link (no transport configured), open it so the agent can send manually.
+// ---------------------------------------------------------------------------
+function EmailCaseDialog({ caseData }: { caseData: Case }) {
+  const [open, setOpen] = useState(false);
+  // customerEmail isn't part of the typed Case schema yet (added via payload
+  // pass-through in MemStorage) — cast for now so the dialog can pre-fill.
+  const [to, setTo] = useState((caseData as any).customerEmail || "");
+  const [subject, setSubject] = useState(
+    `Your visa application — ${caseData.caseNumber}`,
+  );
+  const [body, setBody] = useState(
+    `Hi ${caseData.applicantName || "there"},\n\n` +
+      `Please find attached a copy of your visa application (${caseData.caseNumber}) ` +
+      `for ${caseData.visaType}${caseData.destinationCountry ? ` to ${caseData.destinationCountry}` : ""}.\n\n` +
+      `We'll keep you posted as the application progresses.\n\nThank you.`,
+  );
+  const { toast } = useToast();
+
+  const sendMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/cases/${caseData.id}/email`, {
+        to: to.trim(),
+        subject: subject.trim(),
+        body: body.trim(),
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      // Server returns `{ fallback: { mailto } }` when no email transport is
+      // configured — open the user's mail client as a graceful degradation.
+      if (data?.fallback?.mailto) {
+        window.location.href = data.fallback.mailto;
+        toast({
+          title: "Opened your mail client",
+          description: "No email service is configured — drafted the message in your mail app.",
+        });
+      } else {
+        toast({ title: "Email sent", description: `Sent to ${to}` });
+      }
+      setOpen(false);
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to send", description: err.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" data-testid="button-email-applicant">
+          <Mail className="w-4 h-4 mr-2" />
+          Email Applicant
+        </Button>
+      </DialogTrigger>
+      <DialogContent data-testid="dialog-email-applicant">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Mail className="w-4 h-4" /> Email application to applicant
+          </DialogTitle>
+          <DialogDescription>
+            We'll attach the case summary PDF for {caseData.caseNumber}.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label htmlFor="email-to" className="text-sm">To</Label>
+            <Input
+              id="email-to"
+              type="email"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              placeholder="customer@example.com"
+              data-testid="input-email-to"
+            />
+          </div>
+          <div>
+            <Label htmlFor="email-subject" className="text-sm">Subject</Label>
+            <Input
+              id="email-subject"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              data-testid="input-email-subject"
+            />
+          </div>
+          <div>
+            <Label htmlFor="email-body" className="text-sm">Message</Label>
+            <Textarea
+              id="email-body"
+              rows={6}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              data-testid="textarea-email-body"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)} data-testid="button-email-cancel">
+            Cancel
+          </Button>
+          <Button
+            onClick={() => sendMutation.mutate()}
+            disabled={sendMutation.isPending || !to.trim()}
+            data-testid="button-email-send"
+          >
+            {sendMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+            Send
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
