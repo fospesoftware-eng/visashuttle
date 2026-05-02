@@ -380,6 +380,12 @@ export const invoiceSettings = pgTable("invoice_settings", {
   bankDetails: text("bank_details"),
   footerText: text("footer_text"),
   notes: text("notes"),
+  // GST (India) fields
+  gstEnabled: boolean("gst_enabled").notNull().default(false),
+  gstin: text("gstin"), // 15-char GSTIN of the agency
+  gstStateCode: text("gst_state_code"), // 2-digit Indian state code (e.g. "27" for Maharashtra)
+  gstStateName: text("gst_state_name"),
+  gstLegalName: text("gst_legal_name"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 export const insertInvoiceSettingsSchema = createInsertSchema(invoiceSettings).omit({ id: true, updatedAt: true });
@@ -405,9 +411,18 @@ export const invoices = pgTable("invoices", {
   advancePercent: integer("advance_percent"),
   subtotal: integer("subtotal").notNull().default(0),
   taxAmount: integer("tax_amount").notNull().default(0),
+  // GST split (in cents). All zero for non-GST invoices.
+  cgstAmount: integer("cgst_amount").notNull().default(0),
+  sgstAmount: integer("sgst_amount").notNull().default(0),
+  igstAmount: integer("igst_amount").notNull().default(0),
   total: integer("total").notNull().default(0),
   paidAmount: integer("paid_amount").notNull().default(0),
   currency: text("currency").notNull().default("USD"),
+  // GST customer / place of supply
+  customerGstin: text("customer_gstin"),
+  placeOfSupplyCode: text("place_of_supply_code"), // 2-digit Indian state code
+  placeOfSupplyName: text("place_of_supply_name"),
+  reverseCharge: boolean("reverse_charge").notNull().default(false),
   issuedAt: timestamp("issued_at").defaultNow(),
   dueDate: timestamp("due_date"),
   notes: text("notes"),
@@ -429,6 +444,9 @@ export const invoiceItems = pgTable("invoice_items", {
   unitPrice: integer("unit_price").notNull().default(0),
   amount: integer("amount").notNull().default(0),
   sortOrder: integer("sort_order").notNull().default(0),
+  // GST: HSN/SAC code and per-line tax rate (basis points)
+  hsnCode: text("hsn_code"),
+  taxRate: integer("tax_rate").notNull().default(0),
 });
 export const insertInvoiceItemSchema = createInsertSchema(invoiceItems).omit({ id: true });
 export type InsertInvoiceItem = z.infer<typeof insertInvoiceItemSchema>;

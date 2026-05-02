@@ -362,6 +362,11 @@ export class MemStorage implements IStorage {
       bankDetails: "Bank: Demo Bank\nAccount: 1234567890\nRouting: 021000021",
       footerText: "Thank you for your business.",
       notes: null,
+      gstEnabled: false,
+      gstin: null,
+      gstStateCode: null,
+      gstStateName: null,
+      gstLegalName: null,
       updatedAt: new Date(),
     };
     this.invoiceSettingsByTenant.set("tenant-1", demoSettings);
@@ -383,9 +388,16 @@ export class MemStorage implements IStorage {
       advancePercent: 50,
       subtotal: 26500,
       taxAmount: 0,
+      cgstAmount: 0,
+      sgstAmount: 0,
+      igstAmount: 0,
       total: 26500,
       paidAmount: 13250,
       currency: "USD",
+      customerGstin: null,
+      placeOfSupplyCode: null,
+      placeOfSupplyName: null,
+      reverseCharge: false,
       issuedAt: new Date(Date.now() - 5 * 24 * 3600 * 1000),
       dueDate: new Date(Date.now() + 9 * 24 * 3600 * 1000),
       notes: null,
@@ -394,9 +406,9 @@ export class MemStorage implements IStorage {
     };
     this.invoices.set(sampleInvoice.id, sampleInvoice);
     const sampleItems: InvoiceItem[] = [
-      { id: "inv-item-1", invoiceId: "inv-1", description: "Visa Agency Fee", category: "agency_fee", quantity: 1, unitPrice: 15000, amount: 15000, sortOrder: 0 },
-      { id: "inv-item-2", invoiceId: "inv-1", description: "French Consulate Fee", category: "government_fee", quantity: 1, unitPrice: 8000, amount: 8000, sortOrder: 1 },
-      { id: "inv-item-3", invoiceId: "inv-1", description: "VFS Service Charge", category: "service_charge", quantity: 1, unitPrice: 3500, amount: 3500, sortOrder: 2 },
+      { id: "inv-item-1", invoiceId: "inv-1", description: "Visa Agency Fee", category: "agency_fee", quantity: 1, unitPrice: 15000, amount: 15000, sortOrder: 0, hsnCode: null, taxRate: 0 },
+      { id: "inv-item-2", invoiceId: "inv-1", description: "French Consulate Fee", category: "government_fee", quantity: 1, unitPrice: 8000, amount: 8000, sortOrder: 1, hsnCode: null, taxRate: 0 },
+      { id: "inv-item-3", invoiceId: "inv-1", description: "VFS Service Charge", category: "service_charge", quantity: 1, unitPrice: 3500, amount: 3500, sortOrder: 2, hsnCode: null, taxRate: 0 },
     ];
     sampleItems.forEach(i => this.invoiceItems.set(i.id, i));
     const samplePayment: Payment = {
@@ -717,6 +729,11 @@ export class MemStorage implements IStorage {
       bankDetails: data.bankDetails ?? existing?.bankDetails ?? null,
       footerText: data.footerText ?? existing?.footerText ?? null,
       notes: data.notes ?? existing?.notes ?? null,
+      gstEnabled: data.gstEnabled ?? existing?.gstEnabled ?? false,
+      gstin: data.gstin ?? existing?.gstin ?? null,
+      gstStateCode: data.gstStateCode ?? existing?.gstStateCode ?? null,
+      gstStateName: data.gstStateName ?? existing?.gstStateName ?? null,
+      gstLegalName: data.gstLegalName ?? existing?.gstLegalName ?? null,
       updatedAt: new Date(),
     };
     this.invoiceSettingsByTenant.set(tenantId, merged);
@@ -759,9 +776,16 @@ export class MemStorage implements IStorage {
       advancePercent: data.advancePercent ?? null,
       subtotal,
       taxAmount,
+      cgstAmount: data.cgstAmount ?? 0,
+      sgstAmount: data.sgstAmount ?? 0,
+      igstAmount: data.igstAmount ?? 0,
       total,
       paidAmount: data.paidAmount ?? 0,
       currency: data.currency ?? "USD",
+      customerGstin: data.customerGstin ?? null,
+      placeOfSupplyCode: data.placeOfSupplyCode ?? null,
+      placeOfSupplyName: data.placeOfSupplyName ?? null,
+      reverseCharge: data.reverseCharge ?? false,
       issuedAt: data.issuedAt ?? new Date(),
       dueDate: data.dueDate ?? null,
       notes: data.notes ?? null,
@@ -781,6 +805,8 @@ export class MemStorage implements IStorage {
         unitPrice: it.unitPrice ?? 0,
         amount,
         sortOrder: it.sortOrder ?? idx,
+        hsnCode: it.hsnCode ?? null,
+        taxRate: it.taxRate ?? 0,
       });
     });
     return invoice;
@@ -822,6 +848,8 @@ export class MemStorage implements IStorage {
         unitPrice: it.unitPrice ?? 0,
         amount,
         sortOrder: it.sortOrder ?? idx,
+        hsnCode: it.hsnCode ?? null,
+        taxRate: it.taxRate ?? 0,
       };
       this.invoiceItems.set(id, item);
       created.push(item);

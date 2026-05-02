@@ -22,7 +22,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import {
   Plus, Trash2, Edit, Receipt, FileText, Banknote, Settings as SettingsIcon,
-  TrendingUp, AlertCircle, CheckCircle2, Clock, Send, Eye,
+  TrendingUp, AlertCircle, CheckCircle2, Clock, Send, Eye, Download,
 } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { getCountryVisaConfig } from "@/data/country-visa-types";
@@ -129,6 +129,7 @@ export default function AccountingPage() {
 // Overview tab — KPIs + recent invoices
 // ============================================================
 function OverviewTab({ tenantId, onJump }: { tenantId: string; onJump: (t: string) => void }) {
+  const { toast } = useToast();
   const { data: stats } = useQuery<{
     totalBilled: number; totalPaid: number; totalOutstanding: number; totalOverdue: number;
     draftCount: number; sentCount: number; partialCount: number; paidCount: number;
@@ -139,6 +140,40 @@ function OverviewTab({ tenantId, onJump }: { tenantId: string; onJump: (t: strin
   const { data: invoices = [] } = useQuery<Invoice[]>({
     queryKey: ["/api/tenants", tenantId, "invoices"],
   });
+  const { data: settings } = useQuery<InvoiceSettings | null>({
+    queryKey: ["/api/tenants", tenantId, "invoice-settings"],
+  });
+
+  const now = new Date();
+  const [reportYear, setReportYear] = useState<string>(String(now.getFullYear()));
+  const [reportMonth, setReportMonth] = useState<string>(String(now.getMonth() + 1));
+  const [downloading, setDownloading] = useState(false);
+
+  const downloadGstReport = async () => {
+    setDownloading(true);
+    try {
+      const url = `/api/tenants/${tenantId}/gst-reports/monthly?year=${reportYear}&month=${reportMonth}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Failed to download report" }));
+        throw new Error(err.error ?? "Download failed");
+      }
+      const blob = await res.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `GST-Report-${reportYear}-${String(reportMonth).padStart(2, "0")}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(blobUrl);
+      toast({ title: "GST report downloaded" });
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const kpis = [
     { label: "Total Billed",    value: fmtMoney(stats?.totalBilled ?? 0),      icon: Receipt,    color: "text-blue-600 dark:text-blue-400" },
@@ -203,6 +238,48 @@ function OverviewTab({ tenantId, onJump }: { tenantId: string; onJump: (t: strin
           </div>
         </CardContent>
       </Card>
+
+      {settings?.gstEnabled && (
+        <Card data-testid="card-gst-report">
+          <CardHeader>
+            <CardTitle>GST monthly report</CardTitle>
+            <CardDescription>
+              Download a GSTR-1 style Excel workbook for any month.
+              {settings.gstin ? ` GSTIN: ${settings.gstin}` : " (Add a GSTIN in Settings.)"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Year</Label>
+                <Select value={reportYear} onValueChange={setReportYear}>
+                  <SelectTrigger className="w-28" data-testid="select-report-year"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 6 }, (_, i) => now.getFullYear() - i).map((y) => (
+                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Month</Label>
+                <Select value={reportMonth} onValueChange={setReportMonth}>
+                  <SelectTrigger className="w-40" data-testid="select-report-month"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {["January","February","March","April","May","June","July","August","September","October","November","December"].map((m, i) => (
+                      <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button onClick={downloadGstReport} disabled={downloading} data-testid="button-download-gst-report">
+                <Download className="w-4 h-4 mr-2" />
+                {downloading ? "Preparing..." : "Download Excel"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -372,7 +449,37 @@ function InvoicesTab({ tenantId }: { tenantId: string }) {
 // ============================================================
 // Compose / Create Invoice
 // ============================================================
-type DraftItem = { description: string; category: string; quantity: number; unitPrice: string };
+type DraftItem = {
+  description: string;
+  category: string;
+  quantity: number;
+  unitPrice: string;
+  hsnCode?: string;
+  taxRate?: string; // percent string, e.g. "18"
+};
+
+const GST_STATES: Array<{ code: string; name: string }> = [
+  { code: "01", name: "Jammu & Kashmir" }, { code: "02", name: "Himachal Pradesh" },
+  { code: "03", name: "Punjab" }, { code: "04", name: "Chandigarh" },
+  { code: "05", name: "Uttarakhand" }, { code: "06", name: "Haryana" },
+  { code: "07", name: "Delhi" }, { code: "08", name: "Rajasthan" },
+  { code: "09", name: "Uttar Pradesh" }, { code: "10", name: "Bihar" },
+  { code: "11", name: "Sikkim" }, { code: "12", name: "Arunachal Pradesh" },
+  { code: "13", name: "Nagaland" }, { code: "14", name: "Manipur" },
+  { code: "15", name: "Mizoram" }, { code: "16", name: "Tripura" },
+  { code: "17", name: "Meghalaya" }, { code: "18", name: "Assam" },
+  { code: "19", name: "West Bengal" }, { code: "20", name: "Jharkhand" },
+  { code: "21", name: "Odisha" }, { code: "22", name: "Chhattisgarh" },
+  { code: "23", name: "Madhya Pradesh" }, { code: "24", name: "Gujarat" },
+  { code: "26", name: "Dadra & Nagar Haveli and Daman & Diu" },
+  { code: "27", name: "Maharashtra" }, { code: "29", name: "Karnataka" },
+  { code: "30", name: "Goa" }, { code: "31", name: "Lakshadweep" },
+  { code: "32", name: "Kerala" }, { code: "33", name: "Tamil Nadu" },
+  { code: "34", name: "Puducherry" }, { code: "35", name: "Andaman & Nicobar Islands" },
+  { code: "36", name: "Telangana" }, { code: "37", name: "Andhra Pradesh" },
+  { code: "38", name: "Ladakh" },
+  { code: "96", name: "Foreign Country" }, { code: "97", name: "Other Territory" },
+];
 
 function ComposeInvoiceDialog({
   tenantId, open, onOpenChange,
@@ -400,15 +507,24 @@ function ComposeInvoiceDialog({
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<DraftItem[]>([
-    { description: "", category: "agency_fee", quantity: 1, unitPrice: "" },
+    { description: "", category: "agency_fee", quantity: 1, unitPrice: "", hsnCode: "", taxRate: "" },
   ]);
+  const [customerGstin, setCustomerGstin] = useState("");
+  const [placeOfSupplyCode, setPlaceOfSupplyCode] = useState<string>("");
+  const [reverseCharge, setReverseCharge] = useState(false);
+
+  const gstEnabled = !!settings?.gstEnabled;
+  const supplierStateCode = settings?.gstStateCode ?? "";
+  const effectivePosCode = placeOfSupplyCode || supplierStateCode;
+  const isIntraState = !!supplierStateCode && !!effectivePosCode && supplierStateCode === effectivePosCode;
 
   const reset = () => {
     setCustomerName(""); setCustomerEmail(""); setCustomerPhone("");
     setDestinationCountry(""); setVisaType(""); setCaseId("");
     setPaymentType("upfront"); setAdvancePercent("50");
     setStatus("draft"); setDueDate(""); setNotes("");
-    setItems([{ description: "", category: "agency_fee", quantity: 1, unitPrice: "" }]);
+    setItems([{ description: "", category: "agency_fee", quantity: 1, unitPrice: "", hsnCode: "", taxRate: "" }]);
+    setCustomerGstin(""); setPlaceOfSupplyCode(""); setReverseCharge(false);
   };
 
   const applyTemplate = (templateId: string) => {
@@ -419,11 +535,12 @@ function ComposeInvoiceDialog({
     setPaymentType(tpl.defaultPaymentType);
     if (tpl.advancePercent != null) setAdvancePercent(String(tpl.advancePercent));
     const next: DraftItem[] = [];
-    if (tpl.agencyFee > 0)     next.push({ description: "Agency Fee",     category: "agency_fee",     quantity: 1, unitPrice: fromCents(tpl.agencyFee) });
-    if (tpl.governmentFee > 0) next.push({ description: "Government Fee", category: "government_fee", quantity: 1, unitPrice: fromCents(tpl.governmentFee) });
-    if (tpl.serviceFee > 0)    next.push({ description: "Service Charge", category: "service_charge", quantity: 1, unitPrice: fromCents(tpl.serviceFee) });
-    if (tpl.otherFee > 0)      next.push({ description: tpl.otherFeeLabel ?? "Other", category: "other", quantity: 1, unitPrice: fromCents(tpl.otherFee) });
-    if (next.length === 0) next.push({ description: "", category: "agency_fee", quantity: 1, unitPrice: "" });
+    const defRate = gstEnabled ? ((settings?.taxRate ?? 0) / 100).toString() : "";
+    if (tpl.agencyFee > 0)     next.push({ description: "Agency Fee",     category: "agency_fee",     quantity: 1, unitPrice: fromCents(tpl.agencyFee), hsnCode: "", taxRate: defRate });
+    if (tpl.governmentFee > 0) next.push({ description: "Government Fee", category: "government_fee", quantity: 1, unitPrice: fromCents(tpl.governmentFee), hsnCode: "", taxRate: "" });
+    if (tpl.serviceFee > 0)    next.push({ description: "Service Charge", category: "service_charge", quantity: 1, unitPrice: fromCents(tpl.serviceFee), hsnCode: "", taxRate: defRate });
+    if (tpl.otherFee > 0)      next.push({ description: tpl.otherFeeLabel ?? "Other", category: "other", quantity: 1, unitPrice: fromCents(tpl.otherFee), hsnCode: "", taxRate: defRate });
+    if (next.length === 0) next.push({ description: "", category: "agency_fee", quantity: 1, unitPrice: "", hsnCode: "", taxRate: defRate });
     setItems(next);
   };
 
@@ -438,7 +555,22 @@ function ComposeInvoiceDialog({
 
   const subtotalCents = items.reduce((s, i) => s + toCents(i.unitPrice) * (i.quantity || 1), 0);
   const taxRate = settings?.taxRate ?? 0;
-  const taxAmount = Math.round((subtotalCents * taxRate) / 10000);
+  // Per-line GST when enabled, else fall back to flat tax rate.
+  // Empty/blank rate => fall back to settings.taxRate; explicit "0" => exempt.
+  const perLineTax = items.reduce((s, i) => {
+    const amt = toCents(i.unitPrice) * (i.quantity || 1);
+    const raw = (i.taxRate ?? "").trim();
+    const rateBps = gstEnabled
+      ? (raw === "" ? taxRate : Math.round((parseFloat(raw) || 0) * 100))
+      : taxRate;
+    return s + Math.round((amt * rateBps) / 10000);
+  }, 0);
+  const taxAmount = gstEnabled ? perLineTax : Math.round((subtotalCents * taxRate) / 10000);
+  // Mirror server contract: only split when supplier state is set.
+  const canSplit = gstEnabled && !!supplierStateCode;
+  const cgst = canSplit && isIntraState ? Math.round(taxAmount / 2) : 0;
+  const sgst = canSplit && isIntraState ? taxAmount - cgst : 0;
+  const igst = canSplit && !isIntraState ? taxAmount : 0;
   const total = subtotalCents + taxAmount;
 
   const createMutation = useMutation({
@@ -456,6 +588,12 @@ function ComposeInvoiceDialog({
         dueDate: dueDate || null,
         notes: notes || null,
         currency: settings?.currency ?? "USD",
+        customerGstin: gstEnabled ? (customerGstin.trim() || null) : null,
+        placeOfSupplyCode: gstEnabled ? (placeOfSupplyCode || null) : null,
+        placeOfSupplyName: gstEnabled
+          ? (GST_STATES.find((s) => s.code === placeOfSupplyCode)?.name ?? null)
+          : null,
+        reverseCharge: gstEnabled ? reverseCharge : false,
         items: items
           .filter((i) => i.description.trim() && toCents(i.unitPrice) > 0)
           .map((i, idx) => ({
@@ -465,6 +603,12 @@ function ComposeInvoiceDialog({
             unitPrice: toCents(i.unitPrice),
             amount: toCents(i.unitPrice) * (i.quantity || 1),
             sortOrder: idx,
+            hsnCode: gstEnabled ? (i.hsnCode?.trim() || null) : null,
+            // Send null when blank so the server falls back to settings.taxRate;
+            // an explicit "0" is preserved as exempt.
+            taxRate: gstEnabled
+              ? ((i.taxRate ?? "").trim() === "" ? null : Math.round((parseFloat(i.taxRate || "0") || 0) * 100))
+              : 0,
           })),
       };
       const res = await apiRequest("POST", `/api/tenants/${tenantId}/invoices`, payload);
@@ -576,56 +720,121 @@ function ComposeInvoiceDialog({
 
           <Separator />
 
+          {/* GST customer details (only when GST is enabled in settings) */}
+          {gstEnabled && (
+            <>
+              <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-base font-semibold">GST details</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Supplier state: {supplierStateCode ? `${supplierStateCode} - ${settings?.gstStateName ?? ""}` : "not set (configure in Settings)"}
+                    </p>
+                  </div>
+                  <Badge variant="outline" data-testid="badge-gst-mode">
+                    {!supplierStateCode
+                      ? "Flat tax (set supplier state)"
+                      : isIntraState
+                      ? "Intra-state (CGST + SGST)"
+                      : "Inter-state (IGST)"}
+                  </Badge>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>Customer GSTIN (optional)</Label>
+                    <Input value={customerGstin} onChange={(e) => setCustomerGstin(e.target.value.toUpperCase())}
+                      placeholder="15-char GSTIN" maxLength={15} data-testid="input-customer-gstin" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Place of supply</Label>
+                    <Select value={placeOfSupplyCode || supplierStateCode} onValueChange={setPlaceOfSupplyCode}>
+                      <SelectTrigger data-testid="select-place-of-supply"><SelectValue placeholder="Select state" /></SelectTrigger>
+                      <SelectContent>
+                        {GST_STATES.map((s) => (
+                          <SelectItem key={s.code} value={s.code}>{s.code} - {s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch checked={reverseCharge} onCheckedChange={setReverseCharge} data-testid="switch-reverse-charge" />
+                  <Label className="font-normal">Reverse charge applicable</Label>
+                </div>
+              </div>
+              <Separator />
+            </>
+          )}
+
           {/* Items */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <Label className="text-base font-semibold">Line items</Label>
               <Button type="button" variant="outline" size="sm" onClick={() =>
-                setItems([...items, { description: "", category: "agency_fee", quantity: 1, unitPrice: "" }])
+                setItems([...items, { description: "", category: "agency_fee", quantity: 1, unitPrice: "", hsnCode: "", taxRate: gstEnabled ? ((settings?.taxRate ?? 0) / 100).toString() : "" }])
               } data-testid="button-add-item">
                 <Plus className="w-4 h-4 mr-1" /> Add item
               </Button>
             </div>
             <div className="space-y-2">
               {items.map((it, idx) => (
-                <div key={idx} className="grid grid-cols-12 gap-2 items-end">
-                  <div className="col-span-12 sm:col-span-4 space-y-1">
-                    {idx === 0 && <Label className="text-xs">Description</Label>}
-                    <Input value={it.description} placeholder="Service description"
-                      onChange={(e) => setItems(items.map((x, i) => i === idx ? { ...x, description: e.target.value } : x))}
-                      data-testid={`input-item-desc-${idx}`} />
+                <div key={idx} className="space-y-2 border-b pb-2 last:border-b-0 last:pb-0">
+                  <div className="grid grid-cols-12 gap-2 items-end">
+                    <div className="col-span-12 sm:col-span-4 space-y-1">
+                      {idx === 0 && <Label className="text-xs">Description</Label>}
+                      <Input value={it.description} placeholder="Service description"
+                        onChange={(e) => setItems(items.map((x, i) => i === idx ? { ...x, description: e.target.value } : x))}
+                        data-testid={`input-item-desc-${idx}`} />
+                    </div>
+                    <div className="col-span-6 sm:col-span-3 space-y-1">
+                      {idx === 0 && <Label className="text-xs">Category</Label>}
+                      <Select value={it.category}
+                        onValueChange={(v) => setItems(items.map((x, i) => i === idx ? { ...x, category: v } : x))}>
+                        <SelectTrigger data-testid={`select-item-category-${idx}`}><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {ITEM_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-3 sm:col-span-2 space-y-1">
+                      {idx === 0 && <Label className="text-xs">Qty</Label>}
+                      <Input type="number" min={1} value={it.quantity}
+                        onChange={(e) => setItems(items.map((x, i) => i === idx ? { ...x, quantity: parseInt(e.target.value) || 1 } : x))}
+                        data-testid={`input-item-qty-${idx}`} />
+                    </div>
+                    <div className="col-span-3 sm:col-span-2 space-y-1">
+                      {idx === 0 && <Label className="text-xs">Price</Label>}
+                      <Input type="number" step="0.01" placeholder="0.00" value={it.unitPrice}
+                        onChange={(e) => setItems(items.map((x, i) => i === idx ? { ...x, unitPrice: e.target.value } : x))}
+                        data-testid={`input-item-price-${idx}`} />
+                    </div>
+                    <div className="col-span-12 sm:col-span-1 flex justify-end">
+                      {items.length > 1 && (
+                        <Button type="button" variant="ghost" size="icon"
+                          onClick={() => setItems(items.filter((_, i) => i !== idx))}
+                          data-testid={`button-remove-item-${idx}`}>
+                          <Trash2 className="w-4 h-4 text-red-600" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <div className="col-span-6 sm:col-span-3 space-y-1">
-                    {idx === 0 && <Label className="text-xs">Category</Label>}
-                    <Select value={it.category}
-                      onValueChange={(v) => setItems(items.map((x, i) => i === idx ? { ...x, category: v } : x))}>
-                      <SelectTrigger data-testid={`select-item-category-${idx}`}><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {ITEM_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-3 sm:col-span-2 space-y-1">
-                    {idx === 0 && <Label className="text-xs">Qty</Label>}
-                    <Input type="number" min={1} value={it.quantity}
-                      onChange={(e) => setItems(items.map((x, i) => i === idx ? { ...x, quantity: parseInt(e.target.value) || 1 } : x))}
-                      data-testid={`input-item-qty-${idx}`} />
-                  </div>
-                  <div className="col-span-3 sm:col-span-2 space-y-1">
-                    {idx === 0 && <Label className="text-xs">Price</Label>}
-                    <Input type="number" step="0.01" placeholder="0.00" value={it.unitPrice}
-                      onChange={(e) => setItems(items.map((x, i) => i === idx ? { ...x, unitPrice: e.target.value } : x))}
-                      data-testid={`input-item-price-${idx}`} />
-                  </div>
-                  <div className="col-span-12 sm:col-span-1 flex justify-end">
-                    {items.length > 1 && (
-                      <Button type="button" variant="ghost" size="icon"
-                        onClick={() => setItems(items.filter((_, i) => i !== idx))}
-                        data-testid={`button-remove-item-${idx}`}>
-                        <Trash2 className="w-4 h-4 text-red-600" />
-                      </Button>
-                    )}
-                  </div>
+                  {gstEnabled && (
+                    <div className="grid grid-cols-12 gap-2 items-end">
+                      <div className="col-span-6 sm:col-span-4 space-y-1">
+                        {idx === 0 && <Label className="text-xs">HSN / SAC code</Label>}
+                        <Input value={it.hsnCode ?? ""} placeholder="e.g. 998551"
+                          onChange={(e) => setItems(items.map((x, i) => i === idx ? { ...x, hsnCode: e.target.value } : x))}
+                          data-testid={`input-item-hsn-${idx}`} />
+                      </div>
+                      <div className="col-span-6 sm:col-span-3 space-y-1">
+                        {idx === 0 && <Label className="text-xs">GST rate (%)</Label>}
+                        <Input type="number" step="0.01" min="0" max="100"
+                          placeholder="18" value={it.taxRate ?? ""}
+                          onChange={(e) => setItems(items.map((x, i) => i === idx ? { ...x, taxRate: e.target.value } : x))}
+                          data-testid={`input-item-tax-rate-${idx}`} />
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -634,11 +843,29 @@ function ComposeInvoiceDialog({
           {/* Totals */}
           <div className="rounded-lg border p-4 space-y-1 text-sm">
             <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span data-testid="text-subtotal">{fmtMoney(subtotalCents, settings?.currency)}</span></div>
-            {taxRate > 0 && (
+            {gstEnabled ? (
+              <>
+                {cgst > 0 && (
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>CGST</span><span data-testid="text-cgst">{fmtMoney(cgst, settings?.currency)}</span>
+                  </div>
+                )}
+                {sgst > 0 && (
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>SGST</span><span data-testid="text-sgst">{fmtMoney(sgst, settings?.currency)}</span>
+                  </div>
+                )}
+                {igst > 0 && (
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>IGST</span><span data-testid="text-igst">{fmtMoney(igst, settings?.currency)}</span>
+                  </div>
+                )}
+              </>
+            ) : taxRate > 0 ? (
               <div className="flex justify-between text-muted-foreground">
                 <span>{settings?.taxLabel ?? "Tax"} ({(taxRate / 100).toFixed(2)}%)</span><span>{fmtMoney(taxAmount, settings?.currency)}</span>
               </div>
-            )}
+            ) : null}
             <div className="flex justify-between font-semibold text-base pt-1 border-t mt-1"><span>Total</span><span data-testid="text-total">{fmtMoney(total, settings?.currency)}</span></div>
           </div>
 
@@ -1250,6 +1477,7 @@ function InvoiceSettingsTab({ tenantId }: { tenantId: string }) {
     currency: "USD", taxRate: "0", taxLabel: "Tax", invoicePrefix: "INV",
     paymentTerms: "Due on receipt", paymentInstructions: "", bankDetails: "",
     footerText: "", notes: "",
+    gstEnabled: false, gstin: "", gstStateCode: "", gstLegalName: "",
   });
   const [hydrated, setHydrated] = useState(false);
 
@@ -1270,6 +1498,10 @@ function InvoiceSettingsTab({ tenantId }: { tenantId: string }) {
         bankDetails: settings.bankDetails ?? "",
         footerText: settings.footerText ?? "",
         notes: settings.notes ?? "",
+        gstEnabled: !!settings.gstEnabled,
+        gstin: settings.gstin ?? "",
+        gstStateCode: settings.gstStateCode ?? "",
+        gstLegalName: settings.gstLegalName ?? "",
       });
       setHydrated(true);
     }
@@ -1277,9 +1509,14 @@ function InvoiceSettingsTab({ tenantId }: { tenantId: string }) {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      const stateName = GST_STATES.find((s) => s.code === form.gstStateCode)?.name ?? null;
       const payload = {
         ...form,
         taxRate: Math.round(parseFloat(form.taxRate || "0") * 100), // convert % to basis points
+        gstin: form.gstin.trim() || null,
+        gstStateCode: form.gstStateCode || null,
+        gstStateName: stateName,
+        gstLegalName: form.gstLegalName.trim() || null,
       };
       const res = await apiRequest("PUT", `/api/tenants/${tenantId}/invoice-settings`, payload);
       return res.json();
@@ -1336,6 +1573,57 @@ function InvoiceSettingsTab({ tenantId }: { tenantId: string }) {
               </Select>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>GST (India)</CardTitle>
+          <CardDescription>
+            Enable GST to capture GSTIN, place of supply and CGST/SGST/IGST splits on every invoice,
+            and to download monthly GSTR-1 reports.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center gap-3">
+            <Switch
+              checked={form.gstEnabled}
+              onCheckedChange={(v) => setForm({ ...form, gstEnabled: v })}
+              data-testid="switch-gst-enabled"
+            />
+            <Label>Enable GST on invoices</Label>
+          </div>
+          {form.gstEnabled && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Legal name (as per GSTIN)</Label>
+                <Input value={form.gstLegalName}
+                  onChange={(e) => setForm({ ...form, gstLegalName: e.target.value })}
+                  data-testid="input-gst-legal-name" />
+              </div>
+              <div className="space-y-2">
+                <Label>GSTIN</Label>
+                <Input value={form.gstin}
+                  onChange={(e) => setForm({ ...form, gstin: e.target.value.toUpperCase() })}
+                  placeholder="15-character GSTIN" maxLength={15}
+                  data-testid="input-gstin" />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label>Registered state</Label>
+                <Select value={form.gstStateCode} onValueChange={(v) => setForm({ ...form, gstStateCode: v })}>
+                  <SelectTrigger data-testid="select-gst-state"><SelectValue placeholder="Select state" /></SelectTrigger>
+                  <SelectContent>
+                    {GST_STATES.map((s) => (
+                      <SelectItem key={s.code} value={s.code}>{s.code} - {s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Used to compute CGST/SGST (intra-state) vs IGST (inter-state).
+                </p>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

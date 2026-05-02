@@ -8,6 +8,7 @@ import indiaVisaChanceDataset from "@shared/india_visa_chance_dataset_non_visa_f
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 import { z } from "zod";
+import ExcelJS from "exceljs";
 import {
   insertFeeTemplateSchema,
   insertInvoiceSchema,
@@ -15,6 +16,63 @@ import {
   insertInvoiceSettingsSchema,
   insertPaymentSchema,
 } from "@shared/schema";
+
+// Indian state codes for GST place-of-supply lookups.
+const INDIAN_STATE_NAME_BY_CODE: Record<string, string> = {
+  "01": "Jammu & Kashmir", "02": "Himachal Pradesh", "03": "Punjab", "04": "Chandigarh",
+  "05": "Uttarakhand", "06": "Haryana", "07": "Delhi", "08": "Rajasthan",
+  "09": "Uttar Pradesh", "10": "Bihar", "11": "Sikkim", "12": "Arunachal Pradesh",
+  "13": "Nagaland", "14": "Manipur", "15": "Mizoram", "16": "Tripura",
+  "17": "Meghalaya", "18": "Assam", "19": "West Bengal", "20": "Jharkhand",
+  "21": "Odisha", "22": "Chhattisgarh", "23": "Madhya Pradesh", "24": "Gujarat",
+  "26": "Dadra & Nagar Haveli and Daman & Diu", "27": "Maharashtra",
+  "29": "Karnataka", "30": "Goa", "31": "Lakshadweep", "32": "Kerala",
+  "33": "Tamil Nadu", "34": "Puducherry", "35": "Andaman & Nicobar Islands",
+  "36": "Telangana", "37": "Andhra Pradesh", "38": "Ladakh",
+  "96": "Foreign Country", "97": "Other Territory",
+};
+
+// Compute CGST/SGST/IGST split from items + supplier+place-of-supply state codes.
+// Returns all amounts in cents.
+//
+// Behavior contract:
+// - When `gstEnabled` is false: returns a flat tax computed via `fallbackTaxRate`
+//   on the full subtotal, with all CGST/SGST/IGST = 0 (legacy/non-GST tenants).
+// - When `gstEnabled` is true: each item's `taxRate` is used as-is. An explicit
+//   `0` means exempt/zero-rated and is preserved (no fallback). `null`/`undefined`
+//   falls back to `fallbackTaxRate`. Tax is split into CGST+SGST (intra-state) or
+//   IGST (inter-state). When `gstEnabled` is true but the supplier state code is
+//   missing, we cannot classify the supply: the tax is computed but kept flat
+//   (all splits = 0) so callers/UIs can flag the misconfiguration.
+function computeGstSplit(
+  items: Array<{ amount: number; taxRate?: number | null }>,
+  supplierStateCode: string | null | undefined,
+  placeOfSupplyCode: string | null | undefined,
+  fallbackTaxRate: number,
+  gstEnabled: boolean,
+): { taxAmount: number; cgst: number; sgst: number; igst: number } {
+  if (!gstEnabled) {
+    const subtotal = items.reduce((s, it) => s + (it.amount ?? 0), 0);
+    const taxAmount = Math.round((subtotal * (fallbackTaxRate || 0)) / 10000);
+    return { taxAmount, cgst: 0, sgst: 0, igst: 0 };
+  }
+  let totalTax = 0;
+  for (const it of items) {
+    // Explicit 0 means exempt; only null/undefined falls back.
+    const rate = it.taxRate == null ? fallbackTaxRate : it.taxRate;
+    totalTax += Math.round(((it.amount ?? 0) * (rate || 0)) / 10000);
+  }
+  if (!supplierStateCode) {
+    // Misconfigured supplier: don't guess intra/inter — keep flat.
+    return { taxAmount: totalTax, cgst: 0, sgst: 0, igst: 0 };
+  }
+  const isIntraState = !!placeOfSupplyCode && supplierStateCode === placeOfSupplyCode;
+  if (isIntraState) {
+    const half = Math.round(totalTax / 2);
+    return { taxAmount: totalTax, cgst: half, sgst: totalTax - half, igst: 0 };
+  }
+  return { taxAmount: totalTax, cgst: 0, sgst: 0, igst: totalTax };
+}
 
 // Site-wide password for protecting the entire application
 const SITE_PASSWORD = process.env.SITE_PASSWORD;
@@ -1007,21 +1065,31 @@ export async function registerRoutes(
     customerName: true, customerEmail: true, caseId: true, currency: true,
     status: true, dueDate: true, issuedAt: true, notes: true,
     feePaymentType: true, destinationCountry: true, visaType: true,
+    customerGstin: true, placeOfSupplyCode: true, placeOfSupplyName: true,
+    reverseCharge: true,
   } as any).extend({
     dueDate: z.union([z.string(), z.date(), z.null()]).optional(),
     issuedAt: z.union([z.string(), z.date()]).optional(),
   });
 
-  // Recompute and persist totals for an invoice from its current items + tenant tax rate.
+  // Recompute totals for an invoice from current items + tenant GST/tax settings.
   async function recomputeInvoiceTotals(invoiceId: string) {
     const inv = await storage.getInvoice(invoiceId);
     if (!inv) return;
     const items = await storage.getInvoiceItems(invoiceId);
     const subtotal = items.reduce((s, it) => s + (it.amount ?? ((it.unitPrice ?? 0) * (it.quantity ?? 1))), 0);
     const settings = await storage.getInvoiceSettings(inv.tenantId);
-    const taxRate = settings?.taxRate ?? 0;
-    const taxAmount = Math.round((subtotal * taxRate) / 10000);
-    await storage.updateInvoice(invoiceId, { subtotal, taxAmount, total: subtotal + taxAmount } as any);
+    const fallbackRate = settings?.taxRate ?? 0;
+    const supplyCode = inv.placeOfSupplyCode ?? settings?.gstStateCode ?? null;
+    const split = computeGstSplit(items, settings?.gstStateCode, supplyCode, fallbackRate, !!settings?.gstEnabled);
+    await storage.updateInvoice(invoiceId, {
+      subtotal,
+      taxAmount: split.taxAmount,
+      cgstAmount: split.cgst,
+      sgstAmount: split.sgst,
+      igstAmount: split.igst,
+      total: subtotal + split.taxAmount,
+    } as any);
   }
 
   // Fee Templates
@@ -1075,11 +1143,240 @@ export async function registerRoutes(
     if (!requireTenantAccess(req, res, req.params.tenantId)) return;
     try {
       const { tenantId: _t, id: _i, ...rest } = req.body ?? {};
+      // Auto-fill GST state name from code if a code was provided.
+      if (rest.gstStateCode && !rest.gstStateName) {
+        rest.gstStateName = INDIAN_STATE_NAME_BY_CODE[rest.gstStateCode] ?? null;
+      }
       const parsed = insertInvoiceSettingsSchema.partial().parse(rest);
       const settings = await storage.upsertInvoiceSettings(req.params.tenantId, parsed as any);
       res.json(settings);
     } catch (e: any) {
       res.status(400).json({ error: e?.message ?? "Invalid invoice settings" });
+    }
+  });
+
+  // GST: Indian state list (for selectors)
+  app.get("/api/gst/states", (_req, res) => {
+    res.json(
+      Object.entries(INDIAN_STATE_NAME_BY_CODE).map(([code, name]) => ({ code, name })),
+    );
+  });
+
+  // GST monthly report (GSTR-1 style) — returns an .xlsx file.
+  app.get("/api/tenants/:tenantId/gst-reports/monthly", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
+    try {
+      const tenantId = req.params.tenantId;
+      const yearStr = String(req.query.year ?? "");
+      const monthStr = String(req.query.month ?? "");
+      const year = parseInt(yearStr, 10);
+      const month = parseInt(monthStr, 10); // 1-12
+      if (!Number.isInteger(year) || year < 2000 || year > 2100 || !Number.isInteger(month) || month < 1 || month > 12) {
+        return res.status(400).json({ error: "Invalid year or month (year=YYYY, month=1-12 required)" });
+      }
+      const settings = await storage.getInvoiceSettings(tenantId);
+      const invoices = await storage.getInvoicesByTenantId(tenantId);
+      const startUtc = new Date(Date.UTC(year, month - 1, 1));
+      const endUtc = new Date(Date.UTC(year, month, 1));
+      const inMonth = invoices.filter((inv) => {
+        const d = inv.issuedAt ? new Date(inv.issuedAt) : null;
+        if (!d) return false;
+        return d >= startUtc && d < endUtc && inv.status !== "cancelled";
+      });
+
+      const wb = new ExcelJS.Workbook();
+      wb.creator = "VisaShuttle";
+      wb.created = new Date();
+
+      // ---- Sheet: B2B (invoices with customer GSTIN) ----
+      const b2bRows = inMonth.filter((inv) => !!inv.customerGstin);
+      const b2cRows = inMonth.filter((inv) => !inv.customerGstin);
+
+      const headerStyle = {
+        font: { bold: true, color: { argb: "FFFFFFFF" } },
+        fill: { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FF2563EB" } },
+        alignment: { vertical: "middle" as const, horizontal: "center" as const },
+      };
+      const totalRowStyle = {
+        font: { bold: true },
+        fill: { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFE0E7FF" } },
+      };
+
+      const b2b = wb.addWorksheet("B2B");
+      b2b.columns = [
+        { header: "GSTIN/UIN of Recipient", key: "gstin", width: 22 },
+        { header: "Receiver Name", key: "name", width: 28 },
+        { header: "Invoice Number", key: "no", width: 18 },
+        { header: "Invoice Date", key: "date", width: 14 },
+        { header: "Invoice Value", key: "value", width: 14 },
+        { header: "Place Of Supply", key: "pos", width: 22 },
+        { header: "Reverse Charge", key: "rc", width: 14 },
+        { header: "Invoice Type", key: "type", width: 14 },
+        { header: "Rate", key: "rate", width: 8 },
+        { header: "Taxable Value", key: "taxable", width: 14 },
+        { header: "CGST", key: "cgst", width: 12 },
+        { header: "SGST", key: "sgst", width: 12 },
+        { header: "IGST", key: "igst", width: 12 },
+      ];
+      b2b.getRow(1).eachCell((c) => Object.assign(c, headerStyle));
+      let b2bSubtotal = 0, b2bCgst = 0, b2bSgst = 0, b2bIgst = 0, b2bTotal = 0;
+      for (const inv of b2bRows) {
+        const items = await storage.getInvoiceItems(inv.id);
+        const taxableValue = items.reduce((s, it) => s + (it.amount ?? 0), 0);
+        const ratesUsed = items.map((it) => (it.taxRate ?? 0)).filter((r) => r > 0);
+        const rate = ratesUsed.length ? Math.max(...ratesUsed) / 100 : (settings?.taxRate ?? 0) / 100;
+        b2b.addRow({
+          gstin: inv.customerGstin ?? "",
+          name: inv.customerName,
+          no: inv.invoiceNumber,
+          date: inv.issuedAt ? new Date(inv.issuedAt).toLocaleDateString("en-GB") : "",
+          value: (inv.total ?? 0) / 100,
+          pos: inv.placeOfSupplyCode ? `${inv.placeOfSupplyCode}-${inv.placeOfSupplyName ?? ""}` : "",
+          rc: inv.reverseCharge ? "Y" : "N",
+          type: "Regular",
+          rate,
+          taxable: taxableValue / 100,
+          cgst: (inv.cgstAmount ?? 0) / 100,
+          sgst: (inv.sgstAmount ?? 0) / 100,
+          igst: (inv.igstAmount ?? 0) / 100,
+        });
+        b2bSubtotal += taxableValue;
+        b2bCgst += inv.cgstAmount ?? 0;
+        b2bSgst += inv.sgstAmount ?? 0;
+        b2bIgst += inv.igstAmount ?? 0;
+        b2bTotal += inv.total ?? 0;
+      }
+      const b2bTotalRow = b2b.addRow({
+        name: "TOTAL",
+        value: b2bTotal / 100,
+        taxable: b2bSubtotal / 100,
+        cgst: b2bCgst / 100,
+        sgst: b2bSgst / 100,
+        igst: b2bIgst / 100,
+      });
+      b2bTotalRow.eachCell((c) => Object.assign(c, totalRowStyle));
+
+      // ---- Sheet: B2C (no GSTIN) ----
+      const b2c = wb.addWorksheet("B2C");
+      b2c.columns = [
+        { header: "Invoice Number", key: "no", width: 18 },
+        { header: "Invoice Date", key: "date", width: 14 },
+        { header: "Customer Name", key: "name", width: 28 },
+        { header: "Place Of Supply", key: "pos", width: 22 },
+        { header: "Invoice Value", key: "value", width: 14 },
+        { header: "Rate", key: "rate", width: 8 },
+        { header: "Taxable Value", key: "taxable", width: 14 },
+        { header: "CGST", key: "cgst", width: 12 },
+        { header: "SGST", key: "sgst", width: 12 },
+        { header: "IGST", key: "igst", width: 12 },
+      ];
+      b2c.getRow(1).eachCell((c) => Object.assign(c, headerStyle));
+      let b2cSubtotal = 0, b2cCgst = 0, b2cSgst = 0, b2cIgst = 0, b2cTotal = 0;
+      for (const inv of b2cRows) {
+        const items = await storage.getInvoiceItems(inv.id);
+        const taxableValue = items.reduce((s, it) => s + (it.amount ?? 0), 0);
+        const ratesUsed = items.map((it) => (it.taxRate ?? 0)).filter((r) => r > 0);
+        const rate = ratesUsed.length ? Math.max(...ratesUsed) / 100 : (settings?.taxRate ?? 0) / 100;
+        b2c.addRow({
+          no: inv.invoiceNumber,
+          date: inv.issuedAt ? new Date(inv.issuedAt).toLocaleDateString("en-GB") : "",
+          name: inv.customerName,
+          pos: inv.placeOfSupplyCode ? `${inv.placeOfSupplyCode}-${inv.placeOfSupplyName ?? ""}` : "",
+          value: (inv.total ?? 0) / 100,
+          rate,
+          taxable: taxableValue / 100,
+          cgst: (inv.cgstAmount ?? 0) / 100,
+          sgst: (inv.sgstAmount ?? 0) / 100,
+          igst: (inv.igstAmount ?? 0) / 100,
+        });
+        b2cSubtotal += taxableValue;
+        b2cCgst += inv.cgstAmount ?? 0;
+        b2cSgst += inv.sgstAmount ?? 0;
+        b2cIgst += inv.igstAmount ?? 0;
+        b2cTotal += inv.total ?? 0;
+      }
+      const b2cTotalRow = b2c.addRow({
+        name: "TOTAL",
+        value: b2cTotal / 100,
+        taxable: b2cSubtotal / 100,
+        cgst: b2cCgst / 100,
+        sgst: b2cSgst / 100,
+        igst: b2cIgst / 100,
+      });
+      b2cTotalRow.eachCell((c) => Object.assign(c, totalRowStyle));
+
+      // ---- Sheet: HSN Summary ----
+      const hsn = wb.addWorksheet("HSN Summary");
+      hsn.columns = [
+        { header: "HSN/SAC", key: "hsn", width: 14 },
+        { header: "Description", key: "desc", width: 36 },
+        { header: "Total Quantity", key: "qty", width: 14 },
+        { header: "Total Value", key: "value", width: 14 },
+        { header: "Taxable Value", key: "taxable", width: 14 },
+        { header: "Integrated Tax (IGST)", key: "igst", width: 18 },
+        { header: "Central Tax (CGST)", key: "cgst", width: 18 },
+        { header: "State Tax (SGST)", key: "sgst", width: 18 },
+      ];
+      hsn.getRow(1).eachCell((c) => Object.assign(c, headerStyle));
+      const hsnAgg = new Map<string, { desc: string; qty: number; value: number; taxable: number; cgst: number; sgst: number; igst: number }>();
+      for (const inv of inMonth) {
+        const items = await storage.getInvoiceItems(inv.id);
+        const invTaxable = items.reduce((s, it) => s + (it.amount ?? 0), 0) || 1;
+        for (const it of items) {
+          const key = it.hsnCode || "—";
+          const share = (it.amount ?? 0) / invTaxable;
+          const row = hsnAgg.get(key) ?? { desc: it.description, qty: 0, value: 0, taxable: 0, cgst: 0, sgst: 0, igst: 0 };
+          row.qty += it.quantity ?? 0;
+          row.value += it.amount ?? 0;
+          row.taxable += it.amount ?? 0;
+          row.cgst += Math.round((inv.cgstAmount ?? 0) * share);
+          row.sgst += Math.round((inv.sgstAmount ?? 0) * share);
+          row.igst += Math.round((inv.igstAmount ?? 0) * share);
+          hsnAgg.set(key, row);
+        }
+      }
+      for (const [hsnCode, agg] of Array.from(hsnAgg.entries())) {
+        hsn.addRow({
+          hsn: hsnCode,
+          desc: agg.desc,
+          qty: agg.qty,
+          value: agg.value / 100,
+          taxable: agg.taxable / 100,
+          igst: agg.igst / 100,
+          cgst: agg.cgst / 100,
+          sgst: agg.sgst / 100,
+        });
+      }
+
+      // ---- Sheet: Summary ----
+      const sum = wb.addWorksheet("Summary");
+      sum.columns = [
+        { header: "Field", key: "k", width: 32 },
+        { header: "Value", key: "v", width: 36 },
+      ];
+      sum.getRow(1).eachCell((c) => Object.assign(c, headerStyle));
+      const monthLabel = startUtc.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+      sum.addRow({ k: "Legal Name", v: settings?.gstLegalName ?? settings?.companyName ?? "—" });
+      sum.addRow({ k: "GSTIN", v: settings?.gstin ?? "—" });
+      sum.addRow({ k: "State", v: settings?.gstStateCode ? `${settings.gstStateCode} - ${settings.gstStateName ?? ""}` : "—" });
+      sum.addRow({ k: "Return Period", v: monthLabel });
+      sum.addRow({ k: "Generated At", v: new Date().toISOString() });
+      sum.addRow({ k: "", v: "" });
+      sum.addRow({ k: "B2B Invoices", v: b2bRows.length });
+      sum.addRow({ k: "B2C Invoices", v: b2cRows.length });
+      sum.addRow({ k: "Total Taxable Value", v: (b2bSubtotal + b2cSubtotal) / 100 });
+      sum.addRow({ k: "Total CGST", v: (b2bCgst + b2cCgst) / 100 });
+      sum.addRow({ k: "Total SGST", v: (b2bSgst + b2cSgst) / 100 });
+      sum.addRow({ k: "Total IGST", v: (b2bIgst + b2cIgst) / 100 });
+      sum.addRow({ k: "Total Invoice Value", v: (b2bTotal + b2cTotal) / 100 });
+
+      const filename = `GST-Report-${year}-${String(month).padStart(2, "0")}.xlsx`;
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      const buf = await wb.xlsx.writeBuffer();
+      res.send(Buffer.from(buf));
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message ?? "Failed to build GST report" });
     }
   });
 
@@ -1123,6 +1420,7 @@ export async function registerRoutes(
       const year = new Date().getFullYear();
       const seq = existing.length + 1;
       const rawItems: any[] = Array.isArray(req.body?.items) ? req.body.items : [];
+      const fallbackRate = settings?.taxRate ?? 0;
       // Validate each item; ignore invoiceId in the input (server sets it).
       const items = rawItems.map((it) =>
         insertInvoiceItemSchema.omit({ invoiceId: true } as any).parse({
@@ -1130,28 +1428,40 @@ export async function registerRoutes(
           quantity: it.quantity ?? 1,
           unitPrice: it.unitPrice ?? 0,
           amount: it.amount ?? ((it.unitPrice ?? 0) * (it.quantity ?? 1)),
-          feeType: it.feeType ?? "other",
+          category: it.category ?? "agency_fee",
+          hsnCode: it.hsnCode ?? null,
+          // When GST is on we preserve explicit 0 (exempt) and only fall back when null/undefined.
+          // When GST is off we always store 0 (no per-line GST tracking).
+          taxRate: settings?.gstEnabled
+            ? (it.taxRate == null ? fallbackRate : it.taxRate)
+            : 0,
         }),
       );
       const subtotal: number = (items as any[]).reduce(
         (s: number, it: any) => s + (it.amount ?? ((it.unitPrice ?? 0) * (it.quantity ?? 1))),
         0,
       );
-      const taxRate = settings?.taxRate ?? 0;
-      const computedTax = Math.round((subtotal * taxRate) / 10000);
       // Validate the invoice header. Strip computed/forbidden fields from input.
-      const { items: _items, id: _id, tenantId: _t, invoiceNumber: _n, subtotal: _s, taxAmount: _ta, total: _to, paidAmount: _pa, ...header } = req.body ?? {};
+      const { items: _items, id: _id, tenantId: _t, invoiceNumber: _n, subtotal: _s, taxAmount: _ta, cgstAmount: _c, sgstAmount: _sg, igstAmount: _ig, total: _to, paidAmount: _pa, ...header } = req.body ?? {};
       const invoiceNumber = req.body.invoiceNumber ?? `${prefix}-${year}-${String(seq).padStart(4, "0")}`;
+      const supplyCode = header.placeOfSupplyCode ?? settings?.gstStateCode ?? null;
+      const supplyName = header.placeOfSupplyName ?? (supplyCode ? INDIAN_STATE_NAME_BY_CODE[supplyCode] ?? null : null);
+      const split = computeGstSplit(items as any[], settings?.gstStateCode, supplyCode, fallbackRate, !!settings?.gstEnabled);
       const parsedHeader = insertInvoiceSchema.parse({
         ...header,
         tenantId,
         invoiceNumber,
         subtotal,
-        taxAmount: computedTax,
-        total: subtotal + computedTax,
+        taxAmount: split.taxAmount,
+        cgstAmount: split.cgst,
+        sgstAmount: split.sgst,
+        igstAmount: split.igst,
+        total: subtotal + split.taxAmount,
         paidAmount: 0,
         currency: header.currency ?? settings?.currency ?? "USD",
         status: header.status ?? "draft",
+        placeOfSupplyCode: supplyCode,
+        placeOfSupplyName: supplyName,
         dueDate: header.dueDate ? new Date(header.dueDate) : null,
         issuedAt: header.issuedAt ? new Date(header.issuedAt) : new Date(),
       });
@@ -1185,13 +1495,19 @@ export async function registerRoutes(
       if (parsed.issuedAt !== undefined) patch.issuedAt = new Date(parsed.issuedAt as any);
       await storage.updateInvoice(req.params.id, patch);
       if (Array.isArray(items)) {
+        const settingsForItems = await storage.getInvoiceSettings(invoice.tenantId);
+        const fallbackRate = settingsForItems?.taxRate ?? 0;
         const validated = items.map((it: any) =>
           insertInvoiceItemSchema.omit({ invoiceId: true } as any).parse({
             description: it.description,
             quantity: it.quantity ?? 1,
             unitPrice: it.unitPrice ?? 0,
             amount: it.amount ?? ((it.unitPrice ?? 0) * (it.quantity ?? 1)),
-            feeType: it.feeType ?? "other",
+            category: it.category ?? "agency_fee",
+            hsnCode: it.hsnCode ?? null,
+            taxRate: settingsForItems?.gstEnabled
+              ? (it.taxRate == null ? fallbackRate : it.taxRate)
+              : 0,
           }),
         );
         await storage.replaceInvoiceItems(req.params.id, validated as any);

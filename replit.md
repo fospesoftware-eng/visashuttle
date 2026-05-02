@@ -39,6 +39,14 @@ Preferred communication style: Simple, everyday language.
 - **Seed Data**: Demo tenant, admin user, agency owner, customer, sample cases and documents
 - **Production**: Ready to switch to PostgreSQL with Drizzle ORM
 
+### GST (India)
+- Tenants can opt in via Settings → "GST (India)" card: toggles `gstEnabled`, captures `gstin`, registered state (`gstStateCode` + `gstStateName`), and legal name. Settings PUT auto-fills the state name from the code via `INDIAN_STATE_NAME_BY_CODE` in `server/routes.ts`.
+- Per-invoice fields on `invoices`: `customerGstin`, `placeOfSupplyCode`, `placeOfSupplyName`, `reverseCharge`, plus split tax columns `cgstAmount`, `sgstAmount`, `igstAmount`. Per-line item: `hsnCode` and `taxRate` (basis points, e.g. `1800` = 18%).
+- Tax computation (`computeGstSplit` in `server/routes.ts`): when GST is enabled, each item's `taxRate` is applied to its amount; the resulting tax is split into CGST+SGST (intra-state, supplier state == place of supply) or full IGST (inter-state). When GST is off, behavior falls back to the flat `settings.taxRate`.
+- New endpoints: `GET /api/gst/states` (state list), `GET /api/tenants/:tenantId/gst-reports/monthly?year=&month=` returns an `.xlsx` workbook (B2B / B2C / HSN Summary / Summary sheets, GSTR-1 style) generated with `exceljs`.
+- UI: Compose Invoice dialog shows a GST Details card (customer GSTIN, place of supply, reverse charge, intra/inter badge), HSN + GST-rate inputs per line item, and a CGST/SGST/IGST breakdown in the totals. Overview tab shows a "GST monthly report" card with year/month picker and Download Excel button (only when `gstEnabled`).
+- Same `MemStorage` persistence caveat applies — GST data lives in memory and resets on restart.
+
 ### Accounting Module
 - Tables (`shared/schema.ts`): `feeTemplates`, `invoiceSettings`, `invoices`, `invoiceItems`, `payments`. All money in INTEGER cents; `taxRate` in basis points (1800 = 18%).
 - API base: `/api/tenants/:tenantId/{fee-templates,invoice-settings,invoices,invoices/stats}`, plus ID-based `/api/{fee-templates,invoices,payments}/:id` and `/api/invoices/:id/payments`. All accounting routes require session auth + tenant ownership (or `saas_admin` role) and validate bodies via Zod. Invoice totals are server-computed and recomputed on item changes; payment create/delete auto-updates `paidAmount` + status (draft→sent→partial→paid).
