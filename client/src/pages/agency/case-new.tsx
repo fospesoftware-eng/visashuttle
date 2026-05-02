@@ -410,18 +410,64 @@ export default function NewCasePage() {
   }, [validFeeItems, invoiceSettings]);
   const feeTotal = feeSubtotal + feeTaxAmount;
 
-  // Document checklist: maps requirement.type -> whether to include for this case
-  // Defaults: all required items checked, optional items unchecked
-  const [docChecks, setDocChecks] = useState<Record<string, boolean>>({});
-  // Per-checklist-item file attachment (data URL + meta). Null = no file attached.
+  // === Documents step: PER-PERSON checklist + attachments ===
+  // The same tailored checklist is applied to the main applicant and to every
+  // co-traveller. Each person has their own check map and their own files map,
+  // so an attached photo for the applicant doesn't show up under a co-traveller.
+  // Person key = "applicant" or coTraveller.key.
+  type PersonKey = string;
   type DocFileAttachment = { dataUrl: string; mimeType: string; fileName: string };
-  const [docFiles, setDocFiles] = useState<Record<string, DocFileAttachment | null>>({});
-  // Hidden <input type="file"> per checklist row.
-  const docFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
-  // Track which checklist signature we've seeded (so user toggles aren't blown away on rerender)
+  const APPLICANT_KEY: PersonKey = "applicant";
+  const [docChecks, setDocChecks] = useState<Record<PersonKey, Record<string, boolean>>>({});
+  const [docFiles, setDocFiles] = useState<Record<PersonKey, Record<string, DocFileAttachment | null>>>({});
+  // Hidden <input type="file"> per (person, type).
+  const docFileRefs = useRef<Record<PersonKey, Record<string, HTMLInputElement | null>>>({});
+  // Tracks "we already auto-attached the bio page to this person's passport row".
+  // Cleared when the user unchecks the row, so re-checking re-arms auto-attach.
+  // Set when the user removes / replaces the file, so we don't fight the user.
+  const autoAttachedPassportRef = useRef<Set<string>>(new Set());
+  // Tracks which destination::visa signature we've seeded.
   const seededKeyRef = useRef<string>("");
+  // Which person tab is currently visible in step 5.
+  const [activeDocPerson, setActiveDocPerson] = useState<PersonKey>(APPLICANT_KEY);
 
-  const handleDocFile = (type: string, file: File | undefined) => {
+  const checklist = useMemo<DocumentRequirement[]>(
+    () => getDocumentChecklist(form.destinationCountry, form.visaType),
+    [form.destinationCountry, form.visaType],
+  );
+
+  // Stable list of person tabs. Includes the main applicant + every co-traveller
+  // currently in the form, in display order.
+  const docPersonTabs = useMemo(
+    () => [
+      { key: APPLICANT_KEY, label: form.applicantName.trim() || "Main applicant" },
+      ...coTravellers.map((ct, i) => ({
+        key: ct.key,
+        label: ct.name.trim() || `Co-traveller ${i + 1}`,
+      })),
+    ],
+    [form.applicantName, coTravellers],
+  );
+  // Stable signature so the sync effect below doesn't re-fire on label changes.
+  const docPersonKeysSig = docPersonTabs.map((p) => p.key).join("|");
+
+  // Per-(person,type) monotonically-increasing read tokens. We bump the token
+  // for a slot whenever the user takes ANY action on it (new pick, clear,
+  // uncheck, bulk action). FileReader.onload then no-ops if its captured
+  // token is no longer current — avoids the race where a slow file-read
+  // resurrects a slot the user just cleared.
+  const docFileReadTokensRef = useRef<Record<PersonKey, Record<string, number>>>({});
+  const bumpDocFileReadToken = (person: PersonKey, type: string) => {
+    if (!docFileReadTokensRef.current[person]) docFileReadTokensRef.current[person] = {};
+    const cur = docFileReadTokensRef.current[person][type] ?? 0;
+    const next = cur + 1;
+    docFileReadTokensRef.current[person][type] = next;
+    return next;
+  };
+  const isCurrentDocFileReadToken = (person: PersonKey, type: string, token: number) =>
+    (docFileReadTokensRef.current[person]?.[type] ?? 0) === token;
+
+  const handleDocFile = (person: PersonKey, type: string, file: File | undefined) => {
     if (!file) return;
     const isImage = file.type.startsWith("image/");
     const isPdf = file.type === "application/pdf";
@@ -433,44 +479,150 @@ export default function NewCasePage() {
       toast({ title: "File too large", description: "Please upload a file under 8 MB.", variant: "destructive" });
       return;
     }
+    // Capture the token for this read; if a later user action bumps it, our
+    // onload becomes a no-op so a slow read can't resurrect cleared state.
+    const myToken = bumpDocFileReadToken(person, type);
     const reader = new FileReader();
     reader.onload = () => {
+      if (!isCurrentDocFileReadToken(person, type, myToken)) return;
       setDocFiles((d) => ({
         ...d,
-        [type]: { dataUrl: reader.result as string, mimeType: file.type, fileName: file.name },
+        [person]: {
+          ...(d[person] ?? {}),
+          [type]: { dataUrl: reader.result as string, mimeType: file.type, fileName: file.name },
+        },
       }));
+      // The user just attached a real file — don't let auto-attach overwrite it.
+      if (type === "passport") autoAttachedPassportRef.current.add(person);
     };
     reader.readAsDataURL(file);
   };
 
-  const clearDocFile = (type: string) => {
-    setDocFiles((d) => ({ ...d, [type]: null }));
-    if (docFileRefs.current[type]) docFileRefs.current[type]!.value = "";
+  // Pure file-clear helper. Does NOT touch autoAttachedPassportRef — the
+  // caller decides whether this clear is a "user removed it" (set the flag
+  // to block re-attach while still checked) or "row was unchecked / bulk
+  // cleared" (delete from the flag to re-arm). Mixing the two would cause
+  // the bug where bulk Clear permanently blocks auto-attach.
+  const clearDocFile = (person: PersonKey, type: string) => {
+    // Bump the read token so any pending FileReader.onload for this slot
+    // becomes a no-op and can't resurrect the file we're about to clear.
+    bumpDocFileReadToken(person, type);
+    setDocFiles((d) => ({ ...d, [person]: { ...(d[person] ?? {}), [type]: null } }));
+    const el = docFileRefs.current[person]?.[type];
+    if (el) el.value = "";
   };
 
-  const checklist = useMemo<DocumentRequirement[]>(
-    () => getDocumentChecklist(form.destinationCountry, form.visaType),
-    [form.destinationCountry, form.visaType],
-  );
-
-  // Seed default selections when destination/visa changes
+  // Seed default selections when destination/visa changes — wipes EVERY
+  // person's checks/files since the underlying checklist itself changed.
   useEffect(() => {
     const key = `${form.destinationCountry}::${form.visaType}`;
     if (key === seededKeyRef.current) return;
     seededKeyRef.current = key;
-    const seed: Record<string, boolean> = {};
-    for (const req of checklist) seed[req.type] = req.required;
-    setDocChecks(seed);
-    // Drop any previously-attached files — they belonged to the old checklist
-    // and would silently re-attach if a same-typed item happens to exist in
-    // the new one.
+    const seedRow: Record<string, boolean> = {};
+    for (const req of checklist) seedRow[req.type] = req.required;
+    setDocChecks(() => {
+      const next: Record<PersonKey, Record<string, boolean>> = {};
+      for (const p of docPersonTabs) next[p.key] = { ...seedRow };
+      return next;
+    });
     setDocFiles({});
-    // Reset the hidden file inputs so the agent can re-pick the same filename.
-    for (const k of Object.keys(docFileRefs.current)) {
-      const el = docFileRefs.current[k];
-      if (el) el.value = "";
+    autoAttachedPassportRef.current.clear();
+    // Bump every outstanding read token so any in-flight FileReader.onload
+    // from the previous checklist can't resurrect a slot.
+    for (const person of Object.keys(docFileReadTokensRef.current)) {
+      for (const t of Object.keys(docFileReadTokensRef.current[person] ?? {})) {
+        bumpDocFileReadToken(person, t);
+      }
     }
+    for (const personMap of Object.values(docFileRefs.current)) {
+      for (const el of Object.values(personMap ?? {})) if (el) el.value = "";
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.destinationCountry, form.visaType, checklist]);
+
+  // Keep per-person state in sync as co-travellers are added / removed:
+  // add a fresh seeded bucket for new persons, drop orphaned ones, and snap
+  // the active tab back to the applicant if its person disappears.
+  useEffect(() => {
+    const validKeys = new Set(docPersonTabs.map((p) => p.key));
+    const seedRow: Record<string, boolean> = {};
+    for (const req of checklist) seedRow[req.type] = req.required;
+    setDocChecks((prev) => {
+      let changed = false;
+      const next: typeof prev = {};
+      for (const p of docPersonTabs) {
+        if (prev[p.key]) {
+          next[p.key] = prev[p.key];
+        } else {
+          next[p.key] = { ...seedRow };
+          changed = true;
+        }
+      }
+      for (const k of Object.keys(prev)) if (!validKeys.has(k)) changed = true;
+      return changed ? next : prev;
+    });
+    setDocFiles((prev) => {
+      let changed = false;
+      const next: typeof prev = {};
+      for (const k of Object.keys(prev)) {
+        if (validKeys.has(k)) next[k] = prev[k];
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+    for (const k of Array.from(autoAttachedPassportRef.current)) {
+      if (!validKeys.has(k)) autoAttachedPassportRef.current.delete(k);
+    }
+    if (!validKeys.has(activeDocPerson)) setActiveDocPerson(APPLICANT_KEY);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docPersonKeysSig, checklist]);
+
+  // Auto-attach the previously-uploaded passport bio page to each person's
+  // "passport" checklist row. Fires for a person when ALL of:
+  //  • the destination/visa checklist actually contains a "passport" row,
+  //  • that person's "passport" row is currently checked (so toggling the
+  //    checkbox triggers a re-evaluation — we depend on docChecks below),
+  //  • that person actually has a bio page uploaded in step 2 / step 4,
+  //  • that person has no file already attached on this row,
+  //  • `autoAttachedPassportRef` doesn't already mark this person — meaning
+  //    we haven't auto-attached this session AND the user hasn't manually
+  //    overridden it (they will set the flag via Remove / Replace).
+  // Re-arming happens in the row's check-toggle handler and in the bulk
+  // Clear / Reset / Select-all handlers (they DELETE from the Set), so
+  // unchecking + re-checking always reattaches.
+  useEffect(() => {
+    const hasPassportRow = checklist.some((r) => r.type === "passport");
+    if (!hasPassportRow) return;
+    setDocFiles((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      const tryAttach = (
+        person: PersonKey,
+        preview: string | null,
+        mime: string | null,
+        label: string,
+      ) => {
+        if (!preview || !mime) return;
+        // Only attach if the user has the passport row checked for this person.
+        if (!docChecks[person]?.passport) return;
+        if (autoAttachedPassportRef.current.has(person)) return;
+        const existing = next[person]?.passport;
+        if (existing) return;
+        next[person] = {
+          ...(next[person] ?? {}),
+          passport: { dataUrl: preview, mimeType: mime, fileName: `${label} — bio page` },
+        };
+        autoAttachedPassportRef.current.add(person);
+        changed = true;
+      };
+      tryAttach(APPLICANT_KEY, passportPreview, passportMimeType, "Applicant");
+      for (const ct of coTravellers) {
+        const lbl = ct.name.trim() || "Co-traveller";
+        tryAttach(ct.key, ct.passportPreview, ct.passportMimeType, lbl);
+      }
+      return changed ? next : prev;
+    });
+  }, [passportPreview, passportMimeType, coTravellers, checklist, docChecks]);
 
   // === Per-step validation ===
   const stepError = (s: StepId): string | null => {
@@ -590,10 +742,253 @@ export default function NewCasePage() {
     caseNumber: generateCaseNumber(),
   });
 
+  // Items currently checked for the active person (drives the count badge in
+  // the step header + the "Documents Checklist" panel of the Review step).
   const selectedDocs = useMemo(
-    () => checklist.filter((req) => docChecks[req.type]),
-    [checklist, docChecks],
+    () => {
+      const personChecks = docChecks[activeDocPerson] ?? {};
+      return checklist.filter((req) => personChecks[req.type]);
+    },
+    [checklist, docChecks, activeDocPerson],
   );
+  // Total number of checked items across every person — surfaced in the Review
+  // step so the agent sees the full footprint, not just the active tab.
+  const totalSelectedDocsCount = useMemo(
+    () => docPersonTabs.reduce(
+      (n, p) => n + checklist.filter((r) => docChecks[p.key]?.[r.type]).length,
+      0,
+    ),
+    [docPersonTabs, checklist, docChecks],
+  );
+
+  // Render the bulk-action toolbar + per-row checklist for a given person.
+  // Defined here so it closes over the per-person state map and reuses the
+  // same handlers (handleDocFile / clearDocFile / setDocChecks) for every tab.
+  // Also handles the "auto-attach" UX: rows whose passport file came from the
+  // step-2 / step-4 bio page get an "Auto from passport" badge instead of the
+  // generic green "File attached" badge.
+  const renderDocChecklistFor = (personKey: PersonKey, personLabel: string) => {
+    const personChecks = docChecks[personKey] ?? {};
+    const personFiles = docFiles[personKey] ?? {};
+    const setPersonChecks = (updater: (prev: Record<string, boolean>) => Record<string, boolean>) => {
+      setDocChecks((all) => ({ ...all, [personKey]: updater(all[personKey] ?? {}) }));
+    };
+    const ensureRefBucket = () => {
+      if (!docFileRefs.current[personKey]) docFileRefs.current[personKey] = {};
+      return docFileRefs.current[personKey]!;
+    };
+    const getInputEl = (type: string) => docFileRefs.current[personKey]?.[type] ?? null;
+    // Bio-page preview for this person — used to flag which "passport"
+    // attachments were auto-derived from the existing upload.
+    const bioPagePreview = personKey === APPLICANT_KEY
+      ? passportPreview
+      : coTravellers.find((c) => c.key === personKey)?.passportPreview ?? null;
+
+    return (
+      <>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setPersonChecks(() => Object.fromEntries(checklist.map((r) => [r.type, true])));
+              // Re-arm passport auto-attach: row is now checked, so the
+              // effect should re-pre-fill the bio page on next render.
+              autoAttachedPassportRef.current.delete(personKey);
+            }}
+            data-testid={`button-checklist-select-all-${personKey}`}
+          >
+            Select all
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setPersonChecks(() => Object.fromEntries(checklist.map((r) => [r.type, r.required])));
+              // Drop attachments for items that just became unchecked.
+              setDocFiles((all) => {
+                const personPrev = all[personKey] ?? {};
+                const next: Record<string, DocFileAttachment | null> = {};
+                for (const r of checklist) {
+                  if (r.required) next[r.type] = personPrev[r.type] ?? null;
+                }
+                return { ...all, [personKey]: next };
+              });
+              // Always re-arm. If "passport" is required → checked → effect
+              // will pre-fill it. If not → row stays unchecked → effect won't
+              // attach (it gates on `personChecks[passport]`). Either way,
+              // a later manual check should re-arm correctly.
+              autoAttachedPassportRef.current.delete(personKey);
+            }}
+            data-testid={`button-checklist-reset-${personKey}`}
+          >
+            Reset to recommended
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setPersonChecks(() => ({}));
+              setDocFiles((all) => ({ ...all, [personKey]: {} }));
+              const bucket = docFileRefs.current[personKey] ?? {};
+              for (const el of Object.values(bucket)) if (el) el.value = "";
+              // Bump tokens so any in-flight FileReader.onload from this
+              // person's slots can't resurrect cleared state.
+              for (const t of Object.keys(docFileReadTokensRef.current[personKey] ?? {})) {
+                bumpDocFileReadToken(personKey, t);
+              }
+              // Re-arm: row is now unchecked → effect won't fire → but if
+              // user later re-checks, it should auto-attach.
+              autoAttachedPassportRef.current.delete(personKey);
+            }}
+            data-testid={`button-checklist-clear-${personKey}`}
+          >
+            Clear
+          </Button>
+        </div>
+        <ul className="divide-y border rounded-xl overflow-hidden">
+          {checklist.map((req) => {
+            const checked = !!personChecks[req.type];
+            const attached = personFiles[req.type] ?? null;
+            const isAutoFromBio = !!(
+              req.type === "passport" && attached && bioPagePreview && attached.dataUrl === bioPagePreview
+            );
+            return (
+              <li
+                key={req.type}
+                className="p-3 bg-card hover:bg-muted/40 transition-colors space-y-2"
+                data-testid={`checklist-row-${personKey}-${req.type}`}
+              >
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    id={`doc-${personKey}-${req.type}`}
+                    checked={checked}
+                    onCheckedChange={(v) => {
+                      const nowChecked = v === true;
+                      setPersonChecks((prev) => ({ ...prev, [req.type]: nowChecked }));
+                      // For the passport row, re-arm the auto-attach Set on
+                      // BOTH transitions: unchecked→checked (next render
+                      // attaches) and checked→unchecked (next re-check
+                      // attaches). On uncheck we also clear the file itself.
+                      if (req.type === "passport") {
+                        autoAttachedPassportRef.current.delete(personKey);
+                      }
+                      if (!nowChecked) clearDocFile(personKey, req.type);
+                    }}
+                    className="mt-0.5"
+                    data-testid={`checkbox-doc-${personKey}-${req.type}`}
+                  />
+                  <label htmlFor={`doc-${personKey}-${req.type}`} className="flex-1 cursor-pointer space-y-0.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-medium">{req.name}</span>
+                      {req.required ? (
+                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Recommended</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">Optional</Badge>
+                      )}
+                      {attached && !isAutoFromBio && (
+                        <Badge variant="default" className="text-[10px] px-1.5 py-0 bg-emerald-600 hover:bg-emerald-600">
+                          File attached
+                        </Badge>
+                      )}
+                      {attached && isAutoFromBio && (
+                        <Badge variant="default" className="text-[10px] px-1.5 py-0 bg-sky-600 hover:bg-sky-600">
+                          Auto from passport
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">{req.description}</p>
+                  </label>
+                </div>
+
+                {checked && (
+                  <div className="ml-7 flex flex-wrap items-center gap-2">
+                    <input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      className="hidden"
+                      ref={(el) => { ensureRefBucket()[req.type] = el; }}
+                      onChange={(e) => {
+                        handleDocFile(personKey, req.type, e.target.files?.[0]);
+                        e.target.value = "";
+                      }}
+                      data-testid={`input-doc-file-${personKey}-${req.type}`}
+                    />
+                    {attached ? (
+                      <>
+                        {attached.mimeType.startsWith("image/") ? (
+                          <img
+                            src={attached.dataUrl}
+                            alt=""
+                            className="h-9 w-9 rounded object-cover border"
+                            data-testid={`img-doc-thumb-${personKey}-${req.type}`}
+                          />
+                        ) : (
+                          <div className="h-9 w-9 rounded border bg-muted flex items-center justify-center">
+                            <FileText className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                        )}
+                        <span className="text-xs truncate max-w-[180px]" data-testid={`text-doc-filename-${personKey}-${req.type}`}>
+                          {attached.fileName}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 h-7 text-xs"
+                          onClick={() => getInputEl(req.type)?.click()}
+                          data-testid={`button-doc-replace-${personKey}-${req.type}`}
+                        >
+                          <Upload className="w-3 h-3" /> Replace
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="gap-1 h-7 text-xs text-muted-foreground"
+                          onClick={() => {
+                            clearDocFile(personKey, req.type);
+                            // User explicitly removed the file while the row
+                            // is still checked — block auto-attach from
+                            // putting it back. Re-arms when row is unchecked
+                            // and re-checked, or when bulk Clear/Reset runs.
+                            if (req.type === "passport") {
+                              autoAttachedPassportRef.current.add(personKey);
+                            }
+                          }}
+                          data-testid={`button-doc-remove-${personKey}-${req.type}`}
+                        >
+                          <X className="w-3 h-3" /> Remove
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 h-7 text-xs"
+                        onClick={() => getInputEl(req.type)?.click()}
+                        data-testid={`button-doc-attach-${personKey}-${req.type}`}
+                      >
+                        <Upload className="w-3 h-3" /> Attach file
+                        <span className="text-muted-foreground font-normal">· optional</span>
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+        <p className="text-xs text-muted-foreground">
+          Showing checklist for <span className="font-medium text-foreground">{personLabel}</span>. Items left unchecked won't be added to the case for this person — you can always edit them later from the case detail page.
+        </p>
+      </>
+    );
+  };
 
   const createCaseAndCompanions = async (status: "draft" | "pending") => {
     if (!tenantId) throw new Error("Not signed in");
@@ -707,26 +1102,50 @@ export default function NewCasePage() {
       }
     }
 
-    // Persist document checklist. If the agent attached a file in step 5,
-    // the document is stored with the file's data URL and marked "approved"
-    // (the agency vouched for it by uploading). Unattached items remain
-    // "pending" with no fileUrl — same as before.
-    for (const req of selectedDocs) {
-      try {
-        const file = docFiles[req.type];
-        await uploadDocument({
-          name: req.name,
-          type: req.type,
-          status: file ? "approved" : "pending",
-          fileUrl: file ? file.dataUrl : null,
-          notes: req.description,
-        });
-      } catch (err: any) {
-        toast({
-          title: `Could not add "${req.name}" to checklist`,
-          description: err?.message ?? "Unknown error",
-          variant: "destructive",
-        });
+    // Persist document checklist — once per person (applicant + each
+    // co-traveller). For each person, we walk THEIR checked items and post
+    // the file they attached (or "pending" + null if they left it empty).
+    // Per-person notes carry the person's label so the case Document Center
+    // can group them just like the passport bio/last-page records do.
+    //
+    // De-dup rule: if the "passport" checklist row was auto-attached with the
+    // exact bio-page image already saved above as `passport_first_page`,
+    // we skip the duplicate post. The agent can still post a different file
+    // (e.g. full passport scan) by replacing the auto-attached one.
+    for (const tab of docPersonTabs) {
+      const personChecks = docChecks[tab.key] ?? {};
+      const personFiles = docFiles[tab.key] ?? {};
+      const isApplicant = tab.key === APPLICANT_KEY;
+      const ct = isApplicant ? null : coTravellers.find((c) => c.key === tab.key);
+      const bioPagePreview = isApplicant ? passportPreview : ct?.passportPreview ?? null;
+
+      for (const req of checklist) {
+        if (!personChecks[req.type]) continue;
+        const file = personFiles[req.type] ?? null;
+
+        // Skip the "passport" checklist row if its file is identical to the
+        // bio page we already persisted as passport_first_page.
+        if (req.type === "passport" && file && bioPagePreview && file.dataUrl === bioPagePreview) {
+          continue;
+        }
+
+        const notesPrefix = isApplicant ? "" : `Co-traveller: ${tab.label} · `;
+        const namePrefix = isApplicant ? "" : `${tab.label} — `;
+        try {
+          await uploadDocument({
+            name: `${namePrefix}${req.name}`,
+            type: req.type,
+            status: file ? "approved" : "pending",
+            fileUrl: file ? file.dataUrl : null,
+            notes: `${notesPrefix}${req.description}`,
+          });
+        } catch (err: any) {
+          toast({
+            title: `Could not add "${req.name}" for ${tab.label}`,
+            description: err?.message ?? "Unknown error",
+            variant: "destructive",
+          });
+        }
       }
     }
 
@@ -2058,165 +2477,44 @@ export default function NewCasePage() {
                   </p>
                 ) : (
                   <>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setDocChecks(Object.fromEntries(checklist.map((r) => [r.type, true])))}
-                        data-testid="button-checklist-select-all"
-                      >
-                        Select all
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setDocChecks(Object.fromEntries(checklist.map((r) => [r.type, r.required])));
-                          // Drop attachments for items that just became unchecked.
-                          setDocFiles((d) => {
-                            const next: typeof d = {};
-                            for (const r of checklist) {
-                              if (r.required) next[r.type] = d[r.type] ?? null;
-                            }
-                            return next;
-                          });
-                        }}
-                        data-testid="button-checklist-reset"
-                      >
-                        Reset to recommended
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setDocChecks({});
-                          setDocFiles({});
-                          for (const k of Object.keys(docFileRefs.current)) {
-                            const el = docFileRefs.current[k];
-                            if (el) el.value = "";
-                          }
-                        }}
-                        data-testid="button-checklist-clear"
-                      >
-                        Clear
-                      </Button>
-                    </div>
-                    <ul className="divide-y border rounded-xl overflow-hidden">
-                      {checklist.map((req) => {
-                        const checked = !!docChecks[req.type];
-                        const attached = docFiles[req.type];
-                        return (
-                          <li
-                            key={req.type}
-                            className="p-3 bg-card hover:bg-muted/40 transition-colors space-y-2"
-                            data-testid={`checklist-row-${req.type}`}
-                          >
-                            <div className="flex items-start gap-3">
-                              <Checkbox
-                                id={`doc-${req.type}`}
-                                checked={checked}
-                                onCheckedChange={(v) => {
-                                  const nowChecked = v === true;
-                                  setDocChecks((d) => ({ ...d, [req.type]: nowChecked }));
-                                  if (!nowChecked) clearDocFile(req.type);
-                                }}
-                                className="mt-0.5"
-                                data-testid={`checkbox-doc-${req.type}`}
-                              />
-                              <label htmlFor={`doc-${req.type}`} className="flex-1 cursor-pointer space-y-0.5">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="text-sm font-medium">{req.name}</span>
-                                  {req.required ? (
-                                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Recommended</Badge>
-                                  ) : (
-                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">Optional</Badge>
-                                  )}
-                                  {attached && (
-                                    <Badge variant="default" className="text-[10px] px-1.5 py-0 bg-emerald-600 hover:bg-emerald-600">
-                                      File attached
-                                    </Badge>
-                                  )}
-                                </div>
-                                <p className="text-xs text-muted-foreground">{req.description}</p>
-                              </label>
-                            </div>
-
-                            {checked && (
-                              <div className="ml-7 flex flex-wrap items-center gap-2">
-                                <input
-                                  type="file"
-                                  accept="image/*,application/pdf"
-                                  className="hidden"
-                                  ref={(el) => { docFileRefs.current[req.type] = el; }}
-                                  onChange={(e) => {
-                                    handleDocFile(req.type, e.target.files?.[0]);
-                                    e.target.value = "";
-                                  }}
-                                  data-testid={`input-doc-file-${req.type}`}
-                                />
-                                {attached ? (
-                                  <>
-                                    {attached.mimeType.startsWith("image/") ? (
-                                      <img
-                                        src={attached.dataUrl}
-                                        alt=""
-                                        className="h-9 w-9 rounded object-cover border"
-                                        data-testid={`img-doc-thumb-${req.type}`}
-                                      />
-                                    ) : (
-                                      <div className="h-9 w-9 rounded border bg-muted flex items-center justify-center">
-                                        <FileText className="w-4 h-4 text-muted-foreground" />
-                                      </div>
-                                    )}
-                                    <span className="text-xs truncate max-w-[180px]" data-testid={`text-doc-filename-${req.type}`}>
-                                      {attached.fileName}
-                                    </span>
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      className="gap-1.5 h-7 text-xs"
-                                      onClick={() => docFileRefs.current[req.type]?.click()}
-                                      data-testid={`button-doc-replace-${req.type}`}
-                                    >
-                                      <Upload className="w-3 h-3" /> Replace
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      className="gap-1 h-7 text-xs text-muted-foreground"
-                                      onClick={() => clearDocFile(req.type)}
-                                      data-testid={`button-doc-remove-${req.type}`}
-                                    >
-                                      <X className="w-3 h-3" /> Remove
-                                    </Button>
-                                  </>
+                    {/* Person tabs — only render when there are co-travellers.
+                        With just an applicant, drop the tab strip entirely so
+                        the UI stays identical to the single-person flow. */}
+                    {coTravellers.length > 0 ? (
+                      <Tabs value={activeDocPerson} onValueChange={setActiveDocPerson}>
+                        <TabsList className="flex flex-wrap h-auto gap-1 w-full justify-start">
+                          {docPersonTabs.map((p) => {
+                            const personChecks = docChecks[p.key] ?? {};
+                            const count = checklist.filter((r) => personChecks[r.type]).length;
+                            return (
+                              <TabsTrigger
+                                key={p.key}
+                                value={p.key}
+                                className="gap-1.5 text-xs"
+                                data-testid={`tab-doc-person-${p.key}`}
+                              >
+                                {p.key === APPLICANT_KEY ? (
+                                  <UserIcon className="w-3 h-3" />
                                 ) : (
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="gap-1.5 h-7 text-xs"
-                                    onClick={() => docFileRefs.current[req.type]?.click()}
-                                    data-testid={`button-doc-attach-${req.type}`}
-                                  >
-                                    <Upload className="w-3 h-3" /> Attach file
-                                    <span className="text-muted-foreground font-normal">· optional</span>
-                                  </Button>
+                                  <Users className="w-3 h-3" />
                                 )}
-                              </div>
-                            )}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                    <p className="text-xs text-muted-foreground">
-                      Tip: items left unchecked won't be added to the case. You can always add or remove documents later from the case detail page.
-                    </p>
+                                <span className="truncate max-w-[160px]">{p.label}</span>
+                                <Badge variant="secondary" className="h-4 px-1 text-[9px] ml-0.5">
+                                  {count}
+                                </Badge>
+                              </TabsTrigger>
+                            );
+                          })}
+                        </TabsList>
+                        {docPersonTabs.map((p) => (
+                          <TabsContent key={p.key} value={p.key} className="mt-4 space-y-4">
+                            {renderDocChecklistFor(p.key, p.label)}
+                          </TabsContent>
+                        ))}
+                      </Tabs>
+                    ) : (
+                      renderDocChecklistFor(APPLICANT_KEY, docPersonTabs[0]?.label ?? "Main applicant")
+                    )}
                   </>
                 )}
               </CardContent>
@@ -2469,22 +2767,45 @@ export default function NewCasePage() {
                 </div>
                 <div className="border rounded-xl p-4 bg-muted/20">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="font-medium">Documents Checklist ({selectedDocs.length}/{checklist.length})</p>
+                    <p className="font-medium">Documents Checklist ({totalSelectedDocsCount} item{totalSelectedDocsCount === 1 ? "" : "s"})</p>
                     <Button type="button" variant="ghost" size="sm" onClick={() => setStep(5)} data-testid="button-edit-documents">Edit</Button>
                   </div>
                   {checklist.length === 0 ? (
                     <p className="text-muted-foreground text-sm">No checklist available for this destination + visa type.</p>
-                  ) : selectedDocs.length === 0 ? (
+                  ) : totalSelectedDocsCount === 0 ? (
                     <p className="text-muted-foreground text-sm">No documents selected — case will be created without a checklist.</p>
                   ) : (
-                    <ul className="space-y-1 text-sm">
-                      {selectedDocs.map((req) => (
-                        <li key={req.type} className="flex items-center gap-2 text-foreground">
-                          <CircleDot className="w-3 h-3 text-emerald-600" />
-                          {req.name}
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="space-y-3 text-sm">
+                      {docPersonTabs.map((p) => {
+                        const personChecks = docChecks[p.key] ?? {};
+                        const personFiles = docFiles[p.key] ?? {};
+                        const items = checklist.filter((r) => personChecks[r.type]);
+                        if (items.length === 0) return null;
+                        return (
+                          <div key={p.key} data-testid={`review-doc-person-${p.key}`}>
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                              {p.label} <span className="font-normal normal-case">({items.length}/{checklist.length})</span>
+                            </p>
+                            <ul className="space-y-1">
+                              {items.map((req) => {
+                                const f = personFiles[req.type];
+                                return (
+                                  <li key={req.type} className="flex items-center gap-2 text-foreground">
+                                    <CircleDot className={`w-3 h-3 ${f ? "text-emerald-600" : "text-muted-foreground"}`} />
+                                    <span>{req.name}</span>
+                                    {f && (
+                                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 ml-1">
+                                        Attached
+                                      </Badge>
+                                    )}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
               </CardContent>
