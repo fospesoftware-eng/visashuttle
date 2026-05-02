@@ -406,6 +406,7 @@ export const feeTemplates = pgTable("fee_templates", {
   tenantId: varchar("tenant_id").notNull(),
   name: text("name").notNull(),
   destinationCountry: text("destination_country"),
+  destinationCountries: text("destination_countries").array(),
   visaType: text("visa_type"),
   agencyFee: integer("agency_fee").notNull().default(0),
   governmentFee: integer("government_fee").notNull().default(0),
@@ -434,6 +435,8 @@ export const invoiceSettings = pgTable("invoice_settings", {
   companyEmail: text("company_email"),
   companyPhone: text("company_phone"),
   taxId: text("tax_id"),
+  logoUrl: text("logo_url"),
+  invoiceAccentColor: text("invoice_accent_color"),
   currency: text("currency").notNull().default("USD"),
   taxRate: integer("tax_rate").notNull().default(0), // basis points (e.g. 1800 = 18%)
   taxLabel: text("tax_label").default("Tax"),

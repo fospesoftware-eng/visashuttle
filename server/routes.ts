@@ -3234,6 +3234,310 @@ export async function registerRoutes(
     });
   });
 
+  // ===== Invoice PDF + Email =====
+
+  // SSRF-safe URL guard for tenant-supplied logo URLs.
+  // Rejects non-https, private/loopback/link-local IPs, and cloud metadata endpoints.
+  async function isSafePublicUrl(rawUrl: string): Promise<boolean> {
+    let u: URL;
+    try { u = new URL(rawUrl); } catch { return false; }
+    if (u.protocol !== "https:") return false;
+    const host = u.hostname.toLowerCase();
+    if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".internal")) return false;
+    // IP literal check
+    const ipRegex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
+    const isIp = ipRegex.test(host) || host.includes(":");
+    let resolved: string[] = [];
+    try {
+      const dns = await import("node:dns/promises");
+      if (isIp) resolved = [host];
+      else {
+        const recs = await dns.lookup(host, { all: true });
+        resolved = recs.map((r) => r.address);
+      }
+    } catch { return false; }
+    const isPrivate = (ip: string) => {
+      // IPv6 quick reject (loopback / link-local / unique-local / metadata-style)
+      if (ip.includes(":")) {
+        const lower = ip.toLowerCase();
+        return lower === "::1" || lower.startsWith("fc") || lower.startsWith("fd")
+          || lower.startsWith("fe80:") || lower.startsWith("::ffff:");
+      }
+      const parts = ip.split(".").map(Number);
+      if (parts.length !== 4 || parts.some((p) => isNaN(p))) return true;
+      const [a, b] = parts;
+      if (a === 10) return true;
+      if (a === 127) return true;
+      if (a === 169 && b === 254) return true; // link-local + AWS/GCP metadata
+      if (a === 172 && b >= 16 && b <= 31) return true;
+      if (a === 192 && b === 168) return true;
+      if (a === 0) return true;
+      if (a >= 224) return true; // multicast/reserved
+      return false;
+    };
+    return resolved.length > 0 && resolved.every((ip) => !isPrivate(ip));
+  }
+
+  // Fetch a tenant-provided image with SSRF protection + size/type/timeout limits.
+  async function fetchSafeImage(rawUrl: string | null | undefined): Promise<Buffer | null> {
+    if (!rawUrl) return null;
+    if (!(await isSafePublicUrl(rawUrl))) return null;
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 4000);
+    try {
+      const r = await fetch(rawUrl, { signal: ac.signal, redirect: "error" });
+      if (!r.ok) return null;
+      const ct = (r.headers.get("content-type") ?? "").toLowerCase();
+      if (!ct.includes("png") && !ct.includes("jpeg") && !ct.includes("jpg")) return null;
+      const len = parseInt(r.headers.get("content-length") ?? "0", 10);
+      if (len && len > 2_000_000) return null;
+      const buf = Buffer.from(await r.arrayBuffer());
+      if (buf.byteLength > 2_000_000) return null;
+      return buf;
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  // Render the invoice PDF to an arbitrary writable stream so it can be
+  // streamed to the HTTP response or buffered for email attachment.
+  async function renderInvoicePdf(
+    inv: any,
+    items: any[],
+    settings: any,
+    out: NodeJS.WritableStream,
+  ): Promise<void> {
+    const PDFDocumentMod: any = await import("pdfkit");
+    const PDFDocument = PDFDocumentMod.default ?? PDFDocumentMod;
+    const doc = new PDFDocument({ size: "A4", margin: 48 });
+    doc.pipe(out);
+
+    const accent = settings?.invoiceAccentColor || "#1f2937";
+    const currency = settings?.currency ?? inv.currency ?? "USD";
+    const fmt = (cents: number) =>
+      new Intl.NumberFormat("en-US", { style: "currency", currency }).format((cents ?? 0) / 100);
+    const fmtDate = (d: Date | null | undefined) =>
+      d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+
+    // Accent bar
+    doc.rect(0, 0, doc.page.width, 6).fill(accent);
+
+    // Try to embed logo (SSRF-guarded; failure just skips the image)
+    let logoHeight = 0;
+    const logoBuf = await fetchSafeImage(settings?.logoUrl);
+    if (logoBuf) {
+      try {
+        doc.image(logoBuf, 48, 24, { fit: [120, 60] });
+        logoHeight = 60;
+      } catch { /* invalid image bytes — skip */ }
+    }
+
+    const headerTop = Math.max(28 + logoHeight, 32);
+    doc.fillColor("#111827").fontSize(22).text("INVOICE", 48, headerTop, { align: "right" });
+    doc.fontSize(11).fillColor("#6b7280").text(inv.invoiceNumber, { align: "right" });
+    doc.moveDown(0.4);
+    doc.fontSize(9).fillColor("#6b7280")
+      .text(`Issued: ${fmtDate(inv.issuedAt)}`, { align: "right" })
+      .text(`Due: ${fmtDate(inv.dueDate)}`, { align: "right" })
+      .text(`Status: ${(inv.status ?? "draft").toUpperCase()}`, { align: "right" });
+
+    doc.moveDown(2);
+    const fromY = doc.y;
+
+    doc.fontSize(9).fillColor("#9ca3af").text("FROM", 48, fromY);
+    doc.fillColor("#111827").fontSize(11).text(settings?.companyName ?? "Your agency", 48);
+    doc.fontSize(9).fillColor("#374151");
+    if (settings?.companyAddress) doc.text(settings.companyAddress, 48, doc.y, { width: 220 });
+    if (settings?.companyEmail) doc.text(settings.companyEmail);
+    if (settings?.companyPhone) doc.text(settings.companyPhone);
+    if (settings?.taxId) doc.text(`Tax ID: ${settings.taxId}`);
+
+    doc.fontSize(9).fillColor("#9ca3af").text("BILL TO", 320, fromY);
+    doc.fillColor("#111827").fontSize(11).text(inv.customerName ?? "—", 320);
+    doc.fontSize(9).fillColor("#374151");
+    if (inv.customerEmail) doc.text(inv.customerEmail, 320, doc.y);
+    if (inv.customerPhone) doc.text(inv.customerPhone, 320, doc.y);
+    const meta = [inv.destinationCountry, inv.visaType].filter(Boolean).join(" · ");
+    if (meta) doc.fillColor("#6b7280").text(meta, 320, doc.y);
+
+    doc.moveDown(2);
+
+    const tableTop = Math.max(doc.y, fromY + 90);
+    doc.y = tableTop;
+    const colDesc = 48, colQty = 320, colUnit = 380, colAmt = 470;
+    doc.fontSize(9).fillColor("#9ca3af")
+      .text("DESCRIPTION", colDesc, doc.y, { continued: true })
+      .text("QTY", colQty - colDesc - 30, undefined, { continued: true })
+      .text("UNIT", colUnit - colQty + 8, undefined, { continued: true })
+      .text("AMOUNT", colAmt - colUnit + 24, undefined, { width: 80, align: "right" });
+    doc.moveDown(0.3);
+    doc.strokeColor("#e5e7eb").lineWidth(0.5).moveTo(48, doc.y).lineTo(547, doc.y).stroke();
+    doc.moveDown(0.4);
+
+    doc.fillColor("#111827").fontSize(10);
+    for (const it of items) {
+      const lineY = doc.y;
+      doc.text(it.description ?? "", colDesc, lineY, { width: 260 });
+      const lineEnd = doc.y;
+      doc.text(String(it.quantity ?? 1), colQty, lineY, { width: 40 });
+      doc.text(fmt(it.unitPrice ?? 0), colUnit, lineY, { width: 80 });
+      doc.text(fmt(it.amount ?? 0), colAmt, lineY, { width: 80, align: "right" });
+      doc.y = Math.max(lineEnd, lineY + 14);
+      doc.moveDown(0.2);
+    }
+
+    doc.moveDown(0.5);
+    doc.strokeColor("#e5e7eb").lineWidth(0.5).moveTo(48, doc.y).lineTo(547, doc.y).stroke();
+    doc.moveDown(0.6);
+
+    const totalsX = 360;
+    const balance = Math.max(0, (inv.total ?? 0) - (inv.paidAmount ?? 0));
+    const drawTotal = (label: string, value: string, bold = false) => {
+      doc.fontSize(bold ? 11 : 10).fillColor(bold ? "#111827" : "#374151")
+        .text(label, totalsX, doc.y, { width: 110, continued: true })
+        .text(value, { width: 80, align: "right" });
+      doc.moveDown(0.25);
+    };
+    drawTotal("Subtotal", fmt(inv.subtotal ?? 0));
+    if ((inv.taxAmount ?? 0) > 0) drawTotal(settings?.taxLabel ?? "Tax", fmt(inv.taxAmount));
+    doc.strokeColor(accent).lineWidth(1).moveTo(totalsX, doc.y).lineTo(547, doc.y).stroke();
+    doc.moveDown(0.3);
+    drawTotal("Total", fmt(inv.total ?? 0), true);
+    if ((inv.paidAmount ?? 0) > 0) drawTotal("Paid", fmt(inv.paidAmount));
+    drawTotal("Balance Due", fmt(balance), true);
+
+    doc.moveDown(2);
+    if (settings?.paymentTerms) {
+      doc.fontSize(9).fillColor("#374151").text(`Payment terms: ${settings.paymentTerms}`, 48);
+    }
+    if (settings?.bankDetails) {
+      doc.moveDown(0.5);
+      doc.fontSize(9).fillColor("#9ca3af").text("PAYMENT DETAILS", 48);
+      doc.fontSize(9).fillColor("#374151").text(settings.bankDetails, 48, doc.y, { width: 500 });
+    }
+    if (settings?.footerText) {
+      doc.moveDown(1);
+      doc.fontSize(9).fillColor("#6b7280").text(settings.footerText, 48, doc.y, { align: "center", width: 500 });
+    }
+
+    doc.end();
+    await new Promise<void>((resolve, reject) => {
+      out.on("finish", () => resolve());
+      out.on("end", () => resolve());
+      out.on("error", reject);
+    });
+  }
+
+  // Buffer the PDF in memory (used for email attachments)
+  async function renderInvoicePdfBuffer(inv: any, items: any[], settings: any): Promise<Buffer> {
+    const { PassThrough } = await import("node:stream");
+    const stream = new PassThrough();
+    const chunks: Buffer[] = [];
+    stream.on("data", (c: Buffer) => chunks.push(Buffer.from(c)));
+    const done = new Promise<Buffer>((resolve, reject) => {
+      stream.on("end", () => resolve(Buffer.concat(chunks)));
+      stream.on("error", reject);
+    });
+    await renderInvoicePdf(inv, items, settings, stream);
+    return done;
+  }
+
+  app.get("/api/invoices/:id/pdf", async (req, res) => {
+    try {
+      const inv = await storage.getInvoice(req.params.id);
+      if (!inv) return res.status(404).json({ error: "Not found" });
+      if (!requireTenantAccess(req, res, inv.tenantId)) return;
+      const [items, settings] = await Promise.all([
+        storage.getInvoiceItems(inv.id),
+        storage.getInvoiceSettings(inv.tenantId),
+      ]);
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename="${inv.invoiceNumber}.pdf"`);
+      await renderInvoicePdf(inv, items, settings, res);
+    } catch (e: any) {
+      if (!res.headersSent) res.status(500).json({ error: e?.message ?? "Failed to generate PDF" });
+    }
+  });
+
+  app.post("/api/invoices/:id/email", async (req, res) => {
+    try {
+      const inv = await storage.getInvoice(req.params.id);
+      if (!inv) return res.status(404).json({ error: "Not found" });
+      if (!requireTenantAccess(req, res, inv.tenantId)) return;
+      const settings = await storage.getInvoiceSettings(inv.tenantId);
+      const to = String(req.body?.to ?? "").trim();
+      if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+        return res.status(400).json({ error: "A valid recipient email is required" });
+      }
+      const subject = String(req.body?.subject ?? `Invoice ${inv.invoiceNumber} from ${settings?.companyName ?? "your agency"}`);
+      const currency = settings?.currency ?? inv.currency ?? "USD";
+      const fmt = (cents: number) => new Intl.NumberFormat("en-US", { style: "currency", currency }).format((cents ?? 0) / 100);
+      const balance = Math.max(0, (inv.total ?? 0) - (inv.paidAmount ?? 0));
+      const defaultBody =
+        `Hi ${inv.customerName ?? "there"},\n\n` +
+        `Please find your invoice ${inv.invoiceNumber} attached.\n\n` +
+        `Total: ${fmt(inv.total ?? 0)}\n` +
+        `Balance due: ${fmt(balance)}\n\n` +
+        `${settings?.paymentTerms ? `Payment terms: ${settings.paymentTerms}\n\n` : ""}` +
+        `Thank you,\n${settings?.companyName ?? "Your agency"}`;
+      const body = String(req.body?.body ?? defaultBody);
+
+      const apiKey = process.env.RESEND_API_KEY;
+      if (apiKey) {
+        const fromAddress = process.env.RESEND_FROM ?? settings?.companyEmail ?? "onboarding@resend.dev";
+        try {
+          const items = await storage.getInvoiceItems(inv.id);
+          const pdfBuf = await renderInvoicePdfBuffer(inv, items, settings);
+          const resp = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              from: fromAddress,
+              to: [to],
+              subject,
+              text: body,
+              attachments: [
+                {
+                  filename: `${inv.invoiceNumber}.pdf`,
+                  content: pdfBuf.toString("base64"),
+                },
+              ],
+            }),
+          });
+          if (resp.ok) {
+            return res.json({ ok: true, sent: true, to, attached: true });
+          }
+          // fall through to fallback
+        } catch {
+          // fall through to fallback
+        }
+      }
+
+      // Fallback: hand the agency a mailto: link they can open in their email client.
+      // The dialog UI auto-opens this link and informs the user that email sending
+      // isn't configured, so the "PDF attachment" expectation is met by the user's
+      // own client (we still surface the PDF download URL for convenience).
+      const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      res.json({
+        ok: true,
+        sent: false,
+        fallback: {
+          mailto,
+          pdfUrl: `/api/invoices/${inv.id}/pdf`,
+          message: "Email sending isn't configured. Open this in your email client and attach the PDF download.",
+        },
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message ?? "Failed to send invoice" });
+    }
+  });
+
   app.get('/api/schengen-slots', async (_req, res) => {
     const now = Date.now();
     if (schengenCache && now - schengenCache.ts < 5 * 60 * 1000) {

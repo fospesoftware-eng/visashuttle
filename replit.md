@@ -286,6 +286,18 @@ The platform now includes a full B2C visa approval checker with:
 - Documents page: status stats, change-status actions, real document list
 - Reports page: all charts driven by `/api/tenants/:tenantId/analytics`
 
+### Fee Templates, Wizard Fees Step & Invoice Branding (May 2026)
+- **Fee templates – multi-country**: `feeTemplates.destinationCountries: text().array()` (`shared/schema.ts`) lets a single template apply to multiple countries; legacy single-country `destinationCountry` remains for backward compat. UI: `FeeTemplateDialog` (Accounting → Templates) replaces the country dropdown with a popover + checkbox multi-select and chip remove. Cards show all matching country chips. Compose Invoice + case wizard merge `[destinationCountries[], destinationCountry]` when filtering matches.
+- **Case wizard "Fees" step (case-new.tsx)**: 7-step wizard now (Fees inserted at step 6, Review = step 7). Loads tenant invoice settings + fee templates; shows a template Select filtered by destination country. Per-line editor (description / category / qty / unit price), live subtotal + GST tax + total displayed in tenant currency. Validation: partial-row guard (description xor unit price). On case create, if any valid fee lines exist, automatically POSTs a draft invoice to `/api/tenants/:tenantId/invoices` linked to the new case.
+- **Tenant currency propagation**: All currency-rendering call sites in `accounting.tsx` (invoices list, detail dialog, invoice items, totals, templates tab) now use `(settings?.currency ?? invoice.currency)` so the tenant's chosen currency drives every display, even on legacy invoices created in a different currency.
+- **Invoice branding (logoUrl + accent color)**: `invoiceSettings.logoUrl` + `invoiceSettings.invoiceAccentColor` (`shared/schema.ts`). Settings → Invoices tab adds a Logo URL input (with live preview, broken-image graceful hide) and a color picker + hex input for accent color. The InvoiceDetailDialog renders the logo in the header, the accent color as a top strip, and exposes **Download PDF** + **Email invoice** buttons.
+- **Server PDF + email** (`server/routes.ts`):
+  - `GET /api/invoices/:id/pdf` — pdfkit-rendered A4 invoice with accent strip, optional logo, From/Bill-to, items table, totals (Subtotal, Tax, Total, Paid, Balance Due), and footer (payment terms / bank details / footer text). Uses `storage.getInvoiceItems(inv.id)` (header + items fetched separately).
+  - `POST /api/invoices/:id/email` — when `RESEND_API_KEY` is set, sends via Resend with the PDF attached as base64; otherwise returns a `mailto:` fallback the dialog opens automatically. `RESEND_FROM` env var (or `settings.companyEmail`) controls the From address.
+  - **SSRF mitigation**: `isSafePublicUrl` + `fetchSafeImage` guard the tenant-supplied `logoUrl` — HTTPS only, blocks `localhost`/private CIDRs (10/8, 127/8, 169.254/16, 172.16/12, 192.168/16, multicast/reserved), IPv6 loopback/link-local/ULA, follows-no-redirects, 4s timeout, content-type whitelist (PNG/JPEG), 2 MB cap.
+- **Email invoice dialog**: `EmailInvoiceDialog` in `accounting.tsx` — To/Subject/Message inputs, default email pre-filled from invoice, "send" calls the email endpoint and either toasts success or auto-opens the returned `mailto:` URL.
+- Dependencies: `pdfkit` + `@types/pdfkit`.
+
 ### Planned Integrations (not yet implemented)
 - **AI Provider**: Pluggable interface supporting OpenAI-compatible APIs via `AI_BASE_URL` and `AI_API_KEY` (mock fallback active)
 - **File Storage**: Abstraction for S3-compatible storage with signed URLs

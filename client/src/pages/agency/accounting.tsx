@@ -20,9 +20,13 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Plus, Trash2, Edit, Receipt, FileText, Banknote, Settings as SettingsIcon,
   TrendingUp, AlertCircle, CheckCircle2, Clock, Send, Eye, Download,
+  ChevronDown, X, Mail, FileDown, Image as ImageIcon, Copy,
 } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { getCountryVisaConfig } from "@/data/country-visa-types";
@@ -541,9 +545,9 @@ function OverviewTab({ tenantId, onJump }: { tenantId: string; onJump: (t: strin
                       <TableCell>{inv.customerName}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{fmtDate(inv.issuedAt)}</TableCell>
                       <TableCell><Badge className={conf.className}>{conf.label}</Badge></TableCell>
-                      <TableCell className="text-right font-medium">{fmtMoney(inv.total, inv.currency)}</TableCell>
+                      <TableCell className="text-right font-medium">{fmtMoney(inv.total, displayCurrency)}</TableCell>
                       <TableCell className="text-right text-amber-700 dark:text-amber-400 font-medium">
-                        {fmtMoney(Math.max(0, inv.total - inv.paidAmount), inv.currency)}
+                        {fmtMoney(Math.max(0, inv.total - inv.paidAmount), displayCurrency)}
                       </TableCell>
                     </TableRow>
                   );
@@ -567,6 +571,9 @@ function InvoicesTab({ tenantId }: { tenantId: string }) {
 
   const { data: invoices = [], isLoading } = useQuery<Invoice[]>({
     queryKey: ["/api/tenants", tenantId, "invoices"],
+  });
+  const { data: settings } = useQuery<InvoiceSettings | null>({
+    queryKey: ["/api/tenants", tenantId, "invoice-settings"],
   });
 
   const deleteMutation = useMutation({
@@ -631,13 +638,13 @@ function InvoicesTab({ tenantId }: { tenantId: string }) {
                       <TableCell className="text-sm text-muted-foreground">{fmtDate(inv.issuedAt)}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{fmtDate(inv.dueDate)}</TableCell>
                       <TableCell><Badge className={conf.className}>{conf.label}</Badge></TableCell>
-                      <TableCell className="text-right font-medium">{fmtMoney(inv.total, inv.currency)}</TableCell>
+                      <TableCell className="text-right font-medium">{fmtMoney(inv.total, settings?.currency ?? inv.currency)}</TableCell>
                       <TableCell className="text-right text-emerald-700 dark:text-emerald-400">
-                        {fmtMoney(inv.paidAmount, inv.currency)}
+                        {fmtMoney(inv.paidAmount, settings?.currency ?? inv.currency)}
                       </TableCell>
                       <TableCell className="text-right">
                         <span className={balance > 0 ? "text-amber-700 dark:text-amber-400 font-medium" : "text-muted-foreground"}>
-                          {fmtMoney(balance, inv.currency)}
+                          {fmtMoney(balance, settings?.currency ?? inv.currency)}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -766,7 +773,8 @@ function ComposeInvoiceDialog({
   const applyTemplate = (templateId: string) => {
     const tpl = templates.find((t) => t.id === templateId);
     if (!tpl) return;
-    if (tpl.destinationCountry) setDestinationCountry(tpl.destinationCountry);
+    const firstCountry = (tpl.destinationCountries && tpl.destinationCountries[0]) ?? tpl.destinationCountry ?? null;
+    if (firstCountry) setDestinationCountry(firstCountry);
     if (tpl.visaType) setVisaType(tpl.visaType);
     setPaymentType(tpl.defaultPaymentType);
     if (tpl.advancePercent != null) setAdvancePercent(String(tpl.advancePercent));
@@ -1246,6 +1254,12 @@ function InvoiceDetailDialog({
     },
   });
 
+  const [emailOpen, setEmailOpen] = useState(false);
+  const downloadPdf = () => {
+    if (!invoiceId) return;
+    window.open(`/api/invoices/${invoiceId}/pdf`, "_blank", "noopener");
+  };
+
   if (isLoading || !invoice) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1258,21 +1272,47 @@ function InvoiceDetailDialog({
   const advanceTarget = invoice.paymentType === "advance" && invoice.advancePercent
     ? Math.round(invoice.total * invoice.advancePercent / 100)
     : null;
+  const accent = settings?.invoiceAccentColor || undefined;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        {accent && <div className="h-1 -mt-6 -mx-6 mb-3 rounded-t-lg" style={{ backgroundColor: accent }} />}
         <DialogHeader>
           <div className="flex items-start justify-between gap-4">
-            <div>
-              <DialogTitle className="font-mono text-xl">{invoice.invoiceNumber}</DialogTitle>
-              <DialogDescription>
-                Issued {fmtDate(invoice.issuedAt)} · Due {fmtDate(invoice.dueDate)}
-              </DialogDescription>
+            <div className="flex items-start gap-3 min-w-0">
+              {settings?.logoUrl && (
+                <img
+                  src={settings.logoUrl}
+                  alt="Company logo"
+                  className="h-12 w-12 object-contain rounded border bg-white p-1"
+                  data-testid="img-invoice-logo"
+                />
+              )}
+              <div className="min-w-0">
+                <DialogTitle className="font-mono text-xl">{invoice.invoiceNumber}</DialogTitle>
+                <DialogDescription>
+                  Issued {fmtDate(invoice.issuedAt)} · Due {fmtDate(invoice.dueDate)}
+                </DialogDescription>
+              </div>
             </div>
             <Badge className={conf.className}>{conf.label}</Badge>
           </div>
+          <div className="flex flex-wrap gap-2 pt-2">
+            <Button size="sm" variant="outline" onClick={downloadPdf} data-testid="button-download-pdf">
+              <FileDown className="w-4 h-4 mr-1.5" /> Download PDF
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setEmailOpen(true)} data-testid="button-email-invoice">
+              <Mail className="w-4 h-4 mr-1.5" /> Email invoice
+            </Button>
+          </div>
         </DialogHeader>
+        <EmailInvoiceDialog
+          invoiceId={invoiceId}
+          defaultEmail={invoice.customerEmail}
+          open={emailOpen}
+          onOpenChange={setEmailOpen}
+        />
 
         <div className="space-y-5">
           {/* From / To */}
@@ -1326,8 +1366,8 @@ function InvoiceDetailDialog({
                       </TableCell>
                       <TableCell><Badge variant="outline" className="text-xs">{cat?.label ?? it.category}</Badge></TableCell>
                       <TableCell className="text-right">{it.quantity}</TableCell>
-                      <TableCell className="text-right">{fmtMoney(it.unitPrice, invoice.currency)}</TableCell>
-                      <TableCell className="text-right font-medium">{fmtMoney(it.amount, invoice.currency)}</TableCell>
+                      <TableCell className="text-right">{fmtMoney(it.unitPrice, (settings?.currency ?? invoice.currency))}</TableCell>
+                      <TableCell className="text-right font-medium">{fmtMoney(it.amount, (settings?.currency ?? invoice.currency))}</TableCell>
                     </TableRow>
                   );
                 })}
@@ -1338,16 +1378,16 @@ function InvoiceDetailDialog({
           {/* Summary */}
           <div className="flex justify-end">
             <div className="w-full sm:w-72 space-y-1 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>{fmtMoney(invoice.subtotal, invoice.currency)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>{fmtMoney(invoice.subtotal, (settings?.currency ?? invoice.currency))}</span></div>
               {invoice.taxAmount > 0 && (
-                <div className="flex justify-between text-muted-foreground"><span>{settings?.taxLabel ?? "Tax"}</span><span>{fmtMoney(invoice.taxAmount, invoice.currency)}</span></div>
+                <div className="flex justify-between text-muted-foreground"><span>{settings?.taxLabel ?? "Tax"}</span><span>{fmtMoney(invoice.taxAmount, (settings?.currency ?? invoice.currency))}</span></div>
               )}
-              <div className="flex justify-between font-semibold text-base border-t pt-1 mt-1"><span>Total</span><span>{fmtMoney(invoice.total, invoice.currency)}</span></div>
-              <div className="flex justify-between text-emerald-700 dark:text-emerald-400"><span>Paid</span><span>{fmtMoney(invoice.paidAmount, invoice.currency)}</span></div>
-              <div className="flex justify-between font-semibold text-amber-700 dark:text-amber-400"><span>Balance due</span><span>{fmtMoney(balance, invoice.currency)}</span></div>
+              <div className="flex justify-between font-semibold text-base border-t pt-1 mt-1"><span>Total</span><span>{fmtMoney(invoice.total, (settings?.currency ?? invoice.currency))}</span></div>
+              <div className="flex justify-between text-emerald-700 dark:text-emerald-400"><span>Paid</span><span>{fmtMoney(invoice.paidAmount, (settings?.currency ?? invoice.currency))}</span></div>
+              <div className="flex justify-between font-semibold text-amber-700 dark:text-amber-400"><span>Balance due</span><span>{fmtMoney(balance, (settings?.currency ?? invoice.currency))}</span></div>
               {advanceTarget != null && (
                 <div className="text-xs text-muted-foreground pt-1">
-                  Advance ({invoice.advancePercent}%): {fmtMoney(advanceTarget, invoice.currency)}
+                  Advance ({invoice.advancePercent}%): {fmtMoney(advanceTarget, (settings?.currency ?? invoice.currency))}
                 </div>
               )}
             </div>
@@ -1392,7 +1432,7 @@ function InvoiceDetailDialog({
                         <TableCell className="text-sm">{fmtDate(p.paidAt)}</TableCell>
                         <TableCell>{m?.label ?? p.method}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{p.reference ?? "—"}</TableCell>
-                        <TableCell className="text-right font-medium">{fmtMoney(p.amount, invoice.currency)}</TableCell>
+                        <TableCell className="text-right font-medium">{fmtMoney(p.amount, (settings?.currency ?? invoice.currency))}</TableCell>
                         <TableCell>
                           <Button size="icon" variant="ghost" onClick={() => {
                             if (confirm("Remove this payment?")) deletePaymentMutation.mutate(p.id);
@@ -1451,6 +1491,10 @@ function FeeTemplatesTab({ tenantId }: { tenantId: string }) {
   const { data: templates = [], isLoading } = useQuery<FeeTemplate[]>({
     queryKey: ["/api/tenants", tenantId, "fee-templates"],
   });
+  const { data: settings } = useQuery<InvoiceSettings | null>({
+    queryKey: ["/api/tenants", tenantId, "invoice-settings"],
+  });
+  const tenantCurrency = settings?.currency ?? "USD";
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => apiRequest("DELETE", `/api/fee-templates/${id}`),
@@ -1487,24 +1531,43 @@ function FeeTemplatesTab({ tenantId }: { tenantId: string }) {
               <Card key={tpl.id} data-testid={`card-template-${tpl.id}`}>
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-2">
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <CardTitle className="text-base">{tpl.name}</CardTitle>
                       <CardDescription className="text-xs mt-0.5">
-                        {[tpl.destinationCountry, tpl.visaType].filter(Boolean).join(" · ") || "Generic"}
+                        {tpl.visaType ?? "Any visa type"}
                       </CardDescription>
+                      {(() => {
+                        const countries = Array.from(new Set([
+                          ...(tpl.destinationCountries ?? []),
+                          ...(tpl.destinationCountry ? [tpl.destinationCountry] : []),
+                        ]));
+                        if (countries.length === 0) {
+                          return <p className="text-xs text-muted-foreground mt-1.5 italic">Applies to any country</p>;
+                        }
+                        return (
+                          <div className="flex flex-wrap gap-1 mt-1.5" data-testid={`countries-template-${tpl.id}`}>
+                            {countries.slice(0, 4).map((c) => (
+                              <Badge key={c} variant="outline" className="text-[10px] font-normal">{c}</Badge>
+                            ))}
+                            {countries.length > 4 && (
+                              <Badge variant="outline" className="text-[10px] font-normal">+{countries.length - 4} more</Badge>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                     {!tpl.active && <Badge variant="secondary" className="text-xs">Inactive</Badge>}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm">
                   <div className="space-y-1">
-                    {tpl.agencyFee > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Agency</span><span>{fmtMoney(tpl.agencyFee, tpl.currency)}</span></div>}
-                    {tpl.governmentFee > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Government</span><span>{fmtMoney(tpl.governmentFee, tpl.currency)}</span></div>}
-                    {tpl.serviceFee > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Service</span><span>{fmtMoney(tpl.serviceFee, tpl.currency)}</span></div>}
-                    {tpl.otherFee > 0 && <div className="flex justify-between"><span className="text-muted-foreground">{tpl.otherFeeLabel ?? "Other"}</span><span>{fmtMoney(tpl.otherFee, tpl.currency)}</span></div>}
+                    {tpl.agencyFee > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Agency</span><span>{fmtMoney(tpl.agencyFee, tenantCurrency)}</span></div>}
+                    {tpl.governmentFee > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Government</span><span>{fmtMoney(tpl.governmentFee, tenantCurrency)}</span></div>}
+                    {tpl.serviceFee > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Service</span><span>{fmtMoney(tpl.serviceFee, tenantCurrency)}</span></div>}
+                    {tpl.otherFee > 0 && <div className="flex justify-between"><span className="text-muted-foreground">{tpl.otherFeeLabel ?? "Other"}</span><span>{fmtMoney(tpl.otherFee, tenantCurrency)}</span></div>}
                   </div>
                   <Separator />
-                  <div className="flex justify-between font-semibold"><span>Total</span><span>{fmtMoney(total, tpl.currency)}</span></div>
+                  <div className="flex justify-between font-semibold"><span>Total</span><span>{fmtMoney(total, tenantCurrency)}</span></div>
                   <div className="flex justify-between text-xs text-muted-foreground pt-1">
                     <span>{PAYMENT_TYPE_LABELS[tpl.defaultPaymentType] ?? tpl.defaultPaymentType}</span>
                     {tpl.defaultPaymentType === "advance" && tpl.advancePercent != null && <span>{tpl.advancePercent}% advance</span>}
@@ -1543,19 +1606,25 @@ function FeeTemplateDialog({
   const isEdit = !!template;
 
   const empty = useMemo(() => ({
-    name: "", destinationCountry: "", visaType: "",
+    name: "", destinationCountries: [] as string[], visaType: "",
     agencyFee: "", governmentFee: "", serviceFee: "", otherFee: "", otherFeeLabel: "",
     defaultPaymentType: "upfront", advancePercent: "50", description: "", active: true,
   }), []);
 
   const [form, setForm] = useState(empty);
+  const [countryPickerOpen, setCountryPickerOpen] = useState(false);
+  const [countrySearch, setCountrySearch] = useState("");
 
   // sync when template changes
   useMemo(() => {
     if (template) {
+      const countries = Array.from(new Set([
+        ...(template.destinationCountries ?? []),
+        ...(template.destinationCountry ? [template.destinationCountry] : []),
+      ]));
       setForm({
         name: template.name,
-        destinationCountry: template.destinationCountry ?? "",
+        destinationCountries: countries,
         visaType: template.visaType ?? "",
         agencyFee: template.agencyFee ? fromCents(template.agencyFee) : "",
         governmentFee: template.governmentFee ? fromCents(template.governmentFee) : "",
@@ -1572,18 +1641,43 @@ function FeeTemplateDialog({
     }
   }, [template, empty]);
 
-  const visaConf = form.destinationCountry ? getCountryVisaConfig(form.destinationCountry) : null;
-  const visaOptions: string[] = visaConf
-    ? Object.values(visaConf.categories).flatMap((arr: any) =>
-        Array.isArray(arr) ? arr.map((v: any) => v.label as string) : [],
-      )
-    : ["Tourist Visa", "Business Visa", "Student Visa", "Work Visa", "Visit Visa", "Transit Visa"];
+  // Visa options: union of categories across selected countries (or generic list when no country picked)
+  const visaOptions: string[] = useMemo(() => {
+    if (form.destinationCountries.length === 0) {
+      return ["Tourist Visa", "Business Visa", "Student Visa", "Work Visa", "Visit Visa", "Transit Visa"];
+    }
+    const set = new Set<string>();
+    for (const c of form.destinationCountries) {
+      const conf = getCountryVisaConfig(c);
+      if (conf) {
+        for (const arr of Object.values(conf.categories)) {
+          if (Array.isArray(arr)) arr.forEach((v: any) => set.add(v.label as string));
+        }
+      }
+    }
+    return set.size > 0 ? Array.from(set).sort() : ["Tourist Visa", "Business Visa", "Student Visa", "Work Visa", "Visit Visa", "Transit Visa"];
+  }, [form.destinationCountries]);
+
+  const filteredCountries = useMemo(() => {
+    const q = countrySearch.trim().toLowerCase();
+    if (!q) return COUNTRIES_LIST;
+    return COUNTRIES_LIST.filter((c) => c.toLowerCase().includes(q));
+  }, [countrySearch]);
+
+  const toggleCountry = (c: string) =>
+    setForm((f) => ({
+      ...f,
+      destinationCountries: f.destinationCountries.includes(c)
+        ? f.destinationCountries.filter((x) => x !== c)
+        : [...f.destinationCountries, c],
+    }));
 
   const saveMutation = useMutation({
     mutationFn: async () => {
       const payload = {
         name: form.name,
-        destinationCountry: form.destinationCountry || null,
+        destinationCountry: form.destinationCountries[0] ?? null,
+        destinationCountries: form.destinationCountries.length > 0 ? form.destinationCountries : null,
         visaType: form.visaType || null,
         agencyFee: toCents(form.agencyFee),
         governmentFee: toCents(form.governmentFee),
@@ -1623,25 +1717,100 @@ function FeeTemplateDialog({
             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
               placeholder="e.g. Schengen Tourist Visa - France" data-testid="input-template-name" />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Destination country</Label>
-              <Select value={form.destinationCountry} onValueChange={(v) => setForm({ ...form, destinationCountry: v, visaType: "" })}>
-                <SelectTrigger data-testid="select-template-country"><SelectValue placeholder="Any" /></SelectTrigger>
-                <SelectContent>
-                  {COUNTRIES_LIST.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Visa type</Label>
-              <Select value={form.visaType} onValueChange={(v) => setForm({ ...form, visaType: v })}>
-                <SelectTrigger data-testid="select-template-visa-type"><SelectValue placeholder="Any" /></SelectTrigger>
-                <SelectContent>
-                  {visaOptions.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <Label>Applicable countries</Label>
+            <p className="text-xs text-muted-foreground">
+              Pick one or more countries. Leave empty to make the template available for any country.
+            </p>
+            <Popover open={countryPickerOpen} onOpenChange={setCountryPickerOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-between font-normal"
+                  data-testid="button-template-pick-countries"
+                >
+                  <span className="text-muted-foreground">
+                    {form.destinationCountries.length === 0
+                      ? "Click to pick countries…"
+                      : `${form.destinationCountries.length} ${form.destinationCountries.length === 1 ? "country" : "countries"} selected`}
+                  </span>
+                  <ChevronDown className="w-4 h-4 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <div className="p-2 border-b">
+                  <Input
+                    placeholder="Search countries…"
+                    value={countrySearch}
+                    onChange={(e) => setCountrySearch(e.target.value)}
+                    className="h-8"
+                    data-testid="input-country-search"
+                  />
+                </div>
+                <ScrollArea className="h-64">
+                  <ul className="p-1">
+                    {filteredCountries.length === 0 ? (
+                      <li className="px-3 py-6 text-center text-sm text-muted-foreground">No matches.</li>
+                    ) : (
+                      filteredCountries.map((c) => {
+                        const checked = form.destinationCountries.includes(c);
+                        return (
+                          <li key={c}>
+                            <button
+                              type="button"
+                              onClick={() => toggleCountry(c)}
+                              className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent text-left"
+                              data-testid={`option-country-${c}`}
+                            >
+                              <Checkbox checked={checked} className="pointer-events-none" />
+                              <span className="flex-1">{c}</span>
+                            </button>
+                          </li>
+                        );
+                      })
+                    )}
+                  </ul>
+                </ScrollArea>
+              </PopoverContent>
+            </Popover>
+            {form.destinationCountries.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {form.destinationCountries.map((c) => (
+                  <Badge key={c} variant="secondary" className="gap-1 pr-1" data-testid={`chip-country-${c}`}>
+                    {c}
+                    <button
+                      type="button"
+                      onClick={() => toggleCountry(c)}
+                      className="ml-0.5 rounded hover:bg-background/60 p-0.5"
+                      aria-label={`Remove ${c}`}
+                      data-testid={`button-remove-country-${c}`}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                ))}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-2 text-xs text-muted-foreground"
+                  onClick={() => setForm((f) => ({ ...f, destinationCountries: [] }))}
+                  data-testid="button-clear-countries"
+                >
+                  Clear all
+                </Button>
+              </div>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label>Visa type</Label>
+            <Select value={form.visaType} onValueChange={(v) => setForm({ ...form, visaType: v })}>
+              <SelectTrigger data-testid="select-template-visa-type"><SelectValue placeholder="Any" /></SelectTrigger>
+              <SelectContent>
+                {visaOptions.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
 
           <Separator />
@@ -1736,6 +1905,121 @@ function FeeTemplateDialog({
 }
 
 // ============================================================
+// Email invoice dialog
+// ============================================================
+function EmailInvoiceDialog({
+  invoiceId,
+  defaultEmail,
+  open,
+  onOpenChange,
+}: {
+  invoiceId: string | null;
+  defaultEmail: string | null;
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+}) {
+  const { toast } = useToast();
+  const [to, setTo] = useState("");
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      setTo(defaultEmail ?? "");
+      setSubject("");
+      setBody("");
+    }
+  }, [open, defaultEmail]);
+
+  const sendMutation = useMutation({
+    mutationFn: async () => {
+      if (!invoiceId) throw new Error("Missing invoice");
+      const res = await apiRequest("POST", `/api/invoices/${invoiceId}/email`, {
+        to: to.trim(),
+        subject: subject.trim() || undefined,
+        body: body.trim() || undefined,
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      if (data?.fallback?.mailto) {
+        window.open(data.fallback.mailto, "_blank", "noopener");
+        toast({
+          title: "Opened in your email client",
+          description: "We don't have email sending configured — your default email app was opened with the message ready to send.",
+        });
+      } else {
+        toast({ title: "Email sent", description: `Invoice sent to ${to}.` });
+      }
+      onOpenChange(false);
+    },
+    onError: (e: Error) => toast({ title: "Could not send", description: e.message, variant: "destructive" }),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Email invoice</DialogTitle>
+          <DialogDescription>
+            Send a copy of this invoice. When email sending is configured, a PDF
+            is attached automatically — otherwise we'll open your default email
+            client with the message ready and a link to download the PDF.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label>To *</Label>
+            <Input
+              type="email"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              placeholder="customer@example.com"
+              data-testid="input-email-to"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Subject (optional)</Label>
+            <Input
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              placeholder="Defaults to: Invoice from your agency"
+              data-testid="input-email-subject"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Message (optional)</Label>
+            <Textarea
+              rows={5}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder="A short note to your customer…"
+              data-testid="input-email-body"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} data-testid="button-email-cancel">Cancel</Button>
+          <Button
+            onClick={() => {
+              if (!to.trim()) {
+                toast({ title: "Add a recipient", variant: "destructive" });
+                return;
+              }
+              sendMutation.mutate();
+            }}
+            disabled={sendMutation.isPending}
+            data-testid="button-email-send"
+          >
+            {sendMutation.isPending ? "Sending..." : "Send"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ============================================================
 // Invoice Settings tab
 // ============================================================
 function InvoiceSettingsTab({ tenantId }: { tenantId: string }) {
@@ -1746,6 +2030,7 @@ function InvoiceSettingsTab({ tenantId }: { tenantId: string }) {
 
   const [form, setForm] = useState({
     companyName: "", companyAddress: "", companyEmail: "", companyPhone: "", taxId: "",
+    logoUrl: "", invoiceAccentColor: "",
     currency: "USD", taxRate: "0", taxLabel: "Tax", invoicePrefix: "INV",
     paymentTerms: "Due on receipt", paymentInstructions: "", bankDetails: "",
     footerText: "", notes: "",
@@ -1761,6 +2046,8 @@ function InvoiceSettingsTab({ tenantId }: { tenantId: string }) {
         companyEmail: settings.companyEmail ?? "",
         companyPhone: settings.companyPhone ?? "",
         taxId: settings.taxId ?? "",
+        logoUrl: settings.logoUrl ?? "",
+        invoiceAccentColor: settings.invoiceAccentColor ?? "",
         currency: settings.currency,
         taxRate: ((settings.taxRate ?? 0) / 100).toString(),
         taxLabel: settings.taxLabel ?? "Tax",
@@ -1784,6 +2071,8 @@ function InvoiceSettingsTab({ tenantId }: { tenantId: string }) {
       const stateName = GST_STATES.find((s) => s.code === form.gstStateCode)?.name ?? null;
       const payload = {
         ...form,
+        logoUrl: form.logoUrl.trim() || null,
+        invoiceAccentColor: form.invoiceAccentColor.trim() || null,
         taxRate: Math.round(parseFloat(form.taxRate || "0") * 100), // convert % to basis points
         gstin: form.gstin.trim() || null,
         gstStateCode: form.gstStateCode || null,
@@ -1832,6 +2121,56 @@ function InvoiceSettingsTab({ tenantId }: { tenantId: string }) {
             <div className="space-y-2">
               <Label>Tax ID</Label>
               <Input value={form.taxId} onChange={(e) => setForm({ ...form, taxId: e.target.value })} data-testid="input-tax-id" />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label className="flex items-center gap-2"><ImageIcon className="w-4 h-4" /> Logo URL</Label>
+              <Input
+                value={form.logoUrl}
+                onChange={(e) => setForm({ ...form, logoUrl: e.target.value })}
+                placeholder="https://example.com/logo.png"
+                data-testid="input-logo-url"
+              />
+              <p className="text-xs text-muted-foreground">Paste a public URL to your company logo. It appears on the invoice header and PDF.</p>
+              {form.logoUrl && (
+                <div className="flex items-center gap-3 pt-1">
+                  <img
+                    src={form.logoUrl}
+                    alt="Logo preview"
+                    className="h-12 w-12 object-contain rounded border bg-white p-1"
+                    data-testid="img-logo-preview"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  />
+                  <span className="text-xs text-muted-foreground">Preview</span>
+                </div>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Invoice accent color</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="color"
+                  value={form.invoiceAccentColor || "#1f2937"}
+                  onChange={(e) => setForm({ ...form, invoiceAccentColor: e.target.value })}
+                  className="h-10 w-16 p-1"
+                  data-testid="input-accent-color"
+                />
+                <Input
+                  value={form.invoiceAccentColor}
+                  onChange={(e) => setForm({ ...form, invoiceAccentColor: e.target.value })}
+                  placeholder="#1f2937"
+                  className="flex-1 font-mono text-sm"
+                  data-testid="input-accent-color-hex"
+                />
+                {form.invoiceAccentColor && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setForm({ ...form, invoiceAccentColor: "" })}
+                    data-testid="button-clear-accent"
+                  >Clear</Button>
+                )}
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Currency</Label>

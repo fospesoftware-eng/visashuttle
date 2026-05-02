@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft, ArrowRight, Check, Loader2, Plus, Save, Send, Trash2, Users,
   MapPin, FileText, User as UserIcon, Plane, ClipboardCheck, ListChecks,
-  Search, X, CircleDot,
+  Search, X, CircleDot, DollarSign,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +20,7 @@ import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { CO_TRAVELLER_RELATIONSHIPS, type CoTravellerRelationship } from "@shared/schema";
+import { CO_TRAVELLER_RELATIONSHIPS, type CoTravellerRelationship, type FeeTemplate, type InvoiceSettings } from "@shared/schema";
 import { getDocumentChecklist, type DocumentRequirement } from "@/data/document-checklists";
 
 const COUNTRIES = [
@@ -129,8 +129,44 @@ const STEPS = [
   { id: 3, title: "Travel Details", icon: Plane },
   { id: 4, title: "Co-Travellers", icon: Users },
   { id: 5, title: "Documents", icon: ListChecks },
-  { id: 6, title: "Review", icon: ClipboardCheck },
+  { id: 6, title: "Fees", icon: DollarSign },
+  { id: 7, title: "Review", icon: ClipboardCheck },
 ] as const;
+
+const FEE_CATEGORIES = [
+  { value: "agency_fee",      label: "Agency Fee" },
+  { value: "government_fee",  label: "Government Fee" },
+  { value: "service_charge",  label: "Service Charge" },
+  { value: "other",           label: "Other" },
+  { value: "discount",        label: "Discount" },
+] as const;
+
+type FeeDraft = {
+  key: string;
+  description: string;
+  category: typeof FEE_CATEGORIES[number]["value"];
+  quantity: string;
+  unitPrice: string;
+};
+
+function emptyFee(): FeeDraft {
+  return {
+    key: Math.random().toString(36).slice(2),
+    description: "",
+    category: "agency_fee",
+    quantity: "1",
+    unitPrice: "",
+  };
+}
+
+function feeToCents(v: string): number {
+  const n = parseFloat(v);
+  return isNaN(n) ? 0 : Math.round(n * 100);
+}
+
+function fmtFeeMoney(cents: number, currency = "USD") {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format((cents ?? 0) / 100);
+}
 
 type StepId = typeof STEPS[number]["id"];
 
@@ -154,6 +190,74 @@ export default function NewCasePage() {
   });
 
   const [coTravellers, setCoTravellers] = useState<CoTravellerDraft[]>([]);
+
+  // Fees step state
+  const [feeItems, setFeeItems] = useState<FeeDraft[]>([]);
+  const [appliedTemplateId, setAppliedTemplateId] = useState<string>("");
+
+  const { data: feeTemplates = [] } = useQuery<FeeTemplate[]>({
+    queryKey: ["/api/tenants", tenantId, "fee-templates"],
+    enabled: !!tenantId,
+  });
+  const { data: invoiceSettings } = useQuery<InvoiceSettings | null>({
+    queryKey: ["/api/tenants", tenantId, "invoice-settings"],
+    enabled: !!tenantId,
+  });
+  const tenantCurrency = invoiceSettings?.currency ?? "USD";
+
+  // Templates filtered by destination country (or any if user hasn't picked yet)
+  const matchingTemplates = useMemo(() => {
+    if (!form.destinationCountry) return feeTemplates.filter((t) => t.active);
+    return feeTemplates.filter((t) => {
+      if (!t.active) return false;
+      const countries = [
+        ...(t.destinationCountries ?? []),
+        ...(t.destinationCountry ? [t.destinationCountry] : []),
+      ];
+      // Templates with no country list apply to any destination
+      if (countries.length === 0) return true;
+      return countries.includes(form.destinationCountry);
+    });
+  }, [feeTemplates, form.destinationCountry]);
+
+  const applyFeeTemplate = (templateId: string) => {
+    const tpl = feeTemplates.find((t) => t.id === templateId);
+    if (!tpl) return;
+    setAppliedTemplateId(templateId);
+    const next: FeeDraft[] = [];
+    if (tpl.agencyFee > 0) next.push({ key: Math.random().toString(36).slice(2), description: `${tpl.name} – Agency Fee`, category: "agency_fee", quantity: "1", unitPrice: (tpl.agencyFee / 100).toFixed(2) });
+    if (tpl.governmentFee > 0) next.push({ key: Math.random().toString(36).slice(2), description: `${tpl.name} – Government Fee`, category: "government_fee", quantity: "1", unitPrice: (tpl.governmentFee / 100).toFixed(2) });
+    if (tpl.serviceFee > 0) next.push({ key: Math.random().toString(36).slice(2), description: `${tpl.name} – Service Charge`, category: "service_charge", quantity: "1", unitPrice: (tpl.serviceFee / 100).toFixed(2) });
+    if (tpl.otherFee > 0) next.push({ key: Math.random().toString(36).slice(2), description: tpl.otherFeeLabel ?? `${tpl.name} – Other`, category: "other", quantity: "1", unitPrice: (tpl.otherFee / 100).toFixed(2) });
+    setFeeItems(next.length > 0 ? next : [emptyFee()]);
+    toast({ title: "Template loaded", description: `${tpl.name} added to fees.` });
+  };
+
+  const updateFeeItem = (key: string, patch: Partial<FeeDraft>) => {
+    setFeeItems((arr) => arr.map((it) => (it.key === key ? { ...it, ...patch } : it)));
+  };
+  const removeFeeItem = (key: string) => setFeeItems((arr) => arr.filter((it) => it.key !== key));
+  const addFeeItem = () => setFeeItems((arr) => [...arr, emptyFee()]);
+
+  const validFeeItems = useMemo(
+    () => feeItems.filter((it) => it.description.trim() && feeToCents(it.unitPrice) > 0),
+    [feeItems],
+  );
+  const feeSubtotal = useMemo(
+    () => validFeeItems.reduce((s, it) => s + feeToCents(it.unitPrice) * (parseFloat(it.quantity) || 1), 0),
+    [validFeeItems],
+  );
+  const feeTaxAmount = useMemo(() => {
+    if (!invoiceSettings?.gstEnabled) return 0;
+    const rateBp = invoiceSettings.taxRate ?? 0;
+    // Government fees default non-taxable; others taxable
+    const taxableBase = validFeeItems.reduce((s, it) => {
+      if (it.category === "government_fee") return s;
+      return s + feeToCents(it.unitPrice) * (parseFloat(it.quantity) || 1);
+    }, 0);
+    return Math.round((taxableBase * rateBp) / 10000);
+  }, [validFeeItems, invoiceSettings]);
+  const feeTotal = feeSubtotal + feeTaxAmount;
 
   // Document checklist: maps requirement.type -> whether to include for this case
   // Defaults: all required items checked, optional items unchecked
@@ -212,6 +316,15 @@ export default function NewCasePage() {
       }
     }
     // Step 5 (Documents) has no hard validation — agency may onboard with empty checklist
+    if (s === 6) {
+      // Soft step — allow zero fees, but partially-filled rows must be valid
+      for (const it of feeItems) {
+        const hasDesc = it.description.trim().length > 0;
+        const cents = feeToCents(it.unitPrice);
+        if (hasDesc && cents <= 0) return `Fee line "${it.description}" needs a unit price.`;
+        if (!hasDesc && cents > 0) return "A fee line has a price but no description.";
+      }
+    }
     return null;
   };
 
@@ -220,7 +333,7 @@ export default function NewCasePage() {
 
   // Submission requires every step to be valid
   const fullValidationError = (): string | null => {
-    for (const s of [1, 2, 3, 4, 5] as StepId[]) {
+    for (const s of [1, 2, 3, 4, 5, 6] as StepId[]) {
       const err = stepError(s);
       if (err) return err;
     }
@@ -288,6 +401,40 @@ export default function NewCasePage() {
       }
     }
 
+    // Auto-create a draft invoice if any valid fee lines are present
+    if (validFeeItems.length > 0) {
+      try {
+        const items = validFeeItems.map((it) => {
+          const qty = parseFloat(it.quantity) || 1;
+          const unit = feeToCents(it.unitPrice);
+          return {
+            description: it.description.trim(),
+            category: it.category,
+            quantity: qty,
+            unitPrice: unit,
+            amount: unit * qty,
+            taxable: it.category !== "government_fee",
+          };
+        });
+        await apiRequest("POST", `/api/tenants/${tenantId}/invoices`, {
+          caseId: created.id,
+          customerName: form.applicantName.trim() || "Applicant",
+          customerEmail: null,
+          destinationCountry: form.destinationCountry,
+          visaType: form.visaType,
+          status: "draft",
+          paymentType: "upfront",
+          items,
+        });
+      } catch (err: any) {
+        toast({
+          title: "Case created — but invoice failed",
+          description: err?.message ?? "Add fees again from the Accounting page.",
+          variant: "destructive",
+        });
+      }
+    }
+
     return created;
   };
 
@@ -350,7 +497,7 @@ export default function NewCasePage() {
       return;
     }
     // Lighter validation for drafts: we still don't want bad dates persisted
-    for (const s of [2, 3, 4] as StepId[]) {
+    for (const s of [2, 3, 4, 6] as StepId[]) {
       const err = stepError(s);
       if (err && !err.includes("required")) {
         toast({ title: "Fix before saving draft", description: err, variant: "destructive" });
@@ -784,6 +931,156 @@ export default function NewCasePage() {
           {step === 6 && (
             <Card>
               <CardHeader>
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <DollarSign className="w-4 h-4" /> Fees
+                    </CardTitle>
+                    <CardDescription>
+                      Add fees manually or load them from a saved template. A draft invoice is auto-created on this case if you add any fees.
+                      {invoiceSettings?.gstEnabled && (
+                        <span className="block mt-1 text-xs">
+                          GST is enabled at {((invoiceSettings.taxRate ?? 0) / 100).toFixed(2)}% — applied automatically to non-government lines.
+                        </span>
+                      )}
+                    </CardDescription>
+                  </div>
+                  {matchingTemplates.length > 0 && (
+                    <div className="flex items-center gap-2 min-w-[260px]">
+                      <Select value={appliedTemplateId} onValueChange={applyFeeTemplate}>
+                        <SelectTrigger data-testid="select-fee-template" className="w-full">
+                          <SelectValue placeholder={`Load from template (${matchingTemplates.length})`} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {matchingTemplates.map((t) => (
+                            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {feeItems.length === 0 ? (
+                  <div className="rounded-xl border border-dashed p-6 text-center space-y-2">
+                    <p className="text-sm text-muted-foreground">No fees yet — add lines manually or load a template above.</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addFeeItem}
+                      className="gap-2"
+                      data-testid="button-add-fee-empty"
+                    >
+                      <Plus className="w-4 h-4" /> Add fee line
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      {feeItems.map((it, idx) => (
+                        <div
+                          key={it.key}
+                          className="grid grid-cols-12 gap-2 items-start rounded-lg border p-3 bg-card"
+                          data-testid={`row-fee-${idx}`}
+                        >
+                          <div className="col-span-12 sm:col-span-5 space-y-1">
+                            <Label className="text-xs">Description</Label>
+                            <Input
+                              value={it.description}
+                              onChange={(e) => updateFeeItem(it.key, { description: e.target.value })}
+                              placeholder="e.g. Visa application processing"
+                              data-testid={`input-fee-description-${idx}`}
+                            />
+                          </div>
+                          <div className="col-span-6 sm:col-span-3 space-y-1">
+                            <Label className="text-xs">Category</Label>
+                            <Select
+                              value={it.category}
+                              onValueChange={(v) => updateFeeItem(it.key, { category: v as FeeDraft["category"] })}
+                            >
+                              <SelectTrigger data-testid={`select-fee-category-${idx}`}><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {FEE_CATEGORIES.map((c) => (
+                                  <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="col-span-3 sm:col-span-1 space-y-1">
+                            <Label className="text-xs">Qty</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              value={it.quantity}
+                              onChange={(e) => updateFeeItem(it.key, { quantity: e.target.value })}
+                              data-testid={`input-fee-qty-${idx}`}
+                            />
+                          </div>
+                          <div className="col-span-3 sm:col-span-2 space-y-1">
+                            <Label className="text-xs">Unit ({tenantCurrency})</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={it.unitPrice}
+                              onChange={(e) => updateFeeItem(it.key, { unitPrice: e.target.value })}
+                              data-testid={`input-fee-unit-${idx}`}
+                            />
+                          </div>
+                          <div className="col-span-12 sm:col-span-1 flex sm:justify-end items-end h-full">
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => removeFeeItem(it.key)}
+                              data-testid={`button-fee-remove-${idx}`}
+                            >
+                              <Trash2 className="w-4 h-4 text-red-600" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addFeeItem}
+                      className="gap-2"
+                      data-testid="button-add-fee"
+                    >
+                      <Plus className="w-4 h-4" /> Add another line
+                    </Button>
+
+                    <div className="flex justify-end pt-2">
+                      <div className="w-full sm:w-72 space-y-1 text-sm border-t pt-3">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Subtotal</span>
+                          <span data-testid="text-fee-subtotal">{fmtFeeMoney(feeSubtotal, tenantCurrency)}</span>
+                        </div>
+                        {feeTaxAmount > 0 && (
+                          <div className="flex justify-between text-muted-foreground">
+                            <span>{invoiceSettings?.taxLabel ?? "Tax"}</span>
+                            <span data-testid="text-fee-tax">{fmtFeeMoney(feeTaxAmount, tenantCurrency)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between font-semibold border-t pt-1">
+                          <span>Total</span>
+                          <span data-testid="text-fee-total">{fmtFeeMoney(feeTotal, tenantCurrency)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {step === 7 && (
+            <Card>
+              <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <ClipboardCheck className="w-4 h-4" /> Review & Submit
                 </CardTitle>
@@ -834,6 +1131,35 @@ export default function NewCasePage() {
                         </li>
                       ))}
                     </ul>
+                  )}
+                </div>
+                <div className="border rounded-xl p-4 bg-muted/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="font-medium">Fees ({validFeeItems.length} {validFeeItems.length === 1 ? "line" : "lines"})</p>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setStep(6)} data-testid="button-edit-fees">Edit</Button>
+                  </div>
+                  {validFeeItems.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">No fees added — no invoice will be created.</p>
+                  ) : (
+                    <>
+                      <ul className="space-y-1 text-sm">
+                        {validFeeItems.map((it) => {
+                          const qty = parseFloat(it.quantity) || 1;
+                          const lineTotal = feeToCents(it.unitPrice) * qty;
+                          return (
+                            <li key={it.key} className="flex items-center justify-between gap-2">
+                              <span className="text-foreground truncate">{it.description}</span>
+                              <span className="text-muted-foreground text-xs whitespace-nowrap">{fmtFeeMoney(lineTotal, tenantCurrency)}</span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                      <div className="flex justify-between font-semibold border-t mt-2 pt-2">
+                        <span>Invoice total</span>
+                        <span>{fmtFeeMoney(feeTotal, tenantCurrency)}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">A draft invoice will be created automatically.</p>
+                    </>
                   )}
                 </div>
                 <div className="border rounded-xl p-4 bg-muted/20">
