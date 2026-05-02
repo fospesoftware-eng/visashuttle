@@ -120,6 +120,13 @@ function Router() {
       <Route path="/app/leads" component={LeadsPage} />
       <Route path="/app/cases" component={CasesPage} />
       <Route path="/app/cases/new" component={NewCasePage} />
+      <Route path="/app/cases/processing">
+        <CasesPage defaultStatusFilter="processing" pageTitle="Processing" />
+      </Route>
+      <Route path="/app/cases/completed">
+        <CasesPage defaultStatusFilter="completed" pageTitle="Completed" />
+      </Route>
+      {/* Backward compat for the old combined view */}
       <Route path="/app/cases/pending-completed">
         <CasesPage defaultStatusFilter="pending-completed" pageTitle="Pending & Completed" />
       </Route>

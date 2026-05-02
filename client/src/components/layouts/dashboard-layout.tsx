@@ -53,7 +53,8 @@ const agencyNavItems: NavItem[] = [
   {
     icon: Briefcase, label: "Applications", href: "/app/cases",
     children: [
-      { icon: ClipboardList, label: "Pending & Completed", href: "/app/cases/pending-completed" },
+      { icon: ClipboardList, label: "Processing", href: "/app/cases/processing" },
+      { icon: CheckCircle, label: "Completed", href: "/app/cases/completed" },
     ],
   },
   { icon: FileText, label: "Documents", href: "/app/documents" },

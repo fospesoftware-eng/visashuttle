@@ -47,9 +47,15 @@ interface CasesPageProps {
   pageSubtitle?: string;
 }
 
-const PENDING_COMPLETED_STATUSES = [
-  "pending", "in_progress", "documents_required", "under_review", "submitted", "approved",
+// "Completed" only contains finalised applications.
+const COMPLETED_STATUSES = ["approved"];
+// "Processing" is everything that isn't completed AND isn't a draft/rejected.
+// Drafts are unfinished work; rejected is a separate terminal state.
+const PROCESSING_STATUSES = [
+  "pending", "in_progress", "documents_required", "under_review", "submitted",
 ];
+// Backward-compat: the old "pending-completed" view contained both groups.
+const PENDING_COMPLETED_STATUSES = [...PROCESSING_STATUSES, ...COMPLETED_STATUSES];
 
 export default function CasesPage({
   defaultStatusFilter = "all",
@@ -61,7 +67,18 @@ export default function CasesPage({
   const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState(initialQ);
   const [statusFilter, setStatusFilter] = useState(defaultStatusFilter);
+  const isProcessingView = defaultStatusFilter === "processing";
+  const isCompletedView = defaultStatusFilter === "completed";
   const isPendingCompletedView = defaultStatusFilter === "pending-completed";
+
+  const scopeStatuses = isProcessingView
+    ? PROCESSING_STATUSES
+    : isCompletedView
+    ? COMPLETED_STATUSES
+    : isPendingCompletedView
+    ? PENDING_COMPLETED_STATUSES
+    : null;
+  const isScopedView = scopeStatuses !== null;
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const { toast } = useToast();
@@ -105,14 +122,10 @@ export default function CasesPage({
         (c.referenceId || "").toLowerCase().includes(term) ||
         (c.visaType || "").toLowerCase().includes(term);
       const matchesStatus =
-        statusFilter === "all"
+        statusFilter === "all" || statusFilter === "processing" || statusFilter === "completed" || statusFilter === "pending-completed"
           ? true
-          : statusFilter === "pending-completed"
-          ? PENDING_COMPLETED_STATUSES.includes(c.status)
           : c.status === statusFilter;
-      const matchesScope = isPendingCompletedView
-        ? PENDING_COMPLETED_STATUSES.includes(c.status)
-        : true;
+      const matchesScope = scopeStatuses ? scopeStatuses.includes(c.status) : true;
       return matchesSearch && matchesStatus && matchesScope;
     })
     .sort((a, b) => {
@@ -128,7 +141,11 @@ export default function CasesPage({
             <h1 className="text-2xl font-bold" data-testid="text-page-title">{pageTitle}</h1>
             <p className="text-muted-foreground">
               {pageSubtitle ?? (
-                isPendingCompletedView
+                isProcessingView
+                  ? `${filteredCases.length} application${filteredCases.length !== 1 ? "s" : ""} currently in progress · drafts, completed, and rejected are hidden.`
+                  : isCompletedView
+                  ? `${filteredCases.length} completed application${filteredCases.length !== 1 ? "s" : ""}.`
+                  : isPendingCompletedView
                   ? `${filteredCases.length} active or completed application${filteredCases.length !== 1 ? "s" : ""} · drafts and rejections are hidden.`
                   : `${cases.length} total application${cases.length !== 1 ? "s" : ""} · manage progress and share customer links.`
               )}
@@ -158,7 +175,21 @@ export default function CasesPage({
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
             <SelectContent>
-              {isPendingCompletedView ? (
+              {isProcessingView ? (
+                <>
+                  <SelectItem value="processing">All Processing</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="documents_required">Documents Required</SelectItem>
+                  <SelectItem value="under_review">Under Review</SelectItem>
+                  <SelectItem value="submitted">Submitted</SelectItem>
+                </>
+              ) : isCompletedView ? (
+                <>
+                  <SelectItem value="completed">All Completed</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                </>
+              ) : isPendingCompletedView ? (
                 <>
                   <SelectItem value="pending-completed">All (Pending & Completed)</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
