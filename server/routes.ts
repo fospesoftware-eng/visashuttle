@@ -4502,6 +4502,93 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  // ---- saas_admin "all data" cross-tenant views ----
+  // Each endpoint enriches rows with the agency name/slug so the admin
+  // doesn't have to do a second lookup per row in the UI.
+  app.get("/api/admin/cases", requireAdminAuth, async (_req, res) => {
+    const [cases, tenants] = await Promise.all([
+      storage.getAllCases(),
+      storage.getAllTenants(),
+    ]);
+    const tenantById = new Map(tenants.map((t) => [t.id, t]));
+    const enriched = cases.map((c) => ({
+      ...c,
+      tenantName: tenantById.get(c.tenantId)?.name ?? null,
+      tenantSlug: tenantById.get(c.tenantId)?.slug ?? null,
+      tenantPlan: tenantById.get(c.tenantId)?.plan ?? null,
+    }));
+    enriched.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+    res.json(enriched);
+  });
+
+  app.get("/api/admin/leads", requireAdminAuth, async (_req, res) => {
+    const [leads, tenants] = await Promise.all([
+      storage.getAllLeads(),
+      storage.getAllTenants(),
+    ]);
+    const tenantById = new Map(tenants.map((t) => [t.id, t]));
+    const enriched = leads.map((l) => ({
+      ...l,
+      tenantName: tenantById.get(l.tenantId)?.name ?? null,
+      tenantSlug: tenantById.get(l.tenantId)?.slug ?? null,
+    }));
+    enriched.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+    res.json(enriched);
+  });
+
+  app.get("/api/admin/proposals", requireAdminAuth, async (_req, res) => {
+    const [proposals, tenants] = await Promise.all([
+      storage.getAllProposals(),
+      storage.getAllTenants(),
+    ]);
+    const tenantById = new Map(tenants.map((t) => [t.id, t]));
+    const enriched = proposals.map((p) => ({
+      ...p,
+      tenantName: tenantById.get(p.tenantId)?.name ?? null,
+      tenantSlug: tenantById.get(p.tenantId)?.slug ?? null,
+    }));
+    enriched.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+    res.json(enriched);
+  });
+
+  app.get("/api/admin/invoices", requireAdminAuth, async (_req, res) => {
+    const [invoices, tenants] = await Promise.all([
+      storage.getAllInvoices(),
+      storage.getAllTenants(),
+    ]);
+    const tenantById = new Map(tenants.map((t) => [t.id, t]));
+    const enriched = invoices.map((inv) => ({
+      ...inv,
+      tenantName: tenantById.get(inv.tenantId)?.name ?? null,
+      tenantSlug: tenantById.get(inv.tenantId)?.slug ?? null,
+    }));
+    enriched.sort((a, b) => (b.issuedAt?.getTime() ?? 0) - (a.issuedAt?.getTime() ?? 0));
+    res.json(enriched);
+  });
+
+  app.get("/api/admin/payments", requireAdminAuth, async (_req, res) => {
+    const [payments, invoices, tenants] = await Promise.all([
+      storage.getAllPayments(),
+      storage.getAllInvoices(),
+      storage.getAllTenants(),
+    ]);
+    const tenantById = new Map(tenants.map((t) => [t.id, t]));
+    const invoiceById = new Map(invoices.map((i) => [i.id, i]));
+    const enriched = payments.map((p) => {
+      const inv = invoiceById.get(p.invoiceId);
+      return {
+        ...p,
+        tenantName: tenantById.get(p.tenantId)?.name ?? null,
+        tenantSlug: tenantById.get(p.tenantId)?.slug ?? null,
+        invoiceNumber: inv?.invoiceNumber ?? null,
+        invoiceCustomer: inv?.customerName ?? null,
+        invoiceCurrency: inv?.currency ?? null,
+      };
+    });
+    enriched.sort((a, b) => (b.paidAt?.getTime() ?? 0) - (a.paidAt?.getTime() ?? 0));
+    res.json(enriched);
+  });
+
   // All activity logs
   app.get("/api/admin/activity-logs", requireAdminAuth, async (req, res) => {
     const logs = await storage.getAllActivityLogs();

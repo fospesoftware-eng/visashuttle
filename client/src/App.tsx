@@ -56,6 +56,8 @@ import AdminVKBPage from "@/pages/admin/vkb";
 import AdminAIPage from "@/pages/admin/ai";
 import AdminAuditPage from "@/pages/admin/audit";
 import AdminSettingsPage from "@/pages/admin/settings";
+import AdminOperationsPage from "@/pages/admin/operations";
+import AdminFinancePage from "@/pages/admin/finance";
 
 import AgencyRegisterPage from "@/pages/agency-register";
 import PrivacyPolicyPage from "@/pages/privacy-policy";
@@ -190,6 +192,8 @@ function Router() {
       <Route path="/admin/vkb" component={AdminVKBPage} />
       <Route path="/admin/ai" component={AdminAIPage} />
       <Route path="/admin/users" component={AdminUsersPage} />
+      <Route path="/admin/operations" component={AdminOperationsPage} />
+      <Route path="/admin/finance" component={AdminFinancePage} />
       <Route path="/admin/audit" component={AdminAuditPage} />
       <Route path="/admin/settings" component={AdminSettingsPage} />
 

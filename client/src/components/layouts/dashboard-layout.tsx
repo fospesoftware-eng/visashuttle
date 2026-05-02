@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Home, Users, Briefcase, FileText, BarChart3, Settings,
   ChevronLeft, ChevronRight, ChevronDown, LogOut, Bell, Search,
-  Menu, X, Building2, ShieldCheck, Database, Activity, Globe,
+  Menu, X, Building2, ShieldCheck, Database, Activity, Globe, CreditCard,
   CheckCircle, AlertCircle, Inbox, Receipt, Banknote, ClipboardList,
   Send, Stamp, Loader2, XCircle
 } from "lucide-react";
@@ -42,6 +42,8 @@ const adminNavItems: NavItem[] = [
   { icon: Home, label: "Dashboard", href: "/admin" },
   { icon: Building2, label: "Agencies", href: "/admin/tenants" },
   { icon: Users, label: "Users", href: "/admin/users" },
+  { icon: ClipboardList, label: "Operations", href: "/admin/operations" },
+  { icon: CreditCard, label: "Finance", href: "/admin/finance" },
   { icon: Database, label: "Visa Knowledge", href: "/admin/vkb" },
   { icon: ShieldCheck, label: "AI Governance", href: "/admin/ai" },
   { icon: Activity, label: "Audit Logs", href: "/admin/audit" },

@@ -83,6 +83,11 @@ export interface IStorage {
   deleteProposal(id: string): Promise<boolean>;
   
   getCasesByTenantId(tenantId: string): Promise<Case[]>;
+  getAllCases(): Promise<Case[]>;
+  getAllLeads(): Promise<Lead[]>;
+  getAllProposals(): Promise<Proposal[]>;
+  getAllInvoices(): Promise<Invoice[]>;
+  getAllPayments(): Promise<Payment[]>;
   getCasesByTenantAndVisaStage(tenantId: string, stage: string): Promise<Case[]>;
   getCasesByCustomerId(customerId: string): Promise<Case[]>;
   getCasesByCustomerAccountId(customerAccountId: string, tenantId: string): Promise<Case[]>;
@@ -1107,6 +1112,25 @@ export class MemStorage implements IStorage {
       this.invoices.set(payment.invoiceId, { ...inv, paidAmount, status, updatedAt: new Date() });
     }
     return ok;
+  }
+
+  // Cross-tenant getters used by the saas_admin "all data" views.
+  // These return every row in the workspace — never call them on the
+  // request path of a tenant-scoped page.
+  async getAllCases(): Promise<Case[]> {
+    return Array.from(this.cases.values());
+  }
+  async getAllLeads(): Promise<Lead[]> {
+    return Array.from(this.leads.values());
+  }
+  async getAllProposals(): Promise<Proposal[]> {
+    return Array.from(this.proposals.values());
+  }
+  async getAllInvoices(): Promise<Invoice[]> {
+    return Array.from(this.invoices.values());
+  }
+  async getAllPayments(): Promise<Payment[]> {
+    return Array.from(this.payments.values());
   }
 
   async getCasesByTenantId(tenantId: string): Promise<Case[]> {

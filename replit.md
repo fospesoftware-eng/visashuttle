@@ -461,6 +461,40 @@ The platform now includes a full B2C visa approval checker with:
   - `GET /api/admin/weekly-activity?days=7|30|90` — now configurable; returns `{ date, day, cases, checks, newTenants, approvals }` per day. `day` label is weekday for ≤14d windows, else `MMM D`.
   - Plan pricing constants live in `routes.ts` (`PLAN_PRICING_USD`): starter=$49, professional=$149, enterprise=$499. MRR sums non-suspended tenants.
 
+**Super Admin — Cross-Tenant Operations & Finance Consoles (May 2026)**
+- The `saas_admin` role gets two new global views so they can manage all
+  agencies + B2C users with full visibility into the data those agencies
+  produce. Everything is read-only for now (no edit/delete) — the existing
+  per-agency CRUD is still the canonical write path.
+- **Sidebar (`adminNavItems`)**: adds `Operations` (`/admin/operations`,
+  `ClipboardList` icon) and `Finance` (`/admin/finance`, `CreditCard`
+  icon) between Users and Visa Knowledge.
+- **Pages**:
+  - `client/src/pages/admin/operations.tsx` — three tabs (Cases / Leads /
+    Proposals) with a shared search box + agency filter + status filter.
+    Each row renders the owning agency, and Cases/Proposals deep-link to
+    the agency's white-label portal (`/w/:slug/portal/case/:id`) and the
+    public proposal token (`/p/:token`).
+  - `client/src/pages/admin/finance.tsx` — two tabs (Invoices / Payments)
+    plus four KPI tiles (Total billed / Collected / Outstanding /
+    Payments). KPIs roll up the *filtered* invoice set so the totals
+    always match the visible table. Invoices with a `publicToken` expose
+    the share link `/pay/invoice/:token`.
+- **Backend** (`server/routes.ts`, `requireAdminAuth` guarded):
+  - `GET /api/admin/cases` — every case + `tenantName/Slug/Plan`.
+  - `GET /api/admin/leads` — every lead + `tenantName/Slug`.
+  - `GET /api/admin/proposals` — every proposal + `tenantName/Slug`.
+  - `GET /api/admin/invoices` — every invoice + `tenantName/Slug`,
+    sorted by `issuedAt` desc.
+  - `GET /api/admin/payments` — every payment + `tenantName/Slug` and
+    the joined `invoiceNumber/invoiceCustomer/invoiceCurrency` for
+    one-shot rendering.
+- **Storage** (`server/storage.ts` `IStorage`): five new cross-tenant
+  getters — `getAllCases`, `getAllLeads`, `getAllProposals`,
+  `getAllInvoices`, `getAllPayments`. Each returns
+  `Array.from(this.X.values())`. These must NEVER be called from a
+  tenant-scoped page; they only exist for the saas_admin views above.
+
 **All Mock Pages Wired to Real APIs**
 - Leads page: create/edit/delete/stage-move via real API + search/filter
 - Documents page: status stats, change-status actions, real document list
