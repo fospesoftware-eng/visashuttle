@@ -424,31 +424,37 @@ function ProposalCreateDialog({
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <Label>Destination country <span className="text-red-500">*</span></Label>
-            <Select value={form.destinationCountry} onValueChange={(v) => setForm({ ...form, destinationCountry: v })}>
-              <SelectTrigger data-testid="select-country">
-                <SelectValue placeholder="Pick a country" />
-              </SelectTrigger>
-              <SelectContent>
-                {POPULAR_COUNTRIES.map((c) => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Visa type <span className="text-red-500">*</span></Label>
-            <Select value={form.visaType} onValueChange={(v) => setForm({ ...form, visaType: v })}>
-              <SelectTrigger data-testid="select-visa-type">
-                <SelectValue placeholder="Pick a visa type" />
-              </SelectTrigger>
-              <SelectContent>
-                {GENERIC_VISA_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>{t}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* Destination country + visa type as one adjacent pair — same
+              "where + what" layout used by the lead form and the lead-convert
+              dialog. Both lists come from the global master in
+              `shared/destinations.ts`. */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <Label>Destination country <span className="text-red-500">*</span></Label>
+              <Select value={form.destinationCountry} onValueChange={(v) => setForm({ ...form, destinationCountry: v })}>
+                <SelectTrigger data-testid="select-country">
+                  <SelectValue placeholder="Pick a country" />
+                </SelectTrigger>
+                <SelectContent>
+                  {POPULAR_COUNTRIES.map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Visa type <span className="text-red-500">*</span></Label>
+              <Select value={form.visaType} onValueChange={(v) => setForm({ ...form, visaType: v })}>
+                <SelectTrigger data-testid="select-visa-type">
+                  <SelectValue placeholder="Pick a visa type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {GENERIC_VISA_TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div>
             <Label>Link expires in</Label>

@@ -543,14 +543,14 @@ export default function LeadsPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2 col-span-2">
+                  <div className="space-y-2">
                     <Label>Destination Country</Label>
                     <Select
                       value={form.destinationCountry}
                       onValueChange={(v) => setForm({ ...form, destinationCountry: v, visaType: "" })}
                     >
                       <SelectTrigger data-testid="select-lead-destination">
-                        <SelectValue placeholder="Where do they want to travel?" />
+                        <SelectValue placeholder="Where to?" />
                       </SelectTrigger>
                       <SelectContent className="max-h-72">
                         {COUNTRIES_LIST.map((c) => {
@@ -564,11 +564,11 @@ export default function LeadsPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2 col-span-2">
+                  <div className="space-y-2">
                     <Label>
                       Visa Type
                       {!form.destinationCountry && (
-                        <span className="ml-2 text-xs text-muted-foreground font-normal">(select a country first)</span>
+                        <span className="ml-1 text-xs text-muted-foreground font-normal">(pick country first)</span>
                       )}
                     </Label>
                     <Select
@@ -577,7 +577,7 @@ export default function LeadsPage() {
                       disabled={!form.destinationCountry}
                     >
                       <SelectTrigger data-testid="select-lead-visa-type">
-                        <SelectValue placeholder={form.destinationCountry ? "Select visa type" : "Pick a country to see visa types"} />
+                        <SelectValue placeholder={form.destinationCountry ? "Select visa type" : "Country first"} />
                       </SelectTrigger>
                       <SelectContent className="max-h-72">
                         {getVisaTypesForCountry(form.destinationCountry).map((t) => (
@@ -742,27 +742,32 @@ export default function LeadsPage() {
               These fields are optional pre-fills — you can leave them blank and pick them inside the wizard.
               The lead's email + mobile are always passed through automatically.
             </p>
-            <div className="space-y-2">
-              <Label>Visa Type</Label>
-              <Select value={convertForm.visaType} onValueChange={(v) => setConvertForm({ ...convertForm, visaType: v })}>
-                <SelectTrigger data-testid="select-convert-visa-type">
-                  <SelectValue placeholder="Optional — pick later in the wizard" />
-                </SelectTrigger>
-                <SelectContent>
-                  {GENERIC_VISA_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Destination Country</Label>
-              <Select value={convertForm.destinationCountry} onValueChange={(v) => setConvertForm({ ...convertForm, destinationCountry: v })}>
-                <SelectTrigger data-testid="select-convert-destination">
-                  <SelectValue placeholder="Optional — pick later in the wizard" />
-                </SelectTrigger>
-                <SelectContent>
-                  {COUNTRIES_LIST.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
+            {/* Destination country + visa type live side-by-side as a single
+                application "where + what" pair — kept consistent with the new
+                lead form and the proposal create dialog. */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Destination Country</Label>
+                <Select value={convertForm.destinationCountry} onValueChange={(v) => setConvertForm({ ...convertForm, destinationCountry: v })}>
+                  <SelectTrigger data-testid="select-convert-destination">
+                    <SelectValue placeholder="Optional — pick later" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COUNTRIES_LIST.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Visa Type</Label>
+                <Select value={convertForm.visaType} onValueChange={(v) => setConvertForm({ ...convertForm, visaType: v })}>
+                  <SelectTrigger data-testid="select-convert-visa-type">
+                    <SelectValue placeholder="Optional — pick later" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {GENERIC_VISA_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Priority</Label>
