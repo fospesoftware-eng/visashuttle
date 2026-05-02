@@ -35,12 +35,11 @@ import type {
 } from "@shared/schema";
 
 // ---------- helpers ----------
-const COUNTRIES_LIST = [
-  "United States", "Canada", "United Kingdom", "France", "Germany", "Italy", "Spain",
-  "Netherlands", "Belgium", "Switzerland", "Austria", "Australia", "New Zealand",
-  "Japan", "South Korea", "Singapore", "United Arab Emirates", "Saudi Arabia",
-  "China", "India", "Brazil", "Mexico", "South Africa", "Turkey", "Russia",
-];
+import { COUNTRIES as COUNTRIES_LIST, VISA_TYPES } from "@shared/destinations";
+
+// Master-derived fallback for visa-type pickers in fee templates: drop the
+// "Schengen Visa" + "Other" labels (always-on filters don't need them).
+const VISA_TYPE_FALLBACK = VISA_TYPES.filter(t => t !== "Other" && t !== "Schengen Visa");
 
 const PAYMENT_TYPE_LABELS: Record<string, string> = {
   upfront: "Pay Upfront (100%)",
@@ -920,7 +919,7 @@ function ComposeInvoiceDialog({
     ? Object.values(visaConf.categories).flatMap((arr: any) =>
         Array.isArray(arr) ? arr.map((v: any) => v.label as string) : [],
       )
-    : ["Tourist Visa", "Business Visa", "Student Visa", "Work Visa", "Visit Visa", "Transit Visa"];
+    : VISA_TYPE_FALLBACK;
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
@@ -1672,7 +1671,7 @@ function FeeTemplateDialog({
   // Visa options: union of categories across selected countries (or generic list when no country picked)
   const visaOptions: string[] = useMemo(() => {
     if (form.destinationCountries.length === 0) {
-      return ["Tourist Visa", "Business Visa", "Student Visa", "Work Visa", "Visit Visa", "Transit Visa"];
+      return VISA_TYPE_FALLBACK;
     }
     const set = new Set<string>();
     for (const c of form.destinationCountries) {
@@ -1683,7 +1682,7 @@ function FeeTemplateDialog({
         }
       }
     }
-    return set.size > 0 ? Array.from(set).sort() : ["Tourist Visa", "Business Visa", "Student Visa", "Work Visa", "Visit Visa", "Transit Visa"];
+    return set.size > 0 ? Array.from(set).sort() : VISA_TYPE_FALLBACK;
   }, [form.destinationCountries]);
 
   const filteredCountries = useMemo(() => {

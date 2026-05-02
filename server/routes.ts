@@ -9,6 +9,7 @@ import indiaVisaChanceDataset from "@shared/india_visa_chance_dataset_non_visa_f
 import bcrypt from "bcryptjs";
 import { randomUUID, randomBytes } from "crypto";
 import type { Proposal } from "@shared/schema";
+import { VISA_TYPES } from "@shared/destinations";
 import { z } from "zod";
 import ExcelJS from "exceljs";
 import {
@@ -431,7 +432,12 @@ const LIVE_DESTINATION_CODES: Record<string, string> = {
 const HIGH_MOBILITY_ORIGINS = new Set(["United States", "United Kingdom", "Canada", "Australia", "Germany", "France", "Japan"]);
 const REGIONAL_EASY_DESTINATIONS = new Set(["Nepal", "Bhutan", "Singapore", "Japan"]);
 const HIGH_SCRUTINY_DESTINATIONS = new Set(["United States", "United Kingdom", "Canada", "Australia", "Schengen", "New Zealand"]);
-const LIVE_VISA_TYPES = ["Tourist Visa", "Visit Visa", "Work Visa", "Student Visa", "Business Visa"];
+// Visa types used by the synthetic "live activity" feed generator. We keep
+// this scoped to a small, broadly-recognisable subset of the master list in
+// `shared/destinations.ts` so the feed reads naturally.
+const LIVE_VISA_TYPES = VISA_TYPES.filter(t => [
+  "Tourist Visa", "Visit Visa", "Work Visa", "Student Visa", "Business Visa",
+].includes(t));
 const INDIA_DATASET_VISA_TYPES: Array<{ key: IndiaVisaChanceKey; label: string }> = [
   { key: "visit", label: "Visit Visa" },
   { key: "business", label: "Business Visa" },

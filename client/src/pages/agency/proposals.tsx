@@ -34,20 +34,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getDocumentChecklist } from "@/data/document-checklists";
 import type { Proposal } from "@shared/schema";
-
-// Same generic visa-type list the leads dialog uses, so a proposal works
-// even for countries we don't have a structured config for.
-const GENERIC_VISA_TYPES = [
-  "Tourist Visa", "Business Visa", "Student Visa", "Work Visa",
-  "Transit Visa", "Family Visa", "Schengen Visa", "Investor Visa",
-];
-
-const POPULAR_COUNTRIES = [
-  "United States", "United Kingdom", "Canada", "Australia",
-  "France", "Germany", "Italy", "Spain", "Netherlands",
-  "Schengen", "United Arab Emirates", "Singapore", "Japan",
-  "South Korea", "New Zealand", "Switzerland",
-];
+import { COUNTRIES as POPULAR_COUNTRIES, VISA_TYPES as GENERIC_VISA_TYPES } from "@shared/destinations";
 
 const STATUS_STYLES: Record<string, string> = {
   sent: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900",

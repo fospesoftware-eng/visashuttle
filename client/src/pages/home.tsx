@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
+import { POPULAR_DESTINATIONS, VISA_TYPES } from "@shared/destinations";
 
 // ── Large pool of country-pair visa data ──────────────────────────────────────
 type VisaScoreSample = {
@@ -180,8 +181,14 @@ function shuffle<T>(arr: T[]): T[] {
 
 function fallbackSamples(): VisaScoreSample[] {
   const fallbackFrom = "India";
-  const destinations = shuffle(["Australia", "United Kingdom", "Canada", "United States", "Schengen", "New Zealand", "Japan", "South Korea", "Singapore"]).slice(0, 4);
-  const visaTypes = shuffle(["Tourist Visa", "Visit Visa", "Work Visa", "Student Visa", "Business Visa"]);
+  // Pick from the master POPULAR_DESTINATIONS so the home-page widget stays
+  // in sync with the rest of the app. We add "Schengen" explicitly because
+  // visa-free / scoring logic keys on that exact label.
+  const candidates = [...POPULAR_DESTINATIONS, "Schengen"].filter(c => c !== fallbackFrom);
+  const destinations = shuffle(candidates).slice(0, 4);
+  const visaTypes = shuffle(VISA_TYPES.filter(t => [
+    "Tourist Visa", "Visit Visa", "Work Visa", "Student Visa", "Business Visa",
+  ].includes(t)));
   return destinations.map((to, index) => ({
     from: fallbackFrom,
     to,

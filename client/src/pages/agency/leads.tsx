@@ -96,11 +96,7 @@ const emptyForm = {
 // Minimal staff shape we render in the assignee dropdown / card.
 type StaffMember = { id: string; name: string; role: string };
 
-const GENERIC_VISA_TYPES = [
-  "Tourist Visa", "Business Visa", "Student Visa", "Work Visa",
-  "Visit Visa", "Transit Visa", "Investor Visa", "Family Visa",
-  "Conference / Event Visa", "Medical Visa",
-];
+import { COUNTRIES as COUNTRIES_LIST, VISA_TYPES as GENERIC_VISA_TYPES } from "@shared/destinations";
 
 function getVisaTypesForCountry(country: string): string[] {
   if (!country) return [];
@@ -113,68 +109,12 @@ function getVisaTypesForCountry(country: string): string[] {
   return Array.from(all);
 }
 
-const COUNTRIES_LIST = [
-  "Afghanistan","Albania","Algeria","Andorra","Angola","Antigua and Barbuda",
-  "Argentina","Armenia","Australia","Austria","Azerbaijan",
-  "Bahamas","Bahrain","Bangladesh","Barbados","Belarus","Belgium","Belize",
-  "Benin","Bhutan","Bolivia","Bosnia and Herzegovina","Botswana","Brazil",
-  "Brunei","Bulgaria","Burkina Faso","Burundi",
-  "Cabo Verde","Cambodia","Cameroon","Canada","Central African Republic","Chad",
-  "Chile","China","Colombia","Comoros","Congo","Costa Rica","Croatia","Cuba",
-  "Cyprus","Czech Republic",
-  "Democratic Republic of Congo","Denmark","Djibouti","Dominica","Dominican Republic",
-  "Ecuador","Egypt","El Salvador","Equatorial Guinea","Eritrea","Estonia",
-  "Eswatini","Ethiopia",
-  "Fiji","Finland","France",
-  "Gabon","Gambia","Georgia","Germany","Ghana","Greece","Grenada","Guatemala",
-  "Guinea","Guinea-Bissau","Guyana",
-  "Haiti","Honduras","Hungary",
-  "Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy",
-  "Jamaica","Japan","Jordan",
-  "Kazakhstan","Kenya","Kiribati","Kuwait","Kyrgyzstan",
-  "Laos","Latvia","Lebanon","Lesotho","Liberia","Libya","Liechtenstein",
-  "Lithuania","Luxembourg",
-  "Madagascar","Malawi","Malaysia","Maldives","Mali","Malta",
-  "Marshall Islands","Mauritania","Mauritius","Mexico","Micronesia",
-  "Moldova","Monaco","Mongolia","Montenegro","Morocco","Mozambique","Myanmar",
-  "Namibia","Nauru","Nepal","Netherlands","New Zealand","Nicaragua","Niger",
-  "Nigeria","North Korea","North Macedonia","Norway",
-  "Oman",
-  "Pakistan","Palau","Palestine","Panama","Papua New Guinea","Paraguay","Peru",
-  "Philippines","Poland","Portugal",
-  "Qatar",
-  "Romania","Russia","Rwanda",
-  "Saint Kitts and Nevis","Saint Lucia","Saint Vincent and the Grenadines",
-  "Samoa","San Marino","Sao Tome and Principe","Saudi Arabia","Senegal",
-  "Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia",
-  "Solomon Islands","Somalia","South Africa","South Korea","South Sudan",
-  "Spain","Sri Lanka","Sudan","Suriname","Sweden","Switzerland","Syria",
-  "Taiwan","Tajikistan","Tanzania","Thailand","Timor-Leste","Togo","Tonga",
-  "Trinidad and Tobago","Tunisia","Turkey","Turkmenistan","Tuvalu",
-  "Uganda","Ukraine","United Arab Emirates","United Kingdom","United States",
-  "Uruguay","Uzbekistan",
-  "Vanuatu","Vatican City","Venezuela","Vietnam",
-  "Yemen",
-  "Zambia","Zimbabwe",
-];
-
 function generateCaseNumber(): string {
   const year = new Date().getFullYear();
   const rand = Math.floor(Math.random() * 9000) + 1000;
   return `VS-${year}-${rand}`;
 }
 
-const VISA_TYPES_LEAD = [
-  "Tourist Visa", "Business Visa", "Student Visa", "Work Visa",
-  "Transit Visa", "Family Visa", "Schengen Visa", "Investor Visa",
-];
-
-const COUNTRIES_LEAD = [
-  "United States", "United Kingdom", "Canada", "Australia", "Germany",
-  "France", "Spain", "Italy", "Netherlands", "Switzerland",
-  "Japan", "South Korea", "Singapore", "United Arab Emirates", "Turkey",
-  "Schengen Area", "Other",
-];
 
 interface LeadCardContentProps {
   lead: Lead;
@@ -809,7 +749,7 @@ export default function LeadsPage() {
                   <SelectValue placeholder="Optional — pick later in the wizard" />
                 </SelectTrigger>
                 <SelectContent>
-                  {VISA_TYPES_LEAD.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  {GENERIC_VISA_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -820,7 +760,7 @@ export default function LeadsPage() {
                   <SelectValue placeholder="Optional — pick later in the wizard" />
                 </SelectTrigger>
                 <SelectContent>
-                  {COUNTRIES_LEAD.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  {COUNTRIES_LIST.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

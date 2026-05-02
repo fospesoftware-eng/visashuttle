@@ -333,6 +333,11 @@ The platform now includes a full B2C visa approval checker with:
 - **Email invoice dialog**: `EmailInvoiceDialog` in `accounting.tsx` — To/Subject/Message inputs, default email pre-filled from invoice, "send" calls the email endpoint and either toasts success or auto-opens the returned `mailto:` URL.
 - Dependencies: `pdfkit` + `@types/pdfkit`.
 
+### Master Destinations & Visa Types (May 2026)
+- `shared/destinations.ts` is the **single source of truth** for the destination-country and visa-type pickers used across the entire app — agency case wizard, leads, proposals, fee templates, accounting filters, B2C onboarding, customer profile, deep-check, and the server-side live-activity feed.
+- Exports: `COUNTRIES` (full alphabetical list, ~200 entries incl. "Schengen Area"), `POPULAR_DESTINATIONS` (curated short list), `VISA_TYPES` (12 generic categories: Tourist, Business, Visit, Student, Work, Transit, Family, Schengen, Investor, Conference / Event, Medical, Other).
+- To add or remove an option, edit it here and ONLY here. The structured per-country wizard config in `client/src/data/country-visa-types.ts` and the per-type document checklists in `client/src/data/document-checklists.ts` remain separate concerns (visa-specific logic and document mappings).
+
 ### Proposals — Tokenized Apply Links (May 2026)
 Agencies can send a branded application link to a prospective client; the client clicks/scans, sees the document checklist, fills a short form, and is registered as a regular Case in the tenant — no signup required.
 
