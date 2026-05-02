@@ -1,15 +1,18 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import {
   ArrowLeft, ArrowRight, Check, Loader2, Plus, Save, Send, Trash2, Users,
-  MapPin, FileText, User as UserIcon, Plane, ClipboardCheck,
+  MapPin, FileText, User as UserIcon, Plane, ClipboardCheck, ListChecks,
+  Search, X, CircleDot,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -18,12 +21,53 @@ import { useToast } from "@/hooks/use-toast";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CO_TRAVELLER_RELATIONSHIPS, type CoTravellerRelationship } from "@shared/schema";
+import { getDocumentChecklist, type DocumentRequirement } from "@/data/document-checklists";
 
 const COUNTRIES = [
-  "United States", "United Kingdom", "Canada", "Australia", "Germany",
-  "France", "Spain", "Italy", "Netherlands", "Switzerland",
-  "Japan", "South Korea", "Singapore", "United Arab Emirates", "Turkey",
-  "Schengen Area", "Other",
+  "Afghanistan","Albania","Algeria","Andorra","Angola","Antigua and Barbuda",
+  "Argentina","Armenia","Australia","Austria","Azerbaijan",
+  "Bahamas","Bahrain","Bangladesh","Barbados","Belarus","Belgium","Belize",
+  "Benin","Bhutan","Bolivia","Bosnia and Herzegovina","Botswana","Brazil",
+  "Brunei","Bulgaria","Burkina Faso","Burundi",
+  "Cabo Verde","Cambodia","Cameroon","Canada","Central African Republic","Chad",
+  "Chile","China","Colombia","Comoros","Congo","Costa Rica","Croatia","Cuba",
+  "Cyprus","Czech Republic",
+  "Democratic Republic of Congo","Denmark","Djibouti","Dominica",
+  "Dominican Republic",
+  "Ecuador","Egypt","El Salvador","Equatorial Guinea","Eritrea","Estonia",
+  "Eswatini","Ethiopia",
+  "Fiji","Finland","France",
+  "Gabon","Gambia","Georgia","Germany","Ghana","Greece","Grenada","Guatemala",
+  "Guinea","Guinea-Bissau","Guyana",
+  "Haiti","Honduras","Hungary",
+  "Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy",
+  "Jamaica","Japan","Jordan",
+  "Kazakhstan","Kenya","Kiribati","Kuwait","Kyrgyzstan",
+  "Laos","Latvia","Lebanon","Lesotho","Liberia","Libya","Liechtenstein",
+  "Lithuania","Luxembourg",
+  "Madagascar","Malawi","Malaysia","Maldives","Mali","Malta",
+  "Marshall Islands","Mauritania","Mauritius","Mexico","Micronesia",
+  "Moldova","Monaco","Mongolia","Montenegro","Morocco","Mozambique","Myanmar",
+  "Namibia","Nauru","Nepal","Netherlands","New Zealand","Nicaragua","Niger",
+  "Nigeria","North Korea","North Macedonia","Norway",
+  "Oman",
+  "Pakistan","Palau","Palestine","Panama","Papua New Guinea","Paraguay","Peru",
+  "Philippines","Poland","Portugal",
+  "Qatar",
+  "Romania","Russia","Rwanda",
+  "Saint Kitts and Nevis","Saint Lucia","Saint Vincent and the Grenadines",
+  "Samoa","San Marino","Sao Tome and Principe","Saudi Arabia","Senegal",
+  "Schengen Area",
+  "Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia",
+  "Solomon Islands","Somalia","South Africa","South Korea","South Sudan",
+  "Spain","Sri Lanka","Sudan","Suriname","Sweden","Switzerland","Syria",
+  "Taiwan","Tajikistan","Tanzania","Thailand","Timor-Leste","Togo","Tonga",
+  "Trinidad and Tobago","Tunisia","Turkey","Turkmenistan","Tuvalu",
+  "Uganda","Ukraine","United Arab Emirates","United Kingdom","United States",
+  "Uruguay","Uzbekistan",
+  "Vanuatu","Vatican City","Venezuela","Vietnam",
+  "Yemen",
+  "Zambia","Zimbabwe",
 ];
 
 const VISA_TYPES = [
@@ -84,7 +128,8 @@ const STEPS = [
   { id: 2, title: "Applicant", icon: UserIcon },
   { id: 3, title: "Travel Details", icon: Plane },
   { id: 4, title: "Co-Travellers", icon: Users },
-  { id: 5, title: "Review", icon: ClipboardCheck },
+  { id: 5, title: "Documents", icon: ListChecks },
+  { id: 6, title: "Review", icon: ClipboardCheck },
 ] as const;
 
 type StepId = typeof STEPS[number]["id"];
@@ -109,6 +154,27 @@ export default function NewCasePage() {
   });
 
   const [coTravellers, setCoTravellers] = useState<CoTravellerDraft[]>([]);
+
+  // Document checklist: maps requirement.type -> whether to include for this case
+  // Defaults: all required items checked, optional items unchecked
+  const [docChecks, setDocChecks] = useState<Record<string, boolean>>({});
+  // Track which checklist signature we've seeded (so user toggles aren't blown away on rerender)
+  const seededKeyRef = useRef<string>("");
+
+  const checklist = useMemo<DocumentRequirement[]>(
+    () => getDocumentChecklist(form.destinationCountry, form.visaType),
+    [form.destinationCountry, form.visaType],
+  );
+
+  // Seed default selections when destination/visa changes
+  useEffect(() => {
+    const key = `${form.destinationCountry}::${form.visaType}`;
+    if (key === seededKeyRef.current) return;
+    seededKeyRef.current = key;
+    const seed: Record<string, boolean> = {};
+    for (const req of checklist) seed[req.type] = req.required;
+    setDocChecks(seed);
+  }, [form.destinationCountry, form.visaType, checklist]);
 
   // === Per-step validation ===
   const stepError = (s: StepId): string | null => {
@@ -145,6 +211,7 @@ export default function NewCasePage() {
         }
       }
     }
+    // Step 5 (Documents) has no hard validation — agency may onboard with empty checklist
     return null;
   };
 
@@ -153,7 +220,7 @@ export default function NewCasePage() {
 
   // Submission requires every step to be valid
   const fullValidationError = (): string | null => {
-    for (const s of [1, 2, 3, 4] as StepId[]) {
+    for (const s of [1, 2, 3, 4, 5] as StepId[]) {
       const err = stepError(s);
       if (err) return err;
     }
@@ -171,6 +238,11 @@ export default function NewCasePage() {
     status,
     caseNumber: generateCaseNumber(),
   });
+
+  const selectedDocs = useMemo(
+    () => checklist.filter((req) => docChecks[req.type]),
+    [checklist, docChecks],
+  );
 
   const createCaseAndCompanions = async (status: "draft" | "pending") => {
     if (!tenantId) throw new Error("Not signed in");
@@ -195,6 +267,27 @@ export default function NewCasePage() {
         });
       }
     }
+
+    // Persist document checklist as pending document records on the case
+    for (const req of selectedDocs) {
+      try {
+        await apiRequest("POST", `/api/cases/${created.id}/documents`, {
+          tenantId: created.tenantId,
+          name: req.name,
+          type: req.type,
+          status: "pending",
+          fileUrl: null,
+          notes: req.description,
+        });
+      } catch (err: any) {
+        toast({
+          title: `Could not add "${req.name}" to checklist`,
+          description: err?.message ?? "Unknown error",
+          variant: "destructive",
+        });
+      }
+    }
+
     return created;
   };
 
@@ -231,7 +324,7 @@ export default function NewCasePage() {
       toast({ title: "Please fix this step", description: err, variant: "destructive" });
       return;
     }
-    if (step < 5) setStep((step + 1) as StepId);
+    if (step < STEPS.length) setStep((step + 1) as StepId);
   };
 
   const handleBack = () => {
@@ -272,6 +365,8 @@ export default function NewCasePage() {
   };
 
   const isPending = submitMutation.isPending || draftMutation.isPending;
+
+  const isLastStep = step === STEPS.length;
 
   return (
     <DashboardLayout type="agency">
@@ -335,7 +430,7 @@ export default function NewCasePage() {
         </Card>
 
         {/* Step body */}
-        <form onSubmit={(e) => { e.preventDefault(); step === 5 ? handleSubmit() : handleNext(); }} className="space-y-6">
+        <form onSubmit={(e) => { e.preventDefault(); isLastStep ? handleSubmit() : handleNext(); }} className="space-y-6">
           {step === 1 && (
             <Card>
               <CardHeader>
@@ -343,25 +438,19 @@ export default function NewCasePage() {
                   <MapPin className="w-4 h-4" /> Where are they going?
                 </CardTitle>
                 <CardDescription>
-                  Pick the destination first — the visa type often depends on the country.
+                  Pick the destination first — the visa type and required documents both depend on the country.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
                 <div className="space-y-2">
                   <Label>Destination Country *</Label>
-                  <Select
+                  <CountryCombobox
                     value={form.destinationCountry}
-                    onValueChange={(v) => setForm({ ...form, destinationCountry: v, visaType: "" })}
-                  >
-                    <SelectTrigger data-testid="select-destination">
-                      <SelectValue placeholder="Select destination" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {COUNTRIES.map((c) => (
-                        <SelectItem key={c} value={c}>{c}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    onChange={(v) => setForm({ ...form, destinationCountry: v, visaType: "" })}
+                    options={COUNTRIES}
+                    placeholder="Start typing a country…"
+                    testId="select-destination"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Visa Type *</Label>
@@ -595,6 +684,106 @@ export default function NewCasePage() {
           {step === 5 && (
             <Card>
               <CardHeader>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <ListChecks className="w-4 h-4" /> Documents Checklist
+                    </CardTitle>
+                    <CardDescription>
+                      Tailored to <span className="font-medium text-foreground">{form.destinationCountry || "—"}</span>
+                      {" · "}
+                      <span className="font-medium text-foreground">{form.visaType || "—"}</span>.
+                      Tick the items you need to collect — they'll be added to this case as pending so the customer knows what to upload.
+                    </CardDescription>
+                  </div>
+                  {checklist.length > 0 && (
+                    <Badge variant="secondary" className="shrink-0" data-testid="badge-checklist-count">
+                      {selectedDocs.length}/{checklist.length}
+                    </Badge>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {checklist.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-6 text-center">
+                    No checklist available — pick a destination and visa type first.
+                  </p>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDocChecks(Object.fromEntries(checklist.map((r) => [r.type, true])))}
+                        data-testid="button-checklist-select-all"
+                      >
+                        Select all
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDocChecks(Object.fromEntries(checklist.map((r) => [r.type, r.required])))}
+                        data-testid="button-checklist-reset"
+                      >
+                        Reset to recommended
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDocChecks({})}
+                        data-testid="button-checklist-clear"
+                      >
+                        Clear
+                      </Button>
+                    </div>
+                    <ul className="divide-y border rounded-xl overflow-hidden">
+                      {checklist.map((req) => {
+                        const checked = !!docChecks[req.type];
+                        return (
+                          <li
+                            key={req.type}
+                            className="flex items-start gap-3 p-3 bg-card hover:bg-muted/40 transition-colors"
+                            data-testid={`checklist-row-${req.type}`}
+                          >
+                            <Checkbox
+                              id={`doc-${req.type}`}
+                              checked={checked}
+                              onCheckedChange={(v) =>
+                                setDocChecks((d) => ({ ...d, [req.type]: v === true }))
+                              }
+                              className="mt-0.5"
+                              data-testid={`checkbox-doc-${req.type}`}
+                            />
+                            <label htmlFor={`doc-${req.type}`} className="flex-1 cursor-pointer space-y-0.5">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-medium">{req.name}</span>
+                                {req.required ? (
+                                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Recommended</Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">Optional</Badge>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground">{req.description}</p>
+                            </label>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    <p className="text-xs text-muted-foreground">
+                      Tip: items left unchecked won't be added to the case. You can always add or remove documents later from the case detail page.
+                    </p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {step === 6 && (
+            <Card>
+              <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <ClipboardCheck className="w-4 h-4" /> Review & Submit
                 </CardTitle>
@@ -647,6 +836,26 @@ export default function NewCasePage() {
                     </ul>
                   )}
                 </div>
+                <div className="border rounded-xl p-4 bg-muted/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="font-medium">Documents Checklist ({selectedDocs.length}/{checklist.length})</p>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setStep(5)} data-testid="button-edit-documents">Edit</Button>
+                  </div>
+                  {checklist.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">No checklist available for this destination + visa type.</p>
+                  ) : selectedDocs.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">No documents selected — case will be created without a checklist.</p>
+                  ) : (
+                    <ul className="space-y-1 text-sm">
+                      {selectedDocs.map((req) => (
+                        <li key={req.type} className="flex items-center gap-2 text-foreground">
+                          <CircleDot className="w-3 h-3 text-emerald-600" />
+                          {req.name}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </CardContent>
             </Card>
           )}
@@ -675,7 +884,7 @@ export default function NewCasePage() {
                   <ArrowLeft className="w-4 h-4" /> Back
                 </Button>
               )}
-              {step < 5 ? (
+              {!isLastStep ? (
                 <Button type="submit" disabled={isPending} className="gap-2" data-testid="button-step-next">
                   Next <ArrowRight className="w-4 h-4" />
                 </Button>
@@ -723,6 +932,123 @@ function ReviewBlock({
           </div>
         ))}
       </dl>
+    </div>
+  );
+}
+
+/* ----------------------------------------------------------
+ * CountryCombobox — themed autocomplete (works in dark mode)
+ * ---------------------------------------------------------- */
+function CountryCombobox({
+  value,
+  onChange,
+  options,
+  placeholder,
+  testId,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  placeholder?: string;
+  testId?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(value);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Keep input in sync when value changes from outside
+  useEffect(() => {
+    setQuery(value);
+  }, [value]);
+
+  // Close on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q || q === value.toLowerCase()) return options;
+    return options.filter((o) => o.toLowerCase().includes(q));
+  }, [query, value, options]);
+
+  function pick(opt: string) {
+    onChange(opt);
+    setQuery(opt);
+    setOpen(false);
+  }
+
+  function clear() {
+    onChange("");
+    setQuery("");
+    setOpen(true);
+    inputRef.current?.focus();
+  }
+
+  return (
+    <div className="relative" ref={wrapRef}>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+        <Input
+          ref={inputRef}
+          value={query}
+          placeholder={placeholder}
+          onFocus={() => setOpen(true)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+            if (value && e.target.value !== value) onChange("");
+          }}
+          className="pl-9 pr-9"
+          data-testid={testId}
+          autoComplete="off"
+        />
+        {query && (
+          <button
+            type="button"
+            onClick={clear}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full hover:bg-muted flex items-center justify-center"
+            data-testid={`${testId}-clear`}
+            aria-label="Clear"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <div className="absolute z-50 mt-1 w-full bg-popover text-popover-foreground border border-border rounded-md shadow-md max-h-60 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <div className="px-3 py-2.5 text-sm text-muted-foreground">No matches.</div>
+          ) : (
+            filtered.slice(0, 80).map((opt) => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => pick(opt)}
+                className={[
+                  "w-full text-left px-3 py-2 text-sm flex items-center justify-between hover-elevate",
+                  value === opt ? "font-medium" : "",
+                ].join(" ")}
+                data-testid={`${testId}-option-${opt.toLowerCase().replace(/\s+/g, "-")}`}
+              >
+                <span>{opt}</span>
+                {value === opt && <Check className="w-3.5 h-3.5 text-primary" />}
+              </button>
+            ))
+          )}
+          {filtered.length > 80 && (
+            <div className="px-3 py-1.5 text-[11px] text-muted-foreground border-t">
+              {filtered.length - 80} more — keep typing to narrow.
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
