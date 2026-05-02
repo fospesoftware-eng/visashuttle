@@ -87,7 +87,6 @@ const emptyForm = {
   destinationCountry: "",
   visaType: "",
   notes: "",
-  value: "",
 };
 
 const GENERIC_VISA_TYPES = [
@@ -250,9 +249,6 @@ function LeadCardBody({ lead, onEdit, onConvert, onDelete, onMove, currentStage 
           </span>
         </div>
       )}
-      {(lead.value ?? 0) > 0 && (
-        <p className="text-sm font-semibold text-primary">${(lead.value ?? 0).toLocaleString()}</p>
-      )}
     </div>
   );
 }
@@ -328,10 +324,7 @@ export default function LeadsPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof emptyForm) => {
-      const res = await apiRequest("POST", `/api/tenants/${tenantId}/leads`, {
-        ...data,
-        value: data.value ? parseInt(data.value) : 0,
-      });
+      const res = await apiRequest("POST", `/api/tenants/${tenantId}/leads`, data);
       return res.json();
     },
     onSuccess: () => {
@@ -439,7 +432,7 @@ export default function LeadsPage() {
       return;
     }
     if (editLead) {
-      updateMutation.mutate({ id: editLead.id, data: { ...form, value: form.value ? parseInt(form.value) : 0 } });
+      updateMutation.mutate({ id: editLead.id, data: form });
     } else {
       createMutation.mutate(form);
     }
@@ -455,7 +448,6 @@ export default function LeadsPage() {
       destinationCountry: lead.destinationCountry ?? "",
       visaType: lead.visaType ?? "",
       notes: lead.notes ?? "",
-      value: lead.value ? String(lead.value) : "",
     });
   };
 
@@ -487,8 +479,6 @@ export default function LeadsPage() {
     const leadId = String(active.id).replace("lead:", "");
     moveStageMutation.mutate({ id: leadId, stage: newStage });
   };
-
-  const totalValue = leads.filter((l) => l.stage === "won").reduce((sum, l) => sum + (l.value ?? 0), 0);
 
   return (
     <DashboardLayout type="agency">
@@ -526,10 +516,6 @@ export default function LeadsPage() {
                   <div className="space-y-2">
                     <Label>Phone</Label>
                     <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+1 234 567 8900" data-testid="input-lead-phone" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Value ($)</Label>
-                    <Input type="number" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} placeholder="0" />
                   </div>
                   <div className="space-y-2 col-span-2">
                     <Label>Source</Label>
@@ -613,10 +599,6 @@ export default function LeadsPage() {
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/60">
             <span className="text-muted-foreground">Total leads:</span>
             <span className="font-semibold">{leads.length}</span>
-          </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30">
-            <span className="text-muted-foreground">Won value:</span>
-            <span className="font-semibold text-emerald-700 dark:text-emerald-400">${totalValue.toLocaleString()}</span>
           </div>
           {stages.map((s) => (
             <div key={s} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted/40">

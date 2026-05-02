@@ -54,7 +54,6 @@ export const leads = pgTable("leads", {
   destinationCountry: text("destination_country"),
   visaType: text("visa_type"),
   stage: text("stage").notNull().default("new"), // new, contacted, qualified, proposal, won, lost
-  value: integer("value").default(0),
   notes: text("notes"),
   assignedTo: varchar("assigned_to"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -333,3 +332,121 @@ export const paymentGatewayConfig = pgTable("payment_gateway_config", {
 export const insertPaymentGatewayConfigSchema = createInsertSchema(paymentGatewayConfig).omit({ id: true, updatedAt: true });
 export type InsertPaymentGatewayConfig = z.infer<typeof insertPaymentGatewayConfigSchema>;
 export type PaymentGatewayConfig = typeof paymentGatewayConfig.$inferSelect;
+
+// ===== Accounting =====
+// All monetary values are stored as INTEGER CENTS for precision.
+// e.g. $200.50 -> 20050
+
+// Per-tenant fee catalog. Each row is a fee preset for a (country, visaType) combo.
+export const feeTemplates = pgTable("fee_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull(),
+  name: text("name").notNull(),
+  destinationCountry: text("destination_country"),
+  visaType: text("visa_type"),
+  agencyFee: integer("agency_fee").notNull().default(0),
+  governmentFee: integer("government_fee").notNull().default(0),
+  serviceFee: integer("service_fee").notNull().default(0),
+  otherFee: integer("other_fee").notNull().default(0),
+  otherFeeLabel: text("other_fee_label"),
+  currency: text("currency").notNull().default("USD"),
+  defaultPaymentType: text("default_payment_type").notNull().default("upfront"),
+  // upfront | advance | installments | on_completion
+  advancePercent: integer("advance_percent").default(50),
+  description: text("description"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export const insertFeeTemplateSchema = createInsertSchema(feeTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertFeeTemplate = z.infer<typeof insertFeeTemplateSchema>;
+export type FeeTemplate = typeof feeTemplates.$inferSelect;
+
+// Per-tenant invoice settings (one row per tenant)
+export const invoiceSettings = pgTable("invoice_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().unique(),
+  companyName: text("company_name"),
+  companyAddress: text("company_address"),
+  companyEmail: text("company_email"),
+  companyPhone: text("company_phone"),
+  taxId: text("tax_id"),
+  currency: text("currency").notNull().default("USD"),
+  taxRate: integer("tax_rate").notNull().default(0), // basis points (e.g. 1800 = 18%)
+  taxLabel: text("tax_label").default("Tax"),
+  invoicePrefix: text("invoice_prefix").notNull().default("INV"),
+  paymentTerms: text("payment_terms").default("Due on receipt"),
+  paymentInstructions: text("payment_instructions"),
+  bankDetails: text("bank_details"),
+  footerText: text("footer_text"),
+  notes: text("notes"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export const insertInvoiceSettingsSchema = createInsertSchema(invoiceSettings).omit({ id: true, updatedAt: true });
+export type InsertInvoiceSettings = z.infer<typeof insertInvoiceSettingsSchema>;
+export type InvoiceSettings = typeof invoiceSettings.$inferSelect;
+
+// Invoices table
+export const invoices = pgTable("invoices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull(),
+  invoiceNumber: text("invoice_number").notNull(),
+  caseId: varchar("case_id"),
+  leadId: varchar("lead_id"),
+  customerName: text("customer_name").notNull(),
+  customerEmail: text("customer_email"),
+  customerPhone: text("customer_phone"),
+  destinationCountry: text("destination_country"),
+  visaType: text("visa_type"),
+  status: text("status").notNull().default("draft"),
+  // draft | sent | partial | paid | overdue | cancelled
+  paymentType: text("payment_type").notNull().default("upfront"),
+  // upfront | advance | installments | on_completion
+  advancePercent: integer("advance_percent"),
+  subtotal: integer("subtotal").notNull().default(0),
+  taxAmount: integer("tax_amount").notNull().default(0),
+  total: integer("total").notNull().default(0),
+  paidAmount: integer("paid_amount").notNull().default(0),
+  currency: text("currency").notNull().default("USD"),
+  issuedAt: timestamp("issued_at").defaultNow(),
+  dueDate: timestamp("due_date"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
+export type Invoice = typeof invoices.$inferSelect;
+
+// Invoice line items
+export const invoiceItems = pgTable("invoice_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id").notNull(),
+  description: text("description").notNull(),
+  category: text("category").notNull().default("agency_fee"),
+  // agency_fee | government_fee | service_charge | other | discount
+  quantity: integer("quantity").notNull().default(1),
+  unitPrice: integer("unit_price").notNull().default(0),
+  amount: integer("amount").notNull().default(0),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+export const insertInvoiceItemSchema = createInsertSchema(invoiceItems).omit({ id: true });
+export type InsertInvoiceItem = z.infer<typeof insertInvoiceItemSchema>;
+export type InvoiceItem = typeof invoiceItems.$inferSelect;
+
+// Payments against invoices
+export const payments = pgTable("payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  invoiceId: varchar("invoice_id").notNull(),
+  tenantId: varchar("tenant_id").notNull(),
+  amount: integer("amount").notNull(),
+  method: text("method").notNull().default("cash"),
+  // cash | card | bank_transfer | online | other
+  reference: text("reference"),
+  paidAt: timestamp("paid_at").defaultNow(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export const insertPaymentSchema = createInsertSchema(payments).omit({ id: true, createdAt: true });
+export type InsertPayment = z.infer<typeof insertPaymentSchema>;
+export type Payment = typeof payments.$inferSelect;

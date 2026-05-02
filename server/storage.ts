@@ -16,6 +16,11 @@ import {
   type SmsConfig, type InsertSmsConfig,
   type PlatformAiConfig, type InsertPlatformAiConfig,
   type PaymentGatewayConfig, type InsertPaymentGatewayConfig,
+  type FeeTemplate, type InsertFeeTemplate,
+  type InvoiceSettings, type InsertInvoiceSettings,
+  type Invoice, type InsertInvoice,
+  type InvoiceItem, type InsertInvoiceItem,
+  type Payment, type InsertPayment,
   b2cUsers, visaChecks, savedProfiles, smsConfig as smsConfigTable,
   platformAiConfig as platformAiConfigTable,
   paymentGatewayConfig as paymentGatewayConfigTable,
@@ -121,6 +126,34 @@ export interface IStorage {
   // Payment Gateway Config
   getPaymentGatewayConfig(): Promise<PaymentGatewayConfig | undefined>;
   upsertPaymentGatewayConfig(data: Partial<InsertPaymentGatewayConfig>): Promise<PaymentGatewayConfig>;
+
+  // Fee Templates
+  getFeeTemplatesByTenantId(tenantId: string): Promise<FeeTemplate[]>;
+  getFeeTemplate(id: string): Promise<FeeTemplate | undefined>;
+  createFeeTemplate(data: InsertFeeTemplate): Promise<FeeTemplate>;
+  updateFeeTemplate(id: string, data: Partial<InsertFeeTemplate>): Promise<FeeTemplate | undefined>;
+  deleteFeeTemplate(id: string): Promise<boolean>;
+
+  // Invoice Settings
+  getInvoiceSettings(tenantId: string): Promise<InvoiceSettings | undefined>;
+  upsertInvoiceSettings(tenantId: string, data: Partial<InsertInvoiceSettings>): Promise<InvoiceSettings>;
+
+  // Invoices
+  getInvoicesByTenantId(tenantId: string): Promise<Invoice[]>;
+  getInvoicesByCaseId(caseId: string): Promise<Invoice[]>;
+  getInvoice(id: string): Promise<Invoice | undefined>;
+  createInvoice(data: InsertInvoice, items: Omit<InsertInvoiceItem, "invoiceId">[]): Promise<Invoice>;
+  updateInvoice(id: string, data: Partial<InsertInvoice>): Promise<Invoice | undefined>;
+  deleteInvoice(id: string): Promise<boolean>;
+  replaceInvoiceItems(invoiceId: string, items: Omit<InsertInvoiceItem, "invoiceId">[]): Promise<InvoiceItem[]>;
+  getInvoiceItems(invoiceId: string): Promise<InvoiceItem[]>;
+
+  // Payments
+  getPayment(id: string): Promise<Payment | undefined>;
+  getPaymentsByInvoiceId(invoiceId: string): Promise<Payment[]>;
+  getPaymentsByTenantId(tenantId: string): Promise<Payment[]>;
+  createPayment(data: InsertPayment): Promise<Payment>;
+  deletePayment(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -141,6 +174,11 @@ export class MemStorage implements IStorage {
   private smsConfigRecord?: SmsConfig;
   private platformAiConfigRecord?: PlatformAiConfig;
   private paymentGatewayConfigRecord?: PaymentGatewayConfig;
+  private feeTemplates: Map<string, FeeTemplate> = new Map();
+  private invoiceSettingsByTenant: Map<string, InvoiceSettings> = new Map();
+  private invoices: Map<string, Invoice> = new Map();
+  private invoiceItems: Map<string, InvoiceItem> = new Map();
+  private payments: Map<string, Payment> = new Map();
 
   constructor() {
     this.users = new Map();
@@ -238,11 +276,141 @@ export class MemStorage implements IStorage {
     this.customerTenantLinks.set(customerTenantLink.id, customerTenantLink);
 
     const leads: Lead[] = [
-      { id: "lead-1", tenantId: "tenant-1", name: "Alice Cooper", email: "alice@example.com", phone: "+1 234 567 8901", source: "Website", stage: "new", value: 2500, notes: null, assignedTo: "user-owner", createdAt: new Date(), updatedAt: new Date() },
-      { id: "lead-2", tenantId: "tenant-1", name: "Bob Wilson", email: "bob@example.com", phone: "+1 234 567 8902", source: "Referral", stage: "contacted", value: 3200, notes: null, assignedTo: "user-owner", createdAt: new Date(), updatedAt: new Date() },
-      { id: "lead-3", tenantId: "tenant-1", name: "Carol Martinez", email: "carol@example.com", phone: "+1 234 567 8903", source: "Social Media", stage: "qualified", value: 4500, notes: null, assignedTo: null, createdAt: new Date(), updatedAt: new Date() },
+      { id: "lead-1", tenantId: "tenant-1", name: "Alice Cooper", email: "alice@example.com", phone: "+1 234 567 8901", source: "Website", destinationCountry: "France", visaType: "Tourist Visa", stage: "new", notes: null, assignedTo: "user-owner", createdAt: new Date(), updatedAt: new Date() },
+      { id: "lead-2", tenantId: "tenant-1", name: "Bob Wilson", email: "bob@example.com", phone: "+1 234 567 8902", source: "Referral", destinationCountry: "United States", visaType: "B1/B2 – Business / Pleasure", stage: "contacted", notes: null, assignedTo: "user-owner", createdAt: new Date(), updatedAt: new Date() },
+      { id: "lead-3", tenantId: "tenant-1", name: "Carol Martinez", email: "carol@example.com", phone: "+1 234 567 8903", source: "Social Media", destinationCountry: "Canada", visaType: "Student Visa", stage: "qualified", notes: null, assignedTo: null, createdAt: new Date(), updatedAt: new Date() },
     ];
     leads.forEach(lead => this.leads.set(lead.id, lead));
+
+    // Seed demo fee templates for tenant-1
+    const demoFeeTemplates: FeeTemplate[] = [
+      {
+        id: "fee-tpl-1",
+        tenantId: "tenant-1",
+        name: "Schengen Tourist Visa - France",
+        destinationCountry: "France",
+        visaType: "Tourist Visa",
+        agencyFee: 15000,
+        governmentFee: 8000,
+        serviceFee: 3500,
+        otherFee: 0,
+        otherFeeLabel: null,
+        currency: "USD",
+        defaultPaymentType: "upfront",
+        advancePercent: 50,
+        description: "Standard Schengen short-stay tourist visa via French consulate",
+        active: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "fee-tpl-2",
+        tenantId: "tenant-1",
+        name: "US B1/B2 Visa",
+        destinationCountry: "United States",
+        visaType: "B1/B2 – Business / Pleasure",
+        agencyFee: 25000,
+        governmentFee: 18500,
+        serviceFee: 5000,
+        otherFee: 1500,
+        otherFeeLabel: "Courier",
+        currency: "USD",
+        defaultPaymentType: "advance",
+        advancePercent: 50,
+        description: "B1/B2 visitor visa with interview prep included",
+        active: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: "fee-tpl-3",
+        tenantId: "tenant-1",
+        name: "Canada Student Visa",
+        destinationCountry: "Canada",
+        visaType: "Student Visa",
+        agencyFee: 50000,
+        governmentFee: 15000,
+        serviceFee: 8500,
+        otherFee: 0,
+        otherFeeLabel: null,
+        currency: "USD",
+        defaultPaymentType: "installments",
+        advancePercent: 30,
+        description: "Full study permit application with SOP review",
+        active: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ];
+    demoFeeTemplates.forEach(t => this.feeTemplates.set(t.id, t));
+
+    // Seed default invoice settings for tenant-1
+    const demoSettings: InvoiceSettings = {
+      id: "inv-settings-1",
+      tenantId: "tenant-1",
+      companyName: "Demo Travel Agency",
+      companyAddress: "123 Visa Street, Suite 400\nNew York, NY 10001",
+      companyEmail: "billing@demoagency.com",
+      companyPhone: "+1 234 567 8900",
+      taxId: "TAX-987654321",
+      currency: "USD",
+      taxRate: 0,
+      taxLabel: "Tax",
+      invoicePrefix: "INV",
+      paymentTerms: "Due on receipt",
+      paymentInstructions: "Bank transfers preferred. See bank details below.",
+      bankDetails: "Bank: Demo Bank\nAccount: 1234567890\nRouting: 021000021",
+      footerText: "Thank you for your business.",
+      notes: null,
+      updatedAt: new Date(),
+    };
+    this.invoiceSettingsByTenant.set("tenant-1", demoSettings);
+
+    // Seed a sample invoice tied to case-1
+    const sampleInvoice: Invoice = {
+      id: "inv-1",
+      tenantId: "tenant-1",
+      invoiceNumber: "INV-2024-0001",
+      caseId: "case-1",
+      leadId: null,
+      customerName: "John Smith",
+      customerEmail: "john@example.com",
+      customerPhone: null,
+      destinationCountry: "France",
+      visaType: "Schengen Tourist",
+      status: "partial",
+      paymentType: "advance",
+      advancePercent: 50,
+      subtotal: 26500,
+      taxAmount: 0,
+      total: 26500,
+      paidAmount: 13250,
+      currency: "USD",
+      issuedAt: new Date(Date.now() - 5 * 24 * 3600 * 1000),
+      dueDate: new Date(Date.now() + 9 * 24 * 3600 * 1000),
+      notes: null,
+      createdAt: new Date(Date.now() - 5 * 24 * 3600 * 1000),
+      updatedAt: new Date(),
+    };
+    this.invoices.set(sampleInvoice.id, sampleInvoice);
+    const sampleItems: InvoiceItem[] = [
+      { id: "inv-item-1", invoiceId: "inv-1", description: "Visa Agency Fee", category: "agency_fee", quantity: 1, unitPrice: 15000, amount: 15000, sortOrder: 0 },
+      { id: "inv-item-2", invoiceId: "inv-1", description: "French Consulate Fee", category: "government_fee", quantity: 1, unitPrice: 8000, amount: 8000, sortOrder: 1 },
+      { id: "inv-item-3", invoiceId: "inv-1", description: "VFS Service Charge", category: "service_charge", quantity: 1, unitPrice: 3500, amount: 3500, sortOrder: 2 },
+    ];
+    sampleItems.forEach(i => this.invoiceItems.set(i.id, i));
+    const samplePayment: Payment = {
+      id: "pay-1",
+      invoiceId: "inv-1",
+      tenantId: "tenant-1",
+      amount: 13250,
+      method: "bank_transfer",
+      reference: "TXN-001",
+      paidAt: new Date(Date.now() - 4 * 24 * 3600 * 1000),
+      notes: "50% advance",
+      createdAt: new Date(Date.now() - 4 * 24 * 3600 * 1000),
+    };
+    this.payments.set(samplePayment.id, samplePayment);
 
     const cases: Case[] = [
       { 
@@ -456,7 +624,6 @@ export class MemStorage implements IStorage {
       destinationCountry: insertLead.destinationCountry ?? null,
       visaType: insertLead.visaType ?? null,
       stage: insertLead.stage ?? "new",
-      value: insertLead.value ?? null,
       notes: insertLead.notes ?? null,
       assignedTo: insertLead.assignedTo ?? null,
       createdAt: new Date(), 
@@ -476,6 +643,265 @@ export class MemStorage implements IStorage {
 
   async deleteLead(id: string): Promise<boolean> {
     return this.leads.delete(id);
+  }
+
+  // ===== Accounting: Fee Templates =====
+  async getFeeTemplatesByTenantId(tenantId: string): Promise<FeeTemplate[]> {
+    return Array.from(this.feeTemplates.values())
+      .filter(t => t.tenantId === tenantId)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async getFeeTemplate(id: string): Promise<FeeTemplate | undefined> {
+    return this.feeTemplates.get(id);
+  }
+
+  async createFeeTemplate(data: InsertFeeTemplate): Promise<FeeTemplate> {
+    const id = randomUUID();
+    const tpl: FeeTemplate = {
+      id,
+      tenantId: data.tenantId,
+      name: data.name,
+      destinationCountry: data.destinationCountry ?? null,
+      visaType: data.visaType ?? null,
+      agencyFee: data.agencyFee ?? 0,
+      governmentFee: data.governmentFee ?? 0,
+      serviceFee: data.serviceFee ?? 0,
+      otherFee: data.otherFee ?? 0,
+      otherFeeLabel: data.otherFeeLabel ?? null,
+      currency: data.currency ?? "USD",
+      defaultPaymentType: data.defaultPaymentType ?? "upfront",
+      advancePercent: data.advancePercent ?? 50,
+      description: data.description ?? null,
+      active: data.active ?? true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.feeTemplates.set(id, tpl);
+    return tpl;
+  }
+
+  async updateFeeTemplate(id: string, data: Partial<InsertFeeTemplate>): Promise<FeeTemplate | undefined> {
+    const existing = this.feeTemplates.get(id);
+    if (!existing) return undefined;
+    const updated: FeeTemplate = { ...existing, ...data, id, updatedAt: new Date() };
+    this.feeTemplates.set(id, updated);
+    return updated;
+  }
+
+  async deleteFeeTemplate(id: string): Promise<boolean> {
+    return this.feeTemplates.delete(id);
+  }
+
+  // ===== Accounting: Invoice Settings =====
+  async getInvoiceSettings(tenantId: string): Promise<InvoiceSettings | undefined> {
+    return this.invoiceSettingsByTenant.get(tenantId);
+  }
+
+  async upsertInvoiceSettings(tenantId: string, data: Partial<InsertInvoiceSettings>): Promise<InvoiceSettings> {
+    const existing = this.invoiceSettingsByTenant.get(tenantId);
+    const merged: InvoiceSettings = {
+      id: existing?.id ?? randomUUID(),
+      tenantId,
+      companyName: data.companyName ?? existing?.companyName ?? null,
+      companyAddress: data.companyAddress ?? existing?.companyAddress ?? null,
+      companyEmail: data.companyEmail ?? existing?.companyEmail ?? null,
+      companyPhone: data.companyPhone ?? existing?.companyPhone ?? null,
+      taxId: data.taxId ?? existing?.taxId ?? null,
+      currency: data.currency ?? existing?.currency ?? "USD",
+      taxRate: data.taxRate ?? existing?.taxRate ?? 0,
+      taxLabel: data.taxLabel ?? existing?.taxLabel ?? "Tax",
+      invoicePrefix: data.invoicePrefix ?? existing?.invoicePrefix ?? "INV",
+      paymentTerms: data.paymentTerms ?? existing?.paymentTerms ?? "Due on receipt",
+      paymentInstructions: data.paymentInstructions ?? existing?.paymentInstructions ?? null,
+      bankDetails: data.bankDetails ?? existing?.bankDetails ?? null,
+      footerText: data.footerText ?? existing?.footerText ?? null,
+      notes: data.notes ?? existing?.notes ?? null,
+      updatedAt: new Date(),
+    };
+    this.invoiceSettingsByTenant.set(tenantId, merged);
+    return merged;
+  }
+
+  // ===== Accounting: Invoices =====
+  async getInvoicesByTenantId(tenantId: string): Promise<Invoice[]> {
+    return Array.from(this.invoices.values())
+      .filter(inv => inv.tenantId === tenantId)
+      .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+  }
+
+  async getInvoicesByCaseId(caseId: string): Promise<Invoice[]> {
+    return Array.from(this.invoices.values()).filter(inv => inv.caseId === caseId);
+  }
+
+  async getInvoice(id: string): Promise<Invoice | undefined> {
+    return this.invoices.get(id);
+  }
+
+  async createInvoice(data: InsertInvoice, items: Omit<InsertInvoiceItem, "invoiceId">[]): Promise<Invoice> {
+    const id = randomUUID();
+    const subtotal = items.reduce((sum, it) => sum + (it.amount ?? ((it.unitPrice ?? 0) * (it.quantity ?? 1))), 0);
+    const taxAmount = data.taxAmount ?? 0;
+    const total = subtotal + taxAmount;
+    const invoice: Invoice = {
+      id,
+      tenantId: data.tenantId,
+      invoiceNumber: data.invoiceNumber,
+      caseId: data.caseId ?? null,
+      leadId: data.leadId ?? null,
+      customerName: data.customerName,
+      customerEmail: data.customerEmail ?? null,
+      customerPhone: data.customerPhone ?? null,
+      destinationCountry: data.destinationCountry ?? null,
+      visaType: data.visaType ?? null,
+      status: data.status ?? "draft",
+      paymentType: data.paymentType ?? "upfront",
+      advancePercent: data.advancePercent ?? null,
+      subtotal,
+      taxAmount,
+      total,
+      paidAmount: data.paidAmount ?? 0,
+      currency: data.currency ?? "USD",
+      issuedAt: data.issuedAt ?? new Date(),
+      dueDate: data.dueDate ?? null,
+      notes: data.notes ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.invoices.set(id, invoice);
+    items.forEach((it, idx) => {
+      const itemId = randomUUID();
+      const amount = it.amount ?? ((it.unitPrice ?? 0) * (it.quantity ?? 1));
+      this.invoiceItems.set(itemId, {
+        id: itemId,
+        invoiceId: id,
+        description: it.description,
+        category: it.category ?? "agency_fee",
+        quantity: it.quantity ?? 1,
+        unitPrice: it.unitPrice ?? 0,
+        amount,
+        sortOrder: it.sortOrder ?? idx,
+      });
+    });
+    return invoice;
+  }
+
+  async updateInvoice(id: string, data: Partial<InsertInvoice>): Promise<Invoice | undefined> {
+    const existing = this.invoices.get(id);
+    if (!existing) return undefined;
+    const updated: Invoice = { ...existing, ...data, id, updatedAt: new Date() };
+    this.invoices.set(id, updated);
+    return updated;
+  }
+
+  async deleteInvoice(id: string): Promise<boolean> {
+    // cascade delete items + payments
+    Array.from(this.invoiceItems.entries())
+      .filter(([_, it]) => it.invoiceId === id)
+      .forEach(([k]) => this.invoiceItems.delete(k));
+    Array.from(this.payments.entries())
+      .filter(([_, p]) => p.invoiceId === id)
+      .forEach(([k]) => this.payments.delete(k));
+    return this.invoices.delete(id);
+  }
+
+  async replaceInvoiceItems(invoiceId: string, items: Omit<InsertInvoiceItem, "invoiceId">[]): Promise<InvoiceItem[]> {
+    Array.from(this.invoiceItems.entries())
+      .filter(([_, it]) => it.invoiceId === invoiceId)
+      .forEach(([k]) => this.invoiceItems.delete(k));
+    const created: InvoiceItem[] = [];
+    items.forEach((it, idx) => {
+      const id = randomUUID();
+      const amount = it.amount ?? ((it.unitPrice ?? 0) * (it.quantity ?? 1));
+      const item: InvoiceItem = {
+        id,
+        invoiceId,
+        description: it.description,
+        category: it.category ?? "agency_fee",
+        quantity: it.quantity ?? 1,
+        unitPrice: it.unitPrice ?? 0,
+        amount,
+        sortOrder: it.sortOrder ?? idx,
+      };
+      this.invoiceItems.set(id, item);
+      created.push(item);
+    });
+    // Recompute invoice subtotal/total
+    const inv = this.invoices.get(invoiceId);
+    if (inv) {
+      const subtotal = created.reduce((s, i) => s + i.amount, 0);
+      const total = subtotal + (inv.taxAmount ?? 0);
+      this.invoices.set(invoiceId, { ...inv, subtotal, total, updatedAt: new Date() });
+    }
+    return created;
+  }
+
+  async getInvoiceItems(invoiceId: string): Promise<InvoiceItem[]> {
+    return Array.from(this.invoiceItems.values())
+      .filter(it => it.invoiceId === invoiceId)
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+  }
+
+  // ===== Accounting: Payments =====
+  async getPayment(id: string): Promise<Payment | undefined> {
+    return this.payments.get(id);
+  }
+
+  async getPaymentsByInvoiceId(invoiceId: string): Promise<Payment[]> {
+    return Array.from(this.payments.values())
+      .filter(p => p.invoiceId === invoiceId)
+      .sort((a, b) => (b.paidAt?.getTime() ?? 0) - (a.paidAt?.getTime() ?? 0));
+  }
+
+  async getPaymentsByTenantId(tenantId: string): Promise<Payment[]> {
+    return Array.from(this.payments.values())
+      .filter(p => p.tenantId === tenantId)
+      .sort((a, b) => (b.paidAt?.getTime() ?? 0) - (a.paidAt?.getTime() ?? 0));
+  }
+
+  async createPayment(data: InsertPayment): Promise<Payment> {
+    const id = randomUUID();
+    const payment: Payment = {
+      id,
+      invoiceId: data.invoiceId,
+      tenantId: data.tenantId,
+      amount: data.amount,
+      method: data.method ?? "cash",
+      reference: data.reference ?? null,
+      paidAt: data.paidAt ?? new Date(),
+      notes: data.notes ?? null,
+      createdAt: new Date(),
+    };
+    this.payments.set(id, payment);
+    // Update invoice paidAmount + status
+    const inv = this.invoices.get(data.invoiceId);
+    if (inv) {
+      const allPayments = await this.getPaymentsByInvoiceId(data.invoiceId);
+      const paidAmount = allPayments.reduce((s, p) => s + p.amount, 0);
+      let status = inv.status;
+      if (paidAmount >= inv.total && inv.total > 0) status = "paid";
+      else if (paidAmount > 0) status = "partial";
+      this.invoices.set(data.invoiceId, { ...inv, paidAmount, status, updatedAt: new Date() });
+    }
+    return payment;
+  }
+
+  async deletePayment(id: string): Promise<boolean> {
+    const payment = this.payments.get(id);
+    if (!payment) return false;
+    const ok = this.payments.delete(id);
+    // Recompute invoice paidAmount + status
+    const inv = this.invoices.get(payment.invoiceId);
+    if (inv) {
+      const remaining = await this.getPaymentsByInvoiceId(payment.invoiceId);
+      const paidAmount = remaining.reduce((s, p) => s + p.amount, 0);
+      let status: string = "draft";
+      if (paidAmount >= inv.total && inv.total > 0) status = "paid";
+      else if (paidAmount > 0) status = "partial";
+      else status = inv.status === "paid" || inv.status === "partial" ? "sent" : inv.status;
+      this.invoices.set(payment.invoiceId, { ...inv, paidAmount, status, updatedAt: new Date() });
+    }
+    return ok;
   }
 
   async getCasesByTenantId(tenantId: string): Promise<Case[]> {

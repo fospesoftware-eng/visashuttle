@@ -7,6 +7,14 @@ import { getEntryRequirement } from "@shared/visa-free";
 import indiaVisaChanceDataset from "@shared/india_visa_chance_dataset_non_visa_free_2026.json";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
+import { z } from "zod";
+import {
+  insertFeeTemplateSchema,
+  insertInvoiceSchema,
+  insertInvoiceItemSchema,
+  insertInvoiceSettingsSchema,
+  insertPaymentSchema,
+} from "@shared/schema";
 
 // Site-wide password for protecting the entire application
 const SITE_PASSWORD = process.env.SITE_PASSWORD;
@@ -961,6 +969,291 @@ export async function registerRoutes(
     if (!success) {
       return res.status(404).json({ error: "Lead not found" });
     }
+    res.status(204).send();
+  });
+
+  // === Accounting Routes ===
+  // Roles allowed to view/manage accounting data (agency staff + saas admin).
+  const ACCOUNTING_ALLOWED_ROLES = new Set([
+    "saas_admin",
+    "agency_owner",
+    "agency_admin",
+    "agency_staff",
+    "agency_manager",
+  ]);
+
+  // Helper: caller must be authenticated, hold an allowed role, and either belong
+  // to the tenant or be a saas admin. Customer-role and unknown roles are rejected.
+  function requireTenantAccess(req: Request, res: Response, tenantId: string): boolean {
+    if (!req.session?.userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return false;
+    }
+    const role = req.session.userRole ?? "";
+    if (!ACCOUNTING_ALLOWED_ROLES.has(role)) {
+      res.status(403).json({ error: "Forbidden: insufficient role" });
+      return false;
+    }
+    if (role === "saas_admin") return true;
+    if (req.session.userTenantId !== tenantId) {
+      res.status(403).json({ error: "Forbidden: tenant mismatch" });
+      return false;
+    }
+    return true;
+  }
+
+  // Whitelist of fields that may be patched on an invoice (excludes computed totals).
+  const invoicePatchSchema = insertInvoiceSchema.partial().pick({
+    customerName: true, customerEmail: true, caseId: true, currency: true,
+    status: true, dueDate: true, issuedAt: true, notes: true,
+    feePaymentType: true, destinationCountry: true, visaType: true,
+  } as any).extend({
+    dueDate: z.union([z.string(), z.date(), z.null()]).optional(),
+    issuedAt: z.union([z.string(), z.date()]).optional(),
+  });
+
+  // Recompute and persist totals for an invoice from its current items + tenant tax rate.
+  async function recomputeInvoiceTotals(invoiceId: string) {
+    const inv = await storage.getInvoice(invoiceId);
+    if (!inv) return;
+    const items = await storage.getInvoiceItems(invoiceId);
+    const subtotal = items.reduce((s, it) => s + (it.amount ?? ((it.unitPrice ?? 0) * (it.quantity ?? 1))), 0);
+    const settings = await storage.getInvoiceSettings(inv.tenantId);
+    const taxRate = settings?.taxRate ?? 0;
+    const taxAmount = Math.round((subtotal * taxRate) / 10000);
+    await storage.updateInvoice(invoiceId, { subtotal, taxAmount, total: subtotal + taxAmount } as any);
+  }
+
+  // Fee Templates
+  app.get("/api/tenants/:tenantId/fee-templates", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
+    const items = await storage.getFeeTemplatesByTenantId(req.params.tenantId);
+    res.json(items);
+  });
+
+  app.post("/api/tenants/:tenantId/fee-templates", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
+    try {
+      const parsed = insertFeeTemplateSchema.parse({ ...req.body, tenantId: req.params.tenantId });
+      const created = await storage.createFeeTemplate(parsed);
+      res.status(201).json(created);
+    } catch (e: any) {
+      res.status(400).json({ error: e?.message ?? "Invalid fee template" });
+    }
+  });
+
+  app.patch("/api/fee-templates/:id", async (req, res) => {
+    const existing = await storage.getFeeTemplate(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Fee template not found" });
+    if (!requireTenantAccess(req, res, existing.tenantId)) return;
+    try {
+      const { tenantId: _t, id: _i, ...rest } = req.body ?? {};
+      const parsed = insertFeeTemplateSchema.partial().parse(rest);
+      const updated = await storage.updateFeeTemplate(req.params.id, parsed);
+      res.json(updated);
+    } catch (e: any) {
+      res.status(400).json({ error: e?.message ?? "Invalid fee template patch" });
+    }
+  });
+
+  app.delete("/api/fee-templates/:id", async (req, res) => {
+    const existing = await storage.getFeeTemplate(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Fee template not found" });
+    if (!requireTenantAccess(req, res, existing.tenantId)) return;
+    await storage.deleteFeeTemplate(req.params.id);
+    res.status(204).send();
+  });
+
+  // Invoice Settings
+  app.get("/api/tenants/:tenantId/invoice-settings", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
+    const settings = await storage.getInvoiceSettings(req.params.tenantId);
+    res.json(settings ?? null);
+  });
+
+  app.put("/api/tenants/:tenantId/invoice-settings", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
+    try {
+      const { tenantId: _t, id: _i, ...rest } = req.body ?? {};
+      const parsed = insertInvoiceSettingsSchema.partial().parse(rest);
+      const settings = await storage.upsertInvoiceSettings(req.params.tenantId, parsed as any);
+      res.json(settings);
+    } catch (e: any) {
+      res.status(400).json({ error: e?.message ?? "Invalid invoice settings" });
+    }
+  });
+
+  // Invoices
+  app.get("/api/tenants/:tenantId/invoices", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
+    const invoices = await storage.getInvoicesByTenantId(req.params.tenantId);
+    res.json(invoices);
+  });
+
+  app.get("/api/tenants/:tenantId/invoices/stats", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
+    const invoices = await storage.getInvoicesByTenantId(req.params.tenantId);
+    const totals = invoices.reduce(
+      (acc, inv) => {
+        acc.totalBilled += inv.total;
+        acc.totalPaid += inv.paidAmount;
+        acc.totalOutstanding += Math.max(0, inv.total - inv.paidAmount);
+        if (inv.status === "draft") acc.draftCount += 1;
+        if (inv.status === "sent") acc.sentCount += 1;
+        if (inv.status === "partial") acc.partialCount += 1;
+        if (inv.status === "paid") acc.paidCount += 1;
+        if (inv.status === "overdue") acc.overdueCount += 1;
+        if (inv.dueDate && new Date(inv.dueDate) < new Date() && inv.status !== "paid" && inv.status !== "cancelled") {
+          acc.totalOverdue += Math.max(0, inv.total - inv.paidAmount);
+        }
+        return acc;
+      },
+      { totalBilled: 0, totalPaid: 0, totalOutstanding: 0, totalOverdue: 0, draftCount: 0, sentCount: 0, partialCount: 0, paidCount: 0, overdueCount: 0, count: invoices.length },
+    );
+    res.json(totals);
+  });
+
+  app.post("/api/tenants/:tenantId/invoices", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
+    try {
+      const tenantId = req.params.tenantId;
+      const settings = await storage.getInvoiceSettings(tenantId);
+      const existing = await storage.getInvoicesByTenantId(tenantId);
+      const prefix = settings?.invoicePrefix ?? "INV";
+      const year = new Date().getFullYear();
+      const seq = existing.length + 1;
+      const rawItems: any[] = Array.isArray(req.body?.items) ? req.body.items : [];
+      // Validate each item; ignore invoiceId in the input (server sets it).
+      const items = rawItems.map((it) =>
+        insertInvoiceItemSchema.omit({ invoiceId: true } as any).parse({
+          description: it.description,
+          quantity: it.quantity ?? 1,
+          unitPrice: it.unitPrice ?? 0,
+          amount: it.amount ?? ((it.unitPrice ?? 0) * (it.quantity ?? 1)),
+          feeType: it.feeType ?? "other",
+        }),
+      );
+      const subtotal: number = (items as any[]).reduce(
+        (s: number, it: any) => s + (it.amount ?? ((it.unitPrice ?? 0) * (it.quantity ?? 1))),
+        0,
+      );
+      const taxRate = settings?.taxRate ?? 0;
+      const computedTax = Math.round((subtotal * taxRate) / 10000);
+      // Validate the invoice header. Strip computed/forbidden fields from input.
+      const { items: _items, id: _id, tenantId: _t, invoiceNumber: _n, subtotal: _s, taxAmount: _ta, total: _to, paidAmount: _pa, ...header } = req.body ?? {};
+      const invoiceNumber = req.body.invoiceNumber ?? `${prefix}-${year}-${String(seq).padStart(4, "0")}`;
+      const parsedHeader = insertInvoiceSchema.parse({
+        ...header,
+        tenantId,
+        invoiceNumber,
+        subtotal,
+        taxAmount: computedTax,
+        total: subtotal + computedTax,
+        paidAmount: 0,
+        currency: header.currency ?? settings?.currency ?? "USD",
+        status: header.status ?? "draft",
+        dueDate: header.dueDate ? new Date(header.dueDate) : null,
+        issuedAt: header.issuedAt ? new Date(header.issuedAt) : new Date(),
+      });
+      const created = await storage.createInvoice(parsedHeader, items as any);
+      res.status(201).json(created);
+    } catch (e: any) {
+      res.status(400).json({ error: e?.message ?? "Invalid invoice" });
+    }
+  });
+
+  app.get("/api/invoices/:id", async (req, res) => {
+    const invoice = await storage.getInvoice(req.params.id);
+    if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+    if (!requireTenantAccess(req, res, invoice.tenantId)) return;
+    const [items, payments] = await Promise.all([
+      storage.getInvoiceItems(req.params.id),
+      storage.getPaymentsByInvoiceId(req.params.id),
+    ]);
+    res.json({ ...invoice, items, payments });
+  });
+
+  app.patch("/api/invoices/:id", async (req, res) => {
+    const invoice = await storage.getInvoice(req.params.id);
+    if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+    if (!requireTenantAccess(req, res, invoice.tenantId)) return;
+    try {
+      const { items, ...rest } = req.body ?? {};
+      const parsed = invoicePatchSchema.parse(rest);
+      const patch: any = { ...parsed };
+      if (parsed.dueDate !== undefined) patch.dueDate = parsed.dueDate ? new Date(parsed.dueDate as any) : null;
+      if (parsed.issuedAt !== undefined) patch.issuedAt = new Date(parsed.issuedAt as any);
+      await storage.updateInvoice(req.params.id, patch);
+      if (Array.isArray(items)) {
+        const validated = items.map((it: any) =>
+          insertInvoiceItemSchema.omit({ invoiceId: true } as any).parse({
+            description: it.description,
+            quantity: it.quantity ?? 1,
+            unitPrice: it.unitPrice ?? 0,
+            amount: it.amount ?? ((it.unitPrice ?? 0) * (it.quantity ?? 1)),
+            feeType: it.feeType ?? "other",
+          }),
+        );
+        await storage.replaceInvoiceItems(req.params.id, validated as any);
+      }
+      // Always recompute totals in case items or tax settings changed.
+      await recomputeInvoiceTotals(req.params.id);
+      const final = await storage.getInvoice(req.params.id);
+      res.json(final);
+    } catch (e: any) {
+      res.status(400).json({ error: e?.message ?? "Invalid invoice patch" });
+    }
+  });
+
+  app.delete("/api/invoices/:id", async (req, res) => {
+    const invoice = await storage.getInvoice(req.params.id);
+    if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+    if (!requireTenantAccess(req, res, invoice.tenantId)) return;
+    await storage.deleteInvoice(req.params.id);
+    res.status(204).send();
+  });
+
+  app.get("/api/cases/:caseId/invoices", async (req, res) => {
+    const caseRow = await storage.getCase(req.params.caseId);
+    if (!caseRow) return res.status(404).json({ error: "Case not found" });
+    if (!requireTenantAccess(req, res, caseRow.tenantId)) return;
+    const invoices = await storage.getInvoicesByCaseId(req.params.caseId);
+    res.json(invoices);
+  });
+
+  // Payments
+  app.get("/api/invoices/:invoiceId/payments", async (req, res) => {
+    const invoice = await storage.getInvoice(req.params.invoiceId);
+    if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+    if (!requireTenantAccess(req, res, invoice.tenantId)) return;
+    const payments = await storage.getPaymentsByInvoiceId(req.params.invoiceId);
+    res.json(payments);
+  });
+
+  app.post("/api/invoices/:invoiceId/payments", async (req, res) => {
+    const invoice = await storage.getInvoice(req.params.invoiceId);
+    if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+    if (!requireTenantAccess(req, res, invoice.tenantId)) return;
+    try {
+      const { invoiceId: _i, tenantId: _t, id: _id, ...body } = req.body ?? {};
+      const parsed = insertPaymentSchema.parse({
+        ...body,
+        invoiceId: req.params.invoiceId,
+        tenantId: invoice.tenantId,
+        paidAt: body.paidAt ? new Date(body.paidAt) : new Date(),
+      });
+      const created = await storage.createPayment(parsed);
+      res.status(201).json(created);
+    } catch (e: any) {
+      res.status(400).json({ error: e?.message ?? "Invalid payment" });
+    }
+  });
+
+  app.delete("/api/payments/:id", async (req, res) => {
+    const payment = await storage.getPayment(req.params.id);
+    if (!payment) return res.status(404).json({ error: "Payment not found" });
+    if (!requireTenantAccess(req, res, payment.tenantId)) return;
+    await storage.deletePayment(req.params.id);
     res.status(204).send();
   });
 

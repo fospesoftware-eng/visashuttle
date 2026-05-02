@@ -36,6 +36,7 @@ import NewCasePage from "@/pages/agency/case-new";
 import CaseDetailPage from "@/pages/agency/case-detail";
 import DocumentsPage from "@/pages/agency/documents";
 import ReportsPage from "@/pages/agency/reports";
+import AccountingPage from "@/pages/agency/accounting";
 import AgencySettingsPage from "@/pages/agency/settings";
 
 import CustomerDashboard from "@/pages/customer/dashboard";
@@ -121,6 +122,7 @@ function Router() {
       <Route path="/app/cases/new" component={NewCasePage} />
       <Route path="/app/cases/:id" component={CaseDetailPage} />
       <Route path="/app/documents" component={DocumentsPage} />
+      <Route path="/app/accounting" component={AccountingPage} />
       <Route path="/app/reports" component={ReportsPage} />
       <Route path="/app/settings" component={AgencySettingsPage} />
       <Route path="/app/visa-check" component={VisaCheckPage} />

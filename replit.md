@@ -6,7 +6,7 @@ VisaShuttle is a multi-tenant SaaS platform for travel agencies to manage visa a
 
 1. **Public Marketing Website** - Landing pages, pricing, and signup flows
 2. **SaaS Admin Dashboard** - Tenant management, user management, visa knowledge base, AI governance, audit logs, settings
-3. **Agency Dashboard** - CRM, case management, document center, reporting
+3. **Agency Dashboard** - CRM, case management, document center, accounting/billing, reporting
 4. **Customer Portal** - Self-service application tracking and document uploads
 5. **Agency Public Landing Page** - Branded marketing page for each agency at `/w/:slug`
 
@@ -38,6 +38,12 @@ Preferred communication style: Simple, everyday language.
 - **Schema Location**: `shared/schema.ts` contains all type definitions
 - **Seed Data**: Demo tenant, admin user, agency owner, customer, sample cases and documents
 - **Production**: Ready to switch to PostgreSQL with Drizzle ORM
+
+### Accounting Module
+- Tables (`shared/schema.ts`): `feeTemplates`, `invoiceSettings`, `invoices`, `invoiceItems`, `payments`. All money in INTEGER cents; `taxRate` in basis points (1800 = 18%).
+- API base: `/api/tenants/:tenantId/{fee-templates,invoice-settings,invoices,invoices/stats}`, plus ID-based `/api/{fee-templates,invoices,payments}/:id` and `/api/invoices/:id/payments`. All accounting routes require session auth + tenant ownership (or `saas_admin` role) and validate bodies via Zod. Invoice totals are server-computed and recomputed on item changes; payment create/delete auto-updates `paidAmount` + status (draft→sent→partial→paid).
+- UI page: `/agency/accounting` — Overview/Invoices/Fee Templates/Settings tabs.
+- Persistence note: accounting uses `MemStorage` (cleared on restart). DB tables exist but `HybridStorage` does not yet override accounting methods — same pattern as cases/leads.
 
 ### Demo Credentials
 - **SaaS Admin**: admin@visashuttle.com / Admin@12345
