@@ -7,7 +7,46 @@ import { sendOtp, verifyOtp, getSmsProviderStatus } from "./sms";
 import { getEntryRequirement } from "@shared/visa-free";
 import indiaVisaChanceDataset from "@shared/india_visa_chance_dataset_non_visa_free_2026.json";
 import bcrypt from "bcryptjs";
+import rateLimit from "express-rate-limit";
 import { randomUUID, randomBytes } from "crypto";
+
+// ── Rate limiters ─────────────────────────────────────────────────────────
+// Brute-force defence on credential endpoints. Limits are per-IP and reset
+// each window. They're intentionally permissive enough not to break a real
+// user fat-fingering their password, but tight enough to stop a credential-
+// stuffing script in its tracks. We disable the X-RateLimit-* legacy
+// headers and emit only RFC-standard `RateLimit-*` headers.
+const authRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,                  // 10 attempts / IP / window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many login attempts. Please try again in a few minutes." },
+});
+// OTP request: stricter so we don't burn through SMS quota or spam customers.
+const otpRequestRateLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many OTP requests. Please wait a few minutes before trying again." },
+});
+// OTP verify: more attempts allowed than request (typos), still capped.
+const otpVerifyRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many verification attempts. Please request a new code." },
+});
+// Site-wide password gate: low-entropy single secret, so be aggressive.
+const siteAuthRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 8,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many attempts. Please try again later." },
+});
 import type { Proposal, InsertAppointment } from "@shared/schema";
 import { VISA_STAGES, VISA_PROCESSING_STATUSES, SUBMISSION_METHODS, APPOINTMENT_TYPES, APPOINTMENT_STATUSES, PAYMENT_METHODS } from "@shared/schema";
 import { VISA_TYPES } from "@shared/destinations";
@@ -209,7 +248,11 @@ function computeGstSplit(
 
 // Site-wide password for protecting the entire application
 const SITE_PASSWORD = process.env.SITE_PASSWORD;
-const DEMO_B2C_OTP = "1234";
+// Demo OTP is a developer convenience. In production, the demo bypass MUST be
+// disabled so customers go through the real SMS provider. Setting this to null
+// in prod makes the `if (DEMO_B2C_OTP)` branches in b2c/otp/{send,verify} fall
+// through to the real provider.
+const DEMO_B2C_OTP = process.env.NODE_ENV === "production" ? null : "1234";
 
 function maskKey(key: string): string {
   if (key.length <= 8) return "••••••••";
@@ -599,7 +642,7 @@ export async function registerRoutes(
   await (storage as any).seedDemoUsersToDb?.();
 
   // === Site Password Protection ===
-  app.post("/api/site-auth/verify", (req, res) => {
+  app.post("/api/site-auth/verify", siteAuthRateLimiter, (req, res) => {
     const { password } = req.body;
     if (!SITE_PASSWORD) {
       // No password set - allow access
@@ -627,10 +670,38 @@ export async function registerRoutes(
   });
 
   // === Auth Routes ===
-  app.post("/api/auth/login", async (req, res) => {
+  app.post("/api/auth/login", authRateLimiter, async (req, res) => {
     const { email, password } = req.body;
+    if (typeof email !== "string" || typeof password !== "string" || !email || !password) {
+      return res.status(400).json({ error: "Email and password are required" });
+    }
     const user = await storage.getUserByEmail(email);
-    if (!user || user.password !== password) {
+    if (!user) {
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
+    // Bcrypt hashes always start with `$2`. Anything else is a legacy
+    // plaintext seed from the demo data — accept it on first login, then
+    // rehash transparently so the next login uses bcrypt.
+    let valid = false;
+    const looksHashed = typeof user.password === "string" && user.password.startsWith("$2");
+    if (looksHashed) {
+      try {
+        valid = await bcrypt.compare(password, user.password);
+      } catch {
+        valid = false;
+      }
+    } else {
+      valid = user.password === password;
+      if (valid) {
+        try {
+          const fresh = await bcrypt.hash(password, 10);
+          await storage.updateUser(user.id, { password: fresh });
+        } catch {
+          // Non-fatal: a failed rehash shouldn't block sign-in.
+        }
+      }
+    }
+    if (!valid) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
     // Set session
@@ -678,19 +749,34 @@ export async function registerRoutes(
 
   // === White-Label Auth Routes ===
   
-  // Get tenant by slug (for white-label pages)
+  // Get tenant by slug (for white-label pages). Public by design — the
+  // white-label login page renders before sign-in. Returns ONLY branding-safe
+  // fields; never echo internal config (plan/status/billing) to anonymous
+  // callers, since slugs are guessable.
   app.get("/api/w/:slug/tenant", async (req, res) => {
     const tenant = await storage.getTenantBySlug(req.params.slug);
     if (!tenant) {
       return res.status(404).json({ error: "Agency not found" });
     }
-    res.json(tenant);
+    res.json({
+      id: tenant.id,
+      slug: tenant.slug,
+      name: tenant.name,
+      logoUrl: tenant.logoUrl ?? null,
+      primaryColor: tenant.primaryColor ?? null,
+      secondaryColor: tenant.secondaryColor ?? null,
+      accentColor: tenant.accentColor ?? null,
+      contactEmail: tenant.contactEmail ?? null,
+      contactPhone: tenant.contactPhone ?? null,
+      whatsappNumber: tenant.whatsappNumber ?? null,
+      showPoweredBy: tenant.showPoweredBy ?? true,
+    });
   });
 
   // Request OTP — accepts either `email` or `phone` (one is required).
   // The white-label customer portal lets the customer pick which identifier
   // they want to receive the code on, so this endpoint serves both flows.
-  app.post("/api/w/:slug/auth/request-otp", async (req, res) => {
+  app.post("/api/w/:slug/auth/request-otp", otpRequestRateLimiter, async (req, res) => {
     const { email, phone, name } = req.body ?? {};
 
     const emailNorm = typeof email === "string" && email.trim() ? email.trim().toLowerCase() : null;
@@ -731,15 +817,19 @@ export async function registerRoutes(
       details: { method, email: emailNorm, phone: phoneNorm }
     });
 
-    // In development, log OTP to console
-    console.log(`[OTP] Code for ${method}:${identifier} at ${tenant.slug}: ${code}`);
+    // Dev-only convenience: surface the code in server logs so a developer can
+    // copy it without wiring SMS/email. NEVER log OTPs in production — that
+    // would defeat the entire point of out-of-band verification.
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`[OTP] Code for ${method}:${identifier} at ${tenant.slug}: ${code}`);
+    }
 
     res.json({ message: "OTP sent successfully", method, email: emailNorm, phone: phoneNorm });
   });
 
   // Verify OTP — same shape as request-otp: caller passes whichever identifier
   // they used, plus the 6-digit code.
-  app.post("/api/w/:slug/auth/verify-otp", async (req, res) => {
+  app.post("/api/w/:slug/auth/verify-otp", otpVerifyRateLimiter, async (req, res) => {
     const { email, code, name, phone } = req.body ?? {};
 
     const emailNorm = typeof email === "string" && email.trim() ? email.trim().toLowerCase() : null;
@@ -1103,17 +1193,21 @@ export async function registerRoutes(
   });
 
   // === Tenant Routes ===
-  app.get("/api/tenants", async (req, res) => {
+  // Platform-level: SaaS admin only (lists every tenant on the platform).
+  app.get("/api/tenants", requireAdminAuth, async (req, res) => {
     const tenants = await storage.getAllTenants();
     res.json(tenants);
   });
 
-  app.post("/api/tenants", async (req, res) => {
+  // Platform-level: tenant creation is reserved for SaaS admin. The agency
+  // self-signup flow lives at /api/agency-register which has its own validation.
+  app.post("/api/tenants", requireAdminAuth, async (req, res) => {
     const tenant = await storage.createTenant(req.body);
     res.status(201).json(tenant);
   });
 
   app.get("/api/tenants/:id", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.id)) return;
     const tenant = await storage.getTenant(req.params.id);
     if (!tenant) {
       return res.status(404).json({ error: "Tenant not found" });
@@ -1121,7 +1215,9 @@ export async function registerRoutes(
     res.json(tenant);
   });
 
-  app.patch("/api/tenants/:id", async (req, res) => {
+  // Full tenant row mutation (plan, status, billing, etc.) is platform-only.
+  // Agency owners use PATCH /api/tenants/:id/branding for the fields they own.
+  app.patch("/api/tenants/:id", requireAdminAuth, async (req, res) => {
     const tenant = await storage.updateTenant(req.params.id, req.body);
     if (!tenant) {
       return res.status(404).json({ error: "Tenant not found" });
@@ -1129,19 +1225,38 @@ export async function registerRoutes(
     res.json(tenant);
   });
 
-  // Get tenant by slug (for agency dashboard)
+  // Public by design — used by the white-label login page (`/w/:slug/login`)
+  // which renders BEFORE the customer is signed in. Returns only branding-safe
+  // fields so internal config can't leak via slug enumeration.
   app.get("/api/tenants/by-slug/:slug", async (req, res) => {
     const tenant = await storage.getTenantBySlug(req.params.slug);
     if (!tenant) {
       return res.status(404).json({ error: "Tenant not found" });
     }
-    res.json(tenant);
+    // Whitelist: never echo internal config (plan, status, billing flags).
+    res.json({
+      id: tenant.id,
+      slug: tenant.slug,
+      name: tenant.name,
+      logoUrl: tenant.logoUrl ?? null,
+      primaryColor: tenant.primaryColor ?? null,
+      secondaryColor: tenant.secondaryColor ?? null,
+      accentColor: tenant.accentColor ?? null,
+      contactEmail: tenant.contactEmail ?? null,
+      contactPhone: tenant.contactPhone ?? null,
+      whatsappNumber: tenant.whatsappNumber ?? null,
+      showPoweredBy: tenant.showPoweredBy ?? true,
+    });
   });
 
-  // Update tenant branding (for agency owners)
+  // Update tenant branding (agency owner/manager of that tenant or saas_admin).
+  // Excludes regular agency_staff because branding affects every customer-facing
+  // surface for the agency.
   app.patch("/api/tenants/:id/branding", async (req, res) => {
+    const caller = await requireTenantStaffAdmin(req, res, req.params.id);
+    if (!caller) return;
     const { name, logoUrl, primaryColor, secondaryColor, accentColor, contactEmail, contactPhone, whatsappNumber, showPoweredBy } = req.body;
-    
+
     const tenant = await storage.updateTenant(req.params.id, {
       name,
       logoUrl: logoUrl || null,
@@ -1153,7 +1268,7 @@ export async function registerRoutes(
       whatsappNumber,
       showPoweredBy
     });
-    
+
     if (!tenant) {
       return res.status(404).json({ error: "Tenant not found" });
     }
@@ -1162,11 +1277,13 @@ export async function registerRoutes(
 
   // === Lead Routes ===
   app.get("/api/tenants/:tenantId/leads", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
     const leads = await storage.getLeadsByTenantId(req.params.tenantId);
     res.json(leads);
   });
 
   app.post("/api/tenants/:tenantId/leads", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
     const tenantId = req.params.tenantId;
     // Plan limit enforcement
     const tenantForLeads = await storage.getTenant(tenantId);
@@ -1210,18 +1327,20 @@ export async function registerRoutes(
     if (!lead) {
       return res.status(404).json({ error: "Lead not found" });
     }
+    if (!requireTenantAccess(req, res, lead.tenantId)) return;
     res.json(lead);
   });
 
   app.patch("/api/leads/:id", async (req, res) => {
+    const current = await storage.getLead(req.params.id);
+    if (!current) return res.status(404).json({ error: "Lead not found" });
+    if (!requireTenantAccess(req, res, current.tenantId)) return;
     // If the patch touches either field, validate the EFFECTIVE pair (merge
     // patch over current row) so partial updates can't sneak through with
     // a stale country or visa type. Empty-string is treated as a clear.
     const touchesCountry = req.body && typeof req.body === "object" && "destinationCountry" in req.body;
     const touchesVisaType = req.body && typeof req.body === "object" && "visaType" in req.body;
     if (touchesCountry || touchesVisaType) {
-      const current = await storage.getLead(req.params.id);
-      if (!current) return res.status(404).json({ error: "Lead not found" });
       const effectiveCountry = (touchesCountry ? req.body.destinationCountry : current.destinationCountry) ?? "";
       const effectiveVisaType = (touchesVisaType ? req.body.visaType : current.visaType) ?? "";
       const c = String(effectiveCountry).trim();
@@ -1241,6 +1360,9 @@ export async function registerRoutes(
   });
 
   app.delete("/api/leads/:id", async (req, res) => {
+    const existing = await storage.getLead(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Lead not found" });
+    if (!requireTenantAccess(req, res, existing.tenantId)) return;
     const success = await storage.deleteLead(req.params.id);
     if (!success) {
       return res.status(404).json({ error: "Lead not found" });
@@ -2651,11 +2773,13 @@ export async function registerRoutes(
   }
 
   app.get("/api/tenants/:tenantId/cases", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
     const cases = await storage.getCasesByTenantId(req.params.tenantId);
     res.json(cases);
   });
 
   app.post("/api/tenants/:tenantId/cases", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
     // Validate dates: travel date can't be in the past, DOB can't be in the future
     const dateError = validateCaseDates(req.body);
     if (dateError) return res.status(400).json({ error: dateError });
@@ -3283,7 +3407,9 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
-  app.get("/api/customers/:customerId/cases", async (req, res) => {
+  // SaaS admin only — surfaces every case linked to a customer ID across the
+  // platform. Tenant-scoped customer flows go through /api/w/:slug/portal/cases.
+  app.get("/api/customers/:customerId/cases", requireAdminAuth, async (req, res) => {
     const cases = await storage.getCasesByCustomerId(req.params.customerId);
     res.json(cases);
   });
@@ -3386,19 +3512,33 @@ export async function registerRoutes(
     res.json(template);
   });
 
-  app.post("/api/visa-templates", async (req, res) => {
+  // Platform-level visa knowledge base — only the SaaS admin curates the
+  // global catalog. Reads are public so unauthenticated landing pages can
+  // surface visa requirements.
+  app.post("/api/visa-templates", requireAdminAuth, async (req, res) => {
     const template = await storage.createVisaTemplate(req.body);
     res.status(201).json(template);
   });
 
   // === Activity Log Routes ===
   app.get("/api/tenants/:tenantId/activity-logs", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
     const logs = await storage.getActivityLogsByTenantId(req.params.tenantId);
     res.json(logs);
   });
 
   app.post("/api/activity-logs", async (req, res) => {
-    const log = await storage.createActivityLog(req.body);
+    // Activity logs MUST be tied to a tenant the caller can write to —
+    // otherwise an attacker could spoof audit entries against another agency.
+    const tenantId = String(req.body?.tenantId ?? "").trim();
+    if (!tenantId) return res.status(400).json({ error: "tenantId is required" });
+    if (!requireTenantAccess(req, res, tenantId)) return;
+    const log = await storage.createActivityLog({
+      ...req.body,
+      tenantId,
+      // Always tag with the authenticated user; never trust body.userId.
+      userId: req.session?.userId ?? null,
+    });
     res.status(201).json(log);
   });
 
@@ -3412,7 +3552,7 @@ export async function registerRoutes(
   }
 
   // ── OTP Send ─────────────────────────────────────────────────────────────
-  app.post("/api/b2c/otp/send", async (req, res) => {
+  app.post("/api/b2c/otp/send", otpRequestRateLimiter, async (req, res) => {
     const { phone, email } = req.body;
     if (!phone || typeof phone !== "string") {
       return res.status(400).json({ error: "Phone number is required" });
@@ -3446,7 +3586,7 @@ export async function registerRoutes(
   });
 
   // ── OTP Verify ───────────────────────────────────────────────────────────
-  app.post("/api/b2c/otp/verify", async (req, res) => {
+  app.post("/api/b2c/otp/verify", otpVerifyRateLimiter, async (req, res) => {
     const { phone, otp } = req.body;
     if (!phone || !otp) {
       return res.status(400).json({ error: "Phone number and OTP code are required" });
@@ -3471,7 +3611,7 @@ export async function registerRoutes(
   });
 
   // ── Admin: Get SMS Config ─────────────────────────────────────────────────
-  app.get("/api/admin/sms-config", requireAgencyAuth, async (req, res) => {
+  app.get("/api/admin/sms-config", requireAdminAuth, async (req, res) => {
     const cfg = await storage.getSmsConfig();
     const status = getSmsProviderStatus(cfg);
     // Mask sensitive keys before sending to client
@@ -3491,7 +3631,7 @@ export async function registerRoutes(
   });
 
   // ── Admin: Save SMS Config ────────────────────────────────────────────────
-  app.post("/api/admin/sms-config", requireAgencyAuth, async (req, res) => {
+  app.post("/api/admin/sms-config", requireAdminAuth, async (req, res) => {
     const { provider, msg91AuthKey, msg91TemplateId, msg91SenderId, zauvApiKey, mcCustomerId, mcAuthToken } = req.body;
     // Only overwrite a field if the new value is not a masked placeholder
     const patch: Record<string, any> = { provider };
@@ -3508,7 +3648,7 @@ export async function registerRoutes(
   });
 
   // ── Admin: Test SMS Config ────────────────────────────────────────────────
-  app.post("/api/admin/sms-config/test", requireAgencyAuth, async (req, res) => {
+  app.post("/api/admin/sms-config/test", requireAdminAuth, async (req, res) => {
     const { phone } = req.body;
     if (!phone) return res.status(400).json({ error: "Phone number is required for testing" });
     const dbConfig = await storage.getSmsConfig();
@@ -3797,7 +3937,7 @@ export async function registerRoutes(
   });
 
   // Login
-  app.post("/api/b2c/auth/login", async (req, res) => {
+  app.post("/api/b2c/auth/login", authRateLimiter, async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) {
       return res.status(400).json({ error: "Email and password are required" });
@@ -5005,6 +5145,7 @@ export async function registerRoutes(
 
   // === Tenant Analytics ===
   app.get("/api/tenants/:tenantId/analytics", requireAgencyAuth, async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
     const tenantId = req.params.tenantId;
     const [cases, leads, documents] = await Promise.all([
       storage.getCasesByTenantId(tenantId),
@@ -5079,6 +5220,7 @@ export async function registerRoutes(
 
   // === Tenant Usage / Plan Info ===
   app.get("/api/tenants/:tenantId/usage", requireAgencyAuth, async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
     const tenantId = req.params.tenantId;
     const [tenant, cases, leads, staff] = await Promise.all([
       storage.getTenant(tenantId),

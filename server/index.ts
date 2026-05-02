@@ -75,7 +75,16 @@ app.use(
 
 app.use(express.urlencoded({ extended: false, limit: "1mb" }));
 
-// Session middleware
+// Session middleware. The secret is what protects every signed session
+// cookie on the platform — if it falls back to a hardcoded default in
+// production, anyone who reads the source can forge sessions. So we hard-
+// fail the boot in production when SESSION_SECRET is unset.
+if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
+  console.error(
+    "[Boot] FATAL: SESSION_SECRET is required in production. Refusing to start.",
+  );
+  process.exit(1);
+}
 const sessionOptions: session.SessionOptions = {
   secret: process.env.SESSION_SECRET || "visa-shuttle-dev-secret",
   resave: false,
@@ -195,10 +204,22 @@ app.use((req, res, next) => {
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
+    // Always log the real error server-side so we don't lose debuggability,
+    // but don't leak internal messages / stack traces to the client in
+    // production — they're a great source of recon info for attackers.
+    log(
+      `[error] ${status} ${err?.message ?? "Unknown error"}${err?.stack ? `\n${err.stack}` : ""}`,
+    );
+    const isProd = process.env.NODE_ENV === "production";
+    const safeMessage =
+      isProd && status >= 500
+        ? "Internal Server Error"
+        : err?.message || "Internal Server Error";
+    if (!res.headersSent) {
+      res.status(status).json({ message: safeMessage });
+    }
+    // Note: we used to `throw err` here, which crashed the worker on every
+    // request error. Express has already responded; just stop.
   });
 
   // importantly only setup vite in development and after

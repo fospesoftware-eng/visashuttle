@@ -648,6 +648,97 @@ logging in.
   critical by the case-detail PII expansion (passport sub-fields, contact info,
   internal notes) and is fixed in lockstep with that UI change.
 
+### Production-readiness security pass (May 2026)
+
+A second audit of the route table found ~20 more endpoints still open after
+the case/document/message fix. Plus the agency-login flow was doing a
+plaintext password compare, there was no rate limiting anywhere on the
+auth surface, OTP codes were being printed to the production console, and
+`SESSION_SECRET` had a hardcoded fallback. All addressed:
+
+- **Tenant authz on the remaining open routes** (`server/routes.ts`):
+  `requireTenantAccess` (or `requireAdminAuth` for platform-level routes)
+  now guards `/api/tenants` (GET/POST/PATCH/branding/by-id), every
+  `/api/tenants/:tenantId/leads` and `/api/leads/:id` route,
+  `/api/tenants/:tenantId/cases`, `/api/customers/:customerId/cases`,
+  `/api/visa-templates` POST, `/api/tenants/:tenantId/activity-logs` GET,
+  and `/api/activity-logs` POST. The activity-logs POST also forces
+  `userId = req.session.userId` so the audit trail can't be spoofed by
+  passing a different user id in the body.
+- **`/api/tenants/by-slug/:slug` whitelist**: stays public (the white-label
+  login pages render before sign-in) but now returns ONLY the branding-
+  facing fields — `id, slug, name, logoUrl, *Color, contact*, whatsappNumber,
+  showPoweredBy`. Plan/status/billing flags no longer leak via slug
+  enumeration.
+- **`/api/admin/sms-config` (3 routes)**: were on `requireAgencyAuth`,
+  meaning any agency staff member could read or rotate the platform-wide
+  MSG91 / Zauv / MessageCentral credentials. Switched to `requireAdminAuth`.
+- **Agency login bcrypt + transparent rehash** (`/api/auth/login`):
+  detects legacy plaintext seeds (anything that doesn't start with `$2`),
+  accepts them on first login, then rehashes with `bcrypt.hash(pw, 10)`
+  via `storage.updateUser`. Subsequent logins go through `bcrypt.compare`.
+  No flag day, no migration script — the demo passwords still work.
+- **Rate limiting** (`express-rate-limit` v8): four limiters wired up:
+  `authRateLimiter` (10/15min) on `/api/auth/login` and `/api/b2c/auth/login`;
+  `otpRequestRateLimiter` (5/10min) on `/api/w/:slug/auth/request-otp`;
+  `otpVerifyRateLimiter` (15/15min) on `/api/w/:slug/auth/verify-otp`;
+  `siteAuthRateLimiter` (8/15min) on `/api/site-auth/verify`. RFC-standard
+  `RateLimit-*` headers; legacy `X-RateLimit-*` disabled.
+- **OTP console.log gated to dev** (`/api/w/:slug/auth/request-otp`):
+  the developer-convenience `console.log("[OTP] Code for …")` line now
+  runs only when `NODE_ENV !== "production"`. In prod the code goes
+  out-of-band (SMS/email) and never touches the log stream.
+- **Fail-loud `SESSION_SECRET`** (`server/index.ts`): boot now exits
+  with a fatal error if `NODE_ENV=production` and `SESSION_SECRET` is
+  unset. Dev still falls back to `visa-shuttle-dev-secret` for ergonomics.
+- **Sanitised global error handler** (`server/index.ts`): logs the full
+  message + stack server-side, but in production responds with
+  `{message: "Internal Server Error"}` for any 5xx. Also stops re-throwing
+  the error after responding (which used to crash the worker on every
+  request error).
+
+Smoke-verified: every guard returns 401 for unauthenticated callers and
+403 for cross-tenant agency callers; the agency owner can still read their
+own tenant's cases (200); rate limiter trips at attempt ~9 of 12 bad
+logins; the legacy-plaintext owner login succeeds first time and on
+subsequent calls (rehash transparent).
+
+**Architect-review follow-ups** (second round of fixes after initial pass):
+
+- **`GET /api/w/:slug/tenant`** was still echoing the full tenant row
+  (including `plan` and `status`) on the white-label customer surface,
+  re-exposing what the `/api/tenants/by-slug/:slug` whitelist had been
+  designed to hide. Now whitelists the same branding-only fields.
+- **`GET /api/tenants/:tenantId/analytics`** and
+  **`GET /api/tenants/:tenantId/usage`** were behind only
+  `requireAgencyAuth`, so any authenticated agency user could pull
+  another tenant's stats by guessing the id. Both now also call
+  `requireTenantAccess`.
+- **`PATCH /api/tenants/:id`** (full-row mutation including `plan` /
+  `status` / billing) is now `requireAdminAuth` — no agency role can
+  upgrade itself to enterprise. Agency owners and managers use
+  `PATCH /api/tenants/:id/branding` for the name/colors/contact-info
+  fields they actually own.
+- **`PATCH /api/tenants/:id/branding`** moved from `requireTenantAccess`
+  (allowed `agency_staff`) to `requireTenantStaffAdmin` (owner/manager
+  only). Branding affects every customer-facing surface for the agency,
+  so a regular staff member shouldn't be able to flip the logo or color
+  scheme.
+- **B2C OTP rate limiting**: `/api/b2c/otp/send` now uses
+  `otpRequestRateLimiter` (5/10min) and `/api/b2c/otp/verify` uses
+  `otpVerifyRateLimiter` (15/15min), matching the white-label OTP routes.
+- **`DEMO_B2C_OTP` prod gate**: the `"1234"` demo bypass is now
+  `process.env.NODE_ENV === "production" ? null : "1234"`. The
+  `if (DEMO_B2C_OTP)` branches in send/verify fall through to the real
+  SMS provider in production so customers can't sign in with a
+  predictable code.
+
+**Out of scope for this pass** (flagged for future work):
+CSRF middleware (would require coordinated client refactor),
+B2C portal mock data (feature work, not security),
+agency Knowledge / Messages / Customers pages that the audit identified
+as missing (feature work).
+
 ### Proposal payment link (T007 — May 2026)
 
 Lets the agency attach an estimate amount to a proposal so the customer can
