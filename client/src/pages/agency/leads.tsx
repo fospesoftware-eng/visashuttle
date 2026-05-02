@@ -795,7 +795,7 @@ export default function LeadsPage() {
                 <Combobox
                   options={countryOptions}
                   value={convertForm.destinationCountry}
-                  onChange={(v) => setConvertForm({ ...convertForm, destinationCountry: v })}
+                  onChange={(v) => setConvertForm({ ...convertForm, destinationCountry: v, visaType: "" })}
                   placeholder="Optional — pick later"
                   searchPlaceholder="Type a country..."
                   testId="select-convert-destination"
@@ -803,12 +803,19 @@ export default function LeadsPage() {
               </div>
               <div className="space-y-2">
                 <Label>Visa Type</Label>
-                <Select value={convertForm.visaType} onValueChange={(v) => setConvertForm({ ...convertForm, visaType: v })}>
+                <Select
+                  value={convertForm.visaType}
+                  onValueChange={(v) => setConvertForm({ ...convertForm, visaType: v })}
+                  disabled={!convertForm.destinationCountry}
+                >
                   <SelectTrigger data-testid="select-convert-visa-type">
-                    <SelectValue placeholder="Optional — pick later" />
+                    <SelectValue placeholder={convertForm.destinationCountry ? "Optional — pick later" : "Pick country first"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {GENERIC_VISA_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    {convertForm.destinationCountry &&
+                      getVisaTypesForCountry(convertForm.destinationCountry).map((t) => (
+                        <SelectItem key={t} value={t}>{t}</SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>

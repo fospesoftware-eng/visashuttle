@@ -11,6 +11,7 @@ import { randomUUID, randomBytes } from "crypto";
 import type { Proposal, InsertAppointment } from "@shared/schema";
 import { VISA_STAGES, VISA_PROCESSING_STATUSES, SUBMISSION_METHODS, APPOINTMENT_TYPES, APPOINTMENT_STATUSES, PAYMENT_METHODS } from "@shared/schema";
 import { VISA_TYPES } from "@shared/destinations";
+import { isValidVisaTypeForCountry, getCountryVisaTypes } from "@shared/visa-catalog";
 import { z } from "zod";
 import ExcelJS from "exceljs";
 import {
@@ -1184,6 +1185,18 @@ export async function registerRoutes(
     if (!assignedTo) {
       return res.status(400).json({ error: "A team member must be assigned to this lead." });
     }
+    // Defense-in-depth: if BOTH country + visa type are provided, they must
+    // agree per the shared catalog (e.g. no "Schengen Visa" for Algeria).
+    // Leads can be created with neither (just a name + contact), so we only
+    // validate when the user supplied both.
+    const leadCountry = typeof req.body?.destinationCountry === "string" ? req.body.destinationCountry.trim() : "";
+    const leadVisaType = typeof req.body?.visaType === "string" ? req.body.visaType.trim() : "";
+    if (leadCountry && leadVisaType && !isValidVisaTypeForCountry(leadCountry, leadVisaType)) {
+      const allowed = getCountryVisaTypes(leadCountry).slice(0, 6).join(", ");
+      return res.status(400).json({
+        error: `"${leadVisaType}" is not a recognised visa type for ${leadCountry}. Try one of: ${allowed}…`,
+      });
+    }
     const lead = await storage.createLead({
       ...req.body,
       assignedTo,
@@ -1201,6 +1214,25 @@ export async function registerRoutes(
   });
 
   app.patch("/api/leads/:id", async (req, res) => {
+    // If the patch touches either field, validate the EFFECTIVE pair (merge
+    // patch over current row) so partial updates can't sneak through with
+    // a stale country or visa type. Empty-string is treated as a clear.
+    const touchesCountry = req.body && typeof req.body === "object" && "destinationCountry" in req.body;
+    const touchesVisaType = req.body && typeof req.body === "object" && "visaType" in req.body;
+    if (touchesCountry || touchesVisaType) {
+      const current = await storage.getLead(req.params.id);
+      if (!current) return res.status(404).json({ error: "Lead not found" });
+      const effectiveCountry = (touchesCountry ? req.body.destinationCountry : current.destinationCountry) ?? "";
+      const effectiveVisaType = (touchesVisaType ? req.body.visaType : current.visaType) ?? "";
+      const c = String(effectiveCountry).trim();
+      const v = String(effectiveVisaType).trim();
+      if (c && v && !isValidVisaTypeForCountry(c, v)) {
+        const allowed = getCountryVisaTypes(c).slice(0, 6).join(", ");
+        return res.status(400).json({
+          error: `"${v}" is not a recognised visa type for ${c}. Try one of: ${allowed}…`,
+        });
+      }
+    }
     const lead = await storage.updateLead(req.params.id, req.body);
     if (!lead) {
       return res.status(404).json({ error: "Lead not found" });
@@ -1278,6 +1310,15 @@ export async function registerRoutes(
     }
     if (!visaType || typeof visaType !== "string" || !visaType.trim()) {
       return res.status(400).json({ error: "Visa type is required" });
+    }
+    // Defense-in-depth: reject country↔visa-type mismatches that the
+    // structured selectors should have prevented (e.g. "Schengen Visa" for
+    // Algeria). The shared catalog is the single source of truth.
+    if (!isValidVisaTypeForCountry(destinationCountry.trim(), visaType.trim())) {
+      const allowed = getCountryVisaTypes(destinationCountry.trim()).slice(0, 6).join(", ");
+      return res.status(400).json({
+        error: `"${visaType.trim()}" is not a recognised visa type for ${destinationCountry.trim()}. Try one of: ${allowed}…`,
+      });
     }
 
     // The proposal is owned by whichever team member created it; that same
@@ -1453,6 +1494,19 @@ export async function registerRoutes(
     // path, so they shouldn't get to bypass these checks.
     const dateError = validateCaseDates({ travelDate, applicantDob });
     if (dateError) return res.status(400).json({ error: dateError });
+
+    // Legacy proposals created before the country↔visa-type catalog was
+    // tightened could still hold an invalid pair (e.g. "Schengen Visa"
+    // for Algeria). Don't mint a new case from a bad proposal — the
+    // agency must fix the proposal first. Empty-string fallback is
+    // safe because empty fields are caught by the create-time validators.
+    const propCountry = (proposal.destinationCountry ?? "").trim();
+    const propVisaType = (proposal.visaType ?? "").trim();
+    if (propCountry && propVisaType && !isValidVisaTypeForCountry(propCountry, propVisaType)) {
+      return res.status(409).json({
+        error: `This proposal lists "${propVisaType}" for ${propCountry}, which is no longer a recognised pair. Please ask the agency to update it before applying.`,
+      });
+    }
 
     // Same monthly plan limit as the regular case-create route — the agency
     // can't bypass their plan by funnelling cases through proposal links.
@@ -2449,6 +2503,16 @@ export async function registerRoutes(
     if (!req.body?.visaType || typeof req.body.visaType !== "string" || !req.body.visaType.trim()) {
       return res.status(400).json({ error: "Visa type is required" });
     }
+    // Defense-in-depth: reject country↔visa-type mismatches (e.g. picking
+    // "Schengen Visa" for Algeria). Drafts get the same check — if the
+    // user explicitly chose both fields, they must agree. Empty visaType
+    // is already rejected above.
+    if (!isValidVisaTypeForCountry(req.body.destinationCountry.trim(), req.body.visaType.trim())) {
+      const allowed = getCountryVisaTypes(req.body.destinationCountry.trim()).slice(0, 6).join(", ");
+      return res.status(400).json({
+        error: `"${req.body.visaType.trim()}" is not a recognised visa type for ${req.body.destinationCountry.trim()}. Try one of: ${allowed}…`,
+      });
+    }
     if (req.body?.status !== "draft") {
       if (!req.body?.applicantName || typeof req.body.applicantName !== "string" || !req.body.applicantName.trim()) {
         return res.status(400).json({ error: "Applicant name is required (or save as draft)" });
@@ -2541,6 +2605,23 @@ export async function registerRoutes(
     if (dateError) return res.status(400).json({ error: dateError });
     const enumError = validateCaseEnums(req.body);
     if (enumError) return res.status(400).json({ error: enumError });
+
+    // Defense-in-depth on edits too: when the patch touches country or
+    // visa type, validate the merged effective pair against the catalog.
+    const touchesCountry = req.body && typeof req.body === "object" && "destinationCountry" in req.body;
+    const touchesVisaType = req.body && typeof req.body === "object" && "visaType" in req.body;
+    if (touchesCountry || touchesVisaType) {
+      const current = await storage.getCase(req.params.id);
+      if (!current) return res.status(404).json({ error: "Case not found" });
+      const effectiveCountry = String((touchesCountry ? req.body.destinationCountry : current.destinationCountry) ?? "").trim();
+      const effectiveVisaType = String((touchesVisaType ? req.body.visaType : current.visaType) ?? "").trim();
+      if (effectiveCountry && effectiveVisaType && !isValidVisaTypeForCountry(effectiveCountry, effectiveVisaType)) {
+        const allowed = getCountryVisaTypes(effectiveCountry).slice(0, 6).join(", ");
+        return res.status(400).json({
+          error: `"${effectiveVisaType}" is not a recognised visa type for ${effectiveCountry}. Try one of: ${allowed}…`,
+        });
+      }
+    }
 
     const caseData = await storage.updateCase(req.params.id, req.body);
     if (!caseData) {

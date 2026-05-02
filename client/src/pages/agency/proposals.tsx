@@ -35,7 +35,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getDocumentChecklist } from "@/data/document-checklists";
 import type { Proposal } from "@shared/schema";
 import { COUNTRIES as POPULAR_COUNTRIES, VISA_TYPES as GENERIC_VISA_TYPES } from "@shared/destinations";
-import { getCountryVisaConfig } from "@/data/country-visa-types";
+import { getCountryVisaConfig, getCountryVisaTypes } from "@/data/country-visa-types";
 import { Combobox, type ComboboxOption } from "@/components/combobox";
 
 const STATUS_STYLES: Record<string, string> = {
@@ -436,15 +436,17 @@ function ProposalCreateDialog({
           </div>
           {/* Destination country + visa type as one adjacent pair — same
               "where + what" layout used by the lead form and the lead-convert
-              dialog. Both lists come from the global master in
-              `shared/destinations.ts`. */}
+              dialog. The visa-type list is country-specific (e.g. Algeria
+              never sees "Schengen Visa") via getCountryVisaTypes().
+              Changing the country resets the visa type so a stale value
+              from a previous country can't sneak through. */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>Destination country <span className="text-red-500">*</span></Label>
               <Combobox
                 options={countryOptions}
                 value={form.destinationCountry}
-                onChange={(v) => setForm({ ...form, destinationCountry: v })}
+                onChange={(v) => setForm({ ...form, destinationCountry: v, visaType: "" })}
                 placeholder="Pick a country"
                 searchPlaceholder="Type a country..."
                 testId="select-country"
@@ -453,16 +455,28 @@ function ProposalCreateDialog({
             </div>
             <div>
               <Label>Visa type <span className="text-red-500">*</span></Label>
-              <Select value={form.visaType} onValueChange={(v) => setForm({ ...form, visaType: v })}>
+              <Select
+                value={form.visaType}
+                onValueChange={(v) => setForm({ ...form, visaType: v })}
+                disabled={!form.destinationCountry}
+              >
                 <SelectTrigger data-testid="select-visa-type">
-                  <SelectValue placeholder="Pick a visa type" />
+                  <SelectValue placeholder={form.destinationCountry ? "Pick a visa type" : "Pick a country first"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {GENERIC_VISA_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
-                  ))}
+                  {form.destinationCountry &&
+                    getCountryVisaTypes(form.destinationCountry).map((t) => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
+              {form.destinationCountry && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {getCountryVisaConfig(form.destinationCountry)
+                    ? `Showing official visa categories for ${form.destinationCountry}.`
+                    : `No structured visa list yet for ${form.destinationCountry} — pick the closest generic category.`}
+                </p>
+              )}
             </div>
           </div>
           <div>

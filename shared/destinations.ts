@@ -71,20 +71,12 @@ export const POPULAR_DESTINATIONS: string[] = [
 ];
 
 // Master list of generic visa categories every page falls back on when there
-// isn't a structured per-country config in `client/src/data/country-visa-types.ts`.
+// isn't a structured per-country config in `shared/visa-catalog.ts`.
 // Keep this list short and broadly recognisable — country-specific types
 // (e.g. "B1/B2", "Tier 4", "Subclass 500") belong in the per-country file.
-export const VISA_TYPES: string[] = [
-  "Tourist Visa",
-  "Business Visa",
-  "Visit Visa",
-  "Student Visa",
-  "Work Visa",
-  "Transit Visa",
-  "Family Visa",
-  "Schengen Visa",
-  "Investor Visa",
-  "Conference / Event Visa",
-  "Medical Visa",
-  "Other",
-];
+//
+// "Schengen Visa" intentionally NOT in this generic list — Schengen is a
+// regional arrangement and only valid for the 27 member states (which each
+// have their own structured config). Showing "Schengen Visa" as an option
+// for, say, Algeria is incorrect.
+export { GENERIC_VISA_TYPES as VISA_TYPES } from "./visa-catalog";
