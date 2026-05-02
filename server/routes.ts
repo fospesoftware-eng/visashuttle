@@ -45,19 +45,26 @@ const INDIAN_STATE_NAME_BY_CODE: Record<string, string> = {
 //   missing, we cannot classify the supply: the tax is computed but kept flat
 //   (all splits = 0) so callers/UIs can flag the misconfiguration.
 function computeGstSplit(
-  items: Array<{ amount: number; taxRate?: number | null }>,
+  items: Array<{ amount: number; taxRate?: number | null; taxable?: boolean | null }>,
   supplierStateCode: string | null | undefined,
   placeOfSupplyCode: string | null | undefined,
   fallbackTaxRate: number,
   gstEnabled: boolean,
 ): { taxAmount: number; cgst: number; sgst: number; igst: number } {
+  // A line is taxable unless explicitly flagged false (e.g. government fees).
+  const isTaxable = (it: { taxable?: boolean | null }) => it.taxable !== false;
   if (!gstEnabled) {
-    const subtotal = items.reduce((s, it) => s + (it.amount ?? 0), 0);
-    const taxAmount = Math.round((subtotal * (fallbackTaxRate || 0)) / 10000);
+    // Flat-tax path: only taxable line items contribute to the taxed subtotal.
+    const taxedSubtotal = items
+      .filter(isTaxable)
+      .reduce((s, it) => s + (it.amount ?? 0), 0);
+    const taxAmount = Math.round((taxedSubtotal * (fallbackTaxRate || 0)) / 10000);
     return { taxAmount, cgst: 0, sgst: 0, igst: 0 };
   }
   let totalTax = 0;
   for (const it of items) {
+    // Non-taxable lines (e.g. government fees) contribute zero tax even when GST is on.
+    if (!isTaxable(it)) continue;
     // Explicit 0 means exempt; only null/undefined falls back.
     const rate = it.taxRate == null ? fallbackTaxRate : it.taxRate;
     totalTax += Math.round(((it.amount ?? 0) * (rate || 0)) / 10000);
@@ -1422,21 +1429,29 @@ export async function registerRoutes(
       const rawItems: any[] = Array.isArray(req.body?.items) ? req.body.items : [];
       const fallbackRate = settings?.taxRate ?? 0;
       // Validate each item; ignore invoiceId in the input (server sets it).
-      const items = rawItems.map((it) =>
-        insertInvoiceItemSchema.omit({ invoiceId: true } as any).parse({
+      // For government fees we default `taxable` to false (most agencies don't
+      // charge GST on government/consular fees collected on behalf of authorities)
+      // — but the client can still override either way explicitly.
+      const items = rawItems.map((it) => {
+        const category = it.category ?? "agency_fee";
+        const taxable = typeof it.taxable === "boolean"
+          ? it.taxable
+          : category !== "government_fee";
+        return insertInvoiceItemSchema.omit({ invoiceId: true } as any).parse({
           description: it.description,
           quantity: it.quantity ?? 1,
           unitPrice: it.unitPrice ?? 0,
           amount: it.amount ?? ((it.unitPrice ?? 0) * (it.quantity ?? 1)),
-          category: it.category ?? "agency_fee",
+          category,
           hsnCode: it.hsnCode ?? null,
           // When GST is on we preserve explicit 0 (exempt) and only fall back when null/undefined.
           // When GST is off we always store 0 (no per-line GST tracking).
           taxRate: settings?.gstEnabled
             ? (it.taxRate == null ? fallbackRate : it.taxRate)
             : 0,
-        }),
-      );
+          taxable,
+        });
+      });
       const subtotal: number = (items as any[]).reduce(
         (s: number, it: any) => s + (it.amount ?? ((it.unitPrice ?? 0) * (it.quantity ?? 1))),
         0,
@@ -1497,19 +1512,24 @@ export async function registerRoutes(
       if (Array.isArray(items)) {
         const settingsForItems = await storage.getInvoiceSettings(invoice.tenantId);
         const fallbackRate = settingsForItems?.taxRate ?? 0;
-        const validated = items.map((it: any) =>
-          insertInvoiceItemSchema.omit({ invoiceId: true } as any).parse({
+        const validated = items.map((it: any) => {
+          const category = it.category ?? "agency_fee";
+          const taxable = typeof it.taxable === "boolean"
+            ? it.taxable
+            : category !== "government_fee";
+          return insertInvoiceItemSchema.omit({ invoiceId: true } as any).parse({
             description: it.description,
             quantity: it.quantity ?? 1,
             unitPrice: it.unitPrice ?? 0,
             amount: it.amount ?? ((it.unitPrice ?? 0) * (it.quantity ?? 1)),
-            category: it.category ?? "agency_fee",
+            category,
             hsnCode: it.hsnCode ?? null,
             taxRate: settingsForItems?.gstEnabled
               ? (it.taxRate == null ? fallbackRate : it.taxRate)
               : 0,
-          }),
-        );
+            taxable,
+          });
+        });
         await storage.replaceInvoiceItems(req.params.id, validated as any);
       }
       // Always recompute totals in case items or tax settings changed.

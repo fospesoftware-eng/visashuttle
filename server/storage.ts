@@ -821,6 +821,7 @@ export class MemStorage implements IStorage {
         sortOrder: it.sortOrder ?? idx,
         hsnCode: it.hsnCode ?? null,
         taxRate: it.taxRate ?? 0,
+        taxable: it.taxable ?? true,
       });
     });
     return invoice;
@@ -864,6 +865,7 @@ export class MemStorage implements IStorage {
         sortOrder: it.sortOrder ?? idx,
         hsnCode: it.hsnCode ?? null,
         taxRate: it.taxRate ?? 0,
+        taxable: it.taxable ?? true,
       };
       this.invoiceItems.set(id, item);
       created.push(item);

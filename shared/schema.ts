@@ -486,6 +486,11 @@ export const invoiceItems = pgTable("invoice_items", {
   // GST: HSN/SAC code and per-line tax rate (basis points)
   hsnCode: text("hsn_code"),
   taxRate: integer("tax_rate").notNull().default(0),
+  // Whether this line is subject to tax. Government fees (passport/visa fees
+  // collected on behalf of consulates) are typically NOT taxable; setting this
+  // to false forces the line's tax contribution to 0 regardless of taxRate or
+  // the global GST/flat-tax setting.
+  taxable: boolean("taxable").notNull().default(true),
 });
 export const insertInvoiceItemSchema = createInsertSchema(invoiceItems).omit({ id: true });
 export type InsertInvoiceItem = z.infer<typeof insertInvoiceItemSchema>;

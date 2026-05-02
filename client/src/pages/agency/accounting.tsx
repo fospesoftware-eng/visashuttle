@@ -456,7 +456,11 @@ type DraftItem = {
   unitPrice: string;
   hsnCode?: string;
   taxRate?: string; // percent string, e.g. "18"
+  taxable: boolean; // false for government fees etc. — line excluded from tax
 };
+
+// Default taxability for a category. Government fees are non-taxable by default.
+const defaultTaxableForCategory = (category: string) => category !== "government_fee";
 
 const GST_STATES: Array<{ code: string; name: string }> = [
   { code: "01", name: "Jammu & Kashmir" }, { code: "02", name: "Himachal Pradesh" },
@@ -507,7 +511,7 @@ function ComposeInvoiceDialog({
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<DraftItem[]>([
-    { description: "", category: "agency_fee", quantity: 1, unitPrice: "", hsnCode: "", taxRate: "" },
+    { description: "", category: "agency_fee", quantity: 1, unitPrice: "", hsnCode: "", taxRate: "", taxable: true },
   ]);
   const [customerGstin, setCustomerGstin] = useState("");
   const [placeOfSupplyCode, setPlaceOfSupplyCode] = useState<string>("");
@@ -523,7 +527,7 @@ function ComposeInvoiceDialog({
     setDestinationCountry(""); setVisaType(""); setCaseId("");
     setPaymentType("upfront"); setAdvancePercent("50");
     setStatus("draft"); setDueDate(""); setNotes("");
-    setItems([{ description: "", category: "agency_fee", quantity: 1, unitPrice: "", hsnCode: "", taxRate: "" }]);
+    setItems([{ description: "", category: "agency_fee", quantity: 1, unitPrice: "", hsnCode: "", taxRate: "", taxable: true }]);
     setCustomerGstin(""); setPlaceOfSupplyCode(""); setReverseCharge(false);
   };
 
@@ -536,11 +540,11 @@ function ComposeInvoiceDialog({
     if (tpl.advancePercent != null) setAdvancePercent(String(tpl.advancePercent));
     const next: DraftItem[] = [];
     const defRate = gstEnabled ? ((settings?.taxRate ?? 0) / 100).toString() : "";
-    if (tpl.agencyFee > 0)     next.push({ description: "Agency Fee",     category: "agency_fee",     quantity: 1, unitPrice: fromCents(tpl.agencyFee), hsnCode: "", taxRate: defRate });
-    if (tpl.governmentFee > 0) next.push({ description: "Government Fee", category: "government_fee", quantity: 1, unitPrice: fromCents(tpl.governmentFee), hsnCode: "", taxRate: "" });
-    if (tpl.serviceFee > 0)    next.push({ description: "Service Charge", category: "service_charge", quantity: 1, unitPrice: fromCents(tpl.serviceFee), hsnCode: "", taxRate: defRate });
-    if (tpl.otherFee > 0)      next.push({ description: tpl.otherFeeLabel ?? "Other", category: "other", quantity: 1, unitPrice: fromCents(tpl.otherFee), hsnCode: "", taxRate: defRate });
-    if (next.length === 0) next.push({ description: "", category: "agency_fee", quantity: 1, unitPrice: "", hsnCode: "", taxRate: defRate });
+    if (tpl.agencyFee > 0)     next.push({ description: "Agency Fee",     category: "agency_fee",     quantity: 1, unitPrice: fromCents(tpl.agencyFee),     hsnCode: "", taxRate: defRate, taxable: true });
+    if (tpl.governmentFee > 0) next.push({ description: "Government Fee", category: "government_fee", quantity: 1, unitPrice: fromCents(tpl.governmentFee), hsnCode: "", taxRate: "",      taxable: false });
+    if (tpl.serviceFee > 0)    next.push({ description: "Service Charge", category: "service_charge", quantity: 1, unitPrice: fromCents(tpl.serviceFee),    hsnCode: "", taxRate: defRate, taxable: true });
+    if (tpl.otherFee > 0)      next.push({ description: tpl.otherFeeLabel ?? "Other", category: "other", quantity: 1, unitPrice: fromCents(tpl.otherFee),  hsnCode: "", taxRate: defRate, taxable: true });
+    if (next.length === 0) next.push({ description: "", category: "agency_fee", quantity: 1, unitPrice: "", hsnCode: "", taxRate: defRate, taxable: true });
     setItems(next);
   };
 
@@ -557,7 +561,9 @@ function ComposeInvoiceDialog({
   const taxRate = settings?.taxRate ?? 0;
   // Per-line GST when enabled, else fall back to flat tax rate.
   // Empty/blank rate => fall back to settings.taxRate; explicit "0" => exempt.
+  // Lines flagged `taxable: false` (e.g. government fees) are skipped entirely.
   const perLineTax = items.reduce((s, i) => {
+    if (!i.taxable) return s;
     const amt = toCents(i.unitPrice) * (i.quantity || 1);
     const raw = (i.taxRate ?? "").trim();
     const rateBps = gstEnabled
@@ -565,7 +571,10 @@ function ComposeInvoiceDialog({
       : taxRate;
     return s + Math.round((amt * rateBps) / 10000);
   }, 0);
-  const taxAmount = gstEnabled ? perLineTax : Math.round((subtotalCents * taxRate) / 10000);
+  const taxedSubtotalCents = items
+    .filter((i) => i.taxable)
+    .reduce((s, i) => s + toCents(i.unitPrice) * (i.quantity || 1), 0);
+  const taxAmount = gstEnabled ? perLineTax : Math.round((taxedSubtotalCents * taxRate) / 10000);
   // Mirror server contract: only split when supplier state is set.
   const canSplit = gstEnabled && !!supplierStateCode;
   const cgst = canSplit && isIntraState ? Math.round(taxAmount / 2) : 0;
@@ -605,10 +614,12 @@ function ComposeInvoiceDialog({
             sortOrder: idx,
             hsnCode: gstEnabled ? (i.hsnCode?.trim() || null) : null,
             // Send null when blank so the server falls back to settings.taxRate;
-            // an explicit "0" is preserved as exempt.
+            // an explicit "0" is preserved as exempt. Non-taxable lines are
+            // excluded server-side regardless of this rate.
             taxRate: gstEnabled
               ? ((i.taxRate ?? "").trim() === "" ? null : Math.round((parseFloat(i.taxRate || "0") || 0) * 100))
               : 0,
+            taxable: i.taxable,
           })),
       };
       const res = await apiRequest("POST", `/api/tenants/${tenantId}/invoices`, payload);
@@ -771,7 +782,7 @@ function ComposeInvoiceDialog({
             <div className="flex items-center justify-between">
               <Label className="text-base font-semibold">Line items</Label>
               <Button type="button" variant="outline" size="sm" onClick={() =>
-                setItems([...items, { description: "", category: "agency_fee", quantity: 1, unitPrice: "", hsnCode: "", taxRate: gstEnabled ? ((settings?.taxRate ?? 0) / 100).toString() : "" }])
+                setItems([...items, { description: "", category: "agency_fee", quantity: 1, unitPrice: "", hsnCode: "", taxRate: gstEnabled ? ((settings?.taxRate ?? 0) / 100).toString() : "", taxable: true }])
               } data-testid="button-add-item">
                 <Plus className="w-4 h-4 mr-1" /> Add item
               </Button>
@@ -789,7 +800,12 @@ function ComposeInvoiceDialog({
                     <div className="col-span-6 sm:col-span-3 space-y-1">
                       {idx === 0 && <Label className="text-xs">Category</Label>}
                       <Select value={it.category}
-                        onValueChange={(v) => setItems(items.map((x, i) => i === idx ? { ...x, category: v } : x))}>
+                        onValueChange={(v) => setItems(items.map((x, i) => {
+                          if (i !== idx) return x;
+                          // Reset taxability to the new category's default whenever the
+                          // category changes (gov fee → non-taxable; everything else → taxable).
+                          return { ...x, category: v, taxable: defaultTaxableForCategory(v) };
+                        }))}>
                         <SelectTrigger data-testid={`select-item-category-${idx}`}><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {ITEM_CATEGORIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
@@ -824,17 +840,31 @@ function ComposeInvoiceDialog({
                         {idx === 0 && <Label className="text-xs">HSN / SAC code</Label>}
                         <Input value={it.hsnCode ?? ""} placeholder="e.g. 998551"
                           onChange={(e) => setItems(items.map((x, i) => i === idx ? { ...x, hsnCode: e.target.value } : x))}
-                          data-testid={`input-item-hsn-${idx}`} />
+                          data-testid={`input-item-hsn-${idx}`}
+                          disabled={!it.taxable} />
                       </div>
                       <div className="col-span-6 sm:col-span-3 space-y-1">
                         {idx === 0 && <Label className="text-xs">GST rate (%)</Label>}
                         <Input type="number" step="0.01" min="0" max="100"
-                          placeholder="18" value={it.taxRate ?? ""}
+                          placeholder={it.taxable ? "18" : "Non-taxable"} value={it.taxable ? (it.taxRate ?? "") : ""}
                           onChange={(e) => setItems(items.map((x, i) => i === idx ? { ...x, taxRate: e.target.value } : x))}
-                          data-testid={`input-item-tax-rate-${idx}`} />
+                          data-testid={`input-item-tax-rate-${idx}`}
+                          disabled={!it.taxable} />
                       </div>
                     </div>
                   )}
+                  <div className="flex items-center gap-2 pl-1">
+                    <Switch
+                      checked={it.taxable}
+                      onCheckedChange={(v) => setItems(items.map((x, i) => i === idx ? { ...x, taxable: v } : x))}
+                      data-testid={`switch-item-taxable-${idx}`}
+                    />
+                    <Label className="font-normal text-xs text-muted-foreground">
+                      {it.taxable
+                        ? "Taxable (apply tax to this line)"
+                        : "Non-taxable (e.g. government fee — tax is not applied)"}
+                    </Label>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1049,9 +1079,19 @@ function InvoiceDetailDialog({
               <TableBody>
                 {invoice.items.map((it) => {
                   const cat = ITEM_CATEGORIES.find((c) => c.value === it.category);
+                  const nonTaxable = (it as any).taxable === false;
                   return (
                     <TableRow key={it.id}>
-                      <TableCell>{it.description}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <span>{it.description}</span>
+                          {nonTaxable && (
+                            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                              Non-taxable
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell><Badge variant="outline" className="text-xs">{cat?.label ?? it.category}</Badge></TableCell>
                       <TableCell className="text-right">{it.quantity}</TableCell>
                       <TableCell className="text-right">{fmtMoney(it.unitPrice, invoice.currency)}</TableCell>
