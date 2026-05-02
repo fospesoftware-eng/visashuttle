@@ -639,6 +639,14 @@ logging in.
 - **Public invoice item sanitization**: `GET /api/public/invoice/:token`
   strips `id` and `invoiceId` from each line item, returning only
   `{description, quantity, unitPrice, amount}` to the customer.
+- **Tenant isolation on case/document/message endpoints**: previously
+  unauthenticated `GET/PATCH /api/cases/:id`, `GET/POST /api/cases/:caseId/documents`,
+  `GET/POST /api/cases/:caseId/messages`, `GET /api/tenants/:tenantId/documents`,
+  and `GET/PATCH /api/documents/:id` now resolve the parent case (or tenant) and
+  call `requireTenantAccess` before any read or write. Smoke-verified: anonymous
+  requests get 401; cross-tenant agency users get 403. This was elevated to
+  critical by the case-detail PII expansion (passport sub-fields, contact info,
+  internal notes) and is fixed in lockstep with that UI change.
 
 ### Proposal payment link (T007 — May 2026)
 

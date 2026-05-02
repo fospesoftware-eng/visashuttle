@@ -400,7 +400,7 @@ export default function LeadsPage() {
     },
   });
 
-  // "Convert to Case" now routes through the New Case wizard so the agent can
+  // "Convert to Application" now routes through the New Case wizard so the agent can
   // review/edit the lead's email + mobile (and add passport/travel/fees) before
   // a case is actually created. The wizard reads `?leadId=` to pre-fill the
   // first step and PATCHes the lead to stage="won" after a successful save.
@@ -772,11 +772,11 @@ export default function LeadsPage() {
         )}
       </div>
 
-      {/* Convert to case dialog */}
+      {/* Convert to application dialog */}
       <Dialog open={!!convertLead} onOpenChange={(open) => !open && setConvertLead(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Convert Lead to Case</DialogTitle>
+            <DialogTitle>Convert Lead to Application</DialogTitle>
             <DialogDescription>
               Continue to the New Case wizard for <span className="font-medium">{convertLead?.name}</span> ({convertLead?.email}). Email + mobile + destination will be pre-filled on the first step. The lead is marked as won once the case is saved.
             </DialogDescription>

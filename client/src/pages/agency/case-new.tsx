@@ -211,7 +211,7 @@ export default function NewCasePage() {
 
   const [step, setStep] = useState<StepId>(1);
 
-  // ── Lead pre-fill: when the wizard is opened from "Convert to Case" we
+  // ── Lead pre-fill: when the wizard is opened from "Convert to Application" we
   // get a `?leadId=<id>` query param; the lead is fetched once here and
   // its name/email/phone/destination/visa are seeded into the form state.
   // After a successful case create the lead is PATCHed to stage="won".

@@ -5,7 +5,8 @@ import {
   ArrowLeft, User, Calendar, FileText, 
   CheckCircle, AlertCircle, Clock, Send, Paperclip, Download,
   Brain, Lightbulb, RefreshCw, Copy, Check, ExternalLink, Share2,
-  Loader2, MessageSquare, Flag, Users, Plus, Trash2, Pencil, Mail, FileDown
+  Loader2, MessageSquare, Flag, Users, Plus, Trash2, Pencil, Mail, FileDown,
+  Phone, MapPin, Globe, BookOpen, Hash, StickyNote, Plane
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -428,11 +429,33 @@ function CoTravellersCard({ caseId }: { caseId: string }) {
                   </Button>
                 </div>
               </div>
-              {(t.dob || t.passportNumber || t.nationality) && (
+              {(t.dob || t.passportNumber || t.nationality || t.passportGender) && (
                 <div className="text-muted-foreground space-y-0.5 pt-1 border-t">
                   {t.dob && <p>DOB: {t.dob}</p>}
                   {t.passportNumber && <p className="font-mono">{t.passportNumber}</p>}
-                  {t.nationality && <p>{t.nationality}</p>}
+                  {(t.nationality || t.passportGender) && (
+                    <p>
+                      {t.nationality}
+                      {t.nationality && t.passportGender ? " · " : ""}
+                      {t.passportGender}
+                    </p>
+                  )}
+                </div>
+              )}
+              {(t.passportSurname || t.passportGivenName || t.passportMiddleName) && (
+                <div className="text-muted-foreground space-y-0.5 pt-1 border-t">
+                  <p className="font-medium uppercase text-[10px] tracking-wide">Passport name</p>
+                  {t.passportSurname && <p>Surname: {t.passportSurname}</p>}
+                  {t.passportGivenName && <p>Given: {t.passportGivenName}</p>}
+                  {t.passportMiddleName && <p>Middle: {t.passportMiddleName}</p>}
+                </div>
+              )}
+              {(t.passportDateOfIssue || t.passportDateOfExpiry || t.passportPlaceOfIssue || t.passportPlaceOfBirth) && (
+                <div className="text-muted-foreground space-y-0.5 pt-1 border-t">
+                  {t.passportDateOfIssue && <p>Issued: {t.passportDateOfIssue}</p>}
+                  {t.passportDateOfExpiry && <p>Expires: {t.passportDateOfExpiry}</p>}
+                  {t.passportPlaceOfIssue && <p>Place of issue: {t.passportPlaceOfIssue}</p>}
+                  {t.passportPlaceOfBirth && <p>Place of birth: {t.passportPlaceOfBirth}</p>}
                 </div>
               )}
               {t.notes && (
@@ -835,7 +858,9 @@ export default function CaseDetailPage() {
         <div className="grid gap-6 lg:grid-cols-4">
           {/* Left sidebar */}
           <div className="space-y-4">
-            {/* Applicant info */}
+            {/* Applicant info — surfaces every field captured by the
+                new-application wizard so the case-detail screen mirrors
+                what the agent submitted in step 2. */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm flex items-center gap-2">
@@ -849,33 +874,186 @@ export default function CaseDetailPage() {
                       {initials}
                     </AvatarFallback>
                   </Avatar>
-                  <div>
-                    <p className="font-semibold">{caseData.applicantName || "Untitled draft"}</p>
-                    <p className="text-xs text-muted-foreground">{caseData.visaType}</p>
+                  <div className="min-w-0">
+                    <p className="font-semibold truncate" data-testid="text-applicant-name">
+                      {caseData.applicantName || "Untitled draft"}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {caseData.visaType}{caseData.destinationCountry ? ` · ${caseData.destinationCountry}` : ""}
+                    </p>
                   </div>
                 </div>
-                <div className="space-y-2 text-sm">
+
+                {/* Identity & travel dates */}
+                <div className="space-y-1.5 text-sm">
                   {caseData.applicantDob && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
+                    <div className="flex items-center gap-2 text-muted-foreground" data-testid="row-applicant-dob">
                       <Calendar className="w-3.5 h-3.5 shrink-0" />
                       <span>DOB: {caseData.applicantDob}</span>
                     </div>
                   )}
                   {caseData.travelDate && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Calendar className="w-3.5 h-3.5 shrink-0" />
-                      <span>Travel: {caseData.travelDate}</span>
+                    <div className="flex items-center gap-2 text-muted-foreground" data-testid="row-applicant-travel">
+                      <Plane className="w-3.5 h-3.5 shrink-0" />
+                      <span>Travel: {new Date(caseData.travelDate as any).toLocaleDateString()}</span>
                     </div>
                   )}
                   {caseData.referenceId && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
+                    <div className="flex items-center gap-2 text-muted-foreground" data-testid="row-applicant-ref">
                       <FileText className="w-3.5 h-3.5 shrink-0" />
                       <span className="font-mono text-xs">{caseData.referenceId}</span>
                     </div>
                   )}
                 </div>
+
+                {/* Customer contact — captured in wizard step 2 */}
+                {((caseData as any).customerEmail || (caseData as any).customerPhone) && (
+                  <div className="space-y-1.5 text-sm pt-3 border-t">
+                    {(caseData as any).customerEmail && (
+                      <div className="flex items-center gap-2 text-muted-foreground" data-testid="row-applicant-email">
+                        <Mail className="w-3.5 h-3.5 shrink-0" />
+                        <a
+                          href={`mailto:${(caseData as any).customerEmail}`}
+                          className="truncate hover:underline"
+                        >
+                          {(caseData as any).customerEmail}
+                        </a>
+                      </div>
+                    )}
+                    {(caseData as any).customerPhone && (
+                      <div className="flex items-center gap-2 text-muted-foreground" data-testid="row-applicant-phone">
+                        <Phone className="w-3.5 h-3.5 shrink-0" />
+                        <a
+                          href={`tel:${(caseData as any).customerPhone}`}
+                          className="hover:underline"
+                        >
+                          {(caseData as any).customerPhone}
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Passport block — only renders when at least one of the
+                    structured passport fields is set. */}
+                {(caseData.passportNumber || caseData.passportSurname || caseData.passportGivenName
+                  || caseData.passportNationality || caseData.passportGender
+                  || caseData.passportDateOfIssue || caseData.passportDateOfExpiry
+                  || caseData.passportPlaceOfIssue || caseData.passportPlaceOfBirth
+                  || caseData.passportFileUrl) && (
+                  <div className="space-y-1.5 text-sm pt-3 border-t" data-testid="block-passport">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                      <BookOpen className="w-3 h-3" /> Passport
+                    </p>
+                    {caseData.passportNumber && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Hash className="w-3.5 h-3.5 shrink-0" />
+                        <span className="font-mono">{caseData.passportNumber}</span>
+                      </div>
+                    )}
+                    {(caseData.passportSurname || caseData.passportGivenName || caseData.passportMiddleName) && (
+                      <div className="text-muted-foreground space-y-0.5 pl-5">
+                        {caseData.passportSurname && <p className="text-xs">Surname: <span className="text-foreground">{caseData.passportSurname}</span></p>}
+                        {caseData.passportGivenName && <p className="text-xs">Given: <span className="text-foreground">{caseData.passportGivenName}</span></p>}
+                        {caseData.passportMiddleName && <p className="text-xs">Middle: <span className="text-foreground">{caseData.passportMiddleName}</span></p>}
+                      </div>
+                    )}
+                    {(caseData.passportNationality || caseData.passportGender) && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Globe className="w-3.5 h-3.5 shrink-0" />
+                        <span>
+                          {caseData.passportNationality}
+                          {caseData.passportNationality && caseData.passportGender ? " · " : ""}
+                          {caseData.passportGender}
+                        </span>
+                      </div>
+                    )}
+                    {caseData.passportDateOfIssue && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Calendar className="w-3.5 h-3.5 shrink-0" />
+                        <span>Issued: {caseData.passportDateOfIssue}</span>
+                      </div>
+                    )}
+                    {caseData.passportDateOfExpiry && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Calendar className="w-3.5 h-3.5 shrink-0" />
+                        <span>Expires: {caseData.passportDateOfExpiry}</span>
+                      </div>
+                    )}
+                    {caseData.passportPlaceOfIssue && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <MapPin className="w-3.5 h-3.5 shrink-0" />
+                        <span>Place of issue: {caseData.passportPlaceOfIssue}</span>
+                      </div>
+                    )}
+                    {caseData.passportPlaceOfBirth && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <MapPin className="w-3.5 h-3.5 shrink-0" />
+                        <span>Place of birth: {caseData.passportPlaceOfBirth}</span>
+                      </div>
+                    )}
+                    {caseData.passportFileUrl && (
+                      <a
+                        href={caseData.passportFileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+                        data-testid="link-passport-file"
+                      >
+                        <Paperclip className="w-3 h-3" /> View passport upload
+                      </a>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
+
+            {/* Application details — destination/visa/priority/submission/notes
+                so the agent sees everything submitted in wizard steps 1, 3, 7. */}
+            {(caseData.destinationCountry || caseData.visaType || caseData.priority
+              || caseData.submissionMethod || caseData.notes) && (
+              <Card data-testid="card-application-details">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <FileText className="w-4 h-4" /> Application Details
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-1.5 text-sm">
+                  {caseData.destinationCountry && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Globe className="w-3.5 h-3.5 shrink-0" />
+                      <span>{caseData.destinationCountry}</span>
+                    </div>
+                  )}
+                  {caseData.visaType && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <FileText className="w-3.5 h-3.5 shrink-0" />
+                      <span>{caseData.visaType}</span>
+                    </div>
+                  )}
+                  {caseData.priority && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Flag className="w-3.5 h-3.5 shrink-0" />
+                      <span className="capitalize">Priority: {caseData.priority}</span>
+                    </div>
+                  )}
+                  {caseData.submissionMethod && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Send className="w-3.5 h-3.5 shrink-0" />
+                      <span className="uppercase">{caseData.submissionMethod}</span>
+                    </div>
+                  )}
+                  {caseData.notes && (
+                    <div className="pt-2 mt-2 border-t" data-testid="block-internal-notes">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1.5 mb-1">
+                        <StickyNote className="w-3 h-3" /> Internal notes
+                      </p>
+                      <p className="text-xs whitespace-pre-wrap">{caseData.notes}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Readiness score */}
             <Card>

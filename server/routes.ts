@@ -2718,6 +2718,7 @@ export async function registerRoutes(
     if (!caseData) {
       return res.status(404).json({ error: "Case not found" });
     }
+    if (!requireTenantAccess(req, res, caseData.tenantId)) return;
     res.json(caseData);
   });
 
@@ -2766,6 +2767,12 @@ export async function registerRoutes(
   );
 
   app.patch("/api/cases/:id", async (req, res) => {
+    // Tenant guard — load the case first so we can verify ownership before
+    // any validation/mutation runs.
+    const existing = await storage.getCase(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Case not found" });
+    if (!requireTenantAccess(req, res, existing.tenantId)) return;
+
     const dateError = validateCaseDates(req.body);
     if (dateError) return res.status(400).json({ error: dateError });
     const enumError = validateCaseEnums(req.body);
@@ -2776,10 +2783,8 @@ export async function registerRoutes(
     const touchesCountry = req.body && typeof req.body === "object" && "destinationCountry" in req.body;
     const touchesVisaType = req.body && typeof req.body === "object" && "visaType" in req.body;
     if (touchesCountry || touchesVisaType) {
-      const current = await storage.getCase(req.params.id);
-      if (!current) return res.status(404).json({ error: "Case not found" });
-      const effectiveCountry = String((touchesCountry ? req.body.destinationCountry : current.destinationCountry) ?? "").trim();
-      const effectiveVisaType = String((touchesVisaType ? req.body.visaType : current.visaType) ?? "").trim();
+      const effectiveCountry = String((touchesCountry ? req.body.destinationCountry : existing.destinationCountry) ?? "").trim();
+      const effectiveVisaType = String((touchesVisaType ? req.body.visaType : existing.visaType) ?? "").trim();
       if (effectiveCountry && effectiveVisaType && !isValidVisaTypeForCountry(effectiveCountry, effectiveVisaType)) {
         const allowed = getCountryVisaTypes(effectiveCountry).slice(0, 6).join(", ");
         return res.status(400).json({
@@ -3284,17 +3289,33 @@ export async function registerRoutes(
   });
 
   // === Document Routes ===
+  // Helper: load the parent case and enforce tenant ownership before any
+  // case-scoped read/write. Returns the case row on success, or null after
+  // it has already written the 401/403/404 response.
+  async function caseTenantGuard(req: Request, res: Response, caseId: string) {
+    const c = await storage.getCase(caseId);
+    if (!c) {
+      res.status(404).json({ error: "Case not found" });
+      return null;
+    }
+    if (!requireTenantAccess(req, res, c.tenantId)) return null;
+    return c;
+  }
+
   app.get("/api/cases/:caseId/documents", async (req, res) => {
+    if (!(await caseTenantGuard(req, res, req.params.caseId))) return;
     const documents = await storage.getDocumentsByCaseId(req.params.caseId);
     res.json(documents);
   });
 
   app.get("/api/tenants/:tenantId/documents", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
     const documents = await storage.getDocumentsByTenantId(req.params.tenantId);
     res.json(documents);
   });
 
   app.post("/api/cases/:caseId/documents", async (req, res) => {
+    if (!(await caseTenantGuard(req, res, req.params.caseId))) return;
     const document = await storage.createDocument({
       ...req.body,
       caseId: req.params.caseId
@@ -3307,10 +3328,27 @@ export async function registerRoutes(
     if (!document) {
       return res.status(404).json({ error: "Document not found" });
     }
+    // Document tenant access is verified through the parent case.
+    if (document.caseId) {
+      const c = await storage.getCase(document.caseId);
+      if (!c || !requireTenantAccess(req, res, c.tenantId)) return;
+    } else if (!req.session?.userId || req.session?.userRole !== "saas_admin") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
     res.json(document);
   });
 
   app.patch("/api/documents/:id", async (req, res) => {
+    const existing = await storage.getDocument(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ error: "Document not found" });
+    }
+    if (existing.caseId) {
+      const c = await storage.getCase(existing.caseId);
+      if (!c || !requireTenantAccess(req, res, c.tenantId)) return;
+    } else if (!req.session?.userId || req.session?.userRole !== "saas_admin") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
     const document = await storage.updateDocument(req.params.id, req.body);
     if (!document) {
       return res.status(404).json({ error: "Document not found" });
@@ -3320,11 +3358,13 @@ export async function registerRoutes(
 
   // === Message Routes ===
   app.get("/api/cases/:caseId/messages", async (req, res) => {
+    if (!(await caseTenantGuard(req, res, req.params.caseId))) return;
     const messages = await storage.getMessagesByCaseId(req.params.caseId);
     res.json(messages);
   });
 
   app.post("/api/cases/:caseId/messages", async (req, res) => {
+    if (!(await caseTenantGuard(req, res, req.params.caseId))) return;
     const message = await storage.createMessage({
       ...req.body,
       caseId: req.params.caseId
