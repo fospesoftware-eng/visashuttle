@@ -33,6 +33,7 @@ import { getCountryVisaConfig } from "@/data/country-visa-types";
 import type {
   FeeTemplate, InvoiceSettings, Invoice, InvoiceItem, Payment, Case,
 } from "@shared/schema";
+import { PAYMENT_METHODS } from "@shared/schema";
 
 // ---------- helpers ----------
 import { COUNTRIES as COUNTRIES_LIST, VISA_TYPES } from "@shared/destinations";
@@ -65,13 +66,16 @@ const ITEM_CATEGORIES = [
   { value: "discount",        label: "Discount" },
 ];
 
-const PAYMENT_METHODS = [
-  { value: "cash",          label: "Cash" },
-  { value: "card",          label: "Card" },
-  { value: "bank_transfer", label: "Bank Transfer" },
-  { value: "online",        label: "Online" },
-  { value: "other",         label: "Other" },
-];
+// Reference-label hints per payment method — surfaces the right placeholder
+// (UTR / UPI Txn / Auth Code…) in the "Record a payment" form.
+const PAYMENT_REFERENCE_LABELS: Record<string, string> = {
+  bank_transfer: "UTR / Bank reference",
+  upi:           "UPI transaction ID",
+  card:          "Auth code",
+  cash:          "Receipt number (optional)",
+  gateway:       "Gateway order ID",
+  other:         "Reference (optional)",
+};
 
 function fmtMoney(cents: number, currency = "USD") {
   return new Intl.NumberFormat("en-US", { style: "currency", currency }).format((cents ?? 0) / 100);
@@ -1282,10 +1286,27 @@ function InvoiceDetailDialog({
   });
 
   const [emailOpen, setEmailOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareUrl, setShareUrl] = useState("");
+  const [shareCopied, setShareCopied] = useState(false);
   const downloadPdf = () => {
     if (!invoiceId) return;
     window.open(`/api/invoices/${invoiceId}/pdf`, "_blank", "noopener");
   };
+
+  // Lazily generates a public payment-link the first time the agency
+  // clicks "Share payment link", then caches the URL for subsequent clicks.
+  const shareLinkMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/invoices/${invoiceId}/share-link`, {});
+      return res.json() as Promise<{ token: string; url: string }>;
+    },
+    onSuccess: (data) => {
+      setShareUrl(data.url);
+      setShareOpen(true);
+    },
+    onError: (e: Error) => toast({ title: "Could not generate link", description: e.message, variant: "destructive" }),
+  });
 
   if (isLoading || !invoice) {
     return (
@@ -1332,6 +1353,75 @@ function InvoiceDetailDialog({
             <Button size="sm" variant="outline" onClick={() => setEmailOpen(true)} data-testid="button-email-invoice">
               <Mail className="w-4 h-4 mr-1.5" /> Email invoice
             </Button>
+            <Popover
+              open={shareOpen}
+              onOpenChange={(open) => {
+                if (open && !shareUrl && !shareLinkMutation.isPending) {
+                  shareLinkMutation.mutate();
+                  return;
+                }
+                setShareOpen(open);
+              }}
+            >
+              <PopoverTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={shareLinkMutation.isPending}
+                  data-testid="button-share-payment-link"
+                >
+                  <Send className="w-4 h-4 mr-1.5" />
+                  {shareLinkMutation.isPending ? "Generating…" : "Share payment link"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-80 space-y-2">
+                <p className="text-sm font-medium">Public payment link</p>
+                <p className="text-xs text-muted-foreground">
+                  Anyone with this link can view the invoice and pay online or offline.
+                </p>
+                <div className="flex gap-1.5">
+                  <Input
+                    readOnly
+                    value={shareUrl}
+                    className="text-xs font-mono h-8"
+                    data-testid="input-share-link-url"
+                    onFocus={(e) => e.currentTarget.select()}
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 px-2 shrink-0"
+                    onClick={async () => {
+                      try { await navigator.clipboard.writeText(shareUrl); } catch { /* ignore */ }
+                      setShareCopied(true);
+                      window.setTimeout(() => setShareCopied(false), 1500);
+                    }}
+                    data-testid="button-copy-share-link"
+                  >
+                    {shareCopied ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  </Button>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5 pt-1">
+                  <a
+                    href={`mailto:${invoice.customerEmail ?? ""}?subject=${encodeURIComponent(`Invoice ${invoice.invoiceNumber}`)}&body=${encodeURIComponent(`Hi ${invoice.customerName},\n\nYou can view and pay your invoice here:\n${shareUrl}\n\nThanks!`)}`}
+                    className="text-xs rounded-md border px-2 py-1.5 text-center hover-elevate"
+                    data-testid="button-share-email"
+                  >Email</a>
+                  <a
+                    href={`https://wa.me/${(invoice.customerPhone ?? "").replace(/\D/g, "")}?text=${encodeURIComponent(`Invoice ${invoice.invoiceNumber}: ${shareUrl}`)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs rounded-md border px-2 py-1.5 text-center hover-elevate"
+                    data-testid="button-share-whatsapp"
+                  >WhatsApp</a>
+                  <a
+                    href={`sms:${invoice.customerPhone ?? ""}?body=${encodeURIComponent(`Invoice ${invoice.invoiceNumber}: ${shareUrl}`)}`}
+                    className="text-xs rounded-md border px-2 py-1.5 text-center hover-elevate"
+                    data-testid="button-share-sms"
+                  >SMS</a>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         </DialogHeader>
         <EmailInvoiceDialog
@@ -1486,7 +1576,12 @@ function InvoiceDetailDialog({
                       {PAYMENT_METHODS.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <Input placeholder="Reference (optional)" value={payRef} onChange={(e) => setPayRef(e.target.value)} data-testid="input-pay-ref" />
+                  <Input
+                    placeholder={PAYMENT_REFERENCE_LABELS[payMethod] ?? "Reference (optional)"}
+                    value={payRef}
+                    onChange={(e) => setPayRef(e.target.value)}
+                    data-testid="input-pay-ref"
+                  />
                   <Button onClick={() => {
                     if (toCents(payAmount) <= 0) {
                       toast({ title: "Enter an amount", variant: "destructive" });
@@ -2060,6 +2155,7 @@ function InvoiceSettingsTab({ tenantId }: { tenantId: string }) {
     logoUrl: "", invoiceAccentColor: "",
     currency: "USD", taxRate: "0", taxLabel: "Tax", invoicePrefix: "INV",
     paymentTerms: "Due on receipt", paymentInstructions: "", bankDetails: "",
+    upiId: "", upiQrFileUrl: "",
     footerText: "", notes: "",
     gstEnabled: false, gstin: "", gstStateCode: "", gstLegalName: "",
   });
@@ -2082,6 +2178,8 @@ function InvoiceSettingsTab({ tenantId }: { tenantId: string }) {
         paymentTerms: settings.paymentTerms ?? "",
         paymentInstructions: settings.paymentInstructions ?? "",
         bankDetails: settings.bankDetails ?? "",
+        upiId: (settings as any).upiId ?? "",
+        upiQrFileUrl: (settings as any).upiQrFileUrl ?? "",
         footerText: settings.footerText ?? "",
         notes: settings.notes ?? "",
         gstEnabled: !!settings.gstEnabled,
@@ -2105,6 +2203,8 @@ function InvoiceSettingsTab({ tenantId }: { tenantId: string }) {
         gstStateCode: form.gstStateCode || null,
         gstStateName: stateName,
         gstLegalName: form.gstLegalName.trim() || null,
+        upiId: form.upiId.trim() || null,
+        upiQrFileUrl: form.upiQrFileUrl || null,
       };
       const res = await apiRequest("PUT", `/api/tenants/${tenantId}/invoice-settings`, payload);
       return res.json();
@@ -2300,7 +2400,68 @@ function InvoiceSettingsTab({ tenantId }: { tenantId: string }) {
           </div>
           <div className="space-y-2">
             <Label>Bank details</Label>
-            <Textarea value={form.bankDetails} onChange={(e) => setForm({ ...form, bankDetails: e.target.value })} data-testid="input-bank-details" />
+            <Textarea
+              value={form.bankDetails}
+              onChange={(e) => setForm({ ...form, bankDetails: e.target.value })}
+              placeholder={"Account name: Acme Travel\nBank: HDFC Bank\nA/c No: 1234567890\nIFSC: HDFC0000123\nSWIFT: HDFCINBB"}
+              data-testid="input-bank-details"
+            />
+            <p className="text-xs text-muted-foreground">
+              Shown on the public payment page (Pay Offline tab) and in the bank-transfer instructions.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>UPI ID (India)</Label>
+              <Input
+                value={form.upiId}
+                onChange={(e) => setForm({ ...form, upiId: e.target.value.trim() })}
+                placeholder="myagency@hdfcbank"
+                data-testid="input-upi-id"
+              />
+              <p className="text-xs text-muted-foreground">
+                Customer can pay you directly into this UPI VPA from any UPI app.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>UPI QR image (optional)</Label>
+              <Input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (file.size > 500_000) {
+                    toast({ title: "Image too large", description: "Please upload a QR image under 500 KB.", variant: "destructive" });
+                    e.target.value = "";
+                    return;
+                  }
+                  const reader = new FileReader();
+                  reader.onload = () => setForm((f) => ({ ...f, upiQrFileUrl: String(reader.result || "") }));
+                  reader.readAsDataURL(file);
+                }}
+                data-testid="input-upi-qr-file"
+              />
+              {form.upiQrFileUrl && (
+                <div className="flex items-center gap-3 pt-1">
+                  <img
+                    src={form.upiQrFileUrl}
+                    alt="UPI QR preview"
+                    className="h-20 w-20 object-contain rounded border bg-white p-1"
+                    data-testid="img-upi-qr-preview"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setForm({ ...form, upiQrFileUrl: "" })}
+                    data-testid="button-remove-upi-qr"
+                  >
+                    Remove
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
           <div className="space-y-2">
             <Label>Footer text</Label>

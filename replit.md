@@ -446,3 +446,104 @@ Agencies can send a branded application link to a prospective client; the client
 - **File Storage**: Abstraction for S3-compatible storage with signed URLs
 - **Email**: Nodemailer for transactional emails
 - **Payments**: Stripe integration for billing (Starter/Pro plan upgrade)
+## Visa Copy + Public Payment Workflow (May 2026)
+
+Once a case is **approved**, the agency uploads the stamped visa copy for the
+applicant. Customers can also pay outstanding invoices via a public link —
+either offline (bank transfer / UPI) or online (Cashfree gateway), without ever
+logging in.
+
+### Schema additions (`shared/schema.ts`)
+
+- **cases**: `visaCopyFileUrl text`, `visaCopyFileName text` (only shown when
+  `visaStage === "approved"`).
+- **invoiceSettings**: `upiId text`, `upiQrFileUrl text` — alongside the
+  existing `bankDetails` text block.
+- **invoices**: `publicToken text unique` — generated lazily when a share link
+  is requested. Tenant-scoped via the token itself, no auth required.
+- **`PAYMENT_METHODS` constant** exported with `["bank_transfer", "upi",
+  "cash", "card", "gateway", "other"]` and used both by the payment-record
+  route validator and the frontend dropdown.
+
+### Backend (`server/routes.ts`, `server/storage.ts`)
+
+- `PATCH /api/cases/:id/visa-copy` — accepts `{visaCopyFileUrl,
+  visaCopyFileName}`, enforces a 2 MB data-URL limit, requires the case to be
+  in `approved` stage.
+- `POST /api/invoices/:id/share-link` — lazily creates `publicToken`, returns
+  `{token, url}` (full origin-aware URL).
+- `GET /api/public/invoice/:token` — site-auth-bypassed public endpoint that
+  returns `{invoice, agency, gatewayConfigured}` (sanitized: no internal IDs
+  beyond what the page renders).
+- `POST /api/public/invoice/:token/initiate-payment` — if Cashfree credentials
+  are configured for the tenant, creates an order and returns
+  `{paymentSessionId, mode:"gateway"}`; otherwise returns `{mode:"manual"}` so
+  the page falls back to the Pay Offline tab.
+- `POST /api/public/invoice/:token/confirm-payment` — called by the gateway
+  return URL; verifies status with Cashfree, then auto-records a `payment`
+  with `method="gateway"` and updates invoice status. Idempotent on
+  `referenceId`.
+- `getInvoiceByPublicToken(token)` storage method backs the public lookups.
+- `server/index.ts` line ~115 adds an explicit `/api/public/invoice/` prefix
+  to the site-auth bypass list.
+
+### Frontend
+
+- **`client/src/pages/agency/case-detail.tsx`** — new `VisaCopyCard`
+  component (declared near the top of the file) renders only when
+  `caseData.visaStage === "approved"`. Provides Upload / Replace / Remove /
+  Preview link.
+- **`client/src/pages/agency/accounting.tsx`**:
+  - `InvoiceSettingsTab` gets two new fields under the bank block: **UPI ID**
+    (text) and **UPI QR Image** (file ≤ 500 KB → data URL into
+    `upiQrFileUrl`).
+  - `InvoiceDetailDialog` payment dropdown now uses `PAYMENT_METHODS`. The
+    reference label switches dynamically (`UTR / Bank Ref` for bank,
+    `UPI Txn ID` for UPI, `Auth Code` for card, `Gateway Ref` for online,
+    plain `Reference` otherwise).
+  - **Share Payment Link** button next to Email Invoice opens a popover with
+    Copy / Email (mailto) / WhatsApp (`wa.me`) / SMS (`sms:`) deep links.
+- **`client/src/pages/public/invoice-pay.tsx`** — new public page mounted at
+  `/pay/invoice/:token` (App.tsx route registered, no auth). Shows agency
+  branding, invoice line items, and tabs:
+  - **Pay Online** — loads Cashfree v3 SDK from
+    `https://sdk.cashfree.com/js/v3/cashfree.js`, calls
+    `initiate-payment`, then `cashfree.checkout({paymentSessionId,
+    redirectTarget:"_self"})`. On gateway return (`?orderId=...&status=...`)
+    the page auto-fires `confirm-payment` and shows the success state.
+  - **Pay Offline** — shows agency `bankDetails`, `upiId`, and `upiQrFileUrl`
+    image inline.
+- **`client/src/components/password-gate.tsx`** — `PUBLIC_ROUTE_PREFIXES`
+  extended to `["/p/", "/pay/"]` so customers receiving share links never see
+  the site password modal.
+
+### Lead label rename
+
+- `client/src/pages/agency/leads.tsx`: dropdown action **"Convert to Case"**
+  → **"Convert to Application"**. Routes and backend handlers unchanged.
+
+### Security hardening (post-architect-review)
+
+- **Replay protection on gateway confirm**: `confirm-payment` verifies that
+  Cashfree's returned `order_tags.invoice_id` matches the invoice resolved
+  from `:token` and that `order_currency` matches the invoice currency.
+  A paid order id from a different invoice cannot be replayed against this
+  link.
+- **Visa-copy stage gate (server)**: `PATCH /api/cases/:id/visa-copy` returns
+  `409` when `visaStage !== "approved"`, so the UI affordance and API are in
+  lockstep.
+- **Visa-copy body size**: `server/index.ts` mounts a route-specific
+  `express.json({limit: "3mb"})` for `/api/cases/:id/visa-copy` so a ~2 MB
+  data URL actually fits past the global 1 MB parser. The route also enforces
+  `url.length > 3_000_000` ⇒ 413 as defence-in-depth.
+- **Public invoice item sanitization**: `GET /api/public/invoice/:token`
+  strips `id` and `invoiceId` from each line item, returning only
+  `{description, quantity, unitPrice, amount}` to the customer.
+
+### Pending follow-up
+
+- **Proposal payment link (T007)** — backend `POST
+  /api/public/proposal/:token/initiate-payment` and the post-submission CTA on
+  `client/src/pages/proposal-apply.tsx` are not yet wired. The plan is to
+  reuse the same `/pay/invoice/:token` page once the proposal flow auto-mints
+  an invoice on submission.

@@ -59,6 +59,124 @@ const emptyCoTravellerForm: CoTravellerFormState = {
   name: "", relationship: "", dob: "", passportNumber: "", nationality: "", notes: "",
 };
 
+// Visa Copy upload — only rendered when the case has reached visaStage
+// "approved". Stored inline as a data URL (≤ 2 MB) the same way appointment
+// confirmations are. Replace clears + re-uploads in one action; Remove POSTs
+// nulls so the card returns to its empty-state.
+function VisaCopyCard({ caseId, caseData }: { caseId: string; caseData: Case }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: async (payload: { visaCopyFileUrl: string | null; visaCopyFileName: string | null }) => {
+      const res = await apiRequest("PATCH", `/api/cases/${caseId}/visa-copy`, payload);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cases", caseId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tenants"] });
+    },
+    onError: (e: Error) => toast({ title: "Could not save visa copy", description: e.message, variant: "destructive" }),
+  });
+
+  const handleFile = (file: File) => {
+    if (file.size > 2_000_000) {
+      toast({ title: "File too large", description: "Visa copy must be under 2 MB.", variant: "destructive" });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => mutation.mutate({
+      visaCopyFileUrl: String(reader.result || ""),
+      visaCopyFileName: file.name,
+    });
+    reader.readAsDataURL(file);
+  };
+
+  const has = !!caseData.visaCopyFileUrl;
+
+  return (
+    <Card className="mb-4 border-emerald-200 dark:border-emerald-900 bg-emerald-50/40 dark:bg-emerald-950/20" data-testid="card-visa-copy">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <CheckCircle className="w-4 h-4 text-emerald-600" />
+          Approved Visa Copy
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {has ? (
+          <>
+            <div className="flex items-center justify-between gap-3 rounded-lg bg-background border p-3">
+              <div className="min-w-0 flex items-center gap-2">
+                <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                <span className="text-sm truncate" data-testid="text-visa-copy-name">
+                  {caseData.visaCopyFileName || "visa-copy"}
+                </span>
+              </div>
+              <div className="flex gap-1.5 shrink-0">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => window.open(caseData.visaCopyFileUrl!, "_blank", "noopener,noreferrer")}
+                  data-testid="button-view-visa-copy"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 mr-1" /> View
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    if (confirm("Remove the visa copy?")) {
+                      mutation.mutate({ visaCopyFileUrl: null, visaCopyFileName: null });
+                    }
+                  }}
+                  disabled={mutation.isPending}
+                  data-testid="button-remove-visa-copy"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                </Button>
+              </div>
+            </div>
+            <Label className="text-xs text-muted-foreground">Replace with a new file</Label>
+            <Input
+              type="file"
+              accept="application/pdf,image/png,image/jpeg,image/webp"
+              disabled={mutation.isPending}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleFile(f);
+                e.target.value = "";
+              }}
+              data-testid="input-replace-visa-copy"
+            />
+          </>
+        ) : (
+          <>
+            <p className="text-xs text-muted-foreground">
+              Upload the final approved visa (PDF or image, up to 2 MB) so the applicant can download it from the customer portal.
+            </p>
+            <Input
+              type="file"
+              accept="application/pdf,image/png,image/jpeg,image/webp"
+              disabled={mutation.isPending}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleFile(f);
+                e.target.value = "";
+              }}
+              data-testid="input-upload-visa-copy"
+            />
+            {mutation.isPending && (
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Loader2 className="w-3 h-3 animate-spin" /> Uploading…
+              </p>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function CoTravellersCard({ caseId }: { caseId: string }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -854,6 +972,11 @@ export default function CaseDetailPage() {
 
           {/* Main content — tabs */}
           <div className="lg:col-span-3">
+            {/* Visa copy upload — only after the case is approved. Stored
+                inline as a data URL (≤2 MB) to mirror appointment confirmations. */}
+            {caseData.visaStage === "approved" && (
+              <VisaCopyCard caseId={id!} caseData={caseData} />
+            )}
             <Tabs defaultValue="documents" className="space-y-4">
               <TabsList>
                 <TabsTrigger value="documents" data-testid="tab-documents">

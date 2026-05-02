@@ -9,7 +9,7 @@ import indiaVisaChanceDataset from "@shared/india_visa_chance_dataset_non_visa_f
 import bcrypt from "bcryptjs";
 import { randomUUID, randomBytes } from "crypto";
 import type { Proposal, InsertAppointment } from "@shared/schema";
-import { VISA_STAGES, VISA_PROCESSING_STATUSES, SUBMISSION_METHODS, APPOINTMENT_TYPES, APPOINTMENT_STATUSES } from "@shared/schema";
+import { VISA_STAGES, VISA_PROCESSING_STATUSES, SUBMISSION_METHODS, APPOINTMENT_TYPES, APPOINTMENT_STATUSES, PAYMENT_METHODS } from "@shared/schema";
 import { VISA_TYPES } from "@shared/destinations";
 import { z } from "zod";
 import ExcelJS from "exceljs";
@@ -2091,6 +2091,16 @@ export async function registerRoutes(
     if (!requireTenantAccess(req, res, invoice.tenantId)) return;
     try {
       const { invoiceId: _i, tenantId: _t, id: _id, ...body } = req.body ?? {};
+      // Whitelist payment method against shared enum so a typo (or a
+      // hand-crafted POST) can't store an arbitrary string.
+      if (body.method !== undefined) {
+        const ok = PAYMENT_METHODS.some((m) => m.value === body.method);
+        if (!ok) {
+          return res.status(400).json({
+            error: `Invalid method: must be one of ${PAYMENT_METHODS.map((m) => m.value).join(", ")}`,
+          });
+        }
+      }
       const parsed = insertPaymentSchema.parse({
         ...body,
         invoiceId: req.params.invoiceId,
@@ -2101,6 +2111,229 @@ export async function registerRoutes(
       res.status(201).json(created);
     } catch (e: any) {
       res.status(400).json({ error: e?.message ?? "Invalid payment" });
+    }
+  });
+
+  // POST /api/invoices/:id/share-link — lazily generates the invoice's
+  // publicToken (so an invoice that's never been shared has no token at all)
+  // and returns the full URL the agency can paste/email/whatsapp.
+  app.post("/api/invoices/:id/share-link", async (req, res) => {
+    try {
+      const invoice = await storage.getInvoice(req.params.id);
+      if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+      if (!requireTenantAccess(req, res, invoice.tenantId)) return;
+      let token = invoice.publicToken;
+      if (!token) {
+        token = randomUUID().replace(/-/g, "");
+        await storage.updateInvoice(invoice.id, { publicToken: token } as any);
+      }
+      const origin = getRequestOrigin(req);
+      res.json({ token, url: `${origin}/pay/invoice/${token}` });
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message ?? "Failed to generate share link" });
+    }
+  });
+
+  // GET /api/public/invoice/:token — public, unauthenticated. Returns just
+  // enough to render the customer payment page (no internal IDs leaked).
+  app.get("/api/public/invoice/:token", async (req, res) => {
+    try {
+      const invoice = await storage.getInvoiceByPublicToken(req.params.token);
+      if (!invoice) return res.status(404).json({ error: "This payment link is invalid or has been removed." });
+      const settings = await storage.getInvoiceSettings(invoice.tenantId);
+      const tenant = await storage.getTenant(invoice.tenantId);
+      const items = await storage.getInvoiceItems(invoice.id);
+      const payments = await storage.getPaymentsByInvoiceId(invoice.id);
+      const cfg = await storage.getTenantPaymentGatewayConfig(invoice.tenantId);
+      const gatewayConfigured = !!(cfg?.testClientId || cfg?.liveClientId);
+      // Strip internal ids/foreign keys from the items we return — the public
+      // page only needs description / quantity / unit price / amount to render
+      // the line items table.
+      const publicItems = items
+        .slice()
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+        .map((it) => ({
+          description: it.description,
+          quantity: it.quantity,
+          unitPrice: it.unitPrice,
+          amount: it.amount,
+        }));
+      res.json({
+        invoice: {
+          invoiceNumber: invoice.invoiceNumber,
+          customerName: invoice.customerName,
+          customerEmail: invoice.customerEmail,
+          status: invoice.status,
+          currency: invoice.currency,
+          subtotal: invoice.subtotal,
+          taxAmount: invoice.taxAmount,
+          total: invoice.total,
+          paidAmount: invoice.paidAmount,
+          balance: Math.max(0, invoice.total - invoice.paidAmount),
+          issuedAt: invoice.issuedAt,
+          dueDate: invoice.dueDate,
+          notes: invoice.notes,
+          items: publicItems,
+          paymentsCount: payments.length,
+        },
+        agency: {
+          name: settings?.companyName || tenant?.name || "",
+          logoUrl: settings?.logoUrl || tenant?.logoUrl || null,
+          accentColor: settings?.invoiceAccentColor || tenant?.primaryColor || null,
+          email: settings?.companyEmail || tenant?.contactEmail || null,
+          phone: settings?.companyPhone || tenant?.contactPhone || null,
+          bankDetails: settings?.bankDetails || null,
+          upiId: settings?.upiId || null,
+          upiQrFileUrl: settings?.upiQrFileUrl || null,
+          paymentInstructions: settings?.paymentInstructions || null,
+        },
+        gatewayConfigured,
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message ?? "Failed to load invoice" });
+    }
+  });
+
+  // POST /api/public/invoice/:token/initiate-payment — initiates a Cashfree
+  // order for the outstanding balance if the tenant has gateway credentials.
+  // Returns paymentSessionId (frontend uses Cashfree's drop-in or hosted
+  // checkout) plus the orderId we'll use in /confirm.
+  app.post("/api/public/invoice/:token/initiate-payment", async (req, res) => {
+    try {
+      const invoice = await storage.getInvoiceByPublicToken(req.params.token);
+      if (!invoice) return res.status(404).json({ error: "Invalid payment link" });
+      const balance = Math.max(0, invoice.total - invoice.paidAmount);
+      if (balance <= 0) return res.status(400).json({ error: "This invoice is already fully paid." });
+      const cfg = await storage.getTenantPaymentGatewayConfig(invoice.tenantId);
+      const cashfree = getCashfreeCredentials(cfg as any);
+      if (!cashfree.clientId || !cashfree.clientSecret) {
+        return res.status(503).json({ error: "Online payments are not configured for this agency. Please use the offline tab." });
+      }
+      const orderId = `INV_${invoice.id.slice(0, 8)}_${Date.now()}`;
+      const requestId = randomUUID();
+      const origin = getRequestOrigin(req);
+      const payload = {
+        order_id: orderId,
+        order_amount: balance / 100,
+        order_currency: invoice.currency || "INR",
+        order_note: `Invoice ${invoice.invoiceNumber}`,
+        customer_details: {
+          customer_id: invoice.id.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 45),
+          customer_email: invoice.customerEmail || "noreply@visashuttle.app",
+          customer_name: invoice.customerName,
+          customer_phone: getCashfreePhone(invoice.customerPhone),
+        },
+        order_meta: {
+          return_url: `${origin}/pay/invoice/${req.params.token}?order_id=${orderId}`,
+        },
+        order_tags: { product: "invoice", invoice_id: invoice.id },
+      };
+      // Note: don't annotate `gatewayRes` — Express's `Response` type is
+      // imported at the top of this file and would clash with fetch's.
+      let gatewayRes;
+      try {
+        gatewayRes = await fetch(`${cashfree.baseUrl}/orders`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-version": cashfree.apiVersion,
+            "x-client-id": cashfree.clientId,
+            "x-client-secret": cashfree.clientSecret,
+            "x-request-id": requestId,
+            "x-idempotency-key": randomUUID(),
+          },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(20000),
+        });
+      } catch {
+        return res.status(503).json({ error: "Payment gateway is temporarily unreachable." });
+      }
+      const data = await readCashfreeBody(gatewayRes);
+      if (!gatewayRes.ok) {
+        return res.status(gatewayRes.status >= 500 ? 503 : gatewayRes.status).json({
+          error: data?.message || "Unable to create payment order",
+        });
+      }
+      res.json({
+        orderId: data.order_id || orderId,
+        paymentSessionId: data.payment_session_id,
+        mode: cashfree.mode,
+        amount: balance,
+        currency: invoice.currency,
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message ?? "Failed to initiate payment" });
+    }
+  });
+
+  // POST /api/public/invoice/:token/confirm — called by the public payment
+  // page after Cashfree's return-url. Verifies the order with Cashfree and,
+  // if PAID, records a `gateway` payment row (idempotent: if a payment with
+  // the same gateway-orderId reference already exists, returns it).
+  app.post("/api/public/invoice/:token/confirm", async (req, res) => {
+    try {
+      const invoice = await storage.getInvoiceByPublicToken(req.params.token);
+      if (!invoice) return res.status(404).json({ error: "Invalid payment link" });
+      const orderId = String(req.body?.orderId || "").trim();
+      if (!orderId || !/^INV_[a-zA-Z0-9_-]+$/.test(orderId)) {
+        return res.status(400).json({ error: "Invalid order id" });
+      }
+      // Idempotency: skip if we already recorded this gateway transaction.
+      const existing = (await storage.getPaymentsByInvoiceId(invoice.id))
+        .find((p) => p.method === "gateway" && p.reference === orderId);
+      if (existing) return res.json({ paid: true, payment: existing, alreadyRecorded: true });
+
+      const cfg = await storage.getTenantPaymentGatewayConfig(invoice.tenantId);
+      const cashfree = getCashfreeCredentials(cfg as any);
+      if (!cashfree.clientId || !cashfree.clientSecret) {
+        return res.status(503).json({ error: "Gateway not configured" });
+      }
+      let gatewayRes;
+      try {
+        gatewayRes = await fetch(`${cashfree.baseUrl}/orders/${encodeURIComponent(orderId)}`, {
+          headers: {
+            "x-api-version": cashfree.apiVersion,
+            "x-client-id": cashfree.clientId,
+            "x-client-secret": cashfree.clientSecret,
+            "x-request-id": randomUUID(),
+          },
+          signal: AbortSignal.timeout(20000),
+        });
+      } catch {
+        return res.status(503).json({ error: "Gateway temporarily unreachable" });
+      }
+      const data = await readCashfreeBody(gatewayRes);
+      if (!gatewayRes.ok) {
+        return res.status(gatewayRes.status >= 500 ? 503 : gatewayRes.status).json({
+          error: data?.message || "Unable to verify payment",
+        });
+      }
+      // Bind the gateway order to THIS invoice. Cashfree echoes back the
+      // `order_tags` we sent at create time. We refuse to record a payment if
+      // the order belongs to a different invoice (replay guard) or if the
+      // amount/currency drifted from what we created.
+      const tagInvoiceId = data?.order_tags?.invoice_id;
+      if (tagInvoiceId && tagInvoiceId !== invoice.id) {
+        return res.status(400).json({ error: "Order does not belong to this invoice" });
+      }
+      const orderCurrency = String(data?.order_currency || "").toUpperCase();
+      if (orderCurrency && invoice.currency && orderCurrency !== invoice.currency.toUpperCase()) {
+        return res.status(400).json({ error: "Order currency mismatch" });
+      }
+      const isPaid = data.order_status === "PAID";
+      if (!isPaid) return res.json({ paid: false, status: data.order_status });
+      const amountCents = Math.round((data.order_amount ?? 0) * 100) || Math.max(0, invoice.total - invoice.paidAmount);
+      const payment = await storage.createPayment({
+        invoiceId: invoice.id,
+        tenantId: invoice.tenantId,
+        amount: amountCents,
+        method: "gateway",
+        reference: orderId,
+        notes: `Cashfree ${cashfree.mode} order`,
+      } as any);
+      res.json({ paid: true, payment });
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message ?? "Failed to confirm payment" });
     }
   });
 
@@ -2569,6 +2802,45 @@ export async function registerRoutes(
       res.json(updated);
     } catch (e: any) {
       res.status(500).json({ error: e?.message ?? "Failed to update visa status" });
+    }
+  });
+
+  // PATCH visa-copy file — uploaded after the case is approved. Body:
+  // {visaCopyFileUrl?: string|null, visaCopyFileName?: string|null}. Setting
+  // both to null removes the file. Capped at ~2 MB so a single inline data URL
+  // can't blow past the global 1 MB JSON parser; the body parser also enforces
+  // its own limit so this is defence-in-depth.
+  app.patch("/api/cases/:id/visa-copy", async (req, res) => {
+    try {
+      const c = await storage.getCase(req.params.id);
+      if (!c) return res.status(404).json({ error: "Not found" });
+      if (!requireTenantAccess(req, res, c.tenantId)) return;
+      // Stage gate: visa copies are only meaningful once the destination
+      // authority has approved the application. Block uploads on any other
+      // stage so the UI affordance and server stay in sync.
+      if (c.visaStage !== "approved") {
+        return res.status(409).json({
+          error: "Visa copy can only be uploaded after the case is approved.",
+        });
+      }
+      const url = req.body?.visaCopyFileUrl;
+      const name = req.body?.visaCopyFileName;
+      if (url !== undefined && url !== null && typeof url !== "string") {
+        return res.status(400).json({ error: "visaCopyFileUrl must be a string" });
+      }
+      if (typeof url === "string" && url.length > 3_000_000) {
+        return res.status(413).json({ error: "Visa copy file is too large (max ~2 MB)" });
+      }
+      if (name !== undefined && name !== null && typeof name !== "string") {
+        return res.status(400).json({ error: "visaCopyFileName must be a string" });
+      }
+      const patch: any = {};
+      if (url !== undefined) patch.visaCopyFileUrl = url;
+      if (name !== undefined) patch.visaCopyFileName = name;
+      const updated = await storage.updateCase(c.id, patch);
+      res.json(updated);
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message ?? "Failed to update visa copy" });
     }
   });
 

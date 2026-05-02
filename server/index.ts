@@ -52,6 +52,18 @@ app.use(
   }),
 );
 
+// Visa-copy upload endpoint receives an inline data URL (PDF / image) of the
+// stamped visa. Bumped to 3 MB so a ~2 MB base64 payload fits comfortably.
+app.use(
+  /^\/api\/cases\/[^/]+\/visa-copy$/,
+  express.json({
+    limit: "3mb",
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  }),
+);
+
 app.use(
   express.json({
     limit: "1mb",
@@ -104,6 +116,12 @@ app.use((req, res, next) => {
   // Public, tokenized proposal endpoints — the token IS the credential, so
   // these must work for unauthenticated end-customers clicking a share link.
   if (req.path.startsWith("/api/proposals/")) {
+    return next();
+  }
+
+  // Public, tokenized invoice payment endpoints (share-link flow + Cashfree
+  // return-url) — same rationale as proposals: the token IS the credential.
+  if (req.path.startsWith("/api/public/invoice/")) {
     return next();
   }
 

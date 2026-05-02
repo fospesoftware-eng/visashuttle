@@ -175,7 +175,7 @@ function LeadCardBody({ lead, onEdit, onConvert, onDelete, onMove, onReassign, c
               data-testid={`button-convert-lead-${lead.id}`}
             >
               <Briefcase className="w-3.5 h-3.5 mr-2" />
-              Convert to Case
+              Convert to Application
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <p className="text-xs text-muted-foreground px-2 py-1">Move to stage</p>

@@ -33,6 +33,7 @@ import AgencyDashboard from "@/pages/agency/dashboard";
 import LeadsPage from "@/pages/agency/leads";
 import ProposalsPage from "@/pages/agency/proposals";
 import ProposalApplyPage from "@/pages/proposal-apply";
+import InvoicePayPage from "@/pages/public/invoice-pay";
 import CasesPage from "@/pages/agency/cases";
 import VisaStagePage from "@/pages/agency/visa";
 import NewCasePage from "@/pages/agency/case-new";
@@ -126,6 +127,10 @@ function Router() {
       {/* Public, tokenized proposal apply page — no auth, token IS the
           credential. Sits at the top level so it doesn't need any layout. */}
       <Route path="/p/:token" component={ProposalApplyPage} />
+
+      {/* Public, tokenized invoice payment page — no auth, token IS the
+          credential. Used for both share-link distribution and gateway return. */}
+      <Route path="/pay/invoice/:token" component={InvoicePayPage} />
       <Route path="/app/cases" component={CasesPage} />
       <Route path="/app/cases/new" component={NewCasePage} />
       <Route path="/app/cases/processing">
@@ -216,6 +221,7 @@ const PRODUCT_SHELL_PREFIXES = [
   "/admin",
   "/w/",
   "/p/",
+  "/pay/",
 ];
 
 function SiteChrome() {

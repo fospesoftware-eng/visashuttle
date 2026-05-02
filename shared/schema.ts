@@ -176,6 +176,12 @@ export const cases = pgTable("cases", {
   // sub-status from the dropdown.
   visaStatusComment: text("visa_status_comment"),
   visaStatusUpdatedAt: timestamp("visa_status_updated_at"),
+  // Final approved visa document. Populated only after visaStage transitions
+  // to "approved" — uploaded by the agency from the case-detail page. Stored
+  // inline as a data URL for the in-memory demo (≤ 2 MB), matching how
+  // appointment confirmation files work. In production this becomes a CDN URL.
+  visaCopyFileUrl: text("visa_copy_file_url"),
+  visaCopyFileName: text("visa_copy_file_name"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -638,6 +644,11 @@ export const invoiceSettings = pgTable("invoice_settings", {
   paymentTerms: text("payment_terms").default("Due on receipt"),
   paymentInstructions: text("payment_instructions"),
   bankDetails: text("bank_details"),
+  // UPI (India) — used by the public payment page's "Pay Offline" tab.
+  // upiId is the agency's VPA (e.g. "myagency@hdfcbank"); upiQrFileUrl is
+  // an optional QR-image data URL the customer can scan from any UPI app.
+  upiId: text("upi_id"),
+  upiQrFileUrl: text("upi_qr_file_url"),
   footerText: text("footer_text"),
   notes: text("notes"),
   // GST (India) fields
@@ -686,6 +697,11 @@ export const invoices = pgTable("invoices", {
   issuedAt: timestamp("issued_at").defaultNow(),
   dueDate: timestamp("due_date"),
   notes: text("notes"),
+  // Public, unguessable token used by the customer-facing payment page
+  // (`/pay/invoice/:token`). Generated lazily the first time the agency
+  // clicks "Share payment link". Distinct from the invoice ID so the ID
+  // cannot leak via the share URL.
+  publicToken: text("public_token"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -724,7 +740,9 @@ export const payments = pgTable("payments", {
   tenantId: varchar("tenant_id").notNull(),
   amount: integer("amount").notNull(),
   method: text("method").notNull().default("cash"),
-  // cash | card | bank_transfer | online | other
+  // cash | card | bank_transfer | upi | gateway | other
+  // (`gateway` is auto-recorded when an online payment-link redemption
+  // succeeds; `upi` is the offline UPI transfer flow.)
   reference: text("reference"),
   paidAt: timestamp("paid_at").defaultNow(),
   notes: text("notes"),
@@ -733,3 +751,16 @@ export const payments = pgTable("payments", {
 export const insertPaymentSchema = createInsertSchema(payments).omit({ id: true, createdAt: true });
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 export type Payment = typeof payments.$inferSelect;
+
+// Shared payment-method enum used by both the agency UI dropdown and the
+// server's runtime validator. Adding a new method here automatically widens
+// both ends.
+export const PAYMENT_METHODS = [
+  { value: "bank_transfer", label: "Bank Transfer" },
+  { value: "upi",           label: "UPI" },
+  { value: "cash",          label: "Cash" },
+  { value: "card",          label: "Card" },
+  { value: "gateway",       label: "Online (Gateway)" },
+  { value: "other",         label: "Other" },
+] as const;
+export type PaymentMethod = typeof PAYMENT_METHODS[number]["value"];

@@ -194,6 +194,7 @@ export interface IStorage {
   getInvoicesByTenantId(tenantId: string): Promise<Invoice[]>;
   getInvoicesByCaseId(caseId: string): Promise<Invoice[]>;
   getInvoice(id: string): Promise<Invoice | undefined>;
+  getInvoiceByPublicToken(token: string): Promise<Invoice | undefined>;
   createInvoice(data: InsertInvoice, items: Omit<InsertInvoiceItem, "invoiceId">[]): Promise<Invoice>;
   updateInvoice(id: string, data: Partial<InsertInvoice>): Promise<Invoice | undefined>;
   deleteInvoice(id: string): Promise<boolean>;
@@ -428,6 +429,8 @@ export class MemStorage implements IStorage {
       paymentTerms: "Due on receipt",
       paymentInstructions: "Bank transfers preferred. See bank details below.",
       bankDetails: "Bank: Demo Bank\nAccount: 1234567890\nRouting: 021000021",
+      upiId: null,
+      upiQrFileUrl: null,
       footerText: "Thank you for your business.",
       notes: null,
       gstEnabled: false,
@@ -469,6 +472,7 @@ export class MemStorage implements IStorage {
       issuedAt: new Date(Date.now() - 5 * 24 * 3600 * 1000),
       dueDate: new Date(Date.now() + 9 * 24 * 3600 * 1000),
       notes: null,
+      publicToken: null,
       createdAt: new Date(Date.now() - 5 * 24 * 3600 * 1000),
       updatedAt: new Date(),
     };
@@ -526,6 +530,8 @@ export class MemStorage implements IStorage {
         visaProcessingStatus: null,
         visaStatusComment: null,
         visaStatusUpdatedAt: null,
+        visaCopyFileUrl: null,
+        visaCopyFileName: null,
         createdAt: new Date(), 
         updatedAt: new Date() 
       },
@@ -562,6 +568,8 @@ export class MemStorage implements IStorage {
         visaProcessingStatus: null,
         visaStatusComment: null,
         visaStatusUpdatedAt: null,
+        visaCopyFileUrl: null,
+        visaCopyFileName: null,
         createdAt: new Date(), 
         updatedAt: new Date() 
       },
@@ -885,6 +893,8 @@ export class MemStorage implements IStorage {
       paymentTerms: data.paymentTerms ?? existing?.paymentTerms ?? "Due on receipt",
       paymentInstructions: data.paymentInstructions ?? existing?.paymentInstructions ?? null,
       bankDetails: data.bankDetails ?? existing?.bankDetails ?? null,
+      upiId: (data as any).upiId ?? existing?.upiId ?? null,
+      upiQrFileUrl: (data as any).upiQrFileUrl ?? existing?.upiQrFileUrl ?? null,
       footerText: data.footerText ?? existing?.footerText ?? null,
       notes: data.notes ?? existing?.notes ?? null,
       gstEnabled: data.gstEnabled ?? existing?.gstEnabled ?? false,
@@ -911,6 +921,11 @@ export class MemStorage implements IStorage {
 
   async getInvoice(id: string): Promise<Invoice | undefined> {
     return this.invoices.get(id);
+  }
+
+  async getInvoiceByPublicToken(token: string): Promise<Invoice | undefined> {
+    if (!token) return undefined;
+    return Array.from(this.invoices.values()).find((inv) => inv.publicToken === token);
   }
 
   async createInvoice(data: InsertInvoice, items: Omit<InsertInvoiceItem, "invoiceId">[]): Promise<Invoice> {
@@ -947,6 +962,7 @@ export class MemStorage implements IStorage {
       issuedAt: data.issuedAt ?? new Date(),
       dueDate: data.dueDate ?? null,
       notes: data.notes ?? null,
+      publicToken: (data as any).publicToken ?? null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -1152,6 +1168,8 @@ export class MemStorage implements IStorage {
       visaProcessingStatus: insertCase.visaProcessingStatus ?? null,
       visaStatusComment: insertCase.visaStatusComment ?? null,
       visaStatusUpdatedAt: insertCase.visaStatusUpdatedAt ?? null,
+      visaCopyFileUrl: (insertCase as any).visaCopyFileUrl ?? null,
+      visaCopyFileName: (insertCase as any).visaCopyFileName ?? null,
       createdAt: new Date(),
       updatedAt: new Date()
     };

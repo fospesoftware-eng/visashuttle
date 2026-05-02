@@ -14,7 +14,7 @@ interface PasswordGateProps {
 // Public routes that bypass the site-wide password gate. These either use
 // their own credential (e.g. proposal token) or are intended for fully
 // anonymous customer-facing flows.
-const PUBLIC_ROUTE_PREFIXES = ["/p/"];
+const PUBLIC_ROUTE_PREFIXES = ["/p/", "/pay/"];
 
 function isPublicRoute(): boolean {
   if (typeof window === "undefined") return false;
