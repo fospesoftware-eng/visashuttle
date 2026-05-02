@@ -1,7 +1,18 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, Search, Filter, MoreVertical, Mail, Phone, Loader2, AlertCircle, Briefcase } from "lucide-react";
+import { Plus, Search, MoreVertical, Mail, Phone, Loader2, AlertCircle, Briefcase, GripVertical } from "lucide-react";
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -87,6 +98,124 @@ const COUNTRIES_LEAD = [
   "Schengen Area", "Other",
 ];
 
+interface LeadCardContentProps {
+  lead: Lead;
+  onEdit: (lead: Lead) => void;
+  onConvert: (lead: Lead) => void;
+  onDelete: (id: string) => void;
+  onMove: (id: string, stage: string) => void;
+  currentStage: string;
+}
+
+function LeadCardBody({ lead, onEdit, onConvert, onDelete, onMove, currentStage }: LeadCardContentProps) {
+  return (
+    <div className="p-3 rounded-xl bg-background/95 shadow-sm hover-elevate cursor-grab active:cursor-grabbing space-y-2 border border-border/40 select-none">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <GripVertical className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
+          <Avatar className="w-7 h-7 shrink-0">
+            <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+              {lead.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <p className="text-sm font-medium truncate">{lead.name}</p>
+            {lead.source && <p className="text-xs text-muted-foreground capitalize">{lead.source.replace("_", " ")}</p>}
+          </div>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 shrink-0"
+              onPointerDown={(e) => e.stopPropagation()}
+              data-testid={`button-lead-actions-${lead.id}`}
+            >
+              <MoreVertical className="w-3.5 h-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem onClick={() => onEdit(lead)} data-testid={`button-edit-lead-${lead.id}`}>
+              Edit Lead
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onConvert(lead)}
+              data-testid={`button-convert-lead-${lead.id}`}
+            >
+              <Briefcase className="w-3.5 h-3.5 mr-2" />
+              Convert to Case
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <p className="text-xs text-muted-foreground px-2 py-1">Move to stage</p>
+            {stages.filter((s) => s !== currentStage).map((s) => (
+              <DropdownMenuItem key={s} className="capitalize" onClick={() => onMove(lead.id, s)}>
+                → {s.replace("_", " ")}
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive" onClick={() => onDelete(lead.id)}>
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <div className="text-xs text-muted-foreground flex items-center gap-1 truncate">
+        <Mail className="w-3 h-3 shrink-0" />
+        <span className="truncate">{lead.email}</span>
+      </div>
+      {lead.phone && (
+        <div className="text-xs text-muted-foreground flex items-center gap-1">
+          <Phone className="w-3 h-3 shrink-0" />
+          {lead.phone}
+        </div>
+      )}
+      {(lead.value ?? 0) > 0 && (
+        <p className="text-sm font-semibold text-primary">${(lead.value ?? 0).toLocaleString()}</p>
+      )}
+    </div>
+  );
+}
+
+function DraggableLead({ lead, children }: { lead: Lead; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `lead:${lead.id}`,
+    data: { leadId: lead.id, stage: lead.stage },
+  });
+  return (
+    <div
+      ref={setNodeRef}
+      style={transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 50 } : undefined}
+      className={isDragging ? "opacity-30" : ""}
+      {...attributes}
+      {...listeners}
+    >
+      {children}
+    </div>
+  );
+}
+
+function DroppableStage({
+  stage,
+  children,
+  className,
+}: {
+  stage: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: `stage:${stage}` });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`${className ?? ""} ${isOver ? "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-xl" : ""} transition-all`}
+      data-testid={`droppable-${stage}`}
+    >
+      {children}
+    </div>
+  );
+}
+
 export default function LeadsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -101,6 +230,11 @@ export default function LeadsPage() {
   const [deleteLeadId, setDeleteLeadId] = useState<string | null>(null);
   const [convertLead, setConvertLead] = useState<Lead | null>(null);
   const [form, setForm] = useState(emptyForm);
+  const [activeDragLead, setActiveDragLead] = useState<Lead | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  );
 
   const { data: leads = [], isLoading } = useQuery<Lead[]>({
     queryKey: ["/api/tenants", tenantId, "leads"],
@@ -159,7 +293,25 @@ export default function LeadsPage() {
       const res = await apiRequest("PATCH", `/api/leads/${id}`, { stage });
       return res.json();
     },
-    onSuccess: () => {
+    // Optimistic update for snappy drag/drop
+    onMutate: async ({ id, stage }) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/tenants", tenantId, "leads"] });
+      const previous = queryClient.getQueryData<Lead[]>(["/api/tenants", tenantId, "leads"]);
+      if (previous) {
+        queryClient.setQueryData<Lead[]>(
+          ["/api/tenants", tenantId, "leads"],
+          previous.map((l) => (l.id === id ? { ...l, stage } : l))
+        );
+      }
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["/api/tenants", tenantId, "leads"], context.previous);
+      }
+      toast({ title: "Could not move lead", variant: "destructive" });
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "leads"] });
     },
   });
@@ -180,7 +332,6 @@ export default function LeadsPage() {
         notes: `Converted from lead: ${convertLead.email}${convertLead.phone ? ` · ${convertLead.phone}` : ""}${convertLead.notes ? `\n\nLead notes: ${convertLead.notes}` : ""}`,
       });
       const created = await res.json();
-      // Mark the lead as won
       await apiRequest("PATCH", `/api/leads/${convertLead.id}`, { stage: "won" });
       return created;
     },
@@ -195,12 +346,12 @@ export default function LeadsPage() {
     onError: (e: Error) => toast({ title: "Could not convert", description: e.message, variant: "destructive" }),
   });
 
-  const filteredLeads = leads.filter(lead =>
+  const filteredLeads = leads.filter((lead) =>
     lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     lead.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const getLeadsByStage = (stage: string) => filteredLeads.filter(lead => lead.stage === stage);
+  const getLeadsByStage = (stage: string) => filteredLeads.filter((lead) => lead.stage === stage);
 
   const handleSubmit = () => {
     if (!form.name || !form.email) {
@@ -226,7 +377,31 @@ export default function LeadsPage() {
     });
   };
 
-  const totalValue = leads.filter(l => l.stage === "won").reduce((sum, l) => sum + (l.value ?? 0), 0);
+  const openConvert = (lead: Lead) => {
+    setConvertLead(lead);
+    setConvertForm({ visaType: "", destinationCountry: "", priority: "normal" });
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const id = String(event.active.id).replace("lead:", "");
+    const lead = leads.find((l) => l.id === id);
+    if (lead) setActiveDragLead(lead);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveDragLead(null);
+    const { active, over } = event;
+    if (!over) return;
+    const overId = String(over.id);
+    if (!overId.startsWith("stage:")) return;
+    const newStage = overId.replace("stage:", "");
+    const fromStage = (active.data.current as any)?.stage;
+    if (newStage === fromStage) return;
+    const leadId = String(active.id).replace("lead:", "");
+    moveStageMutation.mutate({ id: leadId, stage: newStage });
+  };
+
+  const totalValue = leads.filter((l) => l.stage === "won").reduce((sum, l) => sum + (l.value ?? 0), 0);
 
   return (
     <DashboardLayout type="agency">
@@ -234,7 +409,7 @@ export default function LeadsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold" data-testid="text-page-title">Leads Pipeline</h1>
-            <p className="text-muted-foreground">Manage your sales pipeline and convert leads to cases.</p>
+            <p className="text-muted-foreground">Drag cards between columns to move leads through your pipeline.</p>
           </div>
           <Dialog open={isAddOpen || !!editLead} onOpenChange={(open) => {
             if (!open) { setIsAddOpen(false); setEditLead(null); setForm(emptyForm); }
@@ -313,7 +488,7 @@ export default function LeadsPage() {
             <span className="text-muted-foreground">Won value:</span>
             <span className="font-semibold text-emerald-700 dark:text-emerald-400">${totalValue.toLocaleString()}</span>
           </div>
-          {stages.map(s => (
+          {stages.map((s) => (
             <div key={s} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted/40">
               <span className={`w-2 h-2 rounded-full ${STAGE_DOT[s]}`} />
               <span className="capitalize text-muted-foreground">{s}:</span>
@@ -340,91 +515,59 @@ export default function LeadsPage() {
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            {stages.map((stage) => (
-              <Card key={stage} className={`min-w-[260px] ${STAGE_COLORS[stage]} border-0`} data-testid={`column-${stage}`}>
-                <CardHeader className="pb-3 pt-4 px-4">
-                  <div className="flex items-center gap-2">
-                    <span className={`w-2.5 h-2.5 rounded-full ${STAGE_DOT[stage]}`} />
-                    <CardTitle className="text-sm font-semibold capitalize">
-                      {stage.replace("_", " ")}
-                    </CardTitle>
-                    <span className="ml-auto text-xs font-medium text-muted-foreground bg-background/70 rounded px-1.5 py-0.5">
-                      {getLeadsByStage(stage).length}
-                    </span>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-2 px-3 pb-4">
-                  {getLeadsByStage(stage).length === 0 ? (
-                    <p className="text-xs text-muted-foreground text-center py-6">No leads</p>
-                  ) : (
-                    getLeadsByStage(stage).map((lead) => (
-                      <div
-                        key={lead.id}
-                        className="p-3 rounded-xl bg-background/90 shadow-sm hover-elevate cursor-pointer space-y-2 border border-border/40"
-                        data-testid={`lead-card-${lead.id}`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <Avatar className="w-7 h-7 shrink-0">
-                              <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
-                                {lead.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium truncate">{lead.name}</p>
-                              {lead.source && <p className="text-xs text-muted-foreground capitalize">{lead.source.replace("_", " ")}</p>}
-                            </div>
-                          </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
-                                <MoreVertical className="w-3.5 h-3.5" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
-                              <DropdownMenuItem onClick={() => openEdit(lead)} data-testid={`button-edit-lead-${lead.id}`}>Edit Lead</DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => { setConvertLead(lead); setConvertForm({ visaType: "", destinationCountry: "", priority: "normal" }); }}
-                                data-testid={`button-convert-lead-${lead.id}`}
-                              >
-                                <Briefcase className="w-3.5 h-3.5 mr-2" />
-                                Convert to Case
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <p className="text-xs text-muted-foreground px-2 py-1">Move to stage</p>
-                              {stages.filter(s => s !== stage).map(s => (
-                                <DropdownMenuItem key={s} className="capitalize" onClick={() => moveStageMutation.mutate({ id: lead.id, stage: s })}>
-                                  → {s.replace("_", " ")}
-                                </DropdownMenuItem>
-                              ))}
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-destructive" onClick={() => setDeleteLeadId(lead.id)}>
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                        <div className="text-xs text-muted-foreground flex items-center gap-1 truncate">
-                          <Mail className="w-3 h-3 shrink-0" />
-                          <span className="truncate">{lead.email}</span>
-                        </div>
-                        {lead.phone && (
-                          <div className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Phone className="w-3 h-3 shrink-0" />
-                            {lead.phone}
-                          </div>
-                        )}
-                        {(lead.value ?? 0) > 0 && (
-                          <p className="text-sm font-semibold text-primary">${(lead.value ?? 0).toLocaleString()}</p>
-                        )}
+          <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setActiveDragLead(null)}>
+            <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+              {stages.map((stage) => (
+                <DroppableStage key={stage} stage={stage} className="min-w-[260px]">
+                  <Card className={`${STAGE_COLORS[stage]} border-0 h-full`} data-testid={`column-${stage}`}>
+                    <CardHeader className="pb-3 pt-4 px-4">
+                      <div className="flex items-center gap-2">
+                        <span className={`w-2.5 h-2.5 rounded-full ${STAGE_DOT[stage]}`} />
+                        <CardTitle className="text-sm font-semibold capitalize">
+                          {stage.replace("_", " ")}
+                        </CardTitle>
+                        <span className="ml-auto text-xs font-medium text-muted-foreground bg-background/70 rounded px-1.5 py-0.5">
+                          {getLeadsByStage(stage).length}
+                        </span>
                       </div>
-                    ))
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                    </CardHeader>
+                    <CardContent className="space-y-2 px-3 pb-4 min-h-[140px]">
+                      {getLeadsByStage(stage).length === 0 ? (
+                        <p className="text-xs text-muted-foreground text-center py-6">Drop leads here</p>
+                      ) : (
+                        getLeadsByStage(stage).map((lead) => (
+                          <DraggableLead key={lead.id} lead={lead}>
+                            <LeadCardBody
+                              lead={lead}
+                              onEdit={openEdit}
+                              onConvert={openConvert}
+                              onDelete={(id) => setDeleteLeadId(id)}
+                              onMove={(id, s) => moveStageMutation.mutate({ id, stage: s })}
+                              currentStage={stage}
+                            />
+                          </DraggableLead>
+                        ))
+                      )}
+                    </CardContent>
+                  </Card>
+                </DroppableStage>
+              ))}
+            </div>
+            <DragOverlay dropAnimation={null}>
+              {activeDragLead ? (
+                <div className="rotate-2 shadow-2xl w-[260px]">
+                  <LeadCardBody
+                    lead={activeDragLead}
+                    onEdit={() => {}}
+                    onConvert={() => {}}
+                    onDelete={() => {}}
+                    onMove={() => {}}
+                    currentStage={activeDragLead.stage}
+                  />
+                </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
         )}
 
         {!isLoading && leads.length === 0 && (
@@ -432,7 +575,8 @@ export default function LeadsPage() {
             icon={AlertCircle}
             title="No leads yet"
             description="Start adding leads to track your sales pipeline."
-            action={{ label: "Add First Lead", onClick: () => setIsAddOpen(true) }}
+            actionLabel="Add First Lead"
+            onAction={() => setIsAddOpen(true)}
           />
         )}
       </div>

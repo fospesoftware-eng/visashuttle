@@ -95,12 +95,12 @@ export default function AgencyDashboard() {
               Welcome back, <span className="font-medium text-foreground">{userName}</span>! Here's what's happening today.
             </p>
           </div>
-          <Link href="/app/cases/new">
-            <Button className="gap-2" data-testid="button-new-case">
+          <Button asChild className="gap-2" data-testid="button-new-case">
+            <Link href="/app/cases/new">
               <Plus className="w-4 h-4" />
               New Application
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
 
         {isLoading ? (
@@ -127,30 +127,30 @@ export default function AgencyDashboard() {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between gap-4">
                     <CardTitle className="text-lg">Recent Applications</CardTitle>
-                    <Link href="/app/cases">
-                      <Button variant="ghost" size="sm" className="gap-1" data-testid="button-view-all-cases">
+                    <Button asChild variant="ghost" size="sm" className="gap-1" data-testid="button-view-all-cases">
+                      <Link href="/app/cases">
                         View All
                         <ArrowRight className="w-4 h-4" />
-                      </Button>
-                    </Link>
+                      </Link>
+                    </Button>
                   </CardHeader>
                   <CardContent>
                     {recentCases.length === 0 ? (
                       <div className="text-center py-12">
                         <Briefcase className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
                         <p className="text-muted-foreground text-sm">No applications yet.</p>
-                        <Link href="/app/cases/new">
-                          <Button size="sm" className="mt-3 gap-2">
+                        <Button asChild size="sm" className="mt-3 gap-2">
+                          <Link href="/app/cases/new">
                             <Plus className="w-4 h-4" /> Create First Application
-                          </Button>
-                        </Link>
+                          </Link>
+                        </Button>
                       </div>
                     ) : (
                       <div className="space-y-3">
                         {recentCases.map((c) => (
-                          <Link key={c.id} href={`/app/cases/${c.id}`}>
-                            <div
-                              className="flex items-center gap-4 p-3 rounded-lg hover-elevate cursor-pointer bg-muted/30"
+                          <Link key={c.id} href={`/app/cases/${c.id}`} asChild>
+                            <a
+                              className="flex items-center gap-4 p-3 rounded-lg hover-elevate cursor-pointer bg-muted/30 no-underline text-foreground"
                               data-testid={`case-row-${c.id}`}
                             >
                               <ProgressRing value={computeReadiness(c)} size={48} strokeWidth={4} />
@@ -166,7 +166,7 @@ export default function AgencyDashboard() {
                                 </div>
                               </div>
                               <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0" />
-                            </div>
+                            </a>
                           </Link>
                         ))}
                       </div>

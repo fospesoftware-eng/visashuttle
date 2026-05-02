@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { 
-  Home, Users, Briefcase, FileText, BarChart3, Settings, 
+import { useQuery } from "@tanstack/react-query";
+import {
+  Home, Users, Briefcase, FileText, BarChart3, Settings,
   ChevronLeft, ChevronRight, LogOut, Bell, Search,
-  Menu, X, Building2, ShieldCheck, Database, Activity, Globe
+  Menu, X, Building2, ShieldCheck, Database, Activity, Globe,
+  CheckCircle, AlertCircle, Inbox
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -21,6 +23,7 @@ import { Logo, LogoMark } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { queryClient } from "@/lib/queryClient";
+import type { ActivityLog } from "@shared/schema";
 
 interface NavItem {
   icon: React.ElementType;
@@ -53,13 +56,52 @@ const agencyNavItems: NavItem[] = [
   { icon: Settings, label: "Settings", href: "/app/settings" },
 ];
 
+function timeAgo(date: string | Date | null | undefined) {
+  if (!date) return "";
+  const d = typeof date === "string" ? new Date(date) : date;
+  if (isNaN(d.getTime())) return "";
+  const diff = Date.now() - d.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  return d.toLocaleDateString();
+}
+
 export function DashboardLayout({ children, type }: DashboardLayoutProps) {
   const [location, setLocation] = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
+  const [notifsOpen, setNotifsOpen] = useState(false);
   const { data: authData, isLoading: authLoading } = useCurrentUser();
 
   const navItems = type === "admin" ? adminNavItems : agencyNavItems;
+  const tenantId = authData?.user?.tenantId;
+
+  // Recent activity for header notifications (agency only)
+  const { data: activityLogs = [] } = useQuery<ActivityLog[]>({
+    queryKey: ["/api/tenants", tenantId, "activity-logs"],
+    queryFn: async () => {
+      const res = await fetch(`/api/tenants/${tenantId}/activity-logs`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!tenantId && type === "agency",
+    refetchInterval: 60000,
+  });
+
+  const recentNotifications = [...activityLogs].slice(-8).reverse();
+  const unreadKey = "agency_notifs_last_seen";
+  const lastSeen = typeof window !== "undefined" ? Number(localStorage.getItem(unreadKey) || "0") : 0;
+  const unreadCount = recentNotifications.filter((l) => {
+    if (!l.createdAt) return false;
+    const t = new Date(l.createdAt).getTime();
+    return !isNaN(t) && t > lastSeen;
+  }).length;
 
   // Redirect to login if not authenticated or wrong role for this layout type
   useEffect(() => {
@@ -81,6 +123,26 @@ export function DashboardLayout({ children, type }: DashboardLayoutProps) {
     localStorage.removeItem("agency_tenant_slug");
     setLocation("/login");
   };
+
+  const handleSearchSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter") return;
+    const q = searchValue.trim();
+    if (!q) return;
+    if (type === "agency") {
+      setLocation(`/app/cases?q=${encodeURIComponent(q)}`);
+    } else {
+      setLocation(`/admin/tenants?q=${encodeURIComponent(q)}`);
+    }
+  };
+
+  const markNotifsRead = () => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(unreadKey, String(Date.now()));
+    }
+  };
+
+  const formatAction = (action: string) =>
+    action.replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
   const userName = authData?.user?.name || authData?.user?.email || "User";
   const userEmail = authData?.user?.email || "";
@@ -116,15 +178,15 @@ export function DashboardLayout({ children, type }: DashboardLayoutProps) {
 
           <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
             {navItems.map((item) => {
-              const isActive = location === item.href || 
+              const isActive = location === item.href ||
                 (item.href !== "/admin" && item.href !== "/app" && location.startsWith(item.href));
               return (
-                <Link key={item.href} href={item.href}>
+                <Link key={item.href} href={item.href} asChild>
                   <a
                     className={`
                       flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors
-                      ${isActive 
-                        ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" 
+                      ${isActive
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                         : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
                       }
                     `}
@@ -141,8 +203,8 @@ export function DashboardLayout({ children, type }: DashboardLayoutProps) {
           <div className="p-4 border-t border-sidebar-border">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   className={`w-full justify-start gap-3 h-auto py-2 ${collapsed ? "px-2" : ""}`}
                   data-testid="button-user-menu"
                 >
@@ -166,12 +228,13 @@ export function DashboardLayout({ children, type }: DashboardLayoutProps) {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <Link href={type === "agency" ? "/app/settings" : "/admin/settings"}>
-                  <DropdownMenuItem data-testid="menu-profile">
-                    <Settings className="w-4 h-4 mr-2" />
-                    Settings
-                  </DropdownMenuItem>
-                </Link>
+                <DropdownMenuItem
+                  onClick={() => setLocation(type === "agency" ? "/app/settings" : "/admin/settings")}
+                  data-testid="menu-profile"
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  Settings
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-red-600 dark:text-red-400 focus:text-red-600"
@@ -188,7 +251,7 @@ export function DashboardLayout({ children, type }: DashboardLayoutProps) {
       </aside>
 
       {mobileMenuOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-30 lg:hidden"
           onClick={() => setMobileMenuOpen(false)}
         />
@@ -217,13 +280,13 @@ export function DashboardLayout({ children, type }: DashboardLayoutProps) {
             {navItems.map((item) => {
               const isActive = location === item.href;
               return (
-                <Link key={item.href} href={item.href}>
+                <Link key={item.href} href={item.href} asChild>
                   <a
                     onClick={() => setMobileMenuOpen(false)}
                     className={`
                       flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors
-                      ${isActive 
-                        ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" 
+                      ${isActive
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                         : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
                       }
                     `}
@@ -252,18 +315,88 @@ export function DashboardLayout({ children, type }: DashboardLayoutProps) {
             </Button>
             <div className="relative hidden sm:block">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input 
-                placeholder="Search..." 
+              <Input
+                placeholder={type === "agency" ? "Search applications, press Enter…" : "Search agencies, press Enter…"}
                 className="w-64 pl-9 bg-muted/50"
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+                onKeyDown={handleSearchSubmit}
                 data-testid="input-search"
               />
             </div>
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <Button variant="ghost" size="icon" data-testid="button-notifications">
-              <Bell className="w-5 h-5" />
-            </Button>
+            {type === "agency" && (
+              <DropdownMenu open={notifsOpen} onOpenChange={(open) => { setNotifsOpen(open); if (open) markNotifsRead(); }}>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="relative" data-testid="button-notifications">
+                    <Bell className="w-5 h-5" />
+                    {unreadCount > 0 && (
+                      <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-[10px] font-bold text-white flex items-center justify-center">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-80">
+                  <DropdownMenuLabel className="flex items-center justify-between">
+                    <span>Notifications</span>
+                    {recentNotifications.length > 0 && (
+                      <span className="text-xs text-muted-foreground">{recentNotifications.length} recent</span>
+                    )}
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {recentNotifications.length === 0 ? (
+                    <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+                      <Inbox className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                      You're all caught up
+                    </div>
+                  ) : (
+                    <div className="max-h-80 overflow-y-auto">
+                      {recentNotifications.map((log) => {
+                        const isApproved = log.action.includes("approved");
+                        const isWarn = log.action.includes("rejected") || log.action.includes("warn");
+                        const Icon = isApproved ? CheckCircle : isWarn ? AlertCircle : Activity;
+                        const iconColor = isApproved
+                          ? "text-emerald-500"
+                          : isWarn
+                          ? "text-amber-500"
+                          : "text-muted-foreground";
+                        return (
+                          <DropdownMenuItem
+                            key={log.id}
+                            className="flex items-start gap-2 py-2 cursor-pointer"
+                            onClick={() => {
+                              if (log.entityType === "case" && log.entityId) {
+                                setLocation(`/app/cases/${log.entityId}`);
+                                setNotifsOpen(false);
+                              }
+                            }}
+                            data-testid={`notification-${log.id}`}
+                          >
+                            <Icon className={`w-4 h-4 mt-0.5 shrink-0 ${iconColor}`} />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{formatAction(log.action)}</p>
+                              <p className="text-xs text-muted-foreground">{timeAgo(log.createdAt)}</p>
+                            </div>
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setLocation("/app/reports")} className="justify-center text-sm">
+                    View all activity
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            {type === "admin" && (
+              <Button variant="ghost" size="icon" onClick={() => setLocation("/admin/audit")} data-testid="button-notifications">
+                <Bell className="w-5 h-5" />
+              </Button>
+            )}
           </div>
         </header>
 

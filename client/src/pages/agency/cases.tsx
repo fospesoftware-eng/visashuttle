@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "wouter";
+import { useState, useEffect } from "react";
+import { Link, useLocation, useSearch } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, Search, MoreVertical, ArrowUpDown, Eye, Copy, Check, ExternalLink, Loader2, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -42,11 +42,20 @@ function computeReadiness(c: Case): number {
 }
 
 export default function CasesPage() {
-  const [searchTerm, setSearchTerm] = useState("");
+  const search = useSearch();
+  const initialQ = new URLSearchParams(search).get("q") || "";
+  const [, setLocation] = useLocation();
+  const [searchTerm, setSearchTerm] = useState(initialQ);
   const [statusFilter, setStatusFilter] = useState("all");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const { toast } = useToast();
+
+  // Keep search input synced with URL changes (e.g. from header search)
+  useEffect(() => {
+    const q = new URLSearchParams(search).get("q") || "";
+    setSearchTerm(q);
+  }, [search]);
 
   const { data: authData } = useCurrentUser();
   const tenantId = authData?.user?.tenantId;
@@ -98,12 +107,12 @@ export default function CasesPage() {
               {cases.length} total application{cases.length !== 1 ? "s" : ""} · manage progress and share customer links.
             </p>
           </div>
-          <Link href="/app/cases/new">
-            <Button className="gap-2" data-testid="button-new-case">
+          <Button asChild className="gap-2" data-testid="button-new-case">
+            <Link href="/app/cases/new">
               <Plus className="w-4 h-4" />
               New Application
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4">
@@ -145,11 +154,11 @@ export default function CasesPage() {
               {cases.length === 0 ? "No applications yet." : "No applications match your filters."}
             </p>
             {cases.length === 0 && (
-              <Link href="/app/cases/new">
-                <Button className="mt-4 gap-2">
+              <Button asChild className="mt-4 gap-2">
+                <Link href="/app/cases/new">
                   <Plus className="w-4 h-4" /> Create First Application
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             )}
           </div>
         ) : (
@@ -184,8 +193,8 @@ export default function CasesPage() {
                     {filteredCases.map((c) => (
                       <TableRow key={c.id} data-testid={`case-row-${c.id}`}>
                         <TableCell className="font-mono text-xs">
-                          <Link href={`/app/cases/${c.id}`}>
-                            <a className="text-primary hover:underline font-medium">{c.caseNumber}</a>
+                          <Link href={`/app/cases/${c.id}`} asChild>
+                            <a className="text-primary hover:underline font-medium cursor-pointer">{c.caseNumber}</a>
                           </Link>
                           {c.referenceId && (
                             <p className="text-muted-foreground text-xs mt-0.5">{c.referenceId}</p>
@@ -220,12 +229,13 @@ export default function CasesPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <Link href={`/app/cases/${c.id}`}>
-                                <DropdownMenuItem>
-                                  <Eye className="w-4 h-4 mr-2" />
-                                  View Details
-                                </DropdownMenuItem>
-                              </Link>
+                              <DropdownMenuItem
+                                onClick={() => setLocation(`/app/cases/${c.id}`)}
+                                data-testid={`button-view-case-${c.id}`}
+                              >
+                                <Eye className="w-4 h-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
                               {c.referenceId && (
                                 <>
                                   <DropdownMenuItem

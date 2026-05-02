@@ -205,6 +205,28 @@ export default function CaseDetailPage() {
     },
   });
 
+  const requestSingleDocMutation = useMutation({
+    mutationFn: async (doc: Document) => {
+      const docLabel = doc.name || (doc.type || "document").replace(/_/g, " ");
+      const content = `Hi ${caseData?.applicantName || ""}, the previously uploaded "${docLabel}" needs to be re-uploaded. Please log in to your portal and upload a fresh copy at your earliest convenience.`;
+      const msgRes = await fetch(`/api/cases/${id}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ content, senderRole: "agent", senderId: authData?.user?.id }),
+      });
+      if (!msgRes.ok) throw new Error("Failed to send request");
+      return msgRes.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cases", id, "messages"] });
+      toast({ title: "Re-upload requested", description: "Customer has been notified via portal message." });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Could not send request", description: e.message, variant: "destructive" });
+    },
+  });
+
   const requestDocumentsMutation = useMutation({
     mutationFn: async () => {
       const content = `Hello ${caseData?.applicantName || ""}, please upload the remaining documents for your ${caseData?.visaType || "visa"} application via your portal at your earliest convenience. Let us know if you have any questions.`;
@@ -258,9 +280,9 @@ export default function CaseDetailPage() {
         <div className="text-center py-32">
           <AlertCircle className="w-12 h-12 mx-auto text-muted-foreground/40 mb-4" />
           <p className="text-muted-foreground font-medium">Case not found</p>
-          <Link href="/app/cases">
-            <Button className="mt-4" variant="outline">Back to Applications</Button>
-          </Link>
+          <Button asChild className="mt-4" variant="outline">
+            <Link href="/app/cases">Back to Applications</Link>
+          </Button>
         </div>
       </DashboardLayout>
     );
@@ -302,11 +324,11 @@ export default function CaseDetailPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-4">
-            <Link href="/app/cases">
-              <Button variant="ghost" size="icon" data-testid="button-back">
+            <Button asChild variant="ghost" size="icon" data-testid="button-back">
+              <Link href="/app/cases">
                 <ArrowLeft className="w-5 h-5" />
-              </Button>
-            </Link>
+              </Link>
+            </Button>
             <div>
               <div className="flex items-center gap-3 flex-wrap">
                 <h1 className="text-xl font-bold font-mono" data-testid="text-case-id">{caseData.caseNumber}</h1>
@@ -591,13 +613,40 @@ export default function CaseDetailPage() {
                                   </>
                                 )}
                                 {doc.status === "approved" && (
-                                  <Button variant="ghost" size="sm" className="flex-1 text-xs h-7">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="flex-1 text-xs h-7"
+                                    onClick={() => {
+                                      if (doc.fileUrl) {
+                                        window.open(doc.fileUrl, "_blank", "noopener,noreferrer");
+                                      } else {
+                                        toast({
+                                          title: "No file attached",
+                                          description: "This document was logged without an uploaded file.",
+                                        });
+                                      }
+                                    }}
+                                    data-testid={`button-download-doc-${doc.id}`}
+                                  >
                                     <Download className="w-3 h-3 mr-1" /> Download
                                   </Button>
                                 )}
                                 {doc.status === "needs_reupload" && (
-                                  <Button variant="outline" size="sm" className="flex-1 text-xs h-7">
-                                    <RefreshCw className="w-3 h-3 mr-1" /> Request Again
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex-1 text-xs h-7"
+                                    disabled={requestSingleDocMutation.isPending}
+                                    onClick={() => requestSingleDocMutation.mutate(doc)}
+                                    data-testid={`button-request-doc-${doc.id}`}
+                                  >
+                                    {requestSingleDocMutation.isPending ? (
+                                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                    ) : (
+                                      <RefreshCw className="w-3 h-3 mr-1" />
+                                    )}
+                                    Request Again
                                   </Button>
                                 )}
                               </div>
