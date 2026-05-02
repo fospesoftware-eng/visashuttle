@@ -102,8 +102,15 @@ Three distinct auth systems coexist:
   - `PATCH /api/co-travellers/:id` — same validation against merged record.
   - `DELETE /api/co-travellers/:id` — 204 on success.
 - UI:
-  - **Create Application** (`client/src/pages/agency/case-new.tsx`): "Co-Travellers" card with add/remove rows; co-travellers are POSTed sequentially after the case is created.
+  - **Create Application** (`client/src/pages/agency/case-new.tsx`): co-travellers are step 4 of the onboarding wizard; rows are POSTed sequentially after the case is created (or saved as draft).
   - **Case Detail** (`client/src/pages/agency/case-detail.tsx`): `CoTravellersCard` in the left sidebar — list with edit/delete buttons and add-dialog.
+
+### Case Onboarding Wizard & Drafts
+- `client/src/pages/agency/case-new.tsx` is a 5-step stepper (Destination & Visa → Applicant → Travel Details → Co-Travellers → Review). Destination is selected before Visa Type (visa-type select is disabled until a destination is picked).
+- Per-step validation runs on Next; users can also click an earlier step in the stepper to jump back. Jumping forward is blocked unless intermediate steps are valid.
+- "Save as Draft" button is available on every step once destination + visa type are filled. Drafts POST to the same `/api/tenants/:tenantId/cases` endpoint with `status: "draft"`; missing applicant name is auto-filled with `"Untitled draft"`. Date validators still apply so bad dates can't be persisted.
+- "Submit Application" on the Review step posts with `status: "pending"` after running full validation across all steps. Both flows redirect to the case detail page.
+- `StatusBadge` (`client/src/components/status-badge.tsx`) handles `draft` (slate, dashed border) and `submitted` (blue) statuses. Cases list (`client/src/pages/agency/cases.tsx`) exposes a "Drafts" filter option so partially-onboarded applications are easy to find.
 
 ### Date Validation (forms + API)
 - All travel dates must be today or later; all DOBs (applicant + co-traveller) must be in the past or today.

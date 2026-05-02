@@ -1614,6 +1614,20 @@ export async function registerRoutes(
     }
     return null;
   }
+  const ALLOWED_CASE_STATUSES = new Set([
+    "draft", "pending", "in_progress", "documents_required",
+    "under_review", "submitted", "approved", "rejected",
+  ]);
+  const ALLOWED_CASE_PRIORITIES = new Set(["low", "normal", "high", "urgent"]);
+  function validateCaseEnums(body: any): string | null {
+    if (body?.status !== undefined && !ALLOWED_CASE_STATUSES.has(body.status)) {
+      return `Invalid status: must be one of ${Array.from(ALLOWED_CASE_STATUSES).join(", ")}`;
+    }
+    if (body?.priority !== undefined && body.priority !== null && !ALLOWED_CASE_PRIORITIES.has(body.priority)) {
+      return `Invalid priority: must be one of ${Array.from(ALLOWED_CASE_PRIORITIES).join(", ")}`;
+    }
+    return null;
+  }
   function validateCoTraveller(body: any): string | null {
     if (!body?.name || typeof body.name !== "string" || !body.name.trim()) return "Co-traveller name is required";
     if (!body?.relationship || typeof body.relationship !== "string") return "Relationship is required";
@@ -1634,6 +1648,20 @@ export async function registerRoutes(
     // Validate dates: travel date can't be in the past, DOB can't be in the future
     const dateError = validateCaseDates(req.body);
     if (dateError) return res.status(400).json({ error: dateError });
+    const enumError = validateCaseEnums(req.body);
+    if (enumError) return res.status(400).json({ error: enumError });
+    // Required fields (relaxed for drafts: only destination + visa type required)
+    if (!req.body?.destinationCountry || typeof req.body.destinationCountry !== "string" || !req.body.destinationCountry.trim()) {
+      return res.status(400).json({ error: "Destination country is required" });
+    }
+    if (!req.body?.visaType || typeof req.body.visaType !== "string" || !req.body.visaType.trim()) {
+      return res.status(400).json({ error: "Visa type is required" });
+    }
+    if (req.body?.status !== "draft") {
+      if (!req.body?.applicantName || typeof req.body.applicantName !== "string" || !req.body.applicantName.trim()) {
+        return res.status(400).json({ error: "Applicant name is required (or save as draft)" });
+      }
+    }
 
     // Plan limit enforcement (cases per month)
     const tenantForCases = await storage.getTenant(req.params.tenantId);
@@ -1667,6 +1695,8 @@ export async function registerRoutes(
   app.patch("/api/cases/:id", async (req, res) => {
     const dateError = validateCaseDates(req.body);
     if (dateError) return res.status(400).json({ error: dateError });
+    const enumError = validateCaseEnums(req.body);
+    if (enumError) return res.status(400).json({ error: enumError });
 
     const caseData = await storage.updateCase(req.params.id, req.body);
     if (!caseData) {
