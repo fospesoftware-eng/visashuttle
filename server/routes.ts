@@ -17,12 +17,126 @@ import {
   insertInvoiceSettingsSchema,
   insertPaymentSchema,
   type InsertCustomerAccount,
+  AGENCY_PERMISSIONS,
 } from "@shared/schema";
 
 // Strip everything that isn't a digit. Used to build the deterministic
 // placeholder email for phone-only customer accounts.
 function normalizePhoneDigits(input: string): string {
   return input.replace(/[^\d]/g, "");
+}
+
+// Send a staff-invitation email containing the agency dashboard URL + the
+// freshly generated temporary password. We use Resend when RESEND_API_KEY is
+// configured (same provider as the invoice emailer) and fall back to a
+// "not sent — show the password to the agent" response otherwise so the owner
+// can still hand the credentials to the new member out-of-band.
+async function sendStaffInviteEmail(opts: {
+  to: string;
+  name: string;
+  tenantName: string;
+  tempPassword: string;
+  loginUrl: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return { ok: false, error: "RESEND_API_KEY not configured" };
+  const fromAddress = process.env.RESEND_FROM ?? "onboarding@resend.dev";
+  const subject = `You've been added to ${opts.tenantName} on VisaShuttle`;
+  const text =
+    `Hi ${opts.name},\n\n` +
+    `${opts.tenantName} has added you as a team member on VisaShuttle.\n\n` +
+    `Sign in at: ${opts.loginUrl}\n` +
+    `Email:    ${opts.to}\n` +
+    `Password: ${opts.tempPassword}\n\n` +
+    `For your security, please change your password after the first login.\n\n` +
+    `— VisaShuttle`;
+  try {
+    const resp = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ from: fromAddress, to: [opts.to], subject, text }),
+    });
+    if (!resp.ok) {
+      const detail = await resp.text().catch(() => "");
+      console.warn("[staff-invite] Resend rejected:", resp.status, detail.slice(0, 200));
+      return { ok: false, error: `Resend HTTP ${resp.status}` };
+    }
+    return { ok: true };
+  } catch (err) {
+    console.warn("[staff-invite] Resend network error:", err);
+    return { ok: false, error: "Network error contacting email provider" };
+  }
+}
+
+// Resolve the team member who should own a new lead/case. Falls back to the
+// currently signed-in user when the client doesn't specify one. Always
+// validates that the resolved user belongs to the tenant — assigning a lead
+// or case to a user from a different agency is never allowed. Returns the
+// assignee userId or `null` when no valid assignee can be determined (caller
+// is unauthenticated AND no explicit valid assignee was passed).
+async function resolveTenantAssignee(
+  req: Request,
+  tenantId: string,
+  candidate: unknown,
+): Promise<string | null> {
+  const TEAM_ROLES = ["agency_owner", "agency_manager", "agency_staff"];
+  const candidateId = typeof candidate === "string" && candidate.trim() ? candidate.trim() : null;
+  // 1) Try the explicit candidate first.
+  if (candidateId) {
+    const user = await storage.getUser(candidateId);
+    if (user && user.tenantId === tenantId && TEAM_ROLES.includes(user.role)) {
+      return user.id;
+    }
+  }
+  // 2) Fall back to the signed-in user — but only when they actually belong
+  //    to this tenant AND hold a team-member role. Customers signed into the
+  //    same tenant are NOT allowed to own a lead/case, so we always reload the
+  //    user from storage and check their role; never trust the session alone.
+  const sessionUserId = req.session?.userId;
+  if (sessionUserId) {
+    const me = await storage.getUser(sessionUserId);
+    if (me && me.tenantId === tenantId && TEAM_ROLES.includes(me.role)) {
+      return me.id;
+    }
+  }
+  return null;
+}
+
+// Guard for the tenant-staff management endpoints. Confirms the caller is
+// signed into THIS tenant AND holds an owner/manager role (or is a saas_admin
+// acting on any tenant). Prevents cross-tenant reads/writes and stops a
+// regular staff member from inviting/editing/removing colleagues. On failure
+// it sends the response and returns null; otherwise it returns the loaded
+// caller user.
+async function requireTenantStaffAdmin(
+  req: Request,
+  res: Response,
+  tenantId: string,
+): Promise<{ id: string; role: string; tenantId: string | null } | null> {
+  const callerId = req.session?.userId;
+  if (!callerId) {
+    res.status(401).json({ error: "Authentication required" });
+    return null;
+  }
+  const caller = await storage.getUser(callerId);
+  if (!caller) {
+    res.status(401).json({ error: "Authentication required" });
+    return null;
+  }
+  // saas_admin can manage any tenant's staff (used by the platform team).
+  if (caller.role === "saas_admin") return caller;
+  if (caller.tenantId !== tenantId) {
+    res.status(403).json({ error: "You don't have access to this agency" });
+    return null;
+  }
+  if (!["agency_owner", "agency_manager"].includes(caller.role)) {
+    res.status(403).json({ error: "Only an agency owner or manager can manage team members" });
+    return null;
+  }
+  return caller;
 }
 
 // Indian state codes for GST place-of-supply lookups.
@@ -1044,19 +1158,28 @@ export async function registerRoutes(
   });
 
   app.post("/api/tenants/:tenantId/leads", async (req, res) => {
+    const tenantId = req.params.tenantId;
     // Plan limit enforcement
-    const tenantForLeads = await storage.getTenant(req.params.tenantId);
+    const tenantForLeads = await storage.getTenant(tenantId);
     if (tenantForLeads) {
       const planLeadLimits: Record<string, number> = { starter: 50, professional: 500, enterprise: 9999 };
       const leadLimit = planLeadLimits[tenantForLeads.plan ?? "starter"] ?? 50;
-      const existingLeads = await storage.getLeadsByTenantId(req.params.tenantId);
+      const existingLeads = await storage.getLeadsByTenantId(tenantId);
       if (existingLeads.length >= leadLimit) {
         return res.status(403).json({ error: `Lead limit reached for your ${tenantForLeads.plan} plan (${leadLimit}). Please upgrade.` });
       }
     }
+    // Resolve assignee: client may pass one explicitly; otherwise default to
+    // the currently signed-in user. Either way we must validate the assignee
+    // belongs to this tenant — leads cannot be assigned to a foreign user.
+    const assignedTo = await resolveTenantAssignee(req, tenantId, req.body?.assignedTo);
+    if (!assignedTo) {
+      return res.status(400).json({ error: "A team member must be assigned to this lead." });
+    }
     const lead = await storage.createLead({
       ...req.body,
-      tenantId: req.params.tenantId
+      assignedTo,
+      tenantId,
     });
     res.status(201).json(lead);
   });
@@ -1758,8 +1881,16 @@ export async function registerRoutes(
         return res.status(403).json({ error: `Monthly case limit reached for your ${tenantForCases.plan} plan (${caseLimit}). Please upgrade.` });
       }
     }
+    // Resolve assignee — every case must be owned by a team member of this
+    // tenant. The wizard always sends one (defaulted to the signed-in user)
+    // but we still validate it server-side.
+    const assignedTo = await resolveTenantAssignee(req, req.params.tenantId, req.body?.assignedTo);
+    if (!assignedTo) {
+      return res.status(400).json({ error: "A team member must be assigned to this case." });
+    }
     const caseData = await storage.createCase({
       ...req.body,
+      assignedTo,
       tenantId: req.params.tenantId,
       referenceId: req.body.referenceId || generateReferenceId()
     });
@@ -3164,8 +3295,24 @@ export async function registerRoutes(
   });
 
   // === Tenant Staff Management ===
+  // The team listing is needed by the leads + case-new pages to populate
+  // their assignee dropdowns, so we open it to all team-role users of the
+  // tenant — but customers signed into the same tenant must NOT be able to
+  // enumerate the agency's internal staff names/emails. saas_admin bypasses.
   app.get("/api/tenants/:tenantId/staff", requireAgencyAuth, async (req, res) => {
-    const users = await storage.getUsersByTenantId(req.params.tenantId);
+    const tenantId = req.params.tenantId;
+    const callerId = req.session?.userId;
+    const caller = callerId ? await storage.getUser(callerId) : null;
+    if (!caller) return res.status(401).json({ error: "Authentication required" });
+    // Only team members of this tenant (or a saas_admin) may enumerate the
+    // staff directory — customers signed into the same tenant must never see
+    // the agency's internal staff names/emails.
+    const isTeamMember = caller.tenantId === tenantId
+      && ["agency_owner", "agency_manager", "agency_staff"].includes(caller.role);
+    if (caller.role !== "saas_admin" && !isTeamMember) {
+      return res.status(403).json({ error: "You don't have access to this agency's team" });
+    }
+    const users = await storage.getUsersByTenantId(tenantId);
     const staff = users
       .filter(u => ["agency_owner", "agency_staff", "agency_manager"].includes(u.role))
       .map(({ password: _, ...u }) => u)
@@ -3174,9 +3321,21 @@ export async function registerRoutes(
   });
 
   app.post("/api/tenants/:tenantId/staff", requireAgencyAuth, async (req, res) => {
-    const { email, name, role } = req.body;
-    if (!email || !name) return res.status(400).json({ error: "Email and name are required" });
     const tenantId = req.params.tenantId;
+    // Only an owner/manager of THIS tenant (or a saas_admin) can invite staff.
+    const caller = await requireTenantStaffAdmin(req, res, tenantId);
+    if (!caller) return; // helper already wrote the error response
+    const { email, name, role, permissions } = req.body;
+    if (!email || !name) return res.status(400).json({ error: "Email and name are required" });
+    // Block creating another agency_owner via this endpoint — owners are
+    // seeded during signup and only saas_admin should ever mint a new one.
+    const requestedRole = (role ?? "agency_staff") as string;
+    if (requestedRole === "agency_owner" && caller.role !== "saas_admin") {
+      return res.status(403).json({ error: "Cannot invite a user as agency owner" });
+    }
+    if (!["agency_staff", "agency_manager", "agency_owner"].includes(requestedRole)) {
+      return res.status(400).json({ error: "Invalid role" });
+    }
     const existing = await storage.getUserByEmail(email.toLowerCase().trim());
     if (existing) return res.status(409).json({ error: "A user with that email already exists" });
     // Plan limits check
@@ -3188,15 +3347,34 @@ export async function registerRoutes(
     if (staffCount >= limit) {
       return res.status(403).json({ error: `Your ${tenant?.plan} plan allows up to ${limit} staff members. Upgrade to add more.` });
     }
+    // Whitelist permissions against the canonical AGENCY_PERMISSIONS set so
+    // a malicious client can't inject arbitrary strings into the array.
+    const safePermissions = Array.isArray(permissions)
+      ? permissions.filter((p: unknown): p is string =>
+          typeof p === "string" && (AGENCY_PERMISSIONS as readonly string[]).includes(p))
+      : [];
     const tempPassword = Math.random().toString(36).slice(-10) + "Aa1!";
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
     const user = await storage.createUser({
       email: email.toLowerCase().trim(),
       name: name.trim(),
       password: hashedPassword,
-      role: role ?? "agency_staff",
+      role: requestedRole,
       tenantId,
       avatarUrl: null,
+      permissions: safePermissions,
+    });
+    // Try to email the credentials. Fall back to returning the temp password
+    // so the agency owner can hand it over manually if email isn't configured.
+    const proto = (req.headers["x-forwarded-proto"] as string | undefined)?.split(",")[0]?.trim() ?? req.protocol;
+    const host = req.headers.host ?? "";
+    const loginUrl = host ? `${proto}://${host}/login` : "/login";
+    const emailResult = await sendStaffInviteEmail({
+      to: email.toLowerCase().trim(),
+      name: name.trim(),
+      tenantName: tenant?.name ?? "your agency",
+      tempPassword,
+      loginUrl,
     });
     await storage.createActivityLog({
       tenantId,
@@ -3204,15 +3382,57 @@ export async function registerRoutes(
       action: "staff.invited",
       entityType: "user",
       entityId: user.id,
-      details: { email, name, role: role ?? "agency_staff" },
+      details: {
+        email, name,
+        role: requestedRole,
+        permissions: safePermissions,
+        emailSent: emailResult.ok,
+      },
     });
     const { password: _, ...safeUser } = user;
-    res.status(201).json({ ...safeUser, tempPassword });
+    res.status(201).json({
+      ...safeUser,
+      // Always include the temp password for the owner UI — even when email
+      // succeeds the owner may want to hand it over directly. The UI keeps
+      // it inside the success toast for ~10s and never persists it anywhere.
+      tempPassword,
+      emailSent: emailResult.ok,
+      emailError: emailResult.ok ? undefined : emailResult.error,
+    });
   });
 
   app.patch("/api/tenants/:tenantId/staff/:userId", requireAgencyAuth, async (req, res) => {
-    const { role, name } = req.body;
-    const user = await storage.updateUser(req.params.userId, { role, name });
+    const tenantId = req.params.tenantId;
+    const caller = await requireTenantStaffAdmin(req, res, tenantId);
+    if (!caller) return;
+    // Confirm the target user actually belongs to this tenant AND is a
+    // team-role user — these "staff" endpoints must never mutate a customer
+    // account (or any other non-staff role) that happens to share the tenant.
+    const target = await storage.getUser(req.params.userId);
+    if (!target || target.tenantId !== tenantId
+        || !["agency_owner", "agency_manager", "agency_staff"].includes(target.role)) {
+      return res.status(404).json({ error: "Staff member not found" });
+    }
+    const { role, name, permissions } = req.body;
+    const patch: { role?: string; name?: string; permissions?: string[] } = {};
+    if (name !== undefined) patch.name = name;
+    if (role !== undefined) {
+      if (!["agency_staff", "agency_manager", "agency_owner"].includes(role)) {
+        return res.status(400).json({ error: "Invalid role" });
+      }
+      // Ownership transfers must go through a dedicated flow (or saas_admin).
+      // Block both demoting an owner and promoting anyone TO owner here.
+      const isOwnershipChange = target.role === "agency_owner" || role === "agency_owner";
+      if (isOwnershipChange && caller.role !== "saas_admin") {
+        return res.status(403).json({ error: "Ownership changes are not allowed via this endpoint" });
+      }
+      patch.role = role;
+    }
+    if (Array.isArray(permissions)) {
+      patch.permissions = permissions.filter((p: unknown): p is string =>
+        typeof p === "string" && (AGENCY_PERMISSIONS as readonly string[]).includes(p));
+    }
+    const user = await storage.updateUser(req.params.userId, patch);
     if (!user) return res.status(404).json({ error: "User not found" });
     const { password: _, ...safeUser } = user;
     res.json(safeUser);
@@ -3221,12 +3441,19 @@ export async function registerRoutes(
   app.delete("/api/tenants/:tenantId/staff/:userId", requireAgencyAuth, async (req, res) => {
     const tenantId = req.params.tenantId;
     const userId = req.params.userId;
+    const caller = await requireTenantStaffAdmin(req, res, tenantId);
+    if (!caller) return;
     if (userId === req.session.userId) {
       return res.status(400).json({ error: "You cannot remove yourself" });
     }
     const user = await storage.getUser(userId);
-    if (!user || user.tenantId !== tenantId) {
+    if (!user || user.tenantId !== tenantId
+        || !["agency_owner", "agency_manager", "agency_staff"].includes(user.role)) {
       return res.status(404).json({ error: "Staff member not found" });
+    }
+    // Block deleting the agency owner via this endpoint — same rule as PATCH.
+    if (user.role === "agency_owner" && caller.role !== "saas_admin") {
+      return res.status(403).json({ error: "Cannot remove the agency owner" });
     }
     await storage.deleteUser(userId);
     await storage.createActivityLog({

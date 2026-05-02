@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, Search, MoreVertical, Mail, Phone, Loader2, AlertCircle, Briefcase, GripVertical, MapPin } from "lucide-react";
+import { Plus, Search, MoreVertical, Mail, Phone, Loader2, AlertCircle, Briefcase, GripVertical, MapPin, UserCog } from "lucide-react";
 import { getCountryVisaConfig } from "@/data/country-visa-types";
 import {
   DndContext,
@@ -87,7 +87,14 @@ const emptyForm = {
   destinationCountry: "",
   visaType: "",
   notes: "",
+  // Every lead must be owned by a team member; the form auto-fills this with
+  // the currently signed-in user when the dialog opens, but the agency owner
+  // can pick any other team member from the dropdown.
+  assignedTo: "",
 };
+
+// Minimal staff shape we render in the assignee dropdown / card.
+type StaffMember = { id: string; name: string; role: string };
 
 const GENERIC_VISA_TYPES = [
   "Tourist Visa", "Business Visa", "Student Visa", "Work Visa",
@@ -175,10 +182,13 @@ interface LeadCardContentProps {
   onConvert: (lead: Lead) => void;
   onDelete: (id: string) => void;
   onMove: (id: string, stage: string) => void;
+  onReassign?: (id: string, userId: string) => void;
   currentStage: string;
+  staff?: StaffMember[];
+  assigneeName?: string | null;
 }
 
-function LeadCardBody({ lead, onEdit, onConvert, onDelete, onMove, currentStage }: LeadCardContentProps) {
+function LeadCardBody({ lead, onEdit, onConvert, onDelete, onMove, onReassign, currentStage, staff = [], assigneeName }: LeadCardContentProps) {
   return (
     <div className="p-3 rounded-xl bg-background/95 shadow-sm hover-elevate cursor-grab active:cursor-grabbing space-y-2 border border-border/40 select-none">
       <div className="flex items-start justify-between gap-2">
@@ -224,6 +234,23 @@ function LeadCardBody({ lead, onEdit, onConvert, onDelete, onMove, currentStage 
                 → {s.replace("_", " ")}
               </DropdownMenuItem>
             ))}
+            {onReassign && staff.length > 0 && (
+              <>
+                <DropdownMenuSeparator />
+                <p className="text-xs text-muted-foreground px-2 py-1">Reassign to</p>
+                {staff.map((s) => (
+                  <DropdownMenuItem
+                    key={s.id}
+                    onClick={() => onReassign(lead.id, s.id)}
+                    disabled={s.id === lead.assignedTo}
+                    data-testid={`button-reassign-lead-${lead.id}-${s.id}`}
+                  >
+                    <UserCog className="w-3.5 h-3.5 mr-2" />
+                    {s.name}
+                  </DropdownMenuItem>
+                ))}
+              </>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive" onClick={() => onDelete(lead.id)}>
               Delete
@@ -247,6 +274,14 @@ function LeadCardBody({ lead, onEdit, onConvert, onDelete, onMove, currentStage 
           <span className="truncate">
             {[lead.destinationCountry, lead.visaType].filter(Boolean).join(" · ")}
           </span>
+        </div>
+      )}
+      {/* Owning team member — shown on every card so the agency can see at a
+          glance who is responsible for following up on this lead. */}
+      {assigneeName && (
+        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground pt-1 border-t border-border/40">
+          <UserCog className="w-3 h-3 shrink-0" />
+          <span className="truncate">Owner: {assigneeName}</span>
         </div>
       )}
     </div>
@@ -298,6 +333,7 @@ export default function LeadsPage() {
   const [, setLocation] = useLocation();
   const { data: authData } = useCurrentUser();
   const tenantId = authData?.user?.tenantId;
+  const currentUserId = authData?.user?.id;
   const [convertForm, setConvertForm] = useState({ visaType: "", destinationCountry: "", priority: "normal" });
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -321,6 +357,31 @@ export default function LeadsPage() {
     },
     enabled: !!tenantId,
   });
+
+  // Team members for the assignee dropdowns. Filtered to actual agency staff
+  // (owner / manager / staff) — we never want to show customers in here.
+  const { data: staffRaw = [] } = useQuery<any[]>({
+    queryKey: ["/api/tenants", tenantId, "staff"],
+    queryFn: async () => {
+      const res = await fetch(`/api/tenants/${tenantId}/staff`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!tenantId,
+  });
+  const staff: StaffMember[] = useMemo(
+    () => staffRaw
+      .filter((u: any) => ["agency_owner", "agency_manager", "agency_staff"].includes(u.role))
+      .map((u: any) => ({ id: u.id, name: u.name, role: u.role })),
+    [staffRaw],
+  );
+  // Look up an assignee's display name by id. Falls back to "Unassigned"
+  // (which should never happen for newly-created leads now that the API
+  // requires it, but old rows may still have a null assignee).
+  const assigneeNameById = (id: string | null | undefined): string | null => {
+    if (!id) return null;
+    return staff.find((s) => s.id === id)?.name ?? "Unknown";
+  };
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof emptyForm) => {
@@ -425,6 +486,10 @@ export default function LeadsPage() {
       toast({ title: "Required fields", description: "Name and email are required.", variant: "destructive" });
       return;
     }
+    if (!form.assignedTo) {
+      toast({ title: "Assignee required", description: "Pick a team member who'll own this lead.", variant: "destructive" });
+      return;
+    }
     if (editLead) {
       updateMutation.mutate({ id: editLead.id, data: form });
     } else {
@@ -442,8 +507,20 @@ export default function LeadsPage() {
       destinationCountry: lead.destinationCountry ?? "",
       visaType: lead.visaType ?? "",
       notes: lead.notes ?? "",
+      assignedTo: lead.assignedTo ?? "",
     });
   };
+
+  // When the Add Lead dialog opens, default the assignee to the current user
+  // unless they've already picked someone else manually. We only seed once
+  // per "open" so the user can clear it afterwards.
+  useEffect(() => {
+    if (!isAddOpen || editLead) return;
+    if (form.assignedTo) return;
+    if (!currentUserId) return;
+    setForm((prev) => ({ ...prev, assignedTo: currentUserId }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAddOpen, editLead, currentUserId]);
 
   const openConvert = (lead: Lead) => {
     setConvertLead(lead);
@@ -570,6 +647,25 @@ export default function LeadsPage() {
                     </Select>
                   </div>
                   <div className="space-y-2 col-span-2">
+                    <Label>Assigned Team Member *</Label>
+                    <Select
+                      value={form.assignedTo}
+                      onValueChange={(v) => setForm({ ...form, assignedTo: v })}
+                    >
+                      <SelectTrigger data-testid="select-lead-assignee">
+                        <SelectValue placeholder="Select a team member" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {staff.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.name}{s.id === currentUserId ? " (you)" : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[11px] text-muted-foreground">Defaults to you — pick another team member to hand it off.</p>
+                  </div>
+                  <div className="space-y-2 col-span-2">
                     <Label>Notes</Label>
                     <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Any notes..." data-testid="input-lead-notes" />
                   </div>
@@ -649,7 +745,10 @@ export default function LeadsPage() {
                               onConvert={openConvert}
                               onDelete={(id) => setDeleteLeadId(id)}
                               onMove={(id, s) => moveStageMutation.mutate({ id, stage: s })}
+                              onReassign={(id, userId) => updateMutation.mutate({ id, data: { assignedTo: userId } as Partial<Lead> })}
                               currentStage={stage}
+                              staff={staff}
+                              assigneeName={assigneeNameById(lead.assignedTo)}
                             />
                           </DraggableLead>
                         ))
@@ -669,6 +768,8 @@ export default function LeadsPage() {
                     onDelete={() => {}}
                     onMove={() => {}}
                     currentStage={activeDragLead.stage}
+                    staff={staff}
+                    assigneeName={assigneeNameById(activeDragLead.assignedTo)}
                   />
                 </div>
               ) : null}

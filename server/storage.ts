@@ -263,6 +263,7 @@ export class MemStorage implements IStorage {
       role: "saas_admin",
       tenantId: null,
       avatarUrl: null,
+      permissions: [],
       createdAt: new Date()
     };
     this.users.set(adminUser.id, adminUser);
@@ -275,6 +276,9 @@ export class MemStorage implements IStorage {
       role: "agency_owner",
       tenantId: "tenant-1",
       avatarUrl: null,
+      // Owner is implicitly all-access at the route layer; the array is just
+      // for completeness so the type matches.
+      permissions: [],
       createdAt: new Date()
     };
     this.users.set(agencyOwner.id, agencyOwner);
@@ -287,6 +291,7 @@ export class MemStorage implements IStorage {
       role: "customer",
       tenantId: "tenant-1",
       avatarUrl: null,
+      permissions: [],
       createdAt: new Date()
     };
     this.users.set(customer.id, customer);
@@ -610,6 +615,7 @@ export class MemStorage implements IStorage {
       role: insertUser.role ?? "customer",
       tenantId: insertUser.tenantId ?? null,
       avatarUrl: insertUser.avatarUrl ?? null,
+      permissions: insertUser.permissions ?? [],
       createdAt: new Date() 
     };
     this.users.set(id, user);

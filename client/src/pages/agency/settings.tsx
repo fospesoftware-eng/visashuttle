@@ -21,10 +21,11 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import type { Tenant } from "@shared/schema";
+import { AGENCY_PERMISSIONS, type AgencyPermission, type Tenant } from "@shared/schema";
 import { useCurrentUser } from "@/hooks/use-current-user";
 
 // ─── Team Tab Component ────────────────────────────────────────────────────────
@@ -35,12 +36,40 @@ const ROLE_LABELS: Record<string, string> = {
   agency_staff: "Staff",
 };
 
+// Human-friendly labels for the granular permission flags. Keep in sync with
+// AGENCY_PERMISSIONS in shared/schema.ts.
+const PERMISSION_LABELS: Record<AgencyPermission, string> = {
+  leads: "Leads pipeline",
+  cases: "Applications / cases",
+  documents: "Document Center",
+  accounting: "Accounting (invoices, payments)",
+  analytics: "Reports & analytics",
+  team: "Manage team members",
+  settings: "Edit agency settings",
+};
+
+// Sensible per-role defaults the dialog seeds when the user picks a role.
+// Owner is implicit — they always have everything regardless of this array.
+const DEFAULT_PERMISSIONS_BY_ROLE: Record<string, AgencyPermission[]> = {
+  agency_staff: ["leads", "cases", "documents"],
+  agency_manager: [...AGENCY_PERMISSIONS],
+};
+
+type InviteForm = { name: string; email: string; role: string; permissions: AgencyPermission[] };
+type EditForm = { id: string; name: string; role: string; permissions: AgencyPermission[] };
+
 function TeamTab({ tenantId, currentUserId }: { tenantId?: string; currentUserId?: string }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [removeId, setRemoveId] = useState<string | null>(null);
-  const [inviteForm, setInviteForm] = useState({ name: "", email: "", role: "agency_staff" });
+  const [editMember, setEditMember] = useState<EditForm | null>(null);
+  const [inviteForm, setInviteForm] = useState<InviteForm>({
+    name: "",
+    email: "",
+    role: "agency_staff",
+    permissions: DEFAULT_PERMISSIONS_BY_ROLE.agency_staff,
+  });
 
   const { data: staff = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/tenants", tenantId, "staff"],
@@ -63,7 +92,7 @@ function TeamTab({ tenantId, currentUserId }: { tenantId?: string; currentUserId
   });
 
   const inviteMutation = useMutation({
-    mutationFn: async (data: typeof inviteForm) => {
+    mutationFn: async (data: InviteForm) => {
       const res = await apiRequest("POST", `/api/tenants/${tenantId}/staff`, data);
       return res.json();
     },
@@ -71,12 +100,39 @@ function TeamTab({ tenantId, currentUserId }: { tenantId?: string; currentUserId
       queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "staff"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "usage"] });
       setIsInviteOpen(false);
-      setInviteForm({ name: "", email: "", role: "agency_staff" });
-      toast({
-        title: "Staff member added",
-        description: `Temporary password: ${data.tempPassword} — share this with them.`,
-        duration: 10000,
+      setInviteForm({ name: "", email: "", role: "agency_staff", permissions: DEFAULT_PERMISSIONS_BY_ROLE.agency_staff });
+      // The server tries Resend first; if email succeeded we say so, otherwise
+      // we still surface the temp password so the owner can share it manually.
+      if (data.emailSent) {
+        toast({
+          title: "Team member added",
+          description: `Login credentials emailed to ${data.email}.`,
+          duration: 8000,
+        });
+      } else {
+        toast({
+          title: "Team member added",
+          description: `Email delivery isn't configured — share these credentials yourself: ${data.email} / ${data.tempPassword}`,
+          duration: 15000,
+        });
+      }
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const updateMemberMutation = useMutation({
+    mutationFn: async (data: EditForm) => {
+      const res = await apiRequest("PATCH", `/api/tenants/${tenantId}/staff/${data.id}`, {
+        name: data.name,
+        role: data.role,
+        permissions: data.permissions,
       });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "staff"] });
+      setEditMember(null);
+      toast({ title: "Team member updated" });
     },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
@@ -93,6 +149,10 @@ function TeamTab({ tenantId, currentUserId }: { tenantId?: string; currentUserId
     },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
+
+  // Toggle a single permission in either the invite form or the edit form.
+  const togglePerm = (perms: AgencyPermission[], perm: AgencyPermission): AgencyPermission[] =>
+    perms.includes(perm) ? perms.filter((p) => p !== perm) : [...perms, perm];
 
   const staffLimit = usageData?.limits?.staff ?? 3;
   const staffCount = usageData?.usage?.staff ?? staff.length;
@@ -116,10 +176,12 @@ function TeamTab({ tenantId, currentUserId }: { tenantId?: string; currentUserId
                 Add Member
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-lg">
               <DialogHeader>
                 <DialogTitle>Add Team Member</DialogTitle>
-                <DialogDescription>They'll receive access credentials to your agency dashboard.</DialogDescription>
+                <DialogDescription>
+                  Pick a role and tick the areas they should be able to access. We'll email them their login details when Resend is configured, otherwise the temporary password will be shown to you so you can share it.
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 mt-2">
                 <div className="space-y-2">
@@ -132,20 +194,47 @@ function TeamTab({ tenantId, currentUserId }: { tenantId?: string; currentUserId
                 </div>
                 <div className="space-y-2">
                   <Label>Role</Label>
-                  <Select value={inviteForm.role} onValueChange={v => setInviteForm({ ...inviteForm, role: v })}>
+                  <Select
+                    value={inviteForm.role}
+                    onValueChange={v => setInviteForm({
+                      ...inviteForm,
+                      role: v,
+                      // Re-seed permissions to the role default — owner can
+                      // still tweak the boxes manually below.
+                      permissions: DEFAULT_PERMISSIONS_BY_ROLE[v] ?? inviteForm.permissions,
+                    })}
+                  >
                     <SelectTrigger data-testid="select-staff-role">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="agency_staff">Staff — can manage cases & leads</SelectItem>
-                      <SelectItem value="agency_manager">Manager — can manage team & settings</SelectItem>
+                      <SelectItem value="agency_staff">Staff — can manage cases &amp; leads</SelectItem>
+                      <SelectItem value="agency_manager">Manager — can manage team &amp; settings</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 p-3">
-                  <p className="text-xs text-amber-700 dark:text-amber-300">
-                    A temporary password will be generated and shown to you after creation. Share it securely with the staff member.
-                  </p>
+                <div className="space-y-2">
+                  <Label>Access &amp; Permissions</Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-lg border p-3">
+                    {AGENCY_PERMISSIONS.map((perm) => (
+                      <label
+                        key={perm}
+                        htmlFor={`perm-invite-${perm}`}
+                        className="flex items-center gap-2 text-sm cursor-pointer"
+                      >
+                        <Checkbox
+                          id={`perm-invite-${perm}`}
+                          checked={inviteForm.permissions.includes(perm)}
+                          onCheckedChange={() => setInviteForm({
+                            ...inviteForm,
+                            permissions: togglePerm(inviteForm.permissions, perm),
+                          })}
+                          data-testid={`checkbox-perm-${perm}`}
+                        />
+                        <span>{PERMISSION_LABELS[perm]}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
                 <Button className="w-full" onClick={() => inviteMutation.mutate(inviteForm)} disabled={inviteMutation.isPending} data-testid="button-submit-staff">
                   {inviteMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
@@ -162,36 +251,80 @@ function TeamTab({ tenantId, currentUserId }: { tenantId?: string; currentUserId
             </div>
           ) : (
             <div className="divide-y rounded-xl border overflow-hidden">
-              {staff.map((member: any) => (
-                <div key={member.id} className="flex items-center gap-4 p-4 bg-background hover:bg-muted/30 transition-colors" data-testid={`staff-row-${member.id}`}>
-                  <Avatar className="w-9 h-9 shrink-0">
+              {staff.map((member: any) => {
+                const memberPerms: AgencyPermission[] = Array.isArray(member.permissions)
+                  ? member.permissions.filter((p: any): p is AgencyPermission =>
+                      (AGENCY_PERMISSIONS as readonly string[]).includes(p))
+                  : [];
+                const isOwner = member.role === "agency_owner";
+                return (
+                <div key={member.id} className="flex items-start gap-4 p-4 bg-background hover:bg-muted/30 transition-colors" data-testid={`staff-row-${member.id}`}>
+                  <Avatar className="w-9 h-9 shrink-0 mt-0.5">
                     <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
                       {member.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-medium text-sm">{member.name}</p>
                       {member.id === currentUserId && <Badge variant="secondary" className="text-xs">You</Badge>}
+                      <Badge variant="outline" className="text-xs capitalize">
+                        {ROLE_LABELS[member.role] ?? member.role}
+                      </Badge>
                     </div>
                     <p className="text-xs text-muted-foreground truncate">{member.email}</p>
+                    {/* Owner is implicitly all-access; for everyone else show
+                        the granular permission badges so the agency knows at a
+                        glance what each member can touch. */}
+                    {!isOwner && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {memberPerms.length === 0 ? (
+                          <span className="text-[11px] text-muted-foreground italic">No access permissions yet — click Edit.</span>
+                        ) : (
+                          memberPerms.map((p) => (
+                            <Badge key={p} variant="secondary" className="text-[10px] font-normal">
+                              {PERMISSION_LABELS[p]}
+                            </Badge>
+                          ))
+                        )}
+                      </div>
+                    )}
+                    {isOwner && (
+                      <p className="mt-2 text-[11px] text-muted-foreground">Full access (owner)</p>
+                    )}
                   </div>
-                  <Badge variant="outline" className="text-xs capitalize shrink-0">
-                    {ROLE_LABELS[member.role] ?? member.role}
-                  </Badge>
-                  {member.id !== currentUserId && member.role !== "agency_owner" && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
-                      onClick={() => setRemoveId(member.id)}
-                      data-testid={`button-remove-staff-${member.id}`}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                  {!isOwner && (
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs"
+                        onClick={() => setEditMember({
+                          id: member.id,
+                          name: member.name,
+                          role: member.role,
+                          permissions: memberPerms,
+                        })}
+                        data-testid={`button-edit-staff-${member.id}`}
+                      >
+                        Edit
+                      </Button>
+                      {member.id !== currentUserId && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={() => setRemoveId(member.id)}
+                          data-testid={`button-remove-staff-${member.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
                   )}
                 </div>
-              ))}
+                );
+              })}
               {staff.length === 0 && (
                 <div className="p-8 text-center text-sm text-muted-foreground">No team members yet.</div>
               )}
@@ -205,6 +338,75 @@ function TeamTab({ tenantId, currentUserId }: { tenantId?: string; currentUserId
           )}
         </CardContent>
       </Card>
+
+      {/* Edit member dialog — change role + flip permission checkboxes */}
+      <Dialog open={!!editMember} onOpenChange={open => !open && setEditMember(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Team Member</DialogTitle>
+            <DialogDescription>Adjust their role and access permissions.</DialogDescription>
+          </DialogHeader>
+          {editMember && (
+            <div className="space-y-4 mt-2">
+              <div className="space-y-2">
+                <Label>Full Name</Label>
+                <Input
+                  value={editMember.name}
+                  onChange={e => setEditMember({ ...editMember, name: e.target.value })}
+                  data-testid="input-edit-staff-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Role</Label>
+                <Select
+                  value={editMember.role}
+                  onValueChange={v => setEditMember({ ...editMember, role: v })}
+                >
+                  <SelectTrigger data-testid="select-edit-staff-role">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="agency_staff">Staff</SelectItem>
+                    <SelectItem value="agency_manager">Manager</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Access &amp; Permissions</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-lg border p-3">
+                  {AGENCY_PERMISSIONS.map((perm) => (
+                    <label
+                      key={perm}
+                      htmlFor={`perm-edit-${perm}`}
+                      className="flex items-center gap-2 text-sm cursor-pointer"
+                    >
+                      <Checkbox
+                        id={`perm-edit-${perm}`}
+                        checked={editMember.permissions.includes(perm)}
+                        onCheckedChange={() => setEditMember({
+                          ...editMember,
+                          permissions: togglePerm(editMember.permissions, perm),
+                        })}
+                        data-testid={`checkbox-edit-perm-${perm}`}
+                      />
+                      <span>{PERMISSION_LABELS[perm]}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <Button
+                className="w-full"
+                onClick={() => updateMemberMutation.mutate(editMember)}
+                disabled={updateMemberMutation.isPending}
+                data-testid="button-save-staff"
+              >
+                {updateMemberMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                Save Changes
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Remove confirmation */}
       <AlertDialog open={!!removeId} onOpenChange={open => !open && setRemoveId(null)}>

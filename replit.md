@@ -16,6 +16,19 @@ The application uses a monorepo structure with a React frontend and Express back
 
 Preferred communication style: Simple, everyday language.
 
+## Team Member Assignment & Permissions (May 2026)
+
+Every lead and case in the agency dashboard is owned by exactly one team member. The owner is shown on the lead card and case header, and only an agency owner / manager can re-assign work.
+
+- **Schema**: `users.permissions` is a `text[]` of granular access flags. The valid flags are exported from `shared/schema.ts` as `AGENCY_PERMISSIONS`: `leads`, `cases`, `documents`, `accounting`, `analytics`, `team`, `settings`. Owner accounts are implicitly all-access; the flags only gate non-owner staff.
+- **Routes** (`server/routes.ts`):
+  - `POST /api/tenants/:tenantId/staff` accepts `permissions: string[]`, generates a temporary password, tries to email it via Resend (`RESEND_API_KEY` + optional `RESEND_FROM`, default `onboarding@resend.dev`), and returns `{ tempPassword, emailSent, emailError }` so the UI can fall back to displaying the password when email isn't configured.
+  - `PATCH /api/tenants/:tenantId/staff/:userId` updates `name`, `role`, and `permissions`.
+  - `POST /api/tenants/:tenantId/leads` and `POST /api/tenants/:tenantId/cases` use a `resolveTenantAssignee()` helper that validates the body's `assignedTo` belongs to this tenant and falls back to `req.session.userId`. Both routes return 400 if no valid assignee is found.
+- **Settings → Team tab**: invite + edit dialogs render a checkbox grid for `AGENCY_PERMISSIONS` with per-role defaults. Member rows show role + permission badges plus an Edit button.
+- **Leads page**: assignee dropdown in the Add/Edit dialog (auto-seeded to the current user), an "Owner" line on every card, and a "Reassign to" submenu in the card's `…` menu.
+- **Case wizard Step 1**: Assignee select directly under Customer Mobile, defaults to the current user (or to `originatingLead.assignedTo` when started from a lead). Step 1 cannot advance without an assignee.
+
 ## System Architecture
 
 ### Frontend Architecture

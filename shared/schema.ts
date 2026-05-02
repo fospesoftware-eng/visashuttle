@@ -3,15 +3,34 @@ import { pgTable, text, varchar, timestamp, integer, boolean, jsonb, serial } fr
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Granular permission flags for agency team members. The agency owner always
+// has every permission implicitly; for staff/managers these checkboxes drive
+// what they can see and do in the dashboard. Persisted as `users.permissions`
+// (text array) so we can grow the list without another migration.
+export const AGENCY_PERMISSIONS = [
+  "leads",       // Manage leads pipeline
+  "cases",       // Create and manage applications
+  "documents",   // Upload / review documents
+  "accounting",  // Invoices, payments, fee templates
+  "analytics",   // Reports and analytics
+  "team",        // Invite / manage team members (manager+ only)
+  "settings",    // Edit agency settings (manager+ only)
+] as const;
+export type AgencyPermission = typeof AGENCY_PERMISSIONS[number];
+
 // Users table
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   name: text("name").notNull(),
-  role: text("role").notNull().default("customer"), // saas_admin, agency_owner, agency_staff, customer
+  role: text("role").notNull().default("customer"), // saas_admin, agency_owner, agency_manager, agency_staff, customer
   tenantId: varchar("tenant_id"),
   avatarUrl: text("avatar_url"),
+  // Granular checkbox permissions (see AGENCY_PERMISSIONS). Empty array means
+  // the user has no extra permissions beyond the implicit ones for their role.
+  // The agency owner is treated as having every permission regardless of this.
+  permissions: text("permissions").array().default(sql`'{}'::text[]`),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

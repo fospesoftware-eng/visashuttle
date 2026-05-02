@@ -291,6 +291,10 @@ export default function NewCasePage() {
     travelDate: "",
     priority: seedPriorityParam || "normal",
     notes: "",
+    // Owning team member — every case must have one. Defaults to the
+    // signed-in user (filled by an effect once auth resolves) but the agency
+    // owner can hand it off to anyone on the team via the Step 1 dropdown.
+    assignedTo: "",
     // Passport details (Indian passport standard)
     passportSurname: "",
     passportGivenName: "",
@@ -303,6 +307,32 @@ export default function NewCasePage() {
     passportPlaceOfIssue: "",
     passportPlaceOfBirth: "",
   });
+
+  // Default assignee to the signed-in user once auth resolves. Only seeds
+  // when the field is still empty so we never clobber a manual choice.
+  useEffect(() => {
+    const meId = authData?.user?.id;
+    if (!meId) return;
+    setForm((f) => (f.assignedTo ? f : { ...f, assignedTo: meId }));
+  }, [authData?.user?.id]);
+
+  // Team members for the assignee dropdown. Filtered to actual agency staff —
+  // we never want to show customers in here.
+  const { data: staffRaw = [] } = useQuery<any[]>({
+    queryKey: ["/api/tenants", tenantId, "staff"],
+    queryFn: async () => {
+      const res = await fetch(`/api/tenants/${tenantId}/staff`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!tenantId,
+  });
+  const staff = useMemo(
+    () => staffRaw
+      .filter((u: any) => ["agency_owner", "agency_manager", "agency_staff"].includes(u.role))
+      .map((u: any) => ({ id: u.id as string, name: u.name as string })),
+    [staffRaw],
+  );
 
   // Passport upload + auto-scan state
   const [passportMode, setPassportMode] = useState<"upload" | "manual">("upload");
@@ -367,6 +397,9 @@ export default function NewCasePage() {
       customerPhone: f.customerPhone || originatingLead.phone || "",
       destinationCountry: f.destinationCountry || originatingLead.destinationCountry || "",
       visaType: f.visaType || originatingLead.visaType || "",
+      // Inherit the lead's owner so the case stays with the same agent unless
+      // the user picks someone else explicitly.
+      assignedTo: f.assignedTo || originatingLead.assignedTo || "",
     }));
     // The applicant name now has a real value, so the passport-name auto-derive
     // effect should leave it alone unless the agent clears it.
@@ -696,6 +729,7 @@ export default function NewCasePage() {
     if (s === 1) {
       if (!form.destinationCountry) return "Please select a destination country.";
       if (!form.visaType) return "Please select a visa type.";
+      if (!form.assignedTo) return "Please assign a team member to this case.";
     }
     if (s === 2) {
       // Either passport surname+given-name OR free-text applicant name must be present.
@@ -807,6 +841,9 @@ export default function NewCasePage() {
     travelDate: form.travelDate ? new Date(form.travelDate).toISOString() : null,
     priority: form.priority,
     notes: form.notes || null,
+    // Send the picked team member; the server still validates that the user
+    // belongs to this tenant and falls back to the session user if missing.
+    assignedTo: form.assignedTo || null,
     status,
     caseNumber: generateCaseNumber(),
   });
@@ -1628,6 +1665,28 @@ export default function NewCasePage() {
                     Pre-filled from the originating lead — edit if needed before continuing.
                   </p>
                 )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="case-assignee">Assigned Team Member *</Label>
+                  <Select
+                    value={form.assignedTo}
+                    onValueChange={(v) => setForm({ ...form, assignedTo: v })}
+                  >
+                    <SelectTrigger id="case-assignee" data-testid="select-case-assignee">
+                      <SelectValue placeholder="Select a team member" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {staff.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.name}{s.id === authData?.user?.id ? " (you)" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Defaults to you — pick another team member to hand off this case.
+                  </p>
+                </div>
 
                 <div className="space-y-2">
                   <Label>Visa Type *</Label>

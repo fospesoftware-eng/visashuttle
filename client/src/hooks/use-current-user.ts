@@ -7,6 +7,7 @@ export interface CurrentUser {
   role: string;
   tenantId: string | null;
   avatarUrl: string | null;
+  permissions?: string[];
 }
 
 export interface CurrentUserData {
