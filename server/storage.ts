@@ -453,6 +453,8 @@ export class MemStorage implements IStorage {
       email: insertLead.email,
       phone: insertLead.phone ?? null,
       source: insertLead.source ?? null,
+      destinationCountry: insertLead.destinationCountry ?? null,
+      visaType: insertLead.visaType ?? null,
       stage: insertLead.stage ?? "new",
       value: insertLead.value ?? null,
       notes: insertLead.notes ?? null,

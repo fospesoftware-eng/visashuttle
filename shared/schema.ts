@@ -51,6 +51,8 @@ export const leads = pgTable("leads", {
   email: text("email").notNull(),
   phone: text("phone"),
   source: text("source"), // website, referral, social, etc.
+  destinationCountry: text("destination_country"),
+  visaType: text("visa_type"),
   stage: text("stage").notNull().default("new"), // new, contacted, qualified, proposal, won, lost
   value: integer("value").default(0),
   notes: text("notes"),

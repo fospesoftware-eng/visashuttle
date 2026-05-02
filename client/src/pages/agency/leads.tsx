@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, Search, MoreVertical, Mail, Phone, Loader2, AlertCircle, Briefcase, GripVertical } from "lucide-react";
+import { Plus, Search, MoreVertical, Mail, Phone, Loader2, AlertCircle, Briefcase, GripVertical, MapPin } from "lucide-react";
+import { getCountryVisaConfig } from "@/data/country-visa-types";
 import {
   DndContext,
   DragEndEvent,
@@ -78,7 +79,78 @@ const STAGE_DOT: Record<string, string> = {
   lost: "bg-red-500",
 };
 
-const emptyForm = { name: "", email: "", phone: "", source: "", notes: "", value: "" };
+const emptyForm = {
+  name: "",
+  email: "",
+  phone: "",
+  source: "",
+  destinationCountry: "",
+  visaType: "",
+  notes: "",
+  value: "",
+};
+
+const GENERIC_VISA_TYPES = [
+  "Tourist Visa", "Business Visa", "Student Visa", "Work Visa",
+  "Visit Visa", "Transit Visa", "Investor Visa", "Family Visa",
+  "Conference / Event Visa", "Medical Visa",
+];
+
+function getVisaTypesForCountry(country: string): string[] {
+  if (!country) return [];
+  const conf = getCountryVisaConfig(country);
+  if (!conf) return GENERIC_VISA_TYPES;
+  const all = new Set<string>();
+  for (const cat of Object.values(conf.categories)) {
+    for (const t of cat.types) all.add(t);
+  }
+  return Array.from(all);
+}
+
+const COUNTRIES_LIST = [
+  "Afghanistan","Albania","Algeria","Andorra","Angola","Antigua and Barbuda",
+  "Argentina","Armenia","Australia","Austria","Azerbaijan",
+  "Bahamas","Bahrain","Bangladesh","Barbados","Belarus","Belgium","Belize",
+  "Benin","Bhutan","Bolivia","Bosnia and Herzegovina","Botswana","Brazil",
+  "Brunei","Bulgaria","Burkina Faso","Burundi",
+  "Cabo Verde","Cambodia","Cameroon","Canada","Central African Republic","Chad",
+  "Chile","China","Colombia","Comoros","Congo","Costa Rica","Croatia","Cuba",
+  "Cyprus","Czech Republic",
+  "Democratic Republic of Congo","Denmark","Djibouti","Dominica","Dominican Republic",
+  "Ecuador","Egypt","El Salvador","Equatorial Guinea","Eritrea","Estonia",
+  "Eswatini","Ethiopia",
+  "Fiji","Finland","France",
+  "Gabon","Gambia","Georgia","Germany","Ghana","Greece","Grenada","Guatemala",
+  "Guinea","Guinea-Bissau","Guyana",
+  "Haiti","Honduras","Hungary",
+  "Iceland","India","Indonesia","Iran","Iraq","Ireland","Israel","Italy",
+  "Jamaica","Japan","Jordan",
+  "Kazakhstan","Kenya","Kiribati","Kuwait","Kyrgyzstan",
+  "Laos","Latvia","Lebanon","Lesotho","Liberia","Libya","Liechtenstein",
+  "Lithuania","Luxembourg",
+  "Madagascar","Malawi","Malaysia","Maldives","Mali","Malta",
+  "Marshall Islands","Mauritania","Mauritius","Mexico","Micronesia",
+  "Moldova","Monaco","Mongolia","Montenegro","Morocco","Mozambique","Myanmar",
+  "Namibia","Nauru","Nepal","Netherlands","New Zealand","Nicaragua","Niger",
+  "Nigeria","North Korea","North Macedonia","Norway",
+  "Oman",
+  "Pakistan","Palau","Palestine","Panama","Papua New Guinea","Paraguay","Peru",
+  "Philippines","Poland","Portugal",
+  "Qatar",
+  "Romania","Russia","Rwanda",
+  "Saint Kitts and Nevis","Saint Lucia","Saint Vincent and the Grenadines",
+  "Samoa","San Marino","Sao Tome and Principe","Saudi Arabia","Senegal",
+  "Serbia","Seychelles","Sierra Leone","Singapore","Slovakia","Slovenia",
+  "Solomon Islands","Somalia","South Africa","South Korea","South Sudan",
+  "Spain","Sri Lanka","Sudan","Suriname","Sweden","Switzerland","Syria",
+  "Taiwan","Tajikistan","Tanzania","Thailand","Timor-Leste","Togo","Tonga",
+  "Trinidad and Tobago","Tunisia","Turkey","Turkmenistan","Tuvalu",
+  "Uganda","Ukraine","United Arab Emirates","United Kingdom","United States",
+  "Uruguay","Uzbekistan",
+  "Vanuatu","Vatican City","Venezuela","Vietnam",
+  "Yemen",
+  "Zambia","Zimbabwe",
+];
 
 function generateCaseNumber(): string {
   const year = new Date().getFullYear();
@@ -168,6 +240,14 @@ function LeadCardBody({ lead, onEdit, onConvert, onDelete, onMove, currentStage 
         <div className="text-xs text-muted-foreground flex items-center gap-1">
           <Phone className="w-3 h-3 shrink-0" />
           {lead.phone}
+        </div>
+      )}
+      {(lead.destinationCountry || lead.visaType) && (
+        <div className="flex items-center gap-1 text-xs text-muted-foreground bg-muted/50 rounded px-1.5 py-1">
+          <MapPin className="w-3 h-3 shrink-0" />
+          <span className="truncate">
+            {[lead.destinationCountry, lead.visaType].filter(Boolean).join(" · ")}
+          </span>
         </div>
       )}
       {(lead.value ?? 0) > 0 && (
@@ -372,6 +452,8 @@ export default function LeadsPage() {
       email: lead.email,
       phone: lead.phone ?? "",
       source: lead.source ?? "",
+      destinationCountry: lead.destinationCountry ?? "",
+      visaType: lead.visaType ?? "",
       notes: lead.notes ?? "",
       value: lead.value ? String(lead.value) : "",
     });
@@ -379,7 +461,12 @@ export default function LeadsPage() {
 
   const openConvert = (lead: Lead) => {
     setConvertLead(lead);
-    setConvertForm({ visaType: "", destinationCountry: "", priority: "normal" });
+    // Prefill from lead's known interest if any
+    setConvertForm({
+      visaType: lead.visaType ?? "",
+      destinationCountry: lead.destinationCountry ?? "",
+      priority: "normal",
+    });
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -456,6 +543,49 @@ export default function LeadsPage() {
                         <SelectItem value="social">Social Media</SelectItem>
                         <SelectItem value="walk_in">Walk-in</SelectItem>
                         <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2 col-span-2">
+                    <Label>Destination Country</Label>
+                    <Select
+                      value={form.destinationCountry}
+                      onValueChange={(v) => setForm({ ...form, destinationCountry: v, visaType: "" })}
+                    >
+                      <SelectTrigger data-testid="select-lead-destination">
+                        <SelectValue placeholder="Where do they want to travel?" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-72">
+                        {COUNTRIES_LIST.map((c) => {
+                          const conf = getCountryVisaConfig(c);
+                          return (
+                            <SelectItem key={c} value={c}>
+                              {conf?.flag ? `${conf.flag} ${c}` : c}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2 col-span-2">
+                    <Label>
+                      Visa Type
+                      {!form.destinationCountry && (
+                        <span className="ml-2 text-xs text-muted-foreground font-normal">(select a country first)</span>
+                      )}
+                    </Label>
+                    <Select
+                      value={form.visaType}
+                      onValueChange={(v) => setForm({ ...form, visaType: v })}
+                      disabled={!form.destinationCountry}
+                    >
+                      <SelectTrigger data-testid="select-lead-visa-type">
+                        <SelectValue placeholder={form.destinationCountry ? "Select visa type" : "Pick a country to see visa types"} />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-72">
+                        {getVisaTypesForCountry(form.destinationCountry).map((t) => (
+                          <SelectItem key={t} value={t}>{t}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
