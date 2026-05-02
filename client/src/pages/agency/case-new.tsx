@@ -105,6 +105,47 @@ function todayISO(): string {
   return d.toISOString().slice(0, 10);
 }
 
+// Shape returned by POST /api/passport/scan
+type ScanResult = {
+  surname: string | null;
+  givenName: string | null;
+  middleName: string | null;
+  passportNumber: string | null;
+  nationality: string | null;
+  gender: "M" | "F" | "X" | null;
+  dateOfBirth: string | null;
+  dateOfIssue: string | null;
+  dateOfExpiry: string | null;
+  placeOfIssue: string | null;
+  placeOfBirth: string | null;
+  warnings: string[];
+};
+
+type ScanStatus = "ok" | "warnings" | "not_passport";
+
+// Existing typed value wins over OCR-extracted value.
+function pickEmpty(current: string, incoming: string | null | undefined): string {
+  return current && current.trim() ? current : (incoming ?? current);
+}
+
+// Classify a scan result so the UI can render success / amber-warning / red-not-passport
+// without each call site re-implementing the heuristic.
+function classifyScanResult(data: ScanResult): { status: ScanStatus; warnings: string[] } {
+  const warnings = data.warnings ?? [];
+  const looksLikeNonPassport = warnings.some((w) =>
+    /not\s+a\s+passport|visa\s+sticker|entry\s+clearance|residence\s+permit|id\s+card|driver|driving\s+licen[cs]e|aadhaar|pan\s+card/i.test(w)
+  );
+  const noCoreFields = !data.surname && !data.givenName && !data.passportNumber;
+  if (looksLikeNonPassport || noCoreFields) return { status: "not_passport", warnings };
+  return { status: warnings.length > 0 ? "warnings" : "ok", warnings };
+}
+
+async function scanPassportApi(base64: string, mimeType: string): Promise<ScanResult> {
+  const cleaned = base64.includes(",") ? base64.split(",").pop()! : base64;
+  const res = await apiRequest("POST", "/api/passport/scan", { imageBase64: cleaned, mimeType });
+  return (await res.json()) as ScanResult;
+}
+
 type CoTravellerDraft = {
   key: string;
   name: string;
@@ -113,6 +154,24 @@ type CoTravellerDraft = {
   passportNumber: string;
   nationality: string;
   notes: string;
+  // --- Per-row passport upload + scan state ---
+  passportMode: "upload" | "manual";
+  passportPreview: string | null;
+  passportMimeType: string | null;
+  scanStatus: ScanStatus | null;
+  scanWarnings: string[];
+  scanError: string | null;
+  scanning: boolean;
+  nameTouched: boolean; // freeze auto-derived name once user types
+  // --- Structured passport fields (auto-filled by scan, editable in either mode) ---
+  passportSurname: string;
+  passportGivenName: string;
+  passportMiddleName: string;
+  passportGender: "" | "M" | "F" | "X";
+  passportDateOfIssue: string;
+  passportDateOfExpiry: string;
+  passportPlaceOfIssue: string;
+  passportPlaceOfBirth: string;
 };
 
 function emptyCoTraveller(): CoTravellerDraft {
@@ -124,6 +183,22 @@ function emptyCoTraveller(): CoTravellerDraft {
     passportNumber: "",
     nationality: "",
     notes: "",
+    passportMode: "upload",
+    passportPreview: null,
+    passportMimeType: null,
+    scanStatus: null,
+    scanWarnings: [],
+    scanError: null,
+    scanning: false,
+    nameTouched: false,
+    passportSurname: "",
+    passportGivenName: "",
+    passportMiddleName: "",
+    passportGender: "",
+    passportDateOfIssue: "",
+    passportDateOfExpiry: "",
+    passportPlaceOfIssue: "",
+    passportPlaceOfBirth: "",
   };
 }
 
@@ -440,6 +515,14 @@ export default function NewCasePage() {
           dob: ct.dob || null,
           passportNumber: ct.passportNumber.trim() || null,
           nationality: ct.nationality.trim() || null,
+          passportSurname: ct.passportSurname.trim() || null,
+          passportGivenName: ct.passportGivenName.trim() || null,
+          passportMiddleName: ct.passportMiddleName.trim() || null,
+          passportGender: ct.passportGender || null,
+          passportDateOfIssue: ct.passportDateOfIssue || null,
+          passportDateOfExpiry: ct.passportDateOfExpiry || null,
+          passportPlaceOfIssue: ct.passportPlaceOfIssue.trim() || null,
+          passportPlaceOfBirth: ct.passportPlaceOfBirth.trim() || null,
           notes: ct.notes.trim() || null,
         });
       } catch (err: any) {
@@ -509,45 +592,20 @@ export default function NewCasePage() {
   };
 
   // === Passport scan mutation (Claude vision OCR) ===
+  // Uses module-level helpers `scanPassportApi`, `classifyScanResult`, `pickEmpty`
+  // so applicant + co-traveller scan flows share one source of truth for the
+  // not-a-passport heuristic. Don't re-implement the regex inline here.
   const scanPassportMutation = useMutation({
     mutationFn: async () => {
       if (!passportPreview || !passportMimeType) {
         throw new Error("Choose a passport image first.");
       }
-      // passportPreview is a data URL — strip the prefix server-side too, but send clean.
-      const base64 = passportPreview.includes(",") ? passportPreview.split(",").pop()! : passportPreview;
-      const res = await apiRequest("POST", "/api/passport/scan", {
-        imageBase64: base64,
-        mimeType: passportMimeType,
-      });
-      return (await res.json()) as {
-        surname: string | null;
-        givenName: string | null;
-        middleName: string | null;
-        passportNumber: string | null;
-        nationality: string | null;
-        gender: "M" | "F" | "X" | null;
-        dateOfBirth: string | null;
-        dateOfIssue: string | null;
-        dateOfExpiry: string | null;
-        placeOfIssue: string | null;
-        placeOfBirth: string | null;
-        warnings: string[];
-      };
+      return scanPassportApi(passportPreview, passportMimeType);
     },
     onSuccess: (data) => {
-      const warnings = data.warnings ?? [];
-      // Heuristics for "this isn't a passport biographic page":
-      //  1. The model itself flagged it (warnings mention "not a passport",
-      //     "visa", "sticker", "entry clearance", "id card", "driver", etc.).
-      //  2. None of the three core identity fields were extracted at all.
-      const looksLikeNonPassport = warnings.some((w) =>
-        /not\s+a\s+passport|visa\s+sticker|entry\s+clearance|residence\s+permit|id\s+card|driver|driving\s+licen[cs]e|aadhaar|pan\s+card/i.test(w)
-      );
-      const noCoreFields = !data.surname && !data.givenName && !data.passportNumber;
-      const isNotPassport = looksLikeNonPassport || noCoreFields;
+      const { status, warnings } = classifyScanResult(data);
 
-      if (isNotPassport) {
+      if (status === "not_passport") {
         // Don't pollute the form with values harvested from the wrong document
         // (e.g. visa-sticker dates would silently overwrite passport dates).
         setScanWarnings(warnings);
@@ -562,9 +620,6 @@ export default function NewCasePage() {
         return;
       }
 
-      // Only fill fields the user hasn't already typed into. Existing typed values win.
-      const pickEmpty = (current: string, incoming: string | null | undefined): string =>
-        current && current.trim() ? current : (incoming ?? current);
       setForm((f) => ({
         ...f,
         passportSurname: pickEmpty(f.passportSurname, data.surname),
@@ -581,7 +636,7 @@ export default function NewCasePage() {
       }));
       setScanWarnings(warnings);
       setScanError(null);
-      setScanStatus(warnings.length > 0 ? "warnings" : "ok");
+      setScanStatus(status);
       setScanCompleted(true);
       toast({
         title: "Passport scanned",
@@ -668,6 +723,98 @@ export default function NewCasePage() {
 
   const updateCoTraveller = (key: string, patch: Partial<CoTravellerDraft>) => {
     setCoTravellers((arr) => arr.map((c) => (c.key === key ? { ...c, ...patch } : c)));
+  };
+
+  // Keeps a hidden <input type="file"> per row so each card has its own picker.
+  const coTravellerFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  const handleCoTravellerFile = (key: string, file: File | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Wrong file type", description: "Please upload an image file (JPG/PNG/WebP).", variant: "destructive" });
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Please upload an image under 8 MB.", variant: "destructive" });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCoTravellers((arr) => arr.map((c) => c.key === key ? {
+        ...c,
+        passportPreview: reader.result as string,
+        passportMimeType: file.type,
+        scanStatus: null,
+        scanWarnings: [],
+        scanError: null,
+      } : c));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const scanCoTravellerPassport = async (key: string) => {
+    const target = coTravellers.find((c) => c.key === key);
+    if (!target?.passportPreview || !target.passportMimeType) {
+      toast({ title: "Choose an image first", description: "Upload the passport bio page before scanning.", variant: "destructive" });
+      return;
+    }
+    setCoTravellers((arr) => arr.map((c) => c.key === key ? { ...c, scanning: true, scanError: null } : c));
+    try {
+      const data = await scanPassportApi(target.passportPreview, target.passportMimeType);
+      const { status, warnings } = classifyScanResult(data);
+
+      if (status === "not_passport") {
+        // Don't auto-fill — visa-sticker dates etc. would silently overwrite real fields.
+        setCoTravellers((arr) => arr.map((c) => c.key === key ? {
+          ...c, scanning: false, scanStatus: "not_passport", scanWarnings: warnings, scanError: null,
+        } : c));
+        toast({
+          title: "Doesn't look like a passport",
+          description: "Please upload the co-traveller's passport biographic page (the photo page).",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setCoTravellers((arr) => arr.map((c) => {
+        if (c.key !== key) return c;
+        const newSurname = pickEmpty(c.passportSurname, data.surname);
+        const newGiven = pickEmpty(c.passportGivenName, data.givenName);
+        const derivedName = [newGiven, newSurname].map((s) => s.trim()).filter(Boolean).join(" ");
+        return {
+          ...c,
+          scanning: false,
+          scanStatus: status,
+          scanWarnings: warnings,
+          scanError: null,
+          passportSurname: newSurname,
+          passportGivenName: newGiven,
+          passportMiddleName: pickEmpty(c.passportMiddleName, data.middleName),
+          passportNumber: pickEmpty(c.passportNumber, data.passportNumber),
+          nationality: pickEmpty(c.nationality, data.nationality),
+          passportGender: (c.passportGender || data.gender || "") as "" | "M" | "F" | "X",
+          dob: pickEmpty(c.dob, data.dateOfBirth),
+          passportDateOfIssue: pickEmpty(c.passportDateOfIssue, data.dateOfIssue),
+          passportDateOfExpiry: pickEmpty(c.passportDateOfExpiry, data.dateOfExpiry),
+          passportPlaceOfIssue: pickEmpty(c.passportPlaceOfIssue, data.placeOfIssue),
+          passportPlaceOfBirth: pickEmpty(c.passportPlaceOfBirth, data.placeOfBirth),
+          // Only freeze the displayed Full Name if the agent has actually typed
+          // into it. A previous OCR-derived value is still allowed to be
+          // overwritten by a fresher re-scan, mirroring applicant-step semantics.
+          name: c.nameTouched ? c.name : (derivedName || c.name),
+        };
+      }));
+      toast({
+        title: "Co-traveller passport scanned",
+        description: warnings.length > 0
+          ? "Details extracted, but some fields need a manual review."
+          : "Details extracted. Please review before continuing.",
+      });
+    } catch (err: any) {
+      setCoTravellers((arr) => arr.map((c) => c.key === key ? {
+        ...c, scanning: false, scanError: err?.message ?? "Scan failed", scanStatus: null,
+      } : c));
+    }
   };
 
   const isPending = submitMutation.isPending || draftMutation.isPending;
@@ -1240,7 +1387,7 @@ export default function NewCasePage() {
                   </p>
                 ) : (
                   coTravellers.map((ct, idx) => (
-                    <div key={ct.key} className="border rounded-xl p-4 space-y-3 bg-muted/20" data-testid={`block-co-traveller-${idx}`}>
+                    <div key={ct.key} className="border rounded-xl p-4 space-y-4 bg-muted/20" data-testid={`block-co-traveller-${idx}`}>
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-medium">Co-traveller #{idx + 1}</p>
                         <Button
@@ -1248,18 +1395,23 @@ export default function NewCasePage() {
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7 text-destructive hover:text-destructive"
-                          onClick={() => setCoTravellers((arr) => arr.filter((c) => c.key !== ct.key))}
+                          onClick={() => {
+                            setCoTravellers((arr) => arr.filter((c) => c.key !== ct.key));
+                            delete coTravellerFileRefs.current[ct.key];
+                          }}
                           data-testid={`button-remove-co-traveller-${idx}`}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
+
+                      {/* === Identity (always visible) === */}
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div className="space-y-1.5 sm:col-span-2">
                           <Label>Full name *</Label>
                           <Input
                             value={ct.name}
-                            onChange={(e) => updateCoTraveller(ct.key, { name: e.target.value })}
+                            onChange={(e) => updateCoTraveller(ct.key, { name: e.target.value, nameTouched: true })}
                             placeholder="As written in passport"
                             data-testid={`input-co-traveller-name-${idx}`}
                           />
@@ -1290,34 +1442,246 @@ export default function NewCasePage() {
                             data-testid={`input-co-traveller-dob-${idx}`}
                           />
                         </div>
-                        <div className="space-y-1.5">
-                          <Label>Passport number</Label>
-                          <Input
-                            value={ct.passportNumber}
-                            onChange={(e) => updateCoTraveller(ct.key, { passportNumber: e.target.value })}
-                            placeholder="Optional"
-                            data-testid={`input-co-traveller-passport-${idx}`}
-                          />
+                      </div>
+
+                      {/* === Passport (optional, with auto-scan) === */}
+                      <div className="space-y-3 pt-3 border-t">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold flex items-center gap-2">
+                            <UserIcon className="w-4 h-4" /> Passport <span className="text-xs font-normal text-muted-foreground">(optional)</span>
+                          </p>
                         </div>
-                        <div className="space-y-1.5">
-                          <Label>Nationality</Label>
-                          <Input
-                            value={ct.nationality}
-                            onChange={(e) => updateCoTraveller(ct.key, { nationality: e.target.value })}
-                            placeholder="Optional"
-                            data-testid={`input-co-traveller-nationality-${idx}`}
-                          />
+
+                        <Tabs
+                          value={ct.passportMode}
+                          onValueChange={(v) => updateCoTraveller(ct.key, { passportMode: v as "upload" | "manual" })}
+                        >
+                          <TabsList className="grid grid-cols-2 w-full sm:w-auto h-8">
+                            <TabsTrigger value="upload" className="gap-1.5 text-xs" data-testid={`tab-co-traveller-upload-${idx}`}>
+                              <Upload className="w-3.5 h-3.5" /> Upload passport
+                            </TabsTrigger>
+                            <TabsTrigger value="manual" className="gap-1.5 text-xs" data-testid={`tab-co-traveller-manual-${idx}`}>
+                              <FileText className="w-3.5 h-3.5" /> Enter manually
+                            </TabsTrigger>
+                          </TabsList>
+
+                          <TabsContent value="upload" className="space-y-3 mt-3">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              ref={(el) => { coTravellerFileRefs.current[ct.key] = el; }}
+                              onChange={(e) => {
+                                handleCoTravellerFile(ct.key, e.target.files?.[0]);
+                                e.target.value = "";
+                              }}
+                              data-testid={`input-co-traveller-passport-file-${idx}`}
+                            />
+                            <div
+                              className="border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center text-center bg-background/40 hover:bg-background/60 transition cursor-pointer"
+                              onClick={() => coTravellerFileRefs.current[ct.key]?.click()}
+                              data-testid={`dropzone-co-traveller-passport-${idx}`}
+                            >
+                              {ct.passportPreview ? (
+                                <img src={ct.passportPreview} alt="Passport preview" className="max-h-32 rounded-md object-contain" />
+                              ) : (
+                                <>
+                                  <Upload className="w-5 h-5 text-muted-foreground mb-1" />
+                                  <p className="text-xs font-medium">Click to upload passport bio page</p>
+                                  <p className="text-[11px] text-muted-foreground">JPG / PNG / WebP, up to 8 MB</p>
+                                </>
+                              )}
+                            </div>
+
+                            {ct.passportPreview && (
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  className="gap-1.5"
+                                  disabled={ct.scanning}
+                                  onClick={() => scanCoTravellerPassport(ct.key)}
+                                  data-testid={`button-scan-co-traveller-passport-${idx}`}
+                                >
+                                  {ct.scanning
+                                    ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Scanning…</>
+                                    : <><ScanLine className="w-3.5 h-3.5" /> {ct.scanStatus ? "Re-scan passport" : "Scan & extract details"}</>}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    updateCoTraveller(ct.key, {
+                                      passportPreview: null,
+                                      passportMimeType: null,
+                                      scanStatus: null,
+                                      scanWarnings: [],
+                                      scanError: null,
+                                    });
+                                    if (coTravellerFileRefs.current[ct.key]) coTravellerFileRefs.current[ct.key]!.value = "";
+                                  }}
+                                  data-testid={`button-remove-co-traveller-passport-${idx}`}
+                                >
+                                  <X className="w-3.5 h-3.5 mr-1" /> Remove image
+                                </Button>
+                              </div>
+                            )}
+
+                            {ct.scanError && (
+                              <div className="flex items-start gap-2 text-xs text-destructive border border-destructive/30 bg-destructive/10 rounded-md p-2.5" data-testid={`text-co-traveller-scan-error-${idx}`}>
+                                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                                <div>
+                                  <p className="font-medium">Couldn't auto-scan this passport</p>
+                                  <p className="mt-0.5">{ct.scanError}</p>
+                                </div>
+                              </div>
+                            )}
+
+                            {!ct.scanError && ct.scanStatus === "not_passport" && (
+                              <div className="flex items-start gap-2 text-xs text-destructive border border-destructive/30 bg-destructive/10 rounded-md p-2.5" data-testid={`text-co-traveller-scan-not-passport-${idx}`}>
+                                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                                <div className="space-y-1">
+                                  <p className="font-medium">This doesn't look like a passport biographic page.</p>
+                                  <p>Please upload the <span className="font-medium">passport bio page</span> for this co-traveller — visa stickers, ID cards or other documents won't work here.</p>
+                                  {ct.scanWarnings.length > 0 && (
+                                    <ul className="list-disc list-inside">
+                                      {ct.scanWarnings.map((w, i) => <li key={i}>{w}</li>)}
+                                    </ul>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {!ct.scanError && ct.scanStatus === "warnings" && (
+                              <div className="flex items-start gap-2 text-xs border border-amber-300/60 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800/60 rounded-md p-2.5" data-testid={`text-co-traveller-scan-warnings-${idx}`}>
+                                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                                <div className="space-y-1 text-amber-900 dark:text-amber-100">
+                                  <p className="font-medium">Passport scanned — please double-check the highlighted items.</p>
+                                  <ul className="list-disc list-inside">
+                                    {ct.scanWarnings.map((w, i) => <li key={i}>{w}</li>)}
+                                  </ul>
+                                </div>
+                              </div>
+                            )}
+
+                            {!ct.scanError && ct.scanStatus === "ok" && (
+                              <div className="flex items-start gap-2 text-xs border border-emerald-300/50 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-800/50 rounded-md p-2.5" data-testid={`text-co-traveller-scan-success-${idx}`}>
+                                <Check className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
+                                <p className="font-medium text-emerald-800 dark:text-emerald-200">Passport details extracted. Review the fields below before continuing.</p>
+                              </div>
+                            )}
+                          </TabsContent>
+
+                          <TabsContent value="manual" className="mt-3">
+                            <p className="text-xs text-muted-foreground">Type details exactly as printed on the passport bio page.</p>
+                          </TabsContent>
+                        </Tabs>
+
+                        {/* Passport detail fields — visible in both modes (auto-filled by scan, editable always) */}
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="space-y-1.5">
+                            <Label>Surname</Label>
+                            <Input
+                              value={ct.passportSurname}
+                              onChange={(e) => updateCoTraveller(ct.key, { passportSurname: e.target.value.toUpperCase() })}
+                              placeholder="As printed"
+                              data-testid={`input-co-traveller-passport-surname-${idx}`}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label>Given Name(s)</Label>
+                            <Input
+                              value={ct.passportGivenName}
+                              onChange={(e) => updateCoTraveller(ct.key, { passportGivenName: e.target.value.toUpperCase() })}
+                              placeholder="Include any middle names"
+                              data-testid={`input-co-traveller-passport-given-${idx}`}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label>Passport number</Label>
+                            <Input
+                              value={ct.passportNumber}
+                              onChange={(e) => updateCoTraveller(ct.key, { passportNumber: e.target.value })}
+                              placeholder="Optional"
+                              data-testid={`input-co-traveller-passport-${idx}`}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label>Nationality</Label>
+                            <Input
+                              value={ct.nationality}
+                              onChange={(e) => updateCoTraveller(ct.key, { nationality: e.target.value })}
+                              placeholder="Optional"
+                              data-testid={`input-co-traveller-nationality-${idx}`}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label>Gender</Label>
+                            <Select
+                              value={ct.passportGender || undefined}
+                              onValueChange={(v) => updateCoTraveller(ct.key, { passportGender: v as "M" | "F" | "X" })}
+                            >
+                              <SelectTrigger data-testid={`select-co-traveller-gender-${idx}`}>
+                                <SelectValue placeholder="Optional" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="M">Male</SelectItem>
+                                <SelectItem value="F">Female</SelectItem>
+                                <SelectItem value="X">Other / X</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label>Date of Issue</Label>
+                            <Input
+                              type="date"
+                              value={ct.passportDateOfIssue}
+                              max={today}
+                              onChange={(e) => updateCoTraveller(ct.key, { passportDateOfIssue: e.target.value })}
+                              data-testid={`input-co-traveller-passport-issue-${idx}`}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label>Date of Expiry</Label>
+                            <Input
+                              type="date"
+                              value={ct.passportDateOfExpiry}
+                              onChange={(e) => updateCoTraveller(ct.key, { passportDateOfExpiry: e.target.value })}
+                              data-testid={`input-co-traveller-passport-expiry-${idx}`}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label>Place of Issue</Label>
+                            <Input
+                              value={ct.passportPlaceOfIssue}
+                              onChange={(e) => updateCoTraveller(ct.key, { passportPlaceOfIssue: e.target.value })}
+                              placeholder="Optional"
+                              data-testid={`input-co-traveller-passport-place-issue-${idx}`}
+                            />
+                          </div>
+                          <div className="space-y-1.5 sm:col-span-2">
+                            <Label>Place of Birth</Label>
+                            <Input
+                              value={ct.passportPlaceOfBirth}
+                              onChange={(e) => updateCoTraveller(ct.key, { passportPlaceOfBirth: e.target.value })}
+                              placeholder="Optional"
+                              data-testid={`input-co-traveller-passport-place-birth-${idx}`}
+                            />
+                          </div>
                         </div>
-                        <div className="space-y-1.5 sm:col-span-2">
-                          <Label>Notes</Label>
-                          <Textarea
-                            value={ct.notes}
-                            rows={2}
-                            onChange={(e) => updateCoTraveller(ct.key, { notes: e.target.value })}
-                            placeholder="Optional notes about this co-traveller"
-                            data-testid={`input-co-traveller-notes-${idx}`}
-                          />
-                        </div>
+                      </div>
+
+                      {/* === Notes === */}
+                      <div className="space-y-1.5 pt-2 border-t">
+                        <Label>Notes</Label>
+                        <Textarea
+                          value={ct.notes}
+                          rows={2}
+                          onChange={(e) => updateCoTraveller(ct.key, { notes: e.target.value })}
+                          placeholder="Optional notes about this co-traveller"
+                          data-testid={`input-co-traveller-notes-${idx}`}
+                        />
                       </div>
                     </div>
                   ))
@@ -1635,6 +1999,7 @@ export default function NewCasePage() {
                           <span className="font-medium text-foreground">{ct.name || `Co-traveller #${idx + 1}`}</span>
                           {ct.relationship ? ` · ${RELATIONSHIP_LABELS[ct.relationship]}` : ""}
                           {ct.dob ? ` · DOB ${ct.dob}` : ""}
+                          {ct.passportNumber ? ` · Passport ${ct.passportNumber}` : ""}
                         </li>
                       ))}
                     </ul>

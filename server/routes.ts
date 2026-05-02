@@ -1646,6 +1646,34 @@ export async function registerRoutes(
     return null;
   }
 
+  // Whitelist + light type-check for co-traveller POST/PATCH bodies. Drops any
+  // unknown keys (e.g. caseId/tenantId injected via body), and rejects
+  // gender values that aren't M/F/X. Ownership keys are set by the route, not
+  // by client input.
+  const coTravellerBodySchema = z.object({
+    name: z.string().optional(),
+    relationship: z.string().optional(),
+    dob: z.string().nullish(),
+    passportNumber: z.string().nullish(),
+    nationality: z.string().nullish(),
+    passportSurname: z.string().nullish(),
+    passportGivenName: z.string().nullish(),
+    passportMiddleName: z.string().nullish(),
+    passportGender: z.enum(["M", "F", "X"]).nullish(),
+    passportDateOfIssue: z.string().nullish(),
+    passportDateOfExpiry: z.string().nullish(),
+    passportPlaceOfIssue: z.string().nullish(),
+    passportPlaceOfBirth: z.string().nullish(),
+    notes: z.string().nullish(),
+  }).strip();
+  function parseCoTravellerBody(body: any): { ok: true; data: z.infer<typeof coTravellerBodySchema> } | { ok: false; error: string } {
+    const parsed = coTravellerBodySchema.safeParse(body ?? {});
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid co-traveller payload" };
+    }
+    return { ok: true, data: parsed.data };
+  }
+
   app.get("/api/tenants/:tenantId/cases", async (req, res) => {
     const cases = await storage.getCasesByTenantId(req.params.tenantId);
     res.json(cases);
@@ -1769,10 +1797,15 @@ export async function registerRoutes(
     const caseRow = await storage.getCase(req.params.caseId);
     if (!caseRow) return res.status(404).json({ error: "Case not found" });
     if (!requireTenantAccess(req, res, caseRow.tenantId)) return;
-    const err = validateCoTraveller(req.body);
+    const parsed = parseCoTravellerBody(req.body);
+    if (!parsed.ok) return res.status(400).json({ error: parsed.error });
+    const err = validateCoTraveller(parsed.data);
     if (err) return res.status(400).json({ error: err });
     const created = await storage.createCoTraveller({
-      ...req.body,
+      ...parsed.data,
+      // Force ownership server-side — never trust caseId/tenantId from body.
+      name: parsed.data.name!,
+      relationship: parsed.data.relationship!,
       caseId: req.params.caseId,
       tenantId: caseRow.tenantId,
     });
@@ -1783,11 +1816,12 @@ export async function registerRoutes(
     const existing = await storage.getCoTraveller(req.params.id);
     if (!existing) return res.status(404).json({ error: "Co-traveller not found" });
     if (!requireTenantAccess(req, res, existing.tenantId)) return;
-    const err = validateCoTraveller({ ...existing, ...req.body });
+    const parsed = parseCoTravellerBody(req.body);
+    if (!parsed.ok) return res.status(400).json({ error: parsed.error });
+    const err = validateCoTraveller({ ...existing, ...parsed.data });
     if (err) return res.status(400).json({ error: err });
-    // Disallow re-parenting to a different case/tenant via body
-    const { caseId: _ignoreCaseId, tenantId: _ignoreTenantId, ...safeBody } = req.body || {};
-    const updated = await storage.updateCoTraveller(req.params.id, safeBody);
+    // parsed.data is already stripped of caseId/tenantId by the schema.
+    const updated = await storage.updateCoTraveller(req.params.id, parsed.data);
     if (!updated) return res.status(404).json({ error: "Co-traveller not found" });
     res.json(updated);
   });

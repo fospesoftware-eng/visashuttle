@@ -118,6 +118,17 @@ export const caseCoTravellers = pgTable("case_co_travellers", {
   relationship: text("relationship").notNull(), // see CO_TRAVELLER_RELATIONSHIPS
   passportNumber: text("passport_number"),
   nationality: text("nationality"),
+  // Optional structured passport fields — populated when an agent uploads a
+  // co-traveller's passport bio page and runs auto-scan. All nullable so
+  // older records and manual rows continue to work.
+  passportSurname: text("passport_surname"),
+  passportGivenName: text("passport_given_name"),
+  passportMiddleName: text("passport_middle_name"),
+  passportGender: text("passport_gender"), // "M" | "F" | "X"
+  passportDateOfIssue: text("passport_date_of_issue"),
+  passportDateOfExpiry: text("passport_date_of_expiry"),
+  passportPlaceOfIssue: text("passport_place_of_issue"),
+  passportPlaceOfBirth: text("passport_place_of_birth"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
 });
