@@ -923,6 +923,16 @@ export async function registerRoutes(
   });
 
   app.post("/api/tenants/:tenantId/leads", async (req, res) => {
+    // Plan limit enforcement
+    const tenantForLeads = await storage.getTenantById(req.params.tenantId);
+    if (tenantForLeads) {
+      const planLeadLimits: Record<string, number> = { starter: 50, professional: 500, enterprise: 9999 };
+      const leadLimit = planLeadLimits[tenantForLeads.plan ?? "starter"] ?? 50;
+      const existingLeads = await storage.getLeadsByTenantId(req.params.tenantId);
+      if (existingLeads.length >= leadLimit) {
+        return res.status(403).json({ error: `Lead limit reached for your ${tenantForLeads.plan} plan (${leadLimit}). Please upgrade.` });
+      }
+    }
     const lead = await storage.createLead({
       ...req.body,
       tenantId: req.params.tenantId
@@ -961,6 +971,19 @@ export async function registerRoutes(
   });
 
   app.post("/api/tenants/:tenantId/cases", async (req, res) => {
+    // Plan limit enforcement (cases per month)
+    const tenantForCases = await storage.getTenantById(req.params.tenantId);
+    if (tenantForCases) {
+      const planCaseLimits: Record<string, number> = { starter: 30, professional: 200, enterprise: 9999 };
+      const caseLimit = planCaseLimits[tenantForCases.plan ?? "starter"] ?? 30;
+      const allCases = await storage.getCasesByTenantId(req.params.tenantId);
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const casesThisMonth = allCases.filter(c => c.createdAt && new Date(c.createdAt) >= startOfMonth).length;
+      if (casesThisMonth >= caseLimit) {
+        return res.status(403).json({ error: `Monthly case limit reached for your ${tenantForCases.plan} plan (${caseLimit}). Please upgrade.` });
+      }
+    }
     const caseData = await storage.createCase({
       ...req.body,
       tenantId: req.params.tenantId,
@@ -1706,6 +1729,42 @@ export async function registerRoutes(
   // === Admin Routes ===
 
   // Platform stats
+  // Weekly activity breakdown for admin dashboard chart
+  app.get("/api/admin/weekly-activity", requireAdminAuth, async (req, res) => {
+    const [allCases, activityLogs] = await Promise.all([
+      (async () => {
+        const tenants = await storage.getAllTenants();
+        const caseArrays = await Promise.all(tenants.map(t => storage.getCasesByTenantId(t.id)));
+        return caseArrays.flat();
+      })(),
+      storage.getAllActivityLogs(),
+    ]);
+
+    const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    const now = new Date();
+    // Build 7-day window ending today
+    const result = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(now);
+      d.setDate(now.getDate() - (6 - i));
+      d.setHours(0, 0, 0, 0);
+      const nextDay = new Date(d);
+      nextDay.setDate(d.getDate() + 1);
+      const dayLabel = days[d.getDay()];
+      const cases = allCases.filter(c => {
+        if (!c.createdAt) return false;
+        const t = new Date(c.createdAt);
+        return t >= d && t < nextDay;
+      }).length;
+      const checks = activityLogs.filter(l => {
+        if (!l.createdAt) return false;
+        const t = new Date(l.createdAt);
+        return t >= d && t < nextDay;
+      }).length;
+      return { day: dayLabel, cases, checks };
+    });
+    res.json(result);
+  });
+
   app.get("/api/admin/stats", requireAdminAuth, async (req, res) => {
     const [tenants, users, b2cUsers, activityLogs] = await Promise.all([
       storage.getAllTenants(),
@@ -2043,6 +2102,251 @@ export async function registerRoutes(
       atlysSlug: ISO_TO_ATLYS_SLUG[c.iso2] ?? c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
     }));
   }
+
+  // === Agency Self-Registration ===
+  app.post("/api/agency-register", async (req, res) => {
+    const { agencyName, slug, email, password, name, contactEmail, contactPhone } = req.body;
+    if (!agencyName || !slug || !email || !password || !name) {
+      return res.status(400).json({ error: "agencyName, slug, email, password, and name are required" });
+    }
+    const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+    if (!cleanSlug) return res.status(400).json({ error: "Invalid slug" });
+    const existing = await storage.getTenantBySlug(cleanSlug);
+    if (existing) return res.status(409).json({ error: "That agency URL is already taken" });
+    const existingUser = await storage.getUserByEmail(email.toLowerCase().trim());
+    if (existingUser) return res.status(409).json({ error: "An account with that email already exists" });
+    const tenant = await storage.createTenant({
+      name: agencyName.trim(),
+      slug: cleanSlug,
+      plan: "starter",
+      status: "active",
+      contactEmail: contactEmail || email,
+      contactPhone: contactPhone || null,
+      showPoweredBy: true,
+      authMethod: "otp",
+    });
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await storage.createUser({
+      email: email.toLowerCase().trim(),
+      name: name.trim(),
+      password: hashedPassword,
+      role: "agency_owner",
+      tenantId: tenant.id,
+      avatarUrl: null,
+    });
+    await storage.createActivityLog({
+      tenantId: tenant.id,
+      userId: user.id,
+      action: "agency.registered",
+      entityType: "tenant",
+      entityId: tenant.id,
+      details: { agencyName: tenant.name, plan: "starter" },
+    });
+    req.session.userId = user.id;
+    req.session.userRole = user.role;
+    req.session.userTenantId = tenant.id;
+    req.session.save(() => {
+      const { password: _, ...safeUser } = user;
+      res.status(201).json({ tenant, user: safeUser });
+    });
+  });
+
+  // === Tenant Staff Management ===
+  app.get("/api/tenants/:tenantId/staff", requireAgencyAuth, async (req, res) => {
+    const users = await storage.getUsersByTenantId(req.params.tenantId);
+    const staff = users
+      .filter(u => ["agency_owner", "agency_staff", "agency_manager"].includes(u.role))
+      .map(({ password: _, ...u }) => u)
+      .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+    res.json(staff);
+  });
+
+  app.post("/api/tenants/:tenantId/staff", requireAgencyAuth, async (req, res) => {
+    const { email, name, role } = req.body;
+    if (!email || !name) return res.status(400).json({ error: "Email and name are required" });
+    const tenantId = req.params.tenantId;
+    const existing = await storage.getUserByEmail(email.toLowerCase().trim());
+    if (existing) return res.status(409).json({ error: "A user with that email already exists" });
+    // Plan limits check
+    const tenant = await storage.getTenant(tenantId);
+    const currentStaff = await storage.getUsersByTenantId(tenantId);
+    const staffCount = currentStaff.filter(u => ["agency_owner", "agency_staff", "agency_manager"].includes(u.role)).length;
+    const limits: Record<string, number> = { starter: 3, professional: 10, enterprise: 999 };
+    const limit = limits[tenant?.plan ?? "starter"] ?? 3;
+    if (staffCount >= limit) {
+      return res.status(403).json({ error: `Your ${tenant?.plan} plan allows up to ${limit} staff members. Upgrade to add more.` });
+    }
+    const tempPassword = Math.random().toString(36).slice(-10) + "Aa1!";
+    const hashedPassword = await bcrypt.hash(tempPassword, 10);
+    const user = await storage.createUser({
+      email: email.toLowerCase().trim(),
+      name: name.trim(),
+      password: hashedPassword,
+      role: role ?? "agency_staff",
+      tenantId,
+      avatarUrl: null,
+    });
+    await storage.createActivityLog({
+      tenantId,
+      userId: req.session.userId ?? null,
+      action: "staff.invited",
+      entityType: "user",
+      entityId: user.id,
+      details: { email, name, role: role ?? "agency_staff" },
+    });
+    const { password: _, ...safeUser } = user;
+    res.status(201).json({ ...safeUser, tempPassword });
+  });
+
+  app.patch("/api/tenants/:tenantId/staff/:userId", requireAgencyAuth, async (req, res) => {
+    const { role, name } = req.body;
+    const user = await storage.updateUser(req.params.userId, { role, name });
+    if (!user) return res.status(404).json({ error: "User not found" });
+    const { password: _, ...safeUser } = user;
+    res.json(safeUser);
+  });
+
+  app.delete("/api/tenants/:tenantId/staff/:userId", requireAgencyAuth, async (req, res) => {
+    const tenantId = req.params.tenantId;
+    const userId = req.params.userId;
+    if (userId === req.session.userId) {
+      return res.status(400).json({ error: "You cannot remove yourself" });
+    }
+    const user = await storage.getUser(userId);
+    if (!user || user.tenantId !== tenantId) {
+      return res.status(404).json({ error: "Staff member not found" });
+    }
+    await storage.deleteUser(userId);
+    await storage.createActivityLog({
+      tenantId,
+      userId: req.session.userId ?? null,
+      action: "staff.removed",
+      entityType: "user",
+      entityId: userId,
+      details: { email: user.email, name: user.name },
+    });
+    res.status(204).send();
+  });
+
+  // === Tenant Analytics ===
+  app.get("/api/tenants/:tenantId/analytics", requireAgencyAuth, async (req, res) => {
+    const tenantId = req.params.tenantId;
+    const [cases, leads, documents] = await Promise.all([
+      storage.getCasesByTenantId(tenantId),
+      storage.getLeadsByTenantId(tenantId),
+      storage.getDocumentsByTenantId(tenantId),
+    ]);
+    const now = new Date();
+    // Monthly breakdown for last 6 months
+    const monthlyData = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+      const label = d.toLocaleString("en", { month: "short" });
+      const monthCases = cases.filter(c => {
+        const cd = new Date(c.createdAt!);
+        return cd.getFullYear() === d.getFullYear() && cd.getMonth() === d.getMonth();
+      });
+      return {
+        month: label,
+        cases: monthCases.length,
+        approved: monthCases.filter(c => c.status === "approved").length,
+        leads: leads.filter(l => {
+          const ld = new Date(l.createdAt!);
+          return ld.getFullYear() === d.getFullYear() && ld.getMonth() === d.getMonth();
+        }).length,
+      };
+    });
+    // Destination breakdown
+    const destinationMap: Record<string, number> = {};
+    cases.forEach(c => {
+      destinationMap[c.destinationCountry] = (destinationMap[c.destinationCountry] ?? 0) + 1;
+    });
+    const topDestinations = Object.entries(destinationMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([country, applications]) => ({ country, applications }));
+    // Visa type breakdown
+    const visaTypeMap: Record<string, number> = {};
+    cases.forEach(c => {
+      visaTypeMap[c.visaType] = (visaTypeMap[c.visaType] ?? 0) + 1;
+    });
+    const visaTypeData = Object.entries(visaTypeMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([type, count]) => ({ type, count }));
+    // Stage breakdown for leads
+    const stageMap: Record<string, number> = {};
+    leads.forEach(l => { stageMap[l.stage] = (stageMap[l.stage] ?? 0) + 1; });
+    const approvedCases = cases.filter(c => c.status === "approved");
+    const approvalRate = cases.length > 0 ? Math.round((approvedCases.length / cases.length) * 100) : 0;
+    const wonLeads = leads.filter(l => l.stage === "won");
+    const conversionRate = leads.length > 0 ? Math.round((wonLeads.length / leads.length) * 100) : 0;
+    const docApprovalRate = documents.length > 0
+      ? Math.round((documents.filter(d => d.status === "approved").length / documents.length) * 100)
+      : 0;
+    res.json({
+      summary: {
+        totalCases: cases.length,
+        activeCases: cases.filter(c => !["approved", "rejected"].includes(c.status)).length,
+        approvedCases: approvedCases.length,
+        approvalRate,
+        totalLeads: leads.length,
+        wonLeads: wonLeads.length,
+        conversionRate,
+        totalDocuments: documents.length,
+        docApprovalRate,
+      },
+      monthlyData,
+      topDestinations,
+      visaTypeData,
+      stageBreakdown: stageMap,
+    });
+  });
+
+  // === Tenant Usage / Plan Info ===
+  app.get("/api/tenants/:tenantId/usage", requireAgencyAuth, async (req, res) => {
+    const tenantId = req.params.tenantId;
+    const [tenant, cases, leads, staff] = await Promise.all([
+      storage.getTenant(tenantId),
+      storage.getCasesByTenantId(tenantId),
+      storage.getLeadsByTenantId(tenantId),
+      storage.getUsersByTenantId(tenantId),
+    ]);
+    const staffCount = staff.filter(u => ["agency_owner", "agency_staff", "agency_manager"].includes(u.role)).length;
+    const now = new Date();
+    const thisMonthCases = cases.filter(c => {
+      const d = new Date(c.createdAt!);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    }).length;
+    const PLAN_LIMITS: Record<string, { staff: number; casesPerMonth: number; leads: number; label: string }> = {
+      starter: { staff: 3, casesPerMonth: 30, leads: 50, label: "Starter" },
+      professional: { staff: 10, casesPerMonth: 200, leads: 500, label: "Professional" },
+      enterprise: { staff: 999, casesPerMonth: 9999, leads: 9999, label: "Enterprise" },
+    };
+    const plan = tenant?.plan ?? "starter";
+    const limits = PLAN_LIMITS[plan] ?? PLAN_LIMITS.starter;
+    res.json({
+      plan,
+      planLabel: limits.label,
+      usage: {
+        staff: staffCount,
+        casesThisMonth: thisMonthCases,
+        totalLeads: leads.length,
+        totalCases: cases.length,
+      },
+      limits: {
+        staff: limits.staff,
+        casesPerMonth: limits.casesPerMonth,
+        leads: limits.leads,
+      },
+      features: {
+        whiteLabel: plan !== "starter",
+        removesPoweredBy: plan === "enterprise",
+        customDomain: plan === "enterprise",
+        advancedAnalytics: plan !== "starter",
+        prioritySupport: plan === "enterprise",
+      },
+    });
+  });
 
   app.get('/api/schengen-slots', async (_req, res) => {
     const now = Date.now();

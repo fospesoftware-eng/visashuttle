@@ -12,16 +12,6 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar,
 } from "recharts";
 
-const weekData = [
-  { day: "Mon", cases: 8, checks: 34 },
-  { day: "Tue", cases: 12, checks: 41 },
-  { day: "Wed", cases: 9, checks: 28 },
-  { day: "Thu", cases: 15, checks: 52 },
-  { day: "Fri", cases: 18, checks: 67 },
-  { day: "Sat", cases: 6, checks: 19 },
-  { day: "Sun", cases: 4, checks: 14 },
-];
-
 function StatsSkeletons() {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -41,6 +31,10 @@ export default function AdminDashboard() {
 
   const { data: activityLogs } = useQuery<any[]>({
     queryKey: ["/api/admin/activity-logs"],
+  });
+
+  const { data: weekData = [], isLoading: weekLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/weekly-activity"],
   });
 
   const timelineItems = (activityLogs ?? []).slice(0, 5).map((log: any) => ({
@@ -121,18 +115,22 @@ export default function AdminDashboard() {
               <CardTitle className="text-base">Platform Activity (This Week)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[260px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={weekData}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="day" className="text-xs" tick={{ fontSize: 12 }} />
-                    <YAxis className="text-xs" tick={{ fontSize: 12 }} />
-                    <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: "8px" }} />
-                    <Line type="monotone" dataKey="cases" stroke="hsl(240, 80%, 65%)" strokeWidth={2} dot={{ fill: "hsl(240,80%,65%)" }} name="Cases" />
-                    <Line type="monotone" dataKey="checks" stroke="hsl(340, 82%, 62%)" strokeWidth={2} dot={{ fill: "hsl(340,82%,62%)" }} name="Visa Checks" />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+              {weekLoading ? (
+                <Skeleton className="h-[260px] rounded-xl" />
+              ) : (
+                <div className="h-[260px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={weekData}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis dataKey="day" className="text-xs" tick={{ fontSize: 12 }} />
+                      <YAxis className="text-xs" tick={{ fontSize: 12 }} />
+                      <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: "8px" }} />
+                      <Line type="monotone" dataKey="cases" stroke="hsl(240, 80%, 65%)" strokeWidth={2} dot={{ fill: "hsl(240,80%,65%)" }} name="Cases" />
+                      <Line type="monotone" dataKey="checks" stroke="hsl(340, 82%, 62%)" strokeWidth={2} dot={{ fill: "hsl(340,82%,62%)" }} name="Activity Logs" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </CardContent>
           </Card>
 

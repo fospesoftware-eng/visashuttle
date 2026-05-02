@@ -1,20 +1,430 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Building2, Users, Bell, Shield, CreditCard, Save, Palette, Upload, Eye, Loader2, Check, ExternalLink, Copy, Globe, Link2 } from "lucide-react";
+import { Building2, Users, Bell, CreditCard, Save, Palette, Eye, Loader2, Check, ExternalLink, Copy, Globe, Link2, Plus, Trash2, ChevronRight, UserCheck, UserX, Zap, Crown, Shield, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { Tenant } from "@shared/schema";
+import { useCurrentUser } from "@/hooks/use-current-user";
+
+// ─── Team Tab Component ────────────────────────────────────────────────────────
+
+const ROLE_LABELS: Record<string, string> = {
+  agency_owner: "Owner",
+  agency_manager: "Manager",
+  agency_staff: "Staff",
+};
+
+function TeamTab({ tenantId, currentUserId }: { tenantId?: string; currentUserId?: string }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [removeId, setRemoveId] = useState<string | null>(null);
+  const [inviteForm, setInviteForm] = useState({ name: "", email: "", role: "agency_staff" });
+
+  const { data: staff = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/tenants", tenantId, "staff"],
+    queryFn: async () => {
+      const res = await fetch(`/api/tenants/${tenantId}/staff`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!tenantId,
+  });
+
+  const { data: usageData } = useQuery<any>({
+    queryKey: ["/api/tenants", tenantId, "usage"],
+    queryFn: async () => {
+      const res = await fetch(`/api/tenants/${tenantId}/usage`, { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!tenantId,
+  });
+
+  const inviteMutation = useMutation({
+    mutationFn: async (data: typeof inviteForm) => {
+      const res = await apiRequest("POST", `/api/tenants/${tenantId}/staff`, data);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "staff"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "usage"] });
+      setIsInviteOpen(false);
+      setInviteForm({ name: "", email: "", role: "agency_staff" });
+      toast({
+        title: "Staff member added",
+        description: `Temporary password: ${data.tempPassword} — share this with them.`,
+        duration: 10000,
+      });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      await apiRequest("DELETE", `/api/tenants/${tenantId}/staff/${userId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "staff"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "usage"] });
+      setRemoveId(null);
+      toast({ title: "Staff member removed" });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const staffLimit = usageData?.limits?.staff ?? 3;
+  const staffCount = usageData?.usage?.staff ?? staff.length;
+  const atLimit = staffCount >= staffLimit;
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-4 pb-4">
+          <div>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              Team Members
+            </CardTitle>
+            <CardDescription>Manage who has access to your agency dashboard</CardDescription>
+          </div>
+          <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="gap-2 shrink-0" disabled={atLimit} data-testid="button-invite">
+                <Plus className="w-4 h-4" />
+                Add Member
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add Team Member</DialogTitle>
+                <DialogDescription>They'll receive access credentials to your agency dashboard.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 mt-2">
+                <div className="space-y-2">
+                  <Label>Full Name *</Label>
+                  <Input value={inviteForm.name} onChange={e => setInviteForm({ ...inviteForm, name: e.target.value })} placeholder="Jane Smith" data-testid="input-staff-name" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Email *</Label>
+                  <Input type="email" value={inviteForm.email} onChange={e => setInviteForm({ ...inviteForm, email: e.target.value })} placeholder="jane@agency.com" data-testid="input-staff-email" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Role</Label>
+                  <Select value={inviteForm.role} onValueChange={v => setInviteForm({ ...inviteForm, role: v })}>
+                    <SelectTrigger data-testid="select-staff-role">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="agency_staff">Staff — can manage cases & leads</SelectItem>
+                      <SelectItem value="agency_manager">Manager — can manage team & settings</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 p-3">
+                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                    A temporary password will be generated and shown to you after creation. Share it securely with the staff member.
+                  </p>
+                </div>
+                <Button className="w-full" onClick={() => inviteMutation.mutate(inviteForm)} disabled={inviteMutation.isPending} data-testid="button-submit-staff">
+                  {inviteMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                  Add Member
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map(i => <Skeleton key={i} className="h-14 rounded-lg" />)}
+            </div>
+          ) : (
+            <div className="divide-y rounded-xl border overflow-hidden">
+              {staff.map((member: any) => (
+                <div key={member.id} className="flex items-center gap-4 p-4 bg-background hover:bg-muted/30 transition-colors" data-testid={`staff-row-${member.id}`}>
+                  <Avatar className="w-9 h-9 shrink-0">
+                    <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                      {member.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-sm">{member.name}</p>
+                      {member.id === currentUserId && <Badge variant="secondary" className="text-xs">You</Badge>}
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">{member.email}</p>
+                  </div>
+                  <Badge variant="outline" className="text-xs capitalize shrink-0">
+                    {ROLE_LABELS[member.role] ?? member.role}
+                  </Badge>
+                  {member.id !== currentUserId && member.role !== "agency_owner" && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
+                      onClick={() => setRemoveId(member.id)}
+                      data-testid={`button-remove-staff-${member.id}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+              {staff.length === 0 && (
+                <div className="p-8 text-center text-sm text-muted-foreground">No team members yet.</div>
+              )}
+            </div>
+          )}
+          {usageData && (
+            <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground border-t pt-4">
+              <span>{staffCount} / {staffLimit === 999 ? "∞" : staffLimit} staff members used</span>
+              {atLimit && <span className="text-amber-600 dark:text-amber-400 font-medium">Upgrade to add more</span>}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Remove confirmation */}
+      <AlertDialog open={!!removeId} onOpenChange={open => !open && setRemoveId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Staff Member?</AlertDialogTitle>
+            <AlertDialogDescription>They will lose access to your agency dashboard immediately.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => removeId && removeMutation.mutate(removeId)}
+            >
+              {removeMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Remove"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+// ─── Billing Tab Component ─────────────────────────────────────────────────────
+
+const PLAN_DETAILS = {
+  starter: {
+    label: "Starter",
+    price: "Free",
+    color: "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700",
+    icon: Zap,
+    features: ["Up to 3 staff members", "30 cases per month", "50 leads", "White-label portal", "Basic analytics"],
+  },
+  professional: {
+    label: "Professional",
+    price: "$149/mo",
+    color: "bg-violet-50 dark:bg-violet-950/30 border-violet-200 dark:border-violet-800",
+    icon: Crown,
+    features: ["Up to 10 staff members", "200 cases per month", "500 leads", "White-label portal", "Advanced analytics", "Remove 'Powered by'"],
+  },
+  enterprise: {
+    label: "Enterprise",
+    price: "$399/mo",
+    color: "bg-primary/5 border-primary/20",
+    icon: Shield,
+    features: ["Unlimited staff", "Unlimited cases", "Unlimited leads", "Custom domain", "Priority support", "SLA guarantee"],
+  },
+};
+
+function BillingTab({ tenantId }: { tenantId?: string }) {
+  const { data: usageData, isLoading } = useQuery<any>({
+    queryKey: ["/api/tenants", tenantId, "usage"],
+    queryFn: async () => {
+      const res = await fetch(`/api/tenants/${tenantId}/usage`, { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!tenantId,
+  });
+
+  const plan = usageData?.plan ?? "starter";
+  const details = PLAN_DETAILS[plan as keyof typeof PLAN_DETAILS] ?? PLAN_DETAILS.starter;
+  const PlanIcon = details.icon;
+
+  const usageItems = usageData ? [
+    {
+      label: "Staff Members",
+      used: usageData.usage.staff,
+      limit: usageData.limits.staff,
+      unlimited: usageData.limits.staff >= 999,
+    },
+    {
+      label: "Cases This Month",
+      used: usageData.usage.casesThisMonth,
+      limit: usageData.limits.casesPerMonth,
+      unlimited: usageData.limits.casesPerMonth >= 9999,
+    },
+    {
+      label: "Total Leads",
+      used: usageData.usage.totalLeads,
+      limit: usageData.limits.leads,
+      unlimited: usageData.limits.leads >= 9999,
+    },
+  ] : [];
+
+  return (
+    <div className="space-y-6">
+      {/* Current plan */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <CreditCard className="w-4 h-4" />
+            Current Plan
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? <Skeleton className="h-20 rounded-xl" /> : (
+            <div className={`rounded-xl border p-5 ${details.color}`}>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-background/60">
+                    <PlanIcon className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-lg">{details.label}</p>
+                    <p className="text-sm text-muted-foreground">{details.price}</p>
+                  </div>
+                </div>
+                {plan !== "enterprise" && (
+                  <Button size="sm" className="gap-1.5 shrink-0" data-testid="button-upgrade">
+                    Upgrade
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                  </Button>
+                )}
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {details.features.map(f => (
+                  <div key={f} className="flex items-center gap-1.5 text-xs bg-background/60 rounded-full px-2.5 py-1">
+                    <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                    {f}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Usage */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Usage</CardTitle>
+          <CardDescription>Your current usage against your plan limits</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {isLoading ? (
+            <div className="space-y-4">{[1, 2, 3].map(i => <Skeleton key={i} className="h-10" />)}</div>
+          ) : (
+            usageItems.map(({ label, used, limit, unlimited }) => {
+              const pct = unlimited ? 0 : Math.min(Math.round((used / limit) * 100), 100);
+              const isNearLimit = !unlimited && pct >= 80;
+              return (
+                <div key={label} className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">{label}</span>
+                    <span className={`text-xs ${isNearLimit ? "text-amber-600 dark:text-amber-400 font-semibold" : "text-muted-foreground"}`}>
+                      {unlimited ? `${used} / ∞` : `${used} / ${limit}`}
+                    </span>
+                  </div>
+                  {!unlimited && (
+                    <Progress
+                      value={pct}
+                      className={`h-2 ${isNearLimit ? "[&>div]:bg-amber-500" : "[&>div]:bg-primary"}`}
+                    />
+                  )}
+                  {isNearLimit && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      Approaching limit — consider upgrading your plan.
+                    </p>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Plan comparison */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Available Plans</CardTitle>
+          <CardDescription>Compare plans and upgrade when you're ready</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-3">
+            {(Object.entries(PLAN_DETAILS) as [string, typeof PLAN_DETAILS.starter][]).map(([key, p]) => {
+              const Icon = p.icon;
+              const isCurrent = key === plan;
+              return (
+                <div key={key} className={`rounded-xl border p-4 relative ${isCurrent ? "ring-2 ring-primary" : ""}`}>
+                  {isCurrent && (
+                    <div className="absolute -top-2 left-1/2 -translate-x-1/2">
+                      <Badge className="text-xs">Current Plan</Badge>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 mb-3">
+                    <Icon className="w-4 h-4 text-primary" />
+                    <p className="font-semibold">{p.label}</p>
+                    <span className="ml-auto text-sm font-bold text-primary">{p.price}</span>
+                  </div>
+                  <ul className="space-y-1.5">
+                    {p.features.map(f => (
+                      <li key={f} className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Check className="w-3 h-3 text-emerald-500 shrink-0" />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  {!isCurrent && key !== "starter" && (
+                    <Button size="sm" className="w-full mt-4 gap-1.5" data-testid={`button-plan-${key}`}>
+                      Upgrade to {p.label}
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ─── Main Settings Page ────────────────────────────────────────────────────────
 
 export default function AgencySettingsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { data: authData } = useCurrentUser();
   
   const [notifications, setNotifications] = useState({
     newLead: true,
@@ -592,57 +1002,11 @@ export default function AgencySettingsPage() {
           </TabsContent>
 
           <TabsContent value="team" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  Team Members
-                </CardTitle>
-                <CardDescription>Manage your agency team</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                    <div>
-                      <p className="font-medium">Sarah Agent</p>
-                      <p className="text-sm text-muted-foreground">owner@demoagency.com</p>
-                    </div>
-                    <span className="text-sm text-muted-foreground">Owner</span>
-                  </div>
-                  <Button variant="outline" className="w-full" data-testid="button-invite">
-                    Invite Team Member
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <TeamTab tenantId={tenant?.id} currentUserId={authData?.user?.id} />
           </TabsContent>
 
           <TabsContent value="billing" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <CreditCard className="w-4 h-4" />
-                  Subscription
-                </CardTitle>
-                <CardDescription>Manage your subscription and billing</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold">Professional Plan</p>
-                      <p className="text-sm text-muted-foreground">$149/month</p>
-                    </div>
-                    <Button variant="outline" data-testid="button-upgrade">
-                      Upgrade Plan
-                    </Button>
-                  </div>
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  Next billing date: February 15, 2024
-                </div>
-              </CardContent>
-            </Card>
+            <BillingTab tenantId={tenant?.id} />
           </TabsContent>
         </Tabs>
       </div>

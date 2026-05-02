@@ -165,6 +165,45 @@ The platform now includes a full B2C visa approval checker with:
 - Session key: `req.session.b2cUserId` (separate from agency `userId`)
 - Passwords hashed with bcryptjs
 
+### B2B SaaS Features (Multi-Tenant Agency Dashboard)
+
+**Agency Self-Registration (`/agency-register`)**
+- 3-step multi-form: Agency Details → Admin Account → Review & Launch
+- Creates tenant (plan=starter) + agency_owner user in one `POST /api/agency-register` call
+- Sets session + stores slug in localStorage on success
+- Linked from all CTAs on `/business` marketing page
+
+**Staff/Team Management**
+- `GET/POST /api/tenants/:tenantId/staff` — list and add staff members
+- `PATCH/DELETE /api/tenants/:tenantId/staff/:userId` — update/remove staff
+- Plan limits enforced: Starter 3, Professional 10, Enterprise unlimited
+- Temp password generated on invite, shown to admin immediately
+- Full UI in Settings → Team tab (add/remove dialogs, role badges, usage bar)
+
+**Billing & Usage Tracking**
+- `GET /api/tenants/:tenantId/usage` — returns plan + usage counters + limits
+- Settings → Billing tab shows: current plan card with features, usage progress bars (staff/cases/leads), plan comparison grid with upgrade buttons
+- Amber warning when usage ≥ 80% of any limit
+
+**Plan Enforcement (Route-level)**
+- Lead creation (`POST /api/tenants/:tenantId/leads`) — enforces per-plan lead limits
+- Case creation (`POST /api/tenants/:tenantId/cases`) — enforces monthly case limits (resets each calendar month)
+- Staff creation — enforces staff member limits
+- Returns HTTP 403 with user-friendly message when limit reached
+
+**Real Analytics API**
+- `GET /api/tenants/:tenantId/analytics` — cases over time (30d), leads over time, destination breakdown, visa type breakdown, lead stage distribution
+- Agency Reports page wired to real API (charts replace all mock data)
+
+**Admin Dashboard — Real Weekly Chart**
+- `GET /api/admin/weekly-activity` — returns last 7 days of case + activity log counts
+- Admin dashboard "Platform Activity (This Week)" chart now uses real data with loading skeleton
+
+**All Mock Pages Wired to Real APIs**
+- Leads page: create/edit/delete/stage-move via real API + search/filter
+- Documents page: status stats, change-status actions, real document list
+- Reports page: all charts driven by `/api/tenants/:tenantId/analytics`
+
 ### Planned Integrations (not yet implemented)
 - **AI Provider**: Pluggable interface supporting OpenAI-compatible APIs via `AI_BASE_URL` and `AI_API_KEY` (mock fallback active)
 - **File Storage**: Abstraction for S3-compatible storage with signed URLs

@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Plus, Search, Filter, MoreVertical, Mail, Phone, Calendar } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Plus, Search, Filter, MoreVertical, Mail, Phone, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +9,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -18,6 +20,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -28,24 +40,108 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
-import { StatusBadge } from "@/components/status-badge";
 import { EmptyState } from "@/components/empty-state";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import type { Lead } from "@shared/schema";
 
 const stages = ["new", "contacted", "qualified", "proposal", "won", "lost"];
 
-const initialLeads = [
-  { id: "1", name: "Alice Cooper", email: "alice@example.com", phone: "+1 234 567 8901", stage: "new", source: "Website", value: 2500, createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2) },
-  { id: "2", name: "Bob Wilson", email: "bob@example.com", phone: "+1 234 567 8902", stage: "contacted", source: "Referral", value: 3200, createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24) },
-  { id: "3", name: "Carol Martinez", email: "carol@example.com", phone: "+1 234 567 8903", stage: "qualified", source: "Social Media", value: 4500, createdAt: new Date(Date.now() - 1000 * 60 * 60 * 48) },
-  { id: "4", name: "David Lee", email: "david@example.com", phone: "+1 234 567 8904", stage: "proposal", source: "Website", value: 5000, createdAt: new Date(Date.now() - 1000 * 60 * 60 * 72) },
-  { id: "5", name: "Emma Watson", email: "emma@example.com", phone: "+1 234 567 8905", stage: "won", source: "Referral", value: 3800, createdAt: new Date(Date.now() - 1000 * 60 * 60 * 96) },
-];
+const STAGE_COLORS: Record<string, string> = {
+  new: "bg-slate-100 dark:bg-slate-800",
+  contacted: "bg-blue-50 dark:bg-blue-950/40",
+  qualified: "bg-violet-50 dark:bg-violet-950/40",
+  proposal: "bg-amber-50 dark:bg-amber-950/40",
+  won: "bg-emerald-50 dark:bg-emerald-950/40",
+  lost: "bg-red-50 dark:bg-red-950/40",
+};
+
+const STAGE_DOT: Record<string, string> = {
+  new: "bg-slate-400",
+  contacted: "bg-blue-500",
+  qualified: "bg-violet-500",
+  proposal: "bg-amber-500",
+  won: "bg-emerald-500",
+  lost: "bg-red-500",
+};
+
+const emptyForm = { name: "", email: "", phone: "", source: "", notes: "", value: "" };
 
 export default function LeadsPage() {
-  const [leads, setLeads] = useState(initialLeads);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { data: authData } = useCurrentUser();
+  const tenantId = authData?.user?.tenantId;
+
   const [searchTerm, setSearchTerm] = useState("");
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newLead, setNewLead] = useState({ name: "", email: "", phone: "", source: "", notes: "" });
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [editLead, setEditLead] = useState<Lead | null>(null);
+  const [deleteLeadId, setDeleteLeadId] = useState<string | null>(null);
+  const [convertLead, setConvertLead] = useState<Lead | null>(null);
+  const [form, setForm] = useState(emptyForm);
+
+  const { data: leads = [], isLoading } = useQuery<Lead[]>({
+    queryKey: ["/api/tenants", tenantId, "leads"],
+    queryFn: async () => {
+      const res = await fetch(`/api/tenants/${tenantId}/leads`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!tenantId,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: typeof emptyForm) => {
+      const res = await apiRequest("POST", `/api/tenants/${tenantId}/leads`, {
+        ...data,
+        value: data.value ? parseInt(data.value) : 0,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "leads"] });
+      setIsAddOpen(false);
+      setForm(emptyForm);
+      toast({ title: "Lead added", description: "New lead has been added to the pipeline." });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Lead> }) => {
+      const res = await apiRequest("PATCH", `/api/leads/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "leads"] });
+      setEditLead(null);
+      toast({ title: "Lead updated" });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/leads/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "leads"] });
+      setDeleteLeadId(null);
+      toast({ title: "Lead deleted" });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const moveStageMutation = useMutation({
+    mutationFn: async ({ id, stage }: { id: string; stage: string }) => {
+      const res = await apiRequest("PATCH", `/api/leads/${id}`, { stage });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "leads"] });
+    },
+  });
 
   const filteredLeads = leads.filter(lead =>
     lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -54,26 +150,31 @@ export default function LeadsPage() {
 
   const getLeadsByStage = (stage: string) => filteredLeads.filter(lead => lead.stage === stage);
 
-  const handleAddLead = () => {
-    if (newLead.name && newLead.email) {
-      setLeads([...leads, {
-        id: Date.now().toString(),
-        ...newLead,
-        stage: "new",
-        value: 0,
-        createdAt: new Date()
-      }]);
-      setNewLead({ name: "", email: "", phone: "", source: "", notes: "" });
-      setIsDialogOpen(false);
+  const handleSubmit = () => {
+    if (!form.name || !form.email) {
+      toast({ title: "Required fields", description: "Name and email are required.", variant: "destructive" });
+      return;
+    }
+    if (editLead) {
+      updateMutation.mutate({ id: editLead.id, data: { ...form, value: form.value ? parseInt(form.value) : 0 } });
+    } else {
+      createMutation.mutate(form);
     }
   };
 
-  const formatDate = (date: Date) => {
-    return new Intl.RelativeTimeFormat('en', { numeric: 'auto' }).format(
-      Math.ceil((date.getTime() - Date.now()) / (1000 * 60 * 60 * 24)),
-      'day'
-    );
+  const openEdit = (lead: Lead) => {
+    setEditLead(lead);
+    setForm({
+      name: lead.name,
+      email: lead.email,
+      phone: lead.phone ?? "",
+      source: lead.source ?? "",
+      notes: lead.notes ?? "",
+      value: lead.value ? String(lead.value) : "",
+    });
   };
+
+  const totalValue = leads.filter(l => l.stage === "won").reduce((sum, l) => sum + (l.value ?? 0), 0);
 
   return (
     <DashboardLayout type="agency">
@@ -83,80 +184,90 @@ export default function LeadsPage() {
             <h1 className="text-2xl font-bold" data-testid="text-page-title">Leads Pipeline</h1>
             <p className="text-muted-foreground">Manage your sales pipeline and convert leads to cases.</p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isAddOpen || !!editLead} onOpenChange={(open) => {
+            if (!open) { setIsAddOpen(false); setEditLead(null); setForm(emptyForm); }
+            else setIsAddOpen(true);
+          }}>
             <DialogTrigger asChild>
-              <Button className="gap-2" data-testid="button-add-lead">
+              <Button className="gap-2" data-testid="button-add-lead" onClick={() => { setEditLead(null); setForm(emptyForm); setIsAddOpen(true); }}>
                 <Plus className="w-4 h-4" />
                 Add Lead
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Add New Lead</DialogTitle>
+                <DialogTitle>{editLead ? "Edit Lead" : "Add New Lead"}</DialogTitle>
                 <DialogDescription>Enter the lead's contact information.</DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 mt-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Name</Label>
-                  <Input
-                    id="name"
-                    value={newLead.name}
-                    onChange={(e) => setNewLead({ ...newLead, name: e.target.value })}
-                    placeholder="Enter name"
-                    data-testid="input-lead-name"
-                  />
+              <div className="space-y-4 mt-2">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2 col-span-2">
+                    <Label>Name *</Label>
+                    <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Full name" data-testid="input-lead-name" />
+                  </div>
+                  <div className="space-y-2 col-span-2">
+                    <Label>Email *</Label>
+                    <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="email@example.com" data-testid="input-lead-email" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Phone</Label>
+                    <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+1 234 567 8900" data-testid="input-lead-phone" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Value ($)</Label>
+                    <Input type="number" value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} placeholder="0" />
+                  </div>
+                  <div className="space-y-2 col-span-2">
+                    <Label>Source</Label>
+                    <Select value={form.source} onValueChange={(v) => setForm({ ...form, source: v })}>
+                      <SelectTrigger data-testid="select-lead-source">
+                        <SelectValue placeholder="Select source" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="website">Website</SelectItem>
+                        <SelectItem value="referral">Referral</SelectItem>
+                        <SelectItem value="social">Social Media</SelectItem>
+                        <SelectItem value="walk_in">Walk-in</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2 col-span-2">
+                    <Label>Notes</Label>
+                    <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Any notes..." data-testid="input-lead-notes" />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={newLead.email}
-                    onChange={(e) => setNewLead({ ...newLead, email: e.target.value })}
-                    placeholder="Enter email"
-                    data-testid="input-lead-email"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input
-                    id="phone"
-                    value={newLead.phone}
-                    onChange={(e) => setNewLead({ ...newLead, phone: e.target.value })}
-                    placeholder="Enter phone number"
-                    data-testid="input-lead-phone"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="source">Source</Label>
-                  <Select value={newLead.source} onValueChange={(value) => setNewLead({ ...newLead, source: value })}>
-                    <SelectTrigger data-testid="select-lead-source">
-                      <SelectValue placeholder="Select source" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="website">Website</SelectItem>
-                      <SelectItem value="referral">Referral</SelectItem>
-                      <SelectItem value="social">Social Media</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="notes">Notes</Label>
-                  <Textarea
-                    id="notes"
-                    value={newLead.notes}
-                    onChange={(e) => setNewLead({ ...newLead, notes: e.target.value })}
-                    placeholder="Add any notes..."
-                    data-testid="input-lead-notes"
-                  />
-                </div>
-                <Button onClick={handleAddLead} className="w-full" data-testid="button-submit-lead">
-                  Add Lead
+                <Button
+                  onClick={handleSubmit}
+                  className="w-full"
+                  disabled={createMutation.isPending || updateMutation.isPending}
+                  data-testid="button-submit-lead"
+                >
+                  {(createMutation.isPending || updateMutation.isPending) ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  {editLead ? "Save Changes" : "Add Lead"}
                 </Button>
               </div>
             </DialogContent>
           </Dialog>
+        </div>
+
+        {/* Summary bar */}
+        <div className="flex flex-wrap gap-4 text-sm">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/60">
+            <span className="text-muted-foreground">Total leads:</span>
+            <span className="font-semibold">{leads.length}</span>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30">
+            <span className="text-muted-foreground">Won value:</span>
+            <span className="font-semibold text-emerald-700 dark:text-emerald-400">${totalValue.toLocaleString()}</span>
+          </div>
+          {stages.map(s => (
+            <div key={s} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted/40">
+              <span className={`w-2 h-2 rounded-full ${STAGE_DOT[s]}`} />
+              <span className="capitalize text-muted-foreground">{s}:</span>
+              <span className="font-medium">{getLeadsByStage(s).length}</span>
+            </div>
+          ))}
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4">
@@ -170,75 +281,121 @@ export default function LeadsPage() {
               data-testid="input-search-leads"
             />
           </div>
-          <Button variant="outline" className="gap-2" data-testid="button-filter">
-            <Filter className="w-4 h-4" />
-            Filter
-          </Button>
         </div>
 
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 overflow-x-auto">
-          {stages.map((stage) => (
-            <Card key={stage} className="min-w-[280px]" data-testid={`column-${stage}`}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between gap-2">
-                  <CardTitle className="text-sm font-medium capitalize flex items-center gap-2">
-                    {stage.replace('_', ' ')}
-                    <span className="text-muted-foreground">({getLeadsByStage(stage).length})</span>
-                  </CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {getLeadsByStage(stage).length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">No leads</p>
-                ) : (
-                  getLeadsByStage(stage).map((lead) => (
-                    <div
-                      key={lead.id}
-                      className="p-3 rounded-lg bg-muted/50 hover-elevate cursor-pointer space-y-2"
-                      data-testid={`lead-card-${lead.id}`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <Avatar className="w-8 h-8">
-                            <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                              {lead.name.split(' ').map(n => n[0]).join('')}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="text-sm font-medium">{lead.name}</p>
-                            <p className="text-xs text-muted-foreground">{lead.source}</p>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            {stages.map((stage) => (
+              <Card key={stage} className={`min-w-[260px] ${STAGE_COLORS[stage]} border-0`} data-testid={`column-${stage}`}>
+                <CardHeader className="pb-3 pt-4 px-4">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2.5 h-2.5 rounded-full ${STAGE_DOT[stage]}`} />
+                    <CardTitle className="text-sm font-semibold capitalize">
+                      {stage.replace("_", " ")}
+                    </CardTitle>
+                    <span className="ml-auto text-xs font-medium text-muted-foreground bg-background/70 rounded px-1.5 py-0.5">
+                      {getLeadsByStage(stage).length}
+                    </span>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-2 px-3 pb-4">
+                  {getLeadsByStage(stage).length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-6">No leads</p>
+                  ) : (
+                    getLeadsByStage(stage).map((lead) => (
+                      <div
+                        key={lead.id}
+                        className="p-3 rounded-xl bg-background/90 shadow-sm hover-elevate cursor-pointer space-y-2 border border-border/40"
+                        data-testid={`lead-card-${lead.id}`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Avatar className="w-7 h-7 shrink-0">
+                              <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                                {lead.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{lead.name}</p>
+                              {lead.source && <p className="text-xs text-muted-foreground capitalize">{lead.source.replace("_", " ")}</p>}
+                            </div>
                           </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                                <MoreVertical className="w-3.5 h-3.5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem onClick={() => openEdit(lead)}>Edit Lead</DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <p className="text-xs text-muted-foreground px-2 py-1">Move to stage</p>
+                              {stages.filter(s => s !== stage).map(s => (
+                                <DropdownMenuItem key={s} className="capitalize" onClick={() => moveStageMutation.mutate({ id: lead.id, stage: s })}>
+                                  → {s.replace("_", " ")}
+                                </DropdownMenuItem>
+                              ))}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-destructive" onClick={() => setDeleteLeadId(lead.id)}>
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>Edit</DropdownMenuItem>
-                            <DropdownMenuItem>Convert to Case</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="text-xs text-muted-foreground flex items-center gap-1 truncate">
+                          <Mail className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{lead.email}</span>
+                        </div>
+                        {lead.phone && (
+                          <div className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Phone className="w-3 h-3 shrink-0" />
+                            {lead.phone}
+                          </div>
+                        )}
+                        {(lead.value ?? 0) > 0 && (
+                          <p className="text-sm font-semibold text-primary">${(lead.value ?? 0).toLocaleString()}</p>
+                        )}
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Mail className="w-3 h-3" />
-                          {lead.email}
-                        </span>
-                      </div>
-                      {lead.value > 0 && (
-                        <p className="text-sm font-semibold text-primary">${lead.value.toLocaleString()}</p>
-                      )}
-                    </div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {!isLoading && leads.length === 0 && (
+          <EmptyState
+            icon={AlertCircle}
+            title="No leads yet"
+            description="Start adding leads to track your sales pipeline."
+            action={{ label: "Add First Lead", onClick: () => setIsAddOpen(true) }}
+          />
+        )}
       </div>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={!!deleteLeadId} onOpenChange={(open) => !open && setDeleteLeadId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Lead?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteLeadId && deleteMutation.mutate(deleteLeadId)}
+            >
+              {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 }

@@ -51,6 +51,7 @@ import AdminAIPage from "@/pages/admin/ai";
 import AdminAuditPage from "@/pages/admin/audit";
 import AdminSettingsPage from "@/pages/admin/settings";
 
+import AgencyRegisterPage from "@/pages/agency-register";
 import PrivacyPolicyPage from "@/pages/privacy-policy";
 import TermsAndConditionsPage from "@/pages/terms-and-conditions";
 import RefundPolicyPage from "@/pages/refund-policy";
@@ -107,6 +108,7 @@ function Router() {
       <Route path="/visa-check" component={VisaCheckPublicPage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/signup" component={SignupPage} />
+      <Route path="/agency-register" component={AgencyRegisterPage} />
       <Route path="/privacy-policy" component={PrivacyPolicyPage} />
       <Route path="/terms-and-conditions" component={TermsAndConditionsPage} />
       <Route path="/refund-policy" component={RefundPolicyPage} />

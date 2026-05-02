@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Search, Filter, Grid, List, FileText, Download, Eye, MoreVertical } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Search, Grid, List, FileText, Download, Eye, MoreVertical, Loader2, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,28 +16,49 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { StatusBadge } from "@/components/status-badge";
-import { UploadDropzone } from "@/components/upload-dropzone";
-
-const documents = [
-  { id: "1", name: "John Smith - Passport", caseId: "VS-2024-001", type: "passport", status: "approved", qualityScore: 95, uploadedAt: "2024-01-15" },
-  { id: "2", name: "John Smith - Photo", caseId: "VS-2024-001", type: "photo", status: "approved", qualityScore: 88, uploadedAt: "2024-01-15" },
-  { id: "3", name: "Sarah Johnson - Passport", caseId: "VS-2024-002", type: "passport", status: "pending", qualityScore: null, uploadedAt: "2024-01-14" },
-  { id: "4", name: "Sarah Johnson - Bank Statement", caseId: "VS-2024-002", type: "bank_statement", status: "needs_reupload", qualityScore: 30, uploadedAt: "2024-01-14" },
-  { id: "5", name: "Michael Brown - Passport", caseId: "VS-2024-003", type: "passport", status: "approved", qualityScore: 92, uploadedAt: "2024-01-13" },
-  { id: "6", name: "Michael Brown - Employment Letter", caseId: "VS-2024-003", type: "employment", status: "pending", qualityScore: null, uploadedAt: "2024-01-13" },
-  { id: "7", name: "Emily Davis - Passport", caseId: "VS-2024-004", type: "passport", status: "pending", qualityScore: null, uploadedAt: "2024-01-12" },
-  { id: "8", name: "James Wilson - Travel Insurance", caseId: "VS-2024-005", type: "insurance", status: "approved", qualityScore: 100, uploadedAt: "2024-01-10" },
-];
+import { EmptyState } from "@/components/empty-state";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import type { Document } from "@shared/schema";
 
 export default function DocumentsPage() {
+  const { data: authData } = useCurrentUser();
+  const tenantId = authData?.user?.tenantId;
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+
+  const { data: documents = [], isLoading } = useQuery<Document[]>({
+    queryKey: ["/api/tenants", tenantId, "documents"],
+    queryFn: async () => {
+      const res = await fetch(`/api/tenants/${tenantId}/documents`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!tenantId,
+  });
+
+  const updateDocMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const res = await apiRequest("PATCH", `/api/documents/${id}`, { status });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "documents"] });
+      toast({ title: "Document updated" });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
 
   const filteredDocuments = documents.filter(doc => {
     const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -46,11 +68,18 @@ export default function DocumentsPage() {
     return matchesSearch && matchesStatus && matchesType;
   });
 
-  const getQualityColor = (score: number | null) => {
-    if (score === null) return "bg-muted";
-    if (score >= 80) return "bg-emerald-500";
-    if (score >= 50) return "bg-amber-500";
-    return "bg-red-500";
+  const docTypes = Array.from(new Set(documents.map(d => d.type)));
+
+  const stats = {
+    total: documents.length,
+    approved: documents.filter(d => d.status === "approved").length,
+    pending: documents.filter(d => d.status === "pending").length,
+    needsReupload: documents.filter(d => d.status === "needs_reupload").length,
+  };
+
+  const formatDate = (date: Date | string | null) => {
+    if (!date) return "—";
+    return new Date(date).toLocaleDateString("en", { month: "short", day: "numeric", year: "numeric" });
   };
 
   return (
@@ -59,18 +88,29 @@ export default function DocumentsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold" data-testid="text-page-title">Document Center</h1>
-            <p className="text-muted-foreground">Manage and review all uploaded documents.</p>
+            <p className="text-muted-foreground">Review and manage all application documents.</p>
           </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Upload Documents</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <UploadDropzone onUpload={(files) => console.log(files)} />
-          </CardContent>
-        </Card>
+        {/* Stats row */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: "Total", value: stats.total, icon: FileText, color: "text-muted-foreground" },
+            { label: "Approved", value: stats.approved, icon: CheckCircle, color: "text-emerald-600 dark:text-emerald-400" },
+            { label: "Pending", value: stats.pending, icon: AlertCircle, color: "text-amber-600 dark:text-amber-400" },
+            { label: "Needs Reupload", value: stats.needsReupload, icon: XCircle, color: "text-red-600 dark:text-red-400" },
+          ].map(({ label, value, icon: Icon, color }) => (
+            <Card key={label}>
+              <CardContent className="p-4 flex items-center gap-3">
+                <Icon className={`w-5 h-5 ${color} shrink-0`} />
+                <div>
+                  <p className="text-xl font-bold">{value}</p>
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
 
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
@@ -92,6 +132,7 @@ export default function DocumentsPage() {
               <SelectItem value="approved">Approved</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="needs_reupload">Needs Reupload</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
             </SelectContent>
           </Select>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -100,73 +141,74 @@ export default function DocumentsPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="passport">Passport</SelectItem>
-              <SelectItem value="photo">Photo</SelectItem>
-              <SelectItem value="bank_statement">Bank Statement</SelectItem>
-              <SelectItem value="employment">Employment</SelectItem>
-              <SelectItem value="insurance">Insurance</SelectItem>
+              {docTypes.map(t => (
+                <SelectItem key={t} value={t}>{t.replace(/_/g, " ")}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <div className="flex gap-1">
-            <Button 
-              variant={viewMode === "grid" ? "secondary" : "ghost"} 
-              size="icon"
-              onClick={() => setViewMode("grid")}
-              data-testid="button-view-grid"
-            >
+            <Button variant={viewMode === "grid" ? "secondary" : "ghost"} size="icon" onClick={() => setViewMode("grid")} data-testid="button-view-grid">
               <Grid className="w-4 h-4" />
             </Button>
-            <Button 
-              variant={viewMode === "list" ? "secondary" : "ghost"} 
-              size="icon"
-              onClick={() => setViewMode("list")}
-              data-testid="button-view-list"
-            >
+            <Button variant={viewMode === "list" ? "secondary" : "ghost"} size="icon" onClick={() => setViewMode("list")} data-testid="button-view-list">
               <List className="w-4 h-4" />
             </Button>
           </div>
         </div>
 
-        {viewMode === "grid" ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : filteredDocuments.length === 0 ? (
+          <EmptyState
+            icon={FileText}
+            title="No documents found"
+            description={documents.length === 0 ? "Documents uploaded by customers will appear here." : "No documents match your filters."}
+          />
+        ) : viewMode === "grid" ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filteredDocuments.map((doc) => (
               <Card key={doc.id} className="hover-elevate" data-testid={`document-card-${doc.id}`}>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-2 mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
                         <FileText className="w-5 h-5 text-muted-foreground" />
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate">{doc.name}</p>
-                        <p className="text-xs text-muted-foreground">{doc.caseId}</p>
+                        <p className="text-xs text-muted-foreground font-mono">{doc.caseId.slice(0, 12)}…</p>
                       </div>
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
                           <MoreVertical className="w-4 h-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
-                          <Eye className="w-4 h-4 mr-2" />
-                          View
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Download className="w-4 h-4 mr-2" />
-                          Download
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
+                        {doc.fileUrl && (
+                          <DropdownMenuItem asChild>
+                            <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
+                              <Eye className="w-4 h-4" /> View
+                            </a>
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        <p className="text-xs text-muted-foreground px-2 py-1">Change status</p>
+                        {["approved", "pending", "needs_reupload", "rejected"].filter(s => s !== doc.status).map(s => (
+                          <DropdownMenuItem key={s} className="capitalize" onClick={() => updateDocMutation.mutate({ id: doc.id, status: s })}>
+                            Mark as {s.replace(/_/g, " ")}
+                          </DropdownMenuItem>
+                        ))}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
-                  
                   <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs text-muted-foreground capitalize">{doc.type.replace('_', ' ')}</span>
+                    <span className="text-xs text-muted-foreground capitalize">{doc.type.replace(/_/g, " ")}</span>
                     <StatusBadge status={doc.status} />
                   </div>
-
                   {doc.qualityScore !== null && (
                     <div className="space-y-1">
                       <div className="flex items-center justify-between text-xs">
@@ -176,10 +218,7 @@ export default function DocumentsPage() {
                       <Progress value={doc.qualityScore} className="h-1.5" />
                     </div>
                   )}
-
-                  <p className="text-xs text-muted-foreground mt-3">
-                    Uploaded {doc.uploadedAt}
-                  </p>
+                  <p className="text-xs text-muted-foreground mt-3">{formatDate(doc.uploadedAt)}</p>
                 </CardContent>
               </Card>
             ))}
@@ -189,17 +228,13 @@ export default function DocumentsPage() {
             <CardContent className="p-0">
               <div className="divide-y">
                 {filteredDocuments.map((doc) => (
-                  <div 
-                    key={doc.id}
-                    className="flex items-center gap-4 p-4 hover:bg-muted/50"
-                    data-testid={`document-row-${doc.id}`}
-                  >
-                    <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                  <div key={doc.id} className="flex items-center gap-4 p-4 hover:bg-muted/50" data-testid={`document-row-${doc.id}`}>
+                    <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
                       <FileText className="w-5 h-5 text-muted-foreground" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">{doc.name}</p>
-                      <p className="text-sm text-muted-foreground">{doc.caseId} • {doc.type.replace('_', ' ')}</p>
+                      <p className="text-sm text-muted-foreground capitalize">{doc.type.replace(/_/g, " ")}</p>
                     </div>
                     <StatusBadge status={doc.status} />
                     {doc.qualityScore !== null && (
@@ -211,7 +246,7 @@ export default function DocumentsPage() {
                         <Progress value={doc.qualityScore} className="h-1.5" />
                       </div>
                     )}
-                    <span className="text-sm text-muted-foreground hidden md:block">{doc.uploadedAt}</span>
+                    <span className="text-sm text-muted-foreground hidden md:block">{formatDate(doc.uploadedAt)}</span>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon">
@@ -219,15 +254,19 @@ export default function DocumentsPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
-                          <Eye className="w-4 h-4 mr-2" />
-                          View
-                        </DropdownMenuItem>
-                        <DropdownMenuItem>
-                          <Download className="w-4 h-4 mr-2" />
-                          Download
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
+                        {doc.fileUrl && (
+                          <DropdownMenuItem asChild>
+                            <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
+                              <Eye className="w-4 h-4" /> View
+                            </a>
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        {["approved", "pending", "needs_reupload", "rejected"].filter(s => s !== doc.status).map(s => (
+                          <DropdownMenuItem key={s} className="capitalize" onClick={() => updateDocMutation.mutate({ id: doc.id, status: s })}>
+                            Mark as {s.replace(/_/g, " ")}
+                          </DropdownMenuItem>
+                        ))}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>

@@ -92,7 +92,7 @@ export default function BusinessPage() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/signup">
+            <Link href="/agency-register">
               <Button size="lg" className="gap-2 text-base" data-testid="button-hero-cta">
                 Start Free Trial
                 <ArrowRight className="w-4 h-4" />
@@ -206,7 +206,7 @@ export default function BusinessPage() {
                     </li>
                   ))}
                 </ul>
-                <Button variant="outline" className="w-full" data-testid="button-pricing-starter">Get Started</Button>
+                <Link href="/agency-register"><Button variant="outline" className="w-full" data-testid="button-pricing-starter">Get Started Free</Button></Link>
               </CardContent>
             </Card>
             
@@ -226,7 +226,7 @@ export default function BusinessPage() {
                     </li>
                   ))}
                 </ul>
-                <Button className="w-full" data-testid="button-pricing-professional">Get Started</Button>
+                <Link href="/agency-register"><Button className="w-full" data-testid="button-pricing-professional">Start Free Trial</Button></Link>
               </CardContent>
             </Card>
             
@@ -259,10 +259,15 @@ export default function BusinessPage() {
             Join 500+ travel agencies already using Visa Shuttle to streamline their operations.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/signup">
+            <Link href="/agency-register">
               <Button size="lg" variant="secondary" className="gap-2 text-base" data-testid="button-cta-final">
                 Start Your Free Trial
                 <ArrowRight className="w-4 h-4" />
+              </Button>
+            </Link>
+            <Link href="/sign-in">
+              <Button size="lg" variant="ghost" className="gap-2 text-base text-white/80 hover:text-white hover:bg-white/10" data-testid="button-cta-signin">
+                Sign In
               </Button>
             </Link>
           </div>
