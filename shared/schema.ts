@@ -216,6 +216,60 @@ export const VISA_PROCESSING_STATUSES = [
 ] as const;
 export type VisaProcessingStatus = typeof VISA_PROCESSING_STATUSES[number]["value"];
 
+// =====================================================================
+// APPOINTMENTS — bookings tied to a visa application case
+//
+// A case can have any number of appointments (e.g. biometric + collection
+// + interview), each either at an embassy/consulate/high commission OR
+// through a 3rd-party visa application centre (VFS, BLS, etc).
+// Appointments power the new "Appointments" phase of the application.
+// =====================================================================
+export const appointments = pgTable("appointments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  caseId: varchar("case_id").notNull(),
+  tenantId: varchar("tenant_id").notNull(),
+  // Top-level kind drives which provider list to show in the UI.
+  appointmentType: text("appointment_type").notNull(), // embassy_consulate | vfs | bls | other
+  // Specific embassy/consulate/centre name. Free text so agents can pick
+  // from the suggested list OR type a custom one (small countries / new centres).
+  provider: text("provider").notNull(),
+  // City / location of the appointment. Optional for embassy if the embassy
+  // name already contains the city (e.g. "French Embassy - New Delhi").
+  location: text("location"),
+  scheduledAt: timestamp("scheduled_at").notNull(),
+  // Confirmation upload — stored as a data URL for the in-memory demo so
+  // it round-trips end-to-end without needing object storage. In production
+  // this becomes a regular CDN URL.
+  confirmationFileUrl: text("confirmation_file_url"),
+  confirmationFileName: text("confirmation_file_name"),
+  notes: text("notes"),
+  status: text("status").notNull().default("scheduled"), // scheduled | completed | rescheduled | cancelled
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAppointmentSchema = createInsertSchema(appointments).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
+export type Appointment = typeof appointments.$inferSelect;
+
+export const APPOINTMENT_TYPES = [
+  { value: "embassy_consulate", label: "Embassy / Consulate / High Commission" },
+  { value: "vfs",   label: "VFS Global" },
+  { value: "bls",   label: "BLS International" },
+  { value: "other", label: "Other 3rd Party" },
+] as const;
+export type AppointmentType = typeof APPOINTMENT_TYPES[number]["value"];
+
+export const APPOINTMENT_STATUSES = [
+  { value: "scheduled",   label: "Scheduled" },
+  { value: "completed",   label: "Completed" },
+  { value: "rescheduled", label: "Rescheduled" },
+  { value: "cancelled",   label: "Cancelled" },
+] as const;
+export type AppointmentStatus = typeof APPOINTMENT_STATUSES[number]["value"];
+
 // Case Co-Travellers (companions on the same application/trip)
 export const CO_TRAVELLER_RELATIONSHIPS = [
   "spouse", "child", "parent", "sibling", "grandparent",

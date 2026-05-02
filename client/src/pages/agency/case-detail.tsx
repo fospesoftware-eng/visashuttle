@@ -19,6 +19,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { ProgressRing } from "@/components/progress-ring";
 import { Timeline } from "@/components/timeline";
 import { UploadDropzone } from "@/components/upload-dropzone";
+import { AppointmentsPanel } from "@/components/appointments-panel";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -861,6 +862,9 @@ export default function CaseDetailPage() {
                     <span className="ml-1.5 text-xs bg-muted rounded-full px-1.5">{documents.length}</span>
                   )}
                 </TabsTrigger>
+                <TabsTrigger value="appointments" data-testid="tab-appointments">
+                  Appointments
+                </TabsTrigger>
                 <TabsTrigger value="messages" data-testid="tab-messages">
                   Messages
                   {messages.length > 0 && (
@@ -1008,6 +1012,14 @@ export default function CaseDetailPage() {
                     )}
                   </CardContent>
                 </Card>
+              </TabsContent>
+
+              {/* Appointments tab */}
+              <TabsContent value="appointments" className="space-y-4">
+                <AppointmentsPanel
+                  caseId={caseData.id}
+                  destinationCountry={caseData.destinationCountry}
+                />
               </TabsContent>
 
               {/* Messages tab */}

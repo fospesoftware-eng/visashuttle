@@ -42,6 +42,65 @@ post-submission tracker.
 - **Visa pages** (`client/src/pages/agency/visa.tsx`): one component shared by all three routes via a `stage` prop. Processing has Update Status / Approve / Reject actions. Approved + Rejected have a "Move back to Processing" action. Status-update dialog enforces a comment for `waiting_documents` and `application_delayed`.
 - **Sidebar nav** (`client/src/components/layouts/dashboard-layout.tsx`): "Visa" group with Stamp icon, between Applications and Documents, with Processing / Approved / Rejected children.
 
+## Appointments (May 2026)
+
+Each visa case can carry one or more **appointments** — embassy / consulate /
+high-commission interviews booked directly with the destination authority, or
+biometric / document-collection slots booked through a third-party provider
+(VFS Global, BLS, etc). Appointments live alongside documents and messages on
+the case detail page and are scoped to the case's tenant.
+
+- **Schema** (`shared/schema.ts`, `appointments` table): `id`, `caseId`,
+  `tenantId`, `appointmentType` (enum: `embassy_consulate | vfs | bls | other`),
+  `provider` (free-text — e.g. "French Consulate Mumbai" or "VFS Global Delhi"),
+  `location` (city, optional), `scheduledAt` (timestamp), `status`
+  (`scheduled | completed | rescheduled | cancelled`),
+  `confirmationFileUrl` + `confirmationFileName` (optional uploaded confirmation
+  PDF/image stored as a base64 data URL up to ~2 MB so it round-trips without
+  object storage), `notes`, `createdAt`, `updatedAt`.
+- **Provider catalog** (`client/src/data/appointment-providers.ts`): static
+  per-country embassy/consulate lists and the VFS / BLS city lists used to
+  populate the picker dropdowns. Lookups key off the case's
+  `destinationCountry` so an India → France case shows French embassy +
+  Indian VFS cities.
+- **Storage** (`server/storage.ts`): `MemStorage` keeps appointments in a
+  `Map<string, Appointment>`. `IStorage` exposes
+  `getAppointmentsByCaseId`, `getAppointmentsByTenantId`, `getAppointment`,
+  `createAppointment`, `updateAppointment`, `deleteAppointment`. Tenant
+  isolation is enforced via the parent case's `tenantId` at the route layer.
+- **Backend routes** (`server/routes.ts`):
+  - `GET /api/cases/:caseId/appointments` — list for a case.
+  - `POST /api/cases/:caseId/appointments` — create. `appointmentType`,
+    `provider`, `scheduledAt` are required; enums (`appointmentType`,
+    `status`) are validated by `validateAppointmentEnums()` returning 400 on
+    bad input. Writes an `appointment.created` activity-log entry.
+  - `PATCH /api/appointments/:id` — partial update with the same enum guard.
+    The handler explicitly **whitelists** mutable fields, so a crafted PATCH
+    can never re-parent an appointment to a different `caseId` or `tenantId`
+    even if those keys appear in the body. `MemStorage.updateAppointment`
+    strips the same two keys as defence-in-depth.
+  - `DELETE /api/appointments/:id` — remove.
+  - All four routes are guarded by `requireTenantAccess()` against the parent
+    case's tenantId. POST + PATCH also reject `confirmationFileUrl`
+    payloads larger than ~2 MB (HTTP 413) so the inline-base64 storage
+    cannot be abused.
+- **UI** (`client/src/components/appointments-panel.tsx`,
+  `client/src/pages/agency/case-detail.tsx`): an **Appointments** tab on the
+  case detail page (between Visa Status and Messages). The panel lists
+  upcoming + past bookings with type-coloured badges, and a single
+  Add/Edit dialog that branches on appointment type:
+  - **Embassy / Consulate / High-Commission** → provider Select keyed off
+    the case's `destinationCountry` with an "Other (custom name)" escape
+    hatch.
+  - **VFS / BLS** → free-text provider name + city Select from the
+    pre-defined VFS_BLS_CITIES list.
+  - **Other** → free-text provider AND free-text location (no city
+    dropdown).
+  The form uses native date + time inputs, an optional confirmation file
+  upload (capped at 2 MB, stored inline as a data URL), a status select,
+  and a notes field. All mutations invalidate the
+  `["/api/cases", caseId, "appointments"]` query key.
+
 ## Team Member Assignment & Permissions (May 2026)
 
 Every lead and case in the agency dashboard is owned by exactly one team member. The owner is shown on the lead card and case header, and only an agency owner / manager can re-assign work.

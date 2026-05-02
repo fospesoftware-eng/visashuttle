@@ -8,8 +8,8 @@ import { getEntryRequirement } from "@shared/visa-free";
 import indiaVisaChanceDataset from "@shared/india_visa_chance_dataset_non_visa_free_2026.json";
 import bcrypt from "bcryptjs";
 import { randomUUID, randomBytes } from "crypto";
-import type { Proposal } from "@shared/schema";
-import { VISA_STAGES, VISA_PROCESSING_STATUSES, SUBMISSION_METHODS } from "@shared/schema";
+import type { Proposal, InsertAppointment } from "@shared/schema";
+import { VISA_STAGES, VISA_PROCESSING_STATUSES, SUBMISSION_METHODS, APPOINTMENT_TYPES, APPOINTMENT_STATUSES } from "@shared/schema";
 import { VISA_TYPES } from "@shared/destinations";
 import { z } from "zod";
 import ExcelJS from "exceljs";
@@ -2569,6 +2569,132 @@ export async function registerRoutes(
       res.json(updated);
     } catch (e: any) {
       res.status(500).json({ error: e?.message ?? "Failed to update visa status" });
+    }
+  });
+
+  // ============================================================
+  // Appointments — embassy / VFS / BLS / other bookings per case.
+  // Tenant isolation is enforced via the parent case's tenantId.
+  // ============================================================
+  function validateAppointmentEnums(body: any): string | null {
+    if (body?.appointmentType !== undefined) {
+      const ok = APPOINTMENT_TYPES.some((t) => t.value === body.appointmentType);
+      if (!ok) return `Invalid appointmentType: must be one of ${APPOINTMENT_TYPES.map((t) => t.value).join(", ")}`;
+    }
+    if (body?.status !== undefined) {
+      const ok = APPOINTMENT_STATUSES.some((s) => s.value === body.status);
+      if (!ok) return `Invalid status: must be one of ${APPOINTMENT_STATUSES.map((s) => s.value).join(", ")}`;
+    }
+    return null;
+  }
+
+  app.get("/api/cases/:caseId/appointments", async (req, res) => {
+    try {
+      const c = await storage.getCase(req.params.caseId);
+      if (!c) return res.status(404).json({ error: "Case not found" });
+      if (!requireTenantAccess(req, res, c.tenantId)) return;
+      const list = await storage.getAppointmentsByCaseId(req.params.caseId);
+      res.json(list);
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message ?? "Failed to load appointments" });
+    }
+  });
+
+  app.post("/api/cases/:caseId/appointments", async (req, res) => {
+    try {
+      const c = await storage.getCase(req.params.caseId);
+      if (!c) return res.status(404).json({ error: "Case not found" });
+      if (!requireTenantAccess(req, res, c.tenantId)) return;
+      const enumError = validateAppointmentEnums(req.body);
+      if (enumError) return res.status(400).json({ error: enumError });
+      // Required fields — surface a clear 400 instead of letting the DB-style
+      // schema fail with a cryptic message.
+      const { appointmentType, provider, scheduledAt } = req.body ?? {};
+      if (!appointmentType || !provider || !scheduledAt) {
+        return res.status(400).json({ error: "appointmentType, provider and scheduledAt are required" });
+      }
+      // Mirror the 2 MB client-side cap on confirmation files so a crafted
+      // request cannot blow up MemStorage with a giant base64 payload.
+      if (
+        typeof req.body.confirmationFileUrl === "string" &&
+        req.body.confirmationFileUrl.length > 3_000_000
+      ) {
+        return res.status(413).json({ error: "Confirmation file too large (max ~2 MB)" });
+      }
+      const appt = await storage.createAppointment({
+        caseId: c.id,
+        tenantId: c.tenantId,
+        appointmentType,
+        provider: String(provider).trim(),
+        location: req.body.location ? String(req.body.location).trim() : null,
+        scheduledAt: new Date(scheduledAt),
+        confirmationFileUrl: req.body.confirmationFileUrl ?? null,
+        confirmationFileName: req.body.confirmationFileName ?? null,
+        notes: req.body.notes ?? null,
+        status: req.body.status ?? "scheduled",
+      });
+      // Activity log so the timeline records who scheduled the booking.
+      await storage.createActivityLog({
+        tenantId: c.tenantId,
+        userId: (req as any).session?.userId ?? null,
+        action: "appointment.created",
+        entityType: "appointment",
+        entityId: appt.id,
+        details: {
+          caseNumber: c.caseNumber,
+          appointmentType,
+          provider,
+          scheduledAt,
+        },
+      });
+      res.status(201).json(appt);
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message ?? "Failed to create appointment" });
+    }
+  });
+
+  app.patch("/api/appointments/:id", async (req, res) => {
+    try {
+      const existing = await storage.getAppointment(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Appointment not found" });
+      if (!requireTenantAccess(req, res, existing.tenantId)) return;
+      const enumError = validateAppointmentEnums(req.body);
+      if (enumError) return res.status(400).json({ error: enumError });
+      // Whitelist mutable fields. `caseId`/`tenantId` are NEVER mutable so a
+      // crafted PATCH cannot re-parent an appointment across cases or tenants.
+      const b = req.body ?? {};
+      const patch: Partial<InsertAppointment> = {};
+      if (b.appointmentType !== undefined) patch.appointmentType = b.appointmentType;
+      if (b.provider !== undefined) patch.provider = String(b.provider).trim();
+      if (b.location !== undefined) patch.location = b.location ? String(b.location).trim() : null;
+      if (b.scheduledAt !== undefined) patch.scheduledAt = new Date(b.scheduledAt);
+      if (b.status !== undefined) patch.status = b.status;
+      if (b.notes !== undefined) patch.notes = b.notes;
+      if (b.confirmationFileUrl !== undefined) {
+        // Server-side guard mirroring the 2 MB client cap so a crafted request
+        // cannot blow up MemStorage with a giant base64 payload.
+        if (typeof b.confirmationFileUrl === "string" && b.confirmationFileUrl.length > 3_000_000) {
+          return res.status(413).json({ error: "Confirmation file too large (max ~2 MB)" });
+        }
+        patch.confirmationFileUrl = b.confirmationFileUrl;
+      }
+      if (b.confirmationFileName !== undefined) patch.confirmationFileName = b.confirmationFileName;
+      const updated = await storage.updateAppointment(req.params.id, patch);
+      res.json(updated);
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message ?? "Failed to update appointment" });
+    }
+  });
+
+  app.delete("/api/appointments/:id", async (req, res) => {
+    try {
+      const existing = await storage.getAppointment(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Appointment not found" });
+      if (!requireTenantAccess(req, res, existing.tenantId)) return;
+      const ok = await storage.deleteAppointment(req.params.id);
+      res.json({ ok });
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message ?? "Failed to delete appointment" });
     }
   });
 

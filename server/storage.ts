@@ -4,6 +4,7 @@ import {
   type Lead, type InsertLead,
   type Proposal, type InsertProposal,
   type Case, type InsertCase,
+  type Appointment, type InsertAppointment,
   type CaseCoTraveller, type InsertCaseCoTraveller,
   type Document, type InsertDocument,
   type Message, type InsertMessage,
@@ -89,6 +90,14 @@ export interface IStorage {
   getCase(id: string): Promise<Case | undefined>;
   createCase(caseData: InsertCase): Promise<Case>;
   updateCase(id: string, data: Partial<InsertCase>): Promise<Case | undefined>;
+
+  // Appointments — bookings tied to a visa application case
+  getAppointmentsByCaseId(caseId: string): Promise<Appointment[]>;
+  getAppointmentsByTenantId(tenantId: string): Promise<Appointment[]>;
+  getAppointment(id: string): Promise<Appointment | undefined>;
+  createAppointment(data: InsertAppointment): Promise<Appointment>;
+  updateAppointment(id: string, data: Partial<InsertAppointment>): Promise<Appointment | undefined>;
+  deleteAppointment(id: string): Promise<boolean>;
 
   // Case Co-Travellers
   getCoTravellersByCaseId(caseId: string): Promise<CaseCoTraveller[]>;
@@ -226,6 +235,7 @@ export class MemStorage implements IStorage {
   private invoiceItems: Map<string, InvoiceItem> = new Map();
   private payments: Map<string, Payment> = new Map();
   private coTravellers: Map<string, CaseCoTraveller> = new Map();
+  private appointments: Map<string, Appointment> = new Map();
 
   constructor() {
     this.users = new Map();
@@ -1147,6 +1157,70 @@ export class MemStorage implements IStorage {
     };
     this.cases.set(id, caseData);
     return caseData;
+  }
+
+  // ===== Appointments (case bookings: embassy / VFS / BLS / other) =====
+  async getAppointmentsByCaseId(caseId: string): Promise<Appointment[]> {
+    return Array.from(this.appointments.values())
+      .filter((a) => a.caseId === caseId)
+      .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
+  }
+
+  async getAppointmentsByTenantId(tenantId: string): Promise<Appointment[]> {
+    return Array.from(this.appointments.values())
+      .filter((a) => a.tenantId === tenantId)
+      .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
+  }
+
+  async getAppointment(id: string): Promise<Appointment | undefined> {
+    return this.appointments.get(id);
+  }
+
+  async createAppointment(data: InsertAppointment): Promise<Appointment> {
+    const now = new Date();
+    const appt: Appointment = {
+      id: randomUUID(),
+      caseId: data.caseId,
+      tenantId: data.tenantId,
+      appointmentType: data.appointmentType,
+      provider: data.provider,
+      location: data.location ?? null,
+      scheduledAt: typeof data.scheduledAt === "string"
+        ? new Date(data.scheduledAt)
+        : (data.scheduledAt as Date),
+      confirmationFileUrl: data.confirmationFileUrl ?? null,
+      confirmationFileName: data.confirmationFileName ?? null,
+      notes: data.notes ?? null,
+      status: data.status ?? "scheduled",
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.appointments.set(appt.id, appt);
+    return appt;
+  }
+
+  async updateAppointment(id: string, data: Partial<InsertAppointment>): Promise<Appointment | undefined> {
+    const existing = this.appointments.get(id);
+    if (!existing) return undefined;
+    // Defence-in-depth: ownership fields can never be re-parented via update.
+    // The route layer should already strip these, but stripping here too means
+    // a future caller that forgets the whitelist can't break tenant isolation.
+    const { caseId: _ignoredCaseId, tenantId: _ignoredTenantId, ...safe } = data as any;
+    const updated: Appointment = {
+      ...existing,
+      ...safe,
+      // Coerce scheduledAt back to a Date if it arrived as a string from JSON.
+      scheduledAt: safe.scheduledAt
+        ? (typeof safe.scheduledAt === "string" ? new Date(safe.scheduledAt) : (safe.scheduledAt as Date))
+        : existing.scheduledAt,
+      updatedAt: new Date(),
+    };
+    this.appointments.set(id, updated);
+    return updated;
+  }
+
+  async deleteAppointment(id: string): Promise<boolean> {
+    return this.appointments.delete(id);
   }
 
   async getCasesByTenantAndVisaStage(tenantId: string, stage: string): Promise<Case[]> {
