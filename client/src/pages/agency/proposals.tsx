@@ -35,6 +35,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getDocumentChecklist } from "@/data/document-checklists";
 import type { Proposal } from "@shared/schema";
 import { COUNTRIES as POPULAR_COUNTRIES, VISA_TYPES as GENERIC_VISA_TYPES } from "@shared/destinations";
+import { getCountryVisaConfig } from "@/data/country-visa-types";
+import { Combobox, type ComboboxOption } from "@/components/combobox";
 
 const STATUS_STYLES: Record<string, string> = {
   sent: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900",
@@ -45,6 +47,14 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 type StaffMember = { id: string; name: string; role: string };
+
+// Country options for the searchable destination picker — built once at module
+// scope from the global master, with flag emojis from the per-country wizard
+// config when available.
+const countryOptions: ComboboxOption[] = POPULAR_COUNTRIES.map((c) => {
+  const conf = getCountryVisaConfig(c);
+  return { value: c, label: c, prefix: conf?.flag };
+});
 
 function buildShareUrl(token: string): string {
   return `${window.location.origin}/p/${token}`;
@@ -431,16 +441,15 @@ function ProposalCreateDialog({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label>Destination country <span className="text-red-500">*</span></Label>
-              <Select value={form.destinationCountry} onValueChange={(v) => setForm({ ...form, destinationCountry: v })}>
-                <SelectTrigger data-testid="select-country">
-                  <SelectValue placeholder="Pick a country" />
-                </SelectTrigger>
-                <SelectContent>
-                  {POPULAR_COUNTRIES.map((c) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Combobox
+                options={countryOptions}
+                value={form.destinationCountry}
+                onChange={(v) => setForm({ ...form, destinationCountry: v })}
+                placeholder="Pick a country"
+                searchPlaceholder="Type a country..."
+                testId="select-country"
+                allowClear={false}
+              />
             </div>
             <div>
               <Label>Visa type <span className="text-red-500">*</span></Label>

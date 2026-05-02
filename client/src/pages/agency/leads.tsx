@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, Search, MoreVertical, Mail, Phone, Loader2, AlertCircle, Briefcase, GripVertical, MapPin, UserCog } from "lucide-react";
+import { Plus, Search, MoreVertical, Mail, Phone, Loader2, AlertCircle, Briefcase, GripVertical, MapPin, UserCog, User, Globe2, StickyNote } from "lucide-react";
 import { getCountryVisaConfig } from "@/data/country-visa-types";
+import { Combobox, type ComboboxOption } from "@/components/combobox";
 import {
   DndContext,
   DragEndEvent,
@@ -78,6 +79,15 @@ const STAGE_DOT: Record<string, string> = {
   won: "bg-emerald-500",
   lost: "bg-red-500",
 };
+
+// Country options for the searchable destination picker — built once at module
+// scope from the global master list, with flag emojis from the per-country
+// wizard config when available. Keeps both the new-lead form and the convert
+// dialog in sync without re-allocating on every render.
+const countryOptions: ComboboxOption[] = COUNTRIES_LIST.map((c) => {
+  const conf = getCountryVisaConfig(c);
+  return { value: c, label: c, prefix: conf?.flag };
+});
 
 const emptyForm = {
   name: "",
@@ -509,30 +519,40 @@ export default function LeadsPage() {
                 Add Lead
               </Button>
             </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{editLead ? "Edit Lead" : "Add New Lead"}</DialogTitle>
-                <DialogDescription>Enter the lead's contact information.</DialogDescription>
+            <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto p-0">
+              <DialogHeader className="px-6 pt-6 pb-4 border-b">
+                <DialogTitle className="text-xl">{editLead ? "Edit Lead" : "Add New Lead"}</DialogTitle>
+                <DialogDescription>
+                  {editLead ? "Update this lead's contact and application details." : "Capture a new lead and assign it to a team member."}
+                </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 mt-2">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2 col-span-2">
-                    <Label>Name *</Label>
-                    <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Full name" data-testid="input-lead-name" />
-                  </div>
-                  <div className="space-y-2 col-span-2">
-                    <Label>Email *</Label>
-                    <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="email@example.com" data-testid="input-lead-email" />
+
+              <div className="px-6 py-5 space-y-6">
+                {/* --- Section: Contact --- */}
+                <section className="space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <User className="w-3.5 h-3.5" />
+                    Contact
                   </div>
                   <div className="space-y-2">
-                    <Label>Phone</Label>
-                    <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+1 234 567 8900" data-testid="input-lead-phone" />
+                    <Label htmlFor="lead-name">Name <span className="text-red-500">*</span></Label>
+                    <Input id="lead-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Full name" data-testid="input-lead-name" />
                   </div>
-                  <div className="space-y-2 col-span-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="lead-email">Email <span className="text-red-500">*</span></Label>
+                      <Input id="lead-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="email@example.com" data-testid="input-lead-email" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="lead-phone">Phone</Label>
+                      <Input id="lead-phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+1 234 567 8900" data-testid="input-lead-phone" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
                     <Label>Source</Label>
                     <Select value={form.source} onValueChange={(v) => setForm({ ...form, source: v })}>
                       <SelectTrigger data-testid="select-lead-source">
-                        <SelectValue placeholder="Select source" />
+                        <SelectValue placeholder="How did they find you?" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="website">Website</SelectItem>
@@ -543,51 +563,59 @@ export default function LeadsPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Destination Country</Label>
-                    <Select
-                      value={form.destinationCountry}
-                      onValueChange={(v) => setForm({ ...form, destinationCountry: v, visaType: "" })}
-                    >
-                      <SelectTrigger data-testid="select-lead-destination">
-                        <SelectValue placeholder="Where to?" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-72">
-                        {COUNTRIES_LIST.map((c) => {
-                          const conf = getCountryVisaConfig(c);
-                          return (
-                            <SelectItem key={c} value={c}>
-                              {conf?.flag ? `${conf.flag} ${c}` : c}
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
+                </section>
+
+                {/* --- Section: Application --- */}
+                <section className="space-y-3 pt-1 border-t">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground pt-4">
+                    <Globe2 className="w-3.5 h-3.5" />
+                    Application
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label>Destination Country</Label>
+                      <Combobox
+                        options={countryOptions}
+                        value={form.destinationCountry}
+                        onChange={(v) => setForm({ ...form, destinationCountry: v, visaType: "" })}
+                        placeholder="Where to?"
+                        searchPlaceholder="Type a country..."
+                        testId="select-lead-destination"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>
+                        Visa Type
+                        {!form.destinationCountry && (
+                          <span className="ml-1 text-xs text-muted-foreground font-normal">(country first)</span>
+                        )}
+                      </Label>
+                      <Select
+                        value={form.visaType}
+                        onValueChange={(v) => setForm({ ...form, visaType: v })}
+                        disabled={!form.destinationCountry}
+                      >
+                        <SelectTrigger data-testid="select-lead-visa-type">
+                          <SelectValue placeholder={form.destinationCountry ? "Select visa type" : "Pick country first"} />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-72">
+                          {getVisaTypesForCountry(form.destinationCountry).map((t) => (
+                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </section>
+
+                {/* --- Section: Assignment & Notes --- */}
+                <section className="space-y-3 pt-1 border-t">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground pt-4">
+                    <StickyNote className="w-3.5 h-3.5" />
+                    Assignment &amp; Notes
                   </div>
                   <div className="space-y-2">
-                    <Label>
-                      Visa Type
-                      {!form.destinationCountry && (
-                        <span className="ml-1 text-xs text-muted-foreground font-normal">(pick country first)</span>
-                      )}
-                    </Label>
-                    <Select
-                      value={form.visaType}
-                      onValueChange={(v) => setForm({ ...form, visaType: v })}
-                      disabled={!form.destinationCountry}
-                    >
-                      <SelectTrigger data-testid="select-lead-visa-type">
-                        <SelectValue placeholder={form.destinationCountry ? "Select visa type" : "Country first"} />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-72">
-                        {getVisaTypesForCountry(form.destinationCountry).map((t) => (
-                          <SelectItem key={t} value={t}>{t}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2 col-span-2">
-                    <Label>Assigned Team Member *</Label>
+                    <Label>Assigned Team Member <span className="text-red-500">*</span></Label>
                     <Select
                       value={form.assignedTo}
                       onValueChange={(v) => setForm({ ...form, assignedTo: v })}
@@ -605,18 +633,34 @@ export default function LeadsPage() {
                     </Select>
                     <p className="text-[11px] text-muted-foreground">Defaults to you — pick another team member to hand it off.</p>
                   </div>
-                  <div className="space-y-2 col-span-2">
+                  <div className="space-y-2">
                     <Label>Notes</Label>
-                    <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Any notes..." data-testid="input-lead-notes" />
+                    <Textarea
+                      value={form.notes}
+                      onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                      placeholder="Any context about this lead — preferred contact time, intent, budget..."
+                      rows={3}
+                      data-testid="input-lead-notes"
+                    />
                   </div>
-                </div>
+                </section>
+              </div>
+
+              <div className="px-6 py-4 border-t bg-muted/30 flex items-center justify-end gap-2 sticky bottom-0">
+                <Button
+                  variant="outline"
+                  onClick={() => { setIsAddOpen(false); setEditLead(null); setForm(emptyForm); }}
+                  data-testid="button-cancel-lead"
+                >
+                  Cancel
+                </Button>
                 <Button
                   onClick={handleSubmit}
-                  className="w-full"
                   disabled={createMutation.isPending || updateMutation.isPending}
                   data-testid="button-submit-lead"
+                  className="gap-2"
                 >
-                  {(createMutation.isPending || updateMutation.isPending) ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  {(createMutation.isPending || updateMutation.isPending) ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                   {editLead ? "Save Changes" : "Add Lead"}
                 </Button>
               </div>
@@ -748,14 +792,14 @@ export default function LeadsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Destination Country</Label>
-                <Select value={convertForm.destinationCountry} onValueChange={(v) => setConvertForm({ ...convertForm, destinationCountry: v })}>
-                  <SelectTrigger data-testid="select-convert-destination">
-                    <SelectValue placeholder="Optional — pick later" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {COUNTRIES_LIST.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Combobox
+                  options={countryOptions}
+                  value={convertForm.destinationCountry}
+                  onChange={(v) => setConvertForm({ ...convertForm, destinationCountry: v })}
+                  placeholder="Optional — pick later"
+                  searchPlaceholder="Type a country..."
+                  testId="select-convert-destination"
+                />
               </div>
               <div className="space-y-2">
                 <Label>Visa Type</Label>
