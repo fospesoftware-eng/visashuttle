@@ -15,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +23,7 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CO_TRAVELLER_RELATIONSHIPS, type CoTravellerRelationship, type FeeTemplate, type InvoiceSettings } from "@shared/schema";
 import { getDocumentChecklist, type DocumentRequirement } from "@/data/document-checklists";
+import { getCountryVisaConfig } from "@/data/country-visa-types";
 
 const COUNTRIES = [
   "Afghanistan","Albania","Algeria","Andorra","Angola","Antigua and Barbuda",
@@ -71,9 +72,11 @@ const COUNTRIES = [
   "Zambia","Zimbabwe",
 ];
 
-const VISA_TYPES = [
+// Generic fallback visa list — used only for countries without a structured
+// per-country config in `client/src/data/country-visa-types.ts`.
+const GENERIC_VISA_TYPES = [
   "Tourist Visa", "Business Visa", "Student Visa", "Work Visa",
-  "Transit Visa", "Family Visa", "Schengen Visa", "Investor Visa",
+  "Transit Visa", "Family Visa", "Investor Visa", "Medical Visa", "Other",
 ];
 
 const RELATIONSHIP_LABELS: Record<CoTravellerRelationship, string> = {
@@ -208,6 +211,9 @@ export default function NewCasePage() {
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanWarnings, setScanWarnings] = useState<string[]>([]);
   const [scanCompleted, setScanCompleted] = useState(false);
+  // "ok" = clean extract, "warnings" = extracted but needs review,
+  // "not_passport" = uploaded image is clearly not a passport bio page.
+  const [scanStatus, setScanStatus] = useState<"ok" | "warnings" | "not_passport" | null>(null);
   // Tracks whether the user has manually edited the full applicant name. Once they
   // do, the auto-derive-from-passport-name effect stops touching it.
   const applicantNameTouchedRef = useRef(false);
@@ -530,6 +536,32 @@ export default function NewCasePage() {
       };
     },
     onSuccess: (data) => {
+      const warnings = data.warnings ?? [];
+      // Heuristics for "this isn't a passport biographic page":
+      //  1. The model itself flagged it (warnings mention "not a passport",
+      //     "visa", "sticker", "entry clearance", "id card", "driver", etc.).
+      //  2. None of the three core identity fields were extracted at all.
+      const looksLikeNonPassport = warnings.some((w) =>
+        /not\s+a\s+passport|visa\s+sticker|entry\s+clearance|residence\s+permit|id\s+card|driver|driving\s+licen[cs]e|aadhaar|pan\s+card/i.test(w)
+      );
+      const noCoreFields = !data.surname && !data.givenName && !data.passportNumber;
+      const isNotPassport = looksLikeNonPassport || noCoreFields;
+
+      if (isNotPassport) {
+        // Don't pollute the form with values harvested from the wrong document
+        // (e.g. visa-sticker dates would silently overwrite passport dates).
+        setScanWarnings(warnings);
+        setScanError(null);
+        setScanStatus("not_passport");
+        setScanCompleted(true);
+        toast({
+          title: "Doesn't look like a passport",
+          description: "Please upload the passport biographic page (the photo page).",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Only fill fields the user hasn't already typed into. Existing typed values win.
       const pickEmpty = (current: string, incoming: string | null | undefined): string =>
         current && current.trim() ? current : (incoming ?? current);
@@ -547,17 +579,21 @@ export default function NewCasePage() {
         passportPlaceOfIssue: pickEmpty(f.passportPlaceOfIssue, data.placeOfIssue),
         passportPlaceOfBirth: pickEmpty(f.passportPlaceOfBirth, data.placeOfBirth),
       }));
-      setScanWarnings(data.warnings ?? []);
+      setScanWarnings(warnings);
       setScanError(null);
+      setScanStatus(warnings.length > 0 ? "warnings" : "ok");
       setScanCompleted(true);
       toast({
         title: "Passport scanned",
-        description: "Details extracted. Please review before continuing.",
+        description: warnings.length > 0
+          ? "Details extracted, but some fields need a manual review."
+          : "Details extracted. Please review before continuing.",
       });
     },
     onError: (err: Error) => {
       setScanError(err.message);
       setScanCompleted(false);
+      setScanStatus(null);
     },
   });
 
@@ -732,12 +768,34 @@ export default function NewCasePage() {
                     <SelectTrigger data-testid="select-visa-type">
                       <SelectValue placeholder={form.destinationCountry ? "Select visa type" : "Select a destination first"} />
                     </SelectTrigger>
-                    <SelectContent>
-                      {VISA_TYPES.map((t) => (
-                        <SelectItem key={t} value={t}>{t}</SelectItem>
-                      ))}
+                    <SelectContent className="max-h-80">
+                      {(() => {
+                        const cfg = form.destinationCountry ? getCountryVisaConfig(form.destinationCountry) : null;
+                        if (cfg) {
+                          // Render category-grouped visa types for countries with a structured
+                          // classification (US: B1/B2, H-1B, L-1, etc.; UK; Schengen A/C/D; …).
+                          return Object.entries(cfg.categories).map(([catLabel, cat]) => (
+                            <SelectGroup key={catLabel}>
+                              <SelectLabel>{catLabel}</SelectLabel>
+                              {cat.types.map((t) => (
+                                <SelectItem key={t} value={t}>{t}</SelectItem>
+                              ))}
+                            </SelectGroup>
+                          ));
+                        }
+                        return GENERIC_VISA_TYPES.map((t) => (
+                          <SelectItem key={t} value={t}>{t}</SelectItem>
+                        ));
+                      })()}
                     </SelectContent>
                   </Select>
+                  {form.destinationCountry && (
+                    <p className="text-xs text-muted-foreground">
+                      {getCountryVisaConfig(form.destinationCountry)
+                        ? `Showing official visa categories for ${form.destinationCountry}.`
+                        : `No structured visa list yet for ${form.destinationCountry} — pick the closest generic category.`}
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -799,6 +857,7 @@ export default function NewCasePage() {
                           setScanError(null);
                           setScanWarnings([]);
                           setScanCompleted(false);
+                          setScanStatus(null);
                           setPassportMimeType(file.type);
                           const reader = new FileReader();
                           reader.onload = () => {
@@ -835,6 +894,7 @@ export default function NewCasePage() {
                             setScanError(null);
                             setScanWarnings([]);
                             setScanCompleted(false);
+                            setScanStatus(null);
                             if (passportFileRef.current) passportFileRef.current.value = "";
                           }}
                           className="gap-2"
@@ -863,16 +923,48 @@ export default function NewCasePage() {
                       </div>
                     )}
 
-                    {scanCompleted && !scanError && (
+                    {scanCompleted && !scanError && scanStatus === "not_passport" && (
+                      <div className="flex items-start gap-2 text-sm text-destructive border border-destructive/30 bg-destructive/10 rounded-md p-3" data-testid="text-scan-not-passport">
+                        <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <p className="font-medium">This doesn't look like a passport biographic page.</p>
+                          <p className="text-xs">
+                            Please upload the <span className="font-medium">passport bio page</span> — the page with the holder's photo, surname and given name(s). Visa stickers, entry-clearance pages, ID cards or other documents won't work here.
+                          </p>
+                          {scanWarnings.length > 0 && (
+                            <ul className="list-disc list-inside text-xs">
+                              {scanWarnings.map((w, i) => <li key={i}>{w}</li>)}
+                            </ul>
+                          )}
+                          <button
+                            type="button"
+                            className="text-xs underline mt-1 text-destructive hover:opacity-80"
+                            onClick={() => setPassportMode("manual")}
+                            data-testid="button-switch-to-manual-not-passport"
+                          >
+                            Or enter the details manually
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {scanCompleted && !scanError && scanStatus === "warnings" && (
+                      <div className="flex items-start gap-2 text-sm border border-amber-300/60 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800/60 rounded-md p-3" data-testid="text-scan-warnings">
+                        <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                        <div className="space-y-1">
+                          <p className="font-medium text-amber-900 dark:text-amber-100">Passport scanned — please double-check the highlighted items.</p>
+                          <ul className="list-disc list-inside text-xs text-amber-800 dark:text-amber-200">
+                            {scanWarnings.map((w, i) => <li key={i}>{w}</li>)}
+                          </ul>
+                        </div>
+                      </div>
+                    )}
+
+                    {scanCompleted && !scanError && scanStatus === "ok" && (
                       <div className="flex items-start gap-2 text-sm border border-emerald-300/50 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-800/50 rounded-md p-3" data-testid="text-scan-success">
                         <Check className="w-4 h-4 flex-shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
                         <div className="space-y-1">
                           <p className="font-medium text-emerald-800 dark:text-emerald-200">Passport details extracted. Review the fields below before continuing.</p>
-                          {scanWarnings.length > 0 && (
-                            <ul className="list-disc list-inside text-xs text-emerald-700 dark:text-emerald-300">
-                              {scanWarnings.map((w, i) => <li key={i}>{w}</li>)}
-                            </ul>
-                          )}
                         </div>
                       </div>
                     )}
@@ -915,6 +1007,7 @@ export default function NewCasePage() {
                           }));
                           setScanCompleted(false);
                           setScanWarnings([]);
+                          setScanStatus(null);
                         }}
                         data-testid="button-clear-passport-fields"
                       >
