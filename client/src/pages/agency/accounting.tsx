@@ -90,17 +90,25 @@ function fmtDate(d: string | Date | null | undefined) {
 }
 
 // ---------- main page ----------
+// View modes:
+//  - "invoices": dedicated Invoices page (only invoices, no extra tabs)
+//  - "settings": Accounting Settings hub with sub-tabs (Overview, Payments,
+//                Fee Templates, Invoice Template). This is what's reached from
+//                the sidebar's "Accounting → Settings" entry.
 interface AccountingPageProps {
-  defaultTab?: "overview" | "invoices" | "payments" | "templates" | "settings";
+  view?: "invoices" | "settings";
+  defaultSettingsTab?: "overview" | "payments" | "templates" | "invoice-template";
 }
 
-export default function AccountingPage({ defaultTab = "overview" }: AccountingPageProps = {}) {
+export default function AccountingPage({
+  view = "invoices",
+  defaultSettingsTab = "overview",
+}: AccountingPageProps = {}) {
   const { data: authData } = useCurrentUser();
   const tenantId = authData?.user?.tenantId;
-  const [tab, setTab] = useState<string>(defaultTab);
+  const [settingsTab, setSettingsTab] = useState<string>(defaultSettingsTab);
 
-  // Sync with route prop changes (so navigating between /accounting/invoices and /accounting/payments works)
-  useEffect(() => { setTab(defaultTab); }, [defaultTab]);
+  useEffect(() => { setSettingsTab(defaultSettingsTab); }, [defaultSettingsTab]);
 
   if (!tenantId) {
     return (
@@ -110,14 +118,31 @@ export default function AccountingPage({ defaultTab = "overview" }: AccountingPa
     );
   }
 
-  const titleMap: Record<string, { title: string; subtitle: string }> = {
-    overview:  { title: "Accounting",   subtitle: "Manage invoices, payments, fee templates, and billing settings." },
-    invoices:  { title: "Invoices",     subtitle: "Create, send, and track all customer invoices." },
-    payments:  { title: "Payments",     subtitle: "Every payment recorded against your invoices, in one place." },
-    templates: { title: "Fee Templates", subtitle: "Reusable line items for faster invoicing." },
-    settings:  { title: "Settings",     subtitle: "Branding, currency, tax, and payment instructions." },
+  // Invoices-only view (the only thing left under "Accounting" in the sidebar)
+  if (view === "invoices") {
+    return (
+      <DashboardLayout type="agency">
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold" data-testid="text-page-title">Invoices</h1>
+            <p className="text-muted-foreground">
+              Create, send, and track all customer invoices.
+            </p>
+          </div>
+          <InvoicesTab tenantId={tenantId} />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // Settings hub — Overview / Payments / Fee Templates / Invoice Template
+  const settingsTitle: Record<string, { title: string; subtitle: string }> = {
+    overview:           { title: "Accounting Settings", subtitle: "Overview of billing, tax, and revenue." },
+    payments:           { title: "Payments",            subtitle: "Every payment recorded against your invoices, in one place." },
+    templates:          { title: "Fee Templates",       subtitle: "Reusable line items for faster invoicing." },
+    "invoice-template": { title: "Invoice Template",    subtitle: "Branding, logo, currency, tax, and payment instructions." },
   };
-  const header = titleMap[tab] ?? titleMap.overview;
+  const header = settingsTitle[settingsTab] ?? settingsTitle.overview;
 
   return (
     <DashboardLayout type="agency">
@@ -127,20 +152,18 @@ export default function AccountingPage({ defaultTab = "overview" }: AccountingPa
           <p className="text-muted-foreground">{header.subtitle}</p>
         </div>
 
-        <Tabs value={tab} onValueChange={setTab} className="space-y-6">
+        <Tabs value={settingsTab} onValueChange={setSettingsTab} className="space-y-6">
           <TabsList>
             <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
-            <TabsTrigger value="invoices" data-testid="tab-invoices">Invoices</TabsTrigger>
             <TabsTrigger value="payments" data-testid="tab-payments">Payments</TabsTrigger>
             <TabsTrigger value="templates" data-testid="tab-templates">Fee Templates</TabsTrigger>
-            <TabsTrigger value="settings" data-testid="tab-settings">Settings</TabsTrigger>
+            <TabsTrigger value="invoice-template" data-testid="tab-invoice-template">Invoice Template</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview"><OverviewTab tenantId={tenantId} onJump={setTab} /></TabsContent>
-          <TabsContent value="invoices"><InvoicesTab tenantId={tenantId} /></TabsContent>
+          <TabsContent value="overview"><OverviewTab tenantId={tenantId} onJump={setSettingsTab} /></TabsContent>
           <TabsContent value="payments"><PaymentsTab tenantId={tenantId} /></TabsContent>
           <TabsContent value="templates"><FeeTemplatesTab tenantId={tenantId} /></TabsContent>
-          <TabsContent value="settings"><InvoiceSettingsTab tenantId={tenantId} /></TabsContent>
+          <TabsContent value="invoice-template"><InvoiceSettingsTab tenantId={tenantId} /></TabsContent>
         </Tabs>
       </div>
     </DashboardLayout>
@@ -449,7 +472,12 @@ function OverviewTab({ tenantId, onJump }: { tenantId: string; onJump: (t: strin
             <CardTitle>Status breakdown</CardTitle>
             <CardDescription>{stats?.count ?? 0} total invoices</CardDescription>
           </div>
-          <Button variant="outline" size="sm" onClick={() => onJump("invoices")} data-testid="button-view-all-invoices">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => { window.location.href = "/app/accounting"; }}
+            data-testid="button-view-all-invoices"
+          >
             View all
           </Button>
         </CardHeader>

@@ -61,7 +61,7 @@ const agencyNavItems: NavItem[] = [
     icon: Receipt, label: "Accounting", href: "/app/accounting",
     children: [
       { icon: FileText, label: "Invoices", href: "/app/accounting/invoices" },
-      { icon: Banknote, label: "Payments", href: "/app/accounting/payments" },
+      { icon: Settings, label: "Settings", href: "/app/accounting/settings" },
     ],
   },
   { icon: BarChart3, label: "Reports", href: "/app/reports" },

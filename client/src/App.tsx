@@ -125,12 +125,23 @@ function Router() {
       </Route>
       <Route path="/app/cases/:id" component={CaseDetailPage} />
       <Route path="/app/documents" component={DocumentsPage} />
-      <Route path="/app/accounting" component={AccountingPage} />
-      <Route path="/app/accounting/invoices">
-        <AccountingPage defaultTab="invoices" />
+      <Route path="/app/accounting">
+        <AccountingPage view="invoices" />
       </Route>
-      <Route path="/app/accounting/payments">
-        <AccountingPage defaultTab="payments" />
+      <Route path="/app/accounting/invoices">
+        <AccountingPage view="invoices" />
+      </Route>
+      <Route path="/app/accounting/settings">
+        <AccountingPage view="settings" defaultSettingsTab="overview" />
+      </Route>
+      <Route path="/app/accounting/settings/payments">
+        <AccountingPage view="settings" defaultSettingsTab="payments" />
+      </Route>
+      <Route path="/app/accounting/settings/templates">
+        <AccountingPage view="settings" defaultSettingsTab="templates" />
+      </Route>
+      <Route path="/app/accounting/settings/invoice-template">
+        <AccountingPage view="settings" defaultSettingsTab="invoice-template" />
       </Route>
       <Route path="/app/reports" component={ReportsPage} />
       <Route path="/app/settings" component={AgencySettingsPage} />

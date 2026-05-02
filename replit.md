@@ -286,6 +286,12 @@ The platform now includes a full B2C visa approval checker with:
 - Documents page: status stats, change-status actions, real document list
 - Reports page: all charts driven by `/api/tenants/:tenantId/analytics`
 
+### Accounting Sidebar Restructure (May 2026)
+- Sidebar nav: **Accounting** → only two children now: **Invoices** (`/app/accounting/invoices`) and **Settings** (`/app/accounting/settings`). Old `/app/accounting/payments` was removed; payments now live under Settings → Payments.
+- Routes (`client/src/App.tsx`): `/app/accounting` and `/app/accounting/invoices` both render `<AccountingPage view="invoices" />` (a clean Invoices-only page, no extra tabs). `/app/accounting/settings[/payments|/templates|/invoice-template]` render `<AccountingPage view="settings" defaultSettingsTab=... />` which exposes a 4-tab hub: **Overview**, **Payments**, **Fee Templates**, **Invoice Template**.
+- `AccountingPage` props: `view: "invoices" | "settings"` + `defaultSettingsTab`. Old `defaultTab` prop replaced.
+- "Invoice Template" tab is the renamed Settings tab — it contains all branding (Logo URL, accent color), currency, tax, GST, and payment instructions.
+
 ### Fee Templates, Wizard Fees Step & Invoice Branding (May 2026)
 - **Fee templates – multi-country**: `feeTemplates.destinationCountries: text().array()` (`shared/schema.ts`) lets a single template apply to multiple countries; legacy single-country `destinationCountry` remains for backward compat. UI: `FeeTemplateDialog` (Accounting → Templates) replaces the country dropdown with a popover + checkbox multi-select and chip remove. Cards show all matching country chips. Compose Invoice + case wizard merge `[destinationCountries[], destinationCountry]` when filtering matches.
 - **Case wizard "Fees" step (case-new.tsx)**: 7-step wizard now (Fees inserted at step 6, Review = step 7). Loads tenant invoice settings + fee templates; shows a template Select filtered by destination country. Per-line editor (description / category / qty / unit price), live subtotal + GST tax + total displayed in tenant currency. Validation: partial-row guard (description xor unit price). On case create, if any valid fee lines exist, automatically POSTs a draft invoice to `/api/tenants/:tenantId/invoices` linked to the new case.
