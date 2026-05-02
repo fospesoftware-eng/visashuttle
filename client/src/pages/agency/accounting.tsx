@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -86,10 +86,17 @@ function fmtDate(d: string | Date | null | undefined) {
 }
 
 // ---------- main page ----------
-export default function AccountingPage() {
+interface AccountingPageProps {
+  defaultTab?: "overview" | "invoices" | "payments" | "templates" | "settings";
+}
+
+export default function AccountingPage({ defaultTab = "overview" }: AccountingPageProps = {}) {
   const { data: authData } = useCurrentUser();
   const tenantId = authData?.user?.tenantId;
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState<string>(defaultTab);
+
+  // Sync with route prop changes (so navigating between /accounting/invoices and /accounting/payments works)
+  useEffect(() => { setTab(defaultTab); }, [defaultTab]);
 
   if (!tenantId) {
     return (
@@ -99,29 +106,253 @@ export default function AccountingPage() {
     );
   }
 
+  const titleMap: Record<string, { title: string; subtitle: string }> = {
+    overview:  { title: "Accounting",   subtitle: "Manage invoices, payments, fee templates, and billing settings." },
+    invoices:  { title: "Invoices",     subtitle: "Create, send, and track all customer invoices." },
+    payments:  { title: "Payments",     subtitle: "Every payment recorded against your invoices, in one place." },
+    templates: { title: "Fee Templates", subtitle: "Reusable line items for faster invoicing." },
+    settings:  { title: "Settings",     subtitle: "Branding, currency, tax, and payment instructions." },
+  };
+  const header = titleMap[tab] ?? titleMap.overview;
+
   return (
     <DashboardLayout type="agency">
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Accounting</h1>
-          <p className="text-muted-foreground">Manage invoices, payments, fee templates, and billing settings.</p>
+          <h1 className="text-2xl font-bold" data-testid="text-page-title">{header.title}</h1>
+          <p className="text-muted-foreground">{header.subtitle}</p>
         </div>
 
         <Tabs value={tab} onValueChange={setTab} className="space-y-6">
           <TabsList>
             <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
             <TabsTrigger value="invoices" data-testid="tab-invoices">Invoices</TabsTrigger>
+            <TabsTrigger value="payments" data-testid="tab-payments">Payments</TabsTrigger>
             <TabsTrigger value="templates" data-testid="tab-templates">Fee Templates</TabsTrigger>
             <TabsTrigger value="settings" data-testid="tab-settings">Settings</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview"><OverviewTab tenantId={tenantId} onJump={setTab} /></TabsContent>
           <TabsContent value="invoices"><InvoicesTab tenantId={tenantId} /></TabsContent>
+          <TabsContent value="payments"><PaymentsTab tenantId={tenantId} /></TabsContent>
           <TabsContent value="templates"><FeeTemplatesTab tenantId={tenantId} /></TabsContent>
           <TabsContent value="settings"><InvoiceSettingsTab tenantId={tenantId} /></TabsContent>
         </Tabs>
       </div>
     </DashboardLayout>
+  );
+}
+
+// ============================================================
+// Payments tab — tenant-wide payments list
+// ============================================================
+function PaymentsTab({ tenantId }: { tenantId: string }) {
+  const { toast } = useToast();
+  const { data: payments = [], isLoading } = useQuery<Payment[]>({
+    queryKey: ["/api/tenants", tenantId, "payments"],
+  });
+  const { data: invoices = [] } = useQuery<Invoice[]>({
+    queryKey: ["/api/tenants", tenantId, "invoices"],
+  });
+  const { data: settings } = useQuery<InvoiceSettings | null>({
+    queryKey: ["/api/tenants", tenantId, "invoice-settings"],
+  });
+
+  const [methodFilter, setMethodFilter] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const invoicesById = useMemo(() => {
+    const m = new Map<string, Invoice>();
+    invoices.forEach((inv) => m.set(inv.id, inv));
+    return m;
+  }, [invoices]);
+
+  const currency = settings?.currency ?? "USD";
+
+  const sortedPayments = useMemo(() => {
+    const term = searchTerm.toLowerCase().trim();
+    return [...payments]
+      .filter((p) => {
+        if (methodFilter !== "all" && p.method !== methodFilter) return false;
+        if (!term) return true;
+        const inv = invoicesById.get(p.invoiceId);
+        return (
+          (inv?.invoiceNumber || "").toLowerCase().includes(term) ||
+          (inv?.customerName || "").toLowerCase().includes(term) ||
+          (p.reference || "").toLowerCase().includes(term)
+        );
+      })
+      .sort((a, b) => {
+        const ta = a.paidAt ? new Date(a.paidAt).getTime() : 0;
+        const tb = b.paidAt ? new Date(b.paidAt).getTime() : 0;
+        return tb - ta;
+      });
+  }, [payments, invoicesById, methodFilter, searchTerm]);
+
+  const totalCollected = sortedPayments.reduce((sum, p) => sum + (p.amount ?? 0), 0);
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => apiRequest("DELETE", `/api/payments/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "payments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "invoices", "stats"] });
+      toast({ title: "Payment removed" });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const methodLabel = (m: string) => ({
+    cash: "Cash", card: "Card", bank_transfer: "Bank Transfer", online: "Online", other: "Other",
+  } as Record<string, string>)[m] ?? m;
+
+  const methodBadgeClass = (m: string) => ({
+    cash:          "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+    card:          "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300",
+    bank_transfer: "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300",
+    online:        "bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300",
+    other:         "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
+  } as Record<string, string>)[m] ?? "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300";
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card data-testid="kpi-payments-count">
+          <CardContent className="p-5">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Payments Recorded</p>
+                <p className="text-2xl font-bold mt-1">{payments.length}</p>
+              </div>
+              <div className="p-2 rounded-lg bg-muted text-blue-600 dark:text-blue-400">
+                <Banknote className="w-5 h-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card data-testid="kpi-payments-collected">
+          <CardContent className="p-5">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Collected (filtered)</p>
+                <p className="text-2xl font-bold mt-1">{fmtMoney(totalCollected, currency)}</p>
+              </div>
+              <div className="p-2 rounded-lg bg-muted text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card data-testid="kpi-payments-invoices">
+          <CardContent className="p-5">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Invoices with Payments</p>
+                <p className="text-2xl font-bold mt-1">
+                  {new Set(payments.map((p) => p.invoiceId)).size}
+                </p>
+              </div>
+              <div className="p-2 rounded-lg bg-muted text-violet-600 dark:text-violet-400">
+                <Receipt className="w-5 h-5" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Input
+          placeholder="Search by invoice #, customer, or reference…"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="flex-1"
+          data-testid="input-payments-search"
+        />
+        <Select value={methodFilter} onValueChange={setMethodFilter}>
+          <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-payment-method">
+            <SelectValue placeholder="Filter by method" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All methods</SelectItem>
+            <SelectItem value="cash">Cash</SelectItem>
+            <SelectItem value="card">Card</SelectItem>
+            <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+            <SelectItem value="online">Online</SelectItem>
+            <SelectItem value="other">Other</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="p-8 text-center text-muted-foreground">Loading payments...</div>
+          ) : sortedPayments.length === 0 ? (
+            <div className="p-12 text-center">
+              <Banknote className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
+              <p className="font-medium">No payments yet</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Open an invoice and record a payment — it will appear here.
+              </p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Invoice #</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Method</TableHead>
+                  <TableHead>Reference</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="w-12"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedPayments.map((p) => {
+                  const inv = invoicesById.get(p.invoiceId);
+                  return (
+                    <TableRow key={p.id} data-testid={`row-payment-${p.id}`}>
+                      <TableCell className="text-sm">{p.paidAt ? fmtDate(p.paidAt) : "—"}</TableCell>
+                      <TableCell className="font-mono text-sm">{inv?.invoiceNumber ?? "—"}</TableCell>
+                      <TableCell>
+                        <div className="font-medium text-sm">{inv?.customerName ?? "—"}</div>
+                        {inv?.customerEmail && (
+                          <div className="text-xs text-muted-foreground">{inv.customerEmail}</div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={methodBadgeClass(p.method)} variant="secondary">
+                          {methodLabel(p.method)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{p.reference || "—"}</TableCell>
+                      <TableCell className="text-right font-mono font-medium">
+                        {fmtMoney(p.amount, currency)}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            if (confirm("Remove this payment? The invoice balance will be updated.")) {
+                              deleteMutation.mutate(p.id);
+                            }
+                          }}
+                          data-testid={`button-delete-payment-${p.id}`}
+                        >
+                          <Trash2 className="w-4 h-4 text-red-600" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 

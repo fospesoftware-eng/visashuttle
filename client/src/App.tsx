@@ -120,9 +120,18 @@ function Router() {
       <Route path="/app/leads" component={LeadsPage} />
       <Route path="/app/cases" component={CasesPage} />
       <Route path="/app/cases/new" component={NewCasePage} />
+      <Route path="/app/cases/pending-completed">
+        <CasesPage defaultStatusFilter="pending-completed" pageTitle="Pending & Completed" />
+      </Route>
       <Route path="/app/cases/:id" component={CaseDetailPage} />
       <Route path="/app/documents" component={DocumentsPage} />
       <Route path="/app/accounting" component={AccountingPage} />
+      <Route path="/app/accounting/invoices">
+        <AccountingPage defaultTab="invoices" />
+      </Route>
+      <Route path="/app/accounting/payments">
+        <AccountingPage defaultTab="payments" />
+      </Route>
       <Route path="/app/reports" component={ReportsPage} />
       <Route path="/app/settings" component={AgencySettingsPage} />
       <Route path="/app/visa-check" component={VisaCheckPage} />

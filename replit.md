@@ -105,6 +105,34 @@ Three distinct auth systems coexist:
   - **Create Application** (`client/src/pages/agency/case-new.tsx`): co-travellers are step 4 of the onboarding wizard; rows are POSTed sequentially after the case is created (or saved as draft).
   - **Case Detail** (`client/src/pages/agency/case-detail.tsx`): `CoTravellersCard` in the left sidebar — list with edit/delete buttons and add-dialog.
 
+### Agency Sidebar Navigation
+- `client/src/components/layouts/dashboard-layout.tsx` defines `agencyNavItems` with optional nested `children?: NavItem[]`. Two parents currently have submenus:
+  - **Applications** (`/app/cases`) → child: **Pending & Completed** (`/app/cases/pending-completed`)
+  - **Accounting** (`/app/accounting`) → children: **Invoices** (`/app/accounting/invoices`), **Payments** (`/app/accounting/payments`)
+- Parent click both navigates to the parent route AND auto-expands its submenu. A separate chevron button on the right toggles expand/collapse manually. Manual collapse persists; auto-expand only flips groups to open (never auto-closes), so the user's collapsed state is respected until they navigate back into that branch.
+- `isItemActive(location, href)` matches exact OR prefix `href + "/"` / `href + "?"`, so parent rows highlight whenever a child route is active. Active state is set when `isItemActive(parent)` OR any child is active.
+- When the sidebar is in icon-only collapsed mode, children and the chevron are hidden — the parent icon still highlights for any descendant route.
+- Mobile sidebar (sheet) always renders children inline (no toggle) for simpler touch UX.
+- New routes wire to existing pages with props rather than duplicate page files:
+  - `/app/cases/pending-completed` → `<CasesPage defaultStatusFilter="pending-completed" pageTitle="Pending & Completed" />`
+  - `/app/accounting/invoices` → `<AccountingPage defaultTab="invoices" />`
+  - `/app/accounting/payments` → `<AccountingPage defaultTab="payments" />`
+
+### Accounting (Invoices, Payments, Templates, Settings)
+- `client/src/pages/agency/accounting.tsx` accepts `defaultTab` and uses a `useEffect` to re-sync internal tab state when the prop changes (so the sidebar's Invoices/Payments items switch tabs even within the same mounted page).
+- Tabs: **Overview** (KPIs + GST report download) · **Invoices** (compose/list/detail dialog with payment recording) · **Payments** (new — tenant-wide list) · **Fee Templates** · **Settings**.
+- **Payments tab** (`PaymentsTab`):
+  - Fetches `GET /api/tenants/:tenantId/payments` (new server route at `server/routes.ts` ~line 1564) which calls `requireTenantAccess` then `storage.getPaymentsByTenantId(tenantId)`.
+  - Joins to invoices in-memory (via `useMemo` Map keyed by `invoiceId`) for invoice number / customer name / customer email lookup.
+  - Search by invoice #, customer, or reference; method filter (cash/card/bank_transfer/online/other).
+  - Three KPI cards: count, collected sum (filtered), distinct invoices with payments.
+  - Delete button uses `DELETE /api/payments/:id` and invalidates `payments`, `invoices`, and `invoices/stats` query keys (storage's `deletePayment` recomputes the parent invoice's `paidAmount` and `status`).
+
+### Applications: Pending & Completed view
+- `client/src/pages/agency/cases.tsx` accepts `defaultStatusFilter`, `pageTitle`, `pageSubtitle` props (defaults preserve the original "all" view at `/app/cases`).
+- `PENDING_COMPLETED_STATUSES = ["pending","in_progress","documents_required","under_review","submitted","approved"]`.
+- When `defaultStatusFilter === "pending-completed"`, a "scope" gate filters out drafts and rejected applications even if the user changes the in-page status dropdown. The dropdown also swaps to a constrained option set (no Drafts / Rejected) and labels Approved as "Approved (Completed)".
+
 ### Case Onboarding Wizard & Drafts
 - `client/src/pages/agency/case-new.tsx` is a **6-step stepper**: Destination & Visa → Applicant → Travel Details → Co-Travellers → **Documents** → Review. Destination is selected before Visa Type (visa-type select is disabled until a destination is picked).
 - **Destination autocomplete**: destination uses an in-file `CountryCombobox` (themed with `bg-popover`, `text-popover-foreground`, `hover-elevate`, dark-mode safe) with a 190+ comprehensive country list; typing filters live, the value is cleared automatically when the user types something that no longer matches, and Schengen Area is included.

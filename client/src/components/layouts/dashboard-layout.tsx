@@ -3,9 +3,9 @@ import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
   Home, Users, Briefcase, FileText, BarChart3, Settings,
-  ChevronLeft, ChevronRight, LogOut, Bell, Search,
+  ChevronLeft, ChevronRight, ChevronDown, LogOut, Bell, Search,
   Menu, X, Building2, ShieldCheck, Database, Activity, Globe,
-  CheckCircle, AlertCircle, Inbox, Receipt
+  CheckCircle, AlertCircle, Inbox, Receipt, Banknote, ClipboardList
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ interface NavItem {
   icon: React.ElementType;
   label: string;
   href: string;
+  children?: NavItem[];
 }
 
 interface DashboardLayoutProps {
@@ -49,13 +50,30 @@ const adminNavItems: NavItem[] = [
 const agencyNavItems: NavItem[] = [
   { icon: Home, label: "Dashboard", href: "/app" },
   { icon: Users, label: "Leads", href: "/app/leads" },
-  { icon: Briefcase, label: "Applications", href: "/app/cases" },
+  {
+    icon: Briefcase, label: "Applications", href: "/app/cases",
+    children: [
+      { icon: ClipboardList, label: "Pending & Completed", href: "/app/cases/pending-completed" },
+    ],
+  },
   { icon: FileText, label: "Documents", href: "/app/documents" },
-  { icon: Receipt, label: "Accounting", href: "/app/accounting" },
+  {
+    icon: Receipt, label: "Accounting", href: "/app/accounting",
+    children: [
+      { icon: FileText, label: "Invoices", href: "/app/accounting/invoices" },
+      { icon: Banknote, label: "Payments", href: "/app/accounting/payments" },
+    ],
+  },
   { icon: BarChart3, label: "Reports", href: "/app/reports" },
   { icon: Globe, label: "Visa Check", href: "/app/visa-check" },
   { icon: Settings, label: "Settings", href: "/app/settings" },
 ];
+
+function isItemActive(location: string, href: string): boolean {
+  if (location === href) return true;
+  if (href === "/admin" || href === "/app") return false;
+  return location.startsWith(href + "/") || location.startsWith(href + "?");
+}
 
 function timeAgo(date: string | Date | null | undefined) {
   if (!date) return "";
@@ -78,9 +96,28 @@ export function DashboardLayout({ children, type }: DashboardLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
   const [notifsOpen, setNotifsOpen] = useState(false);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const { data: authData, isLoading: authLoading } = useCurrentUser();
 
   const navItems = type === "admin" ? adminNavItems : agencyNavItems;
+
+  // Auto-expand groups whose parent or any child matches the current location.
+  useEffect(() => {
+    setOpenGroups((prev) => {
+      const next = { ...prev };
+      for (const item of navItems) {
+        if (!item.children?.length) continue;
+        const branchActive =
+          isItemActive(location, item.href) ||
+          item.children.some((c) => isItemActive(location, c.href));
+        if (branchActive) next[item.label] = true;
+      }
+      return next;
+    });
+  }, [location, navItems]);
+
+  const toggleGroup = (label: string) =>
+    setOpenGroups((p) => ({ ...p, [label]: !p[label] }));
   const tenantId = authData?.user?.tenantId;
 
   // Recent activity for header notifications (agency only)
@@ -179,24 +216,67 @@ export function DashboardLayout({ children, type }: DashboardLayoutProps) {
 
           <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
             {navItems.map((item) => {
-              const isActive = location === item.href ||
-                (item.href !== "/admin" && item.href !== "/app" && location.startsWith(item.href));
+              const hasChildren = !!item.children?.length;
+              const childActive = hasChildren && item.children!.some((c) => isItemActive(location, c.href));
+              const isActive = isItemActive(location, item.href) || childActive;
+              const isOpen = !!openGroups[item.label];
+              const testId = `nav-${item.label.toLowerCase().replace(/\s+&\s+/g, "-").replace(/\s+/g, "-")}`;
               return (
-                <Link key={item.href} href={item.href} asChild>
-                  <a
-                    className={`
-                      flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors
-                      ${isActive
-                        ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-                      }
-                    `}
-                    data-testid={`nav-${item.label.toLowerCase()}`}
-                  >
-                    <item.icon className="w-5 h-5 flex-shrink-0" />
-                    {!collapsed && <span className="truncate">{item.label}</span>}
-                  </a>
-                </Link>
+                <div key={item.href}>
+                  <div className="flex items-stretch">
+                    <Link href={item.href} asChild>
+                      <a
+                        className={`
+                          flex-1 flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors min-w-0
+                          ${isActive
+                            ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                            : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                          }
+                        `}
+                        data-testid={testId}
+                      >
+                        <item.icon className="w-5 h-5 flex-shrink-0" />
+                        {!collapsed && <span className="truncate">{item.label}</span>}
+                      </a>
+                    </Link>
+                    {hasChildren && !collapsed && (
+                      <button
+                        type="button"
+                        onClick={() => toggleGroup(item.label)}
+                        className="px-2 ml-1 rounded-md text-sidebar-foreground/60 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors"
+                        aria-label={isOpen ? `Collapse ${item.label}` : `Expand ${item.label}`}
+                        data-testid={`${testId}-toggle`}
+                      >
+                        <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? "" : "-rotate-90"}`} />
+                      </button>
+                    )}
+                  </div>
+                  {hasChildren && !collapsed && isOpen && (
+                    <div className="mt-1 ml-4 pl-3 border-l border-sidebar-border space-y-1">
+                      {item.children!.map((child) => {
+                        const childIsActive = isItemActive(location, child.href);
+                        const childTestId = `nav-${child.label.toLowerCase().replace(/\s+&\s+/g, "-").replace(/\s+/g, "-")}`;
+                        return (
+                          <Link key={child.href} href={child.href} asChild>
+                            <a
+                              className={`
+                                flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors
+                                ${childIsActive
+                                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                                  : "text-sidebar-foreground/65 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                                }
+                              `}
+                              data-testid={childTestId}
+                            >
+                              <child.icon className="w-4 h-4 flex-shrink-0" />
+                              <span className="truncate">{child.label}</span>
+                            </a>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </nav>
@@ -279,23 +359,51 @@ export function DashboardLayout({ children, type }: DashboardLayoutProps) {
           </div>
           <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
             {navItems.map((item) => {
-              const isActive = location === item.href;
+              const hasChildren = !!item.children?.length;
+              const childActive = hasChildren && item.children!.some((c) => isItemActive(location, c.href));
+              const isActive = isItemActive(location, item.href) || childActive;
               return (
-                <Link key={item.href} href={item.href} asChild>
-                  <a
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`
-                      flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors
-                      ${isActive
-                        ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
-                      }
-                    `}
-                  >
-                    <item.icon className="w-5 h-5 flex-shrink-0" />
-                    <span>{item.label}</span>
-                  </a>
-                </Link>
+                <div key={item.href}>
+                  <Link href={item.href} asChild>
+                    <a
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`
+                        flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors
+                        ${isActive
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                        }
+                      `}
+                    >
+                      <item.icon className="w-5 h-5 flex-shrink-0" />
+                      <span>{item.label}</span>
+                    </a>
+                  </Link>
+                  {hasChildren && (
+                    <div className="mt-1 ml-4 pl-3 border-l border-sidebar-border space-y-1">
+                      {item.children!.map((child) => {
+                        const childIsActive = isItemActive(location, child.href);
+                        return (
+                          <Link key={child.href} href={child.href} asChild>
+                            <a
+                              onClick={() => setMobileMenuOpen(false)}
+                              className={`
+                                flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors
+                                ${childIsActive
+                                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                                  : "text-sidebar-foreground/65 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                                }
+                              `}
+                            >
+                              <child.icon className="w-4 h-4 flex-shrink-0" />
+                              <span>{child.label}</span>
+                            </a>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </nav>

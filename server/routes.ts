@@ -1558,6 +1558,12 @@ export async function registerRoutes(
   });
 
   // Payments
+  app.get("/api/tenants/:tenantId/payments", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
+    const payments = await storage.getPaymentsByTenantId(req.params.tenantId);
+    res.json(payments);
+  });
+
   app.get("/api/invoices/:invoiceId/payments", async (req, res) => {
     const invoice = await storage.getInvoice(req.params.invoiceId);
     if (!invoice) return res.status(404).json({ error: "Invoice not found" });

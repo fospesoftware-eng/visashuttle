@@ -41,12 +41,27 @@ function computeReadiness(c: Case): number {
   return 20;
 }
 
-export default function CasesPage() {
+interface CasesPageProps {
+  defaultStatusFilter?: string;
+  pageTitle?: string;
+  pageSubtitle?: string;
+}
+
+const PENDING_COMPLETED_STATUSES = [
+  "pending", "in_progress", "documents_required", "under_review", "submitted", "approved",
+];
+
+export default function CasesPage({
+  defaultStatusFilter = "all",
+  pageTitle = "Applications",
+  pageSubtitle,
+}: CasesPageProps = {}) {
   const search = useSearch();
   const initialQ = new URLSearchParams(search).get("q") || "";
   const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState(initialQ);
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState(defaultStatusFilter);
+  const isPendingCompletedView = defaultStatusFilter === "pending-completed";
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const { toast } = useToast();
@@ -89,8 +104,16 @@ export default function CasesPage() {
         (c.caseNumber || "").toLowerCase().includes(term) ||
         (c.referenceId || "").toLowerCase().includes(term) ||
         (c.visaType || "").toLowerCase().includes(term);
-      const matchesStatus = statusFilter === "all" || c.status === statusFilter;
-      return matchesSearch && matchesStatus;
+      const matchesStatus =
+        statusFilter === "all"
+          ? true
+          : statusFilter === "pending-completed"
+          ? PENDING_COMPLETED_STATUSES.includes(c.status)
+          : c.status === statusFilter;
+      const matchesScope = isPendingCompletedView
+        ? PENDING_COMPLETED_STATUSES.includes(c.status)
+        : true;
+      return matchesSearch && matchesStatus && matchesScope;
     })
     .sort((a, b) => {
       const cmp = a.caseNumber.localeCompare(b.caseNumber, undefined, { numeric: true });
@@ -102,9 +125,13 @@ export default function CasesPage() {
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold" data-testid="text-page-title">Applications</h1>
+            <h1 className="text-2xl font-bold" data-testid="text-page-title">{pageTitle}</h1>
             <p className="text-muted-foreground">
-              {cases.length} total application{cases.length !== 1 ? "s" : ""} · manage progress and share customer links.
+              {pageSubtitle ?? (
+                isPendingCompletedView
+                  ? `${filteredCases.length} active or completed application${filteredCases.length !== 1 ? "s" : ""} · drafts and rejections are hidden.`
+                  : `${cases.length} total application${cases.length !== 1 ? "s" : ""} · manage progress and share customer links.`
+              )}
             </p>
           </div>
           <Button asChild className="gap-2" data-testid="button-new-case">
@@ -131,15 +158,29 @@ export default function CasesPage() {
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="draft">Drafts</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="in_progress">In Progress</SelectItem>
-              <SelectItem value="documents_required">Documents Required</SelectItem>
-              <SelectItem value="under_review">Under Review</SelectItem>
-              <SelectItem value="submitted">Submitted</SelectItem>
-              <SelectItem value="approved">Approved</SelectItem>
-              <SelectItem value="rejected">Rejected</SelectItem>
+              {isPendingCompletedView ? (
+                <>
+                  <SelectItem value="pending-completed">All (Pending & Completed)</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="documents_required">Documents Required</SelectItem>
+                  <SelectItem value="under_review">Under Review</SelectItem>
+                  <SelectItem value="submitted">Submitted</SelectItem>
+                  <SelectItem value="approved">Approved (Completed)</SelectItem>
+                </>
+              ) : (
+                <>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="draft">Drafts</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="documents_required">Documents Required</SelectItem>
+                  <SelectItem value="under_review">Under Review</SelectItem>
+                  <SelectItem value="submitted">Submitted</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                </>
+              )}
             </SelectContent>
           </Select>
         </div>
