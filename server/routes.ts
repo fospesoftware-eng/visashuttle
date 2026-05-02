@@ -7,7 +7,8 @@ import { sendOtp, verifyOtp, getSmsProviderStatus } from "./sms";
 import { getEntryRequirement } from "@shared/visa-free";
 import indiaVisaChanceDataset from "@shared/india_visa_chance_dataset_non_visa_free_2026.json";
 import bcrypt from "bcryptjs";
-import { randomUUID } from "crypto";
+import { randomUUID, randomBytes } from "crypto";
+import type { Proposal } from "@shared/schema";
 import { z } from "zod";
 import ExcelJS from "exceljs";
 import {
@@ -1206,6 +1207,340 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Lead not found" });
     }
     res.status(204).send();
+  });
+
+  // === Proposals ===
+  // Tokenized intake invitations the agency sends to a prospect. The customer
+  // opens a public /p/:token URL (or scans the QR), sees the document
+  // checklist for the chosen visa, and submits an application that becomes a
+  // regular Case under the tenant.
+
+  // Generate an unguessable URL-safe token. 22+ chars of base64url ≈ 132 bits
+  // of entropy — enough that we don't need a separate secret for these links.
+  function generateProposalToken(): string {
+    return randomBytes(18).toString("base64url");
+  }
+
+  // Mirror the agency staff guard: caller must be a team member of this
+  // tenant (owner / manager / staff) — saas_admin bypasses. We don't reuse
+  // requireTenantStaffAdmin() here because regular staff are allowed to send
+  // their own proposals, not just owner/manager.
+  async function requireTenantTeamMember(req: Request, res: Response, tenantId: string) {
+    const callerId = req.session?.userId;
+    const caller = callerId ? await storage.getUser(callerId) : null;
+    if (!caller) {
+      res.status(401).json({ error: "Authentication required" });
+      return null;
+    }
+    if (caller.role === "saas_admin") return caller;
+    if (caller.tenantId !== tenantId) {
+      res.status(403).json({ error: "You don't have access to this agency" });
+      return null;
+    }
+    if (!["agency_owner", "agency_manager", "agency_staff"].includes(caller.role)) {
+      res.status(403).json({ error: "Only team members can manage proposals" });
+      return null;
+    }
+    return caller;
+  }
+
+  app.get("/api/tenants/:tenantId/proposals", requireAgencyAuth, async (req, res) => {
+    const tenantId = req.params.tenantId;
+    const caller = await requireTenantTeamMember(req, res, tenantId);
+    if (!caller) return;
+    const proposals = await storage.getProposalsByTenantId(tenantId);
+    res.json(proposals);
+  });
+
+  app.post("/api/tenants/:tenantId/proposals", requireAgencyAuth, async (req, res) => {
+    const tenantId = req.params.tenantId;
+    const caller = await requireTenantTeamMember(req, res, tenantId);
+    if (!caller) return;
+
+    const {
+      customerName, customerEmail, customerPhone,
+      destinationCountry, visaType, notes, leadId,
+      expiresInDays,
+    } = req.body ?? {};
+
+    if (!customerName || typeof customerName !== "string" || !customerName.trim()) {
+      return res.status(400).json({ error: "Customer name is required" });
+    }
+    if (!destinationCountry || typeof destinationCountry !== "string" || !destinationCountry.trim()) {
+      return res.status(400).json({ error: "Destination country is required" });
+    }
+    if (!visaType || typeof visaType !== "string" || !visaType.trim()) {
+      return res.status(400).json({ error: "Visa type is required" });
+    }
+
+    // The proposal is owned by whichever team member created it; that same
+    // user becomes the case's assignee when the customer applies.
+    const createdBy = await resolveTenantAssignee(req, tenantId, req.body?.assignedTo);
+    if (!createdBy) {
+      return res.status(400).json({ error: "A team member must own this proposal." });
+    }
+
+    let expiresAt: Date | null = null;
+    const days = Number(expiresInDays);
+    if (Number.isFinite(days) && days > 0 && days <= 365) {
+      expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+    }
+
+    const proposal = await storage.createProposal({
+      tenantId,
+      token: generateProposalToken(),
+      createdBy,
+      leadId: leadId ?? null,
+      customerName: customerName.trim(),
+      customerEmail: customerEmail?.trim() || null,
+      customerPhone: customerPhone?.trim() || null,
+      destinationCountry: destinationCountry.trim(),
+      visaType: visaType.trim(),
+      notes: notes?.trim() || null,
+      status: "sent",
+      expiresAt,
+    });
+
+    await storage.createActivityLog({
+      tenantId,
+      userId: createdBy,
+      action: "proposal.created",
+      entityType: "proposal",
+      entityId: proposal.id,
+      details: { customerName: proposal.customerName, destinationCountry, visaType },
+    });
+
+    res.status(201).json(proposal);
+  });
+
+  app.patch("/api/tenants/:tenantId/proposals/:id", requireAgencyAuth, async (req, res) => {
+    const tenantId = req.params.tenantId;
+    const caller = await requireTenantTeamMember(req, res, tenantId);
+    if (!caller) return;
+    const existing = await storage.getProposal(req.params.id);
+    if (!existing || existing.tenantId !== tenantId) {
+      return res.status(404).json({ error: "Proposal not found" });
+    }
+    // Only allow safe fields. Don't let the client rewrite the token, the
+    // tenant binding, or the applied-case linkage.
+    const patch: Partial<Proposal> = {};
+    const { status, notes, customerEmail, customerPhone } = req.body ?? {};
+    if (status !== undefined) {
+      if (!["sent", "viewed", "applied", "expired", "revoked"].includes(status)) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+      patch.status = status;
+    }
+    if (notes !== undefined) patch.notes = notes || null;
+    if (customerEmail !== undefined) patch.customerEmail = customerEmail || null;
+    if (customerPhone !== undefined) patch.customerPhone = customerPhone || null;
+
+    const updated = await storage.updateProposal(req.params.id, patch);
+    res.json(updated);
+  });
+
+  app.delete("/api/tenants/:tenantId/proposals/:id", requireAgencyAuth, async (req, res) => {
+    const tenantId = req.params.tenantId;
+    const caller = await requireTenantTeamMember(req, res, tenantId);
+    if (!caller) return;
+    const existing = await storage.getProposal(req.params.id);
+    if (!existing || existing.tenantId !== tenantId) {
+      return res.status(404).json({ error: "Proposal not found" });
+    }
+    await storage.deleteProposal(req.params.id);
+    res.status(204).send();
+  });
+
+  // --- Public proposal endpoints (no auth — token IS the credential) ---
+
+  // Returns the proposal + minimal tenant branding so the public apply page
+  // can render the right colors and logo. Marks the proposal as "viewed" on
+  // the first hit so the agency can see when the customer opened the link.
+  app.get("/api/proposals/:token", async (req, res) => {
+    const proposal = await storage.getProposalByToken(req.params.token);
+    if (!proposal) {
+      return res.status(404).json({ error: "This proposal link is invalid or has been removed." });
+    }
+    if (proposal.status === "revoked") {
+      return res.status(410).json({ error: "This proposal link has been revoked." });
+    }
+    if (proposal.expiresAt && proposal.expiresAt.getTime() < Date.now()) {
+      // Lazily mark expired so the agency dashboard reflects state without a cron.
+      if (proposal.status !== "expired") {
+        await storage.updateProposal(proposal.id, { status: "expired" });
+      }
+      return res.status(410).json({ error: "This proposal link has expired. Please contact your agency for a new one." });
+    }
+    if (proposal.status === "sent") {
+      await storage.updateProposal(proposal.id, { status: "viewed", viewedAt: new Date() });
+    }
+    const tenant = await storage.getTenant(proposal.tenantId);
+    if (!tenant) return res.status(404).json({ error: "Agency not found" });
+
+    res.json({
+      proposal: {
+        id: proposal.id,
+        token: proposal.token,
+        customerName: proposal.customerName,
+        customerEmail: proposal.customerEmail,
+        customerPhone: proposal.customerPhone,
+        destinationCountry: proposal.destinationCountry,
+        visaType: proposal.visaType,
+        notes: proposal.notes,
+        status: proposal.status === "sent" ? "viewed" : proposal.status,
+        appliedCaseId: proposal.appliedCaseId,
+        expiresAt: proposal.expiresAt,
+      },
+      tenant: {
+        id: tenant.id,
+        name: tenant.name,
+        slug: tenant.slug,
+        logoUrl: tenant.logoUrl,
+        primaryColor: tenant.primaryColor,
+        secondaryColor: tenant.secondaryColor,
+        accentColor: tenant.accentColor,
+        contactEmail: tenant.contactEmail,
+        contactPhone: tenant.contactPhone,
+      },
+    });
+  });
+
+  // Public apply: customer submits the form on the proposal page. Creates a
+  // Case under the tenant, owned by the proposal's createdBy team member.
+  // Per-token in-flight guard so a double-clicked submit can't create two
+  // cases for the same proposal before the DB write of `appliedCaseId` lands.
+  // (MemStorage is single-process; for a real DB this would be a SELECT FOR
+  //  UPDATE or a unique-constraint upsert.)
+  const proposalApplyInFlight = new Set<string>();
+
+  app.post("/api/proposals/:token/apply", async (req, res) => {
+    const proposal = await storage.getProposalByToken(req.params.token);
+    if (!proposal) {
+      return res.status(404).json({ error: "Invalid proposal link." });
+    }
+    if (proposal.status === "revoked") {
+      return res.status(410).json({ error: "This proposal has been revoked." });
+    }
+    if (proposal.expiresAt && proposal.expiresAt.getTime() < Date.now()) {
+      return res.status(410).json({ error: "This proposal has expired." });
+    }
+    if (proposal.appliedCaseId) {
+      return res.status(409).json({ error: "An application has already been submitted for this proposal." });
+    }
+    if (proposalApplyInFlight.has(proposal.id)) {
+      return res.status(409).json({ error: "An application is already being submitted for this proposal. Please wait." });
+    }
+
+    const {
+      applicantName, applicantDob, email, phone,
+      passportNumber, passportNationality,
+      travelDate, notes,
+    } = req.body ?? {};
+
+    if (!applicantName || typeof applicantName !== "string" || !applicantName.trim()) {
+      return res.status(400).json({ error: "Applicant name is required" });
+    }
+
+    // Same date validation the authenticated /api/tenants/:tenantId/cases
+    // route enforces — clients submitting via a token aren't a privileged
+    // path, so they shouldn't get to bypass these checks.
+    const dateError = validateCaseDates({ travelDate, applicantDob });
+    if (dateError) return res.status(400).json({ error: dateError });
+
+    // Same monthly plan limit as the regular case-create route — the agency
+    // can't bypass their plan by funnelling cases through proposal links.
+    const tenant = await storage.getTenant(proposal.tenantId);
+    if (tenant) {
+      const planCaseLimits: Record<string, number> = { starter: 30, professional: 200, enterprise: 9999 };
+      const caseLimit = planCaseLimits[tenant.plan ?? "starter"] ?? 30;
+      const allCases = await storage.getCasesByTenantId(tenant.id);
+      const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      const casesThisMonth = allCases.filter(c => c.createdAt && new Date(c.createdAt) >= startOfMonth).length;
+      if (casesThisMonth >= caseLimit) {
+        return res.status(403).json({ error: "This agency has reached its monthly application limit. Please contact them directly." });
+      }
+    }
+
+    proposalApplyInFlight.add(proposal.id);
+    try {
+    // Re-read the proposal inside the lock to defend against a concurrent
+    // request that already finished the apply between our pre-check above
+    // and acquiring the lock.
+    const fresh = await storage.getProposal(proposal.id);
+    if (fresh?.appliedCaseId) {
+      return res.status(409).json({ error: "An application has already been submitted for this proposal." });
+    }
+
+    const caseCount = (await storage.getCasesByTenantId(proposal.tenantId)).length + 1;
+    const caseNumber = `CASE-${String(caseCount).padStart(5, "0")}`;
+    let travelDateObj: Date | null = null;
+    if (travelDate) {
+      const t = new Date(travelDate);
+      if (!isNaN(t.getTime())) travelDateObj = t;
+    }
+
+    const newCase = await storage.createCase({
+      tenantId: proposal.tenantId,
+      customerId: null,
+      customerAccountId: null,
+      caseNumber,
+      referenceId: generateReferenceId(),
+      applicantName: applicantName.trim(),
+      applicantDob: applicantDob || null,
+      passportSurname: null,
+      passportGivenName: null,
+      passportMiddleName: null,
+      passportNumber: passportNumber?.trim() || null,
+      passportNationality: passportNationality?.trim() || null,
+      passportGender: null,
+      passportDateOfIssue: null,
+      passportDateOfExpiry: null,
+      passportPlaceOfIssue: null,
+      passportPlaceOfBirth: null,
+      passportFileUrl: null,
+      visaType: proposal.visaType,
+      destinationCountry: proposal.destinationCountry,
+      status: "pending",
+      priority: "normal",
+      assignedTo: proposal.createdBy,
+      travelDate: travelDateObj,
+      notes: notes?.trim() || null,
+      readinessScore: 0,
+    });
+
+    await storage.updateProposal(proposal.id, {
+      status: "applied",
+      appliedCaseId: newCase.id,
+      appliedAt: new Date(),
+      // If the customer corrected their email/phone on the form, save it back
+      // on the proposal so the agency sees what the customer actually entered.
+      customerEmail: email?.trim() || proposal.customerEmail,
+      customerPhone: phone?.trim() || proposal.customerPhone,
+    });
+
+    await storage.createActivityLog({
+      tenantId: proposal.tenantId,
+      userId: proposal.createdBy,
+      action: "proposal.applied",
+      entityType: "case",
+      entityId: newCase.id,
+      details: {
+        proposalId: proposal.id,
+        applicantName,
+        destinationCountry: proposal.destinationCountry,
+        visaType: proposal.visaType,
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      referenceId: newCase.referenceId,
+      caseNumber: newCase.caseNumber,
+      tenantSlug: tenant?.slug ?? null,
+    });
+    } finally {
+      proposalApplyInFlight.delete(proposal.id);
+    }
   });
 
   // === Accounting Routes ===

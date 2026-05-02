@@ -83,6 +83,54 @@ export const insertLeadSchema = createInsertSchema(leads).omit({ id: true, creat
 export type InsertLead = z.infer<typeof insertLeadSchema>;
 export type Lead = typeof leads.$inferSelect;
 
+// Proposals table — a shareable, tokenized invitation that the agency sends
+// to a prospective applicant. The customer opens the URL (or scans the QR
+// code on the printed/emailed proposal) and lands on a tenant-branded apply
+// page that shows the required-document checklist for the chosen visa and
+// lets them submit their application without first creating an account. The
+// submission becomes a regular Case under the tenant.
+export const PROPOSAL_STATUSES = ["sent", "viewed", "applied", "expired", "revoked"] as const;
+export type ProposalStatus = typeof PROPOSAL_STATUSES[number];
+
+export const proposals = pgTable("proposals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull(),
+  // URL-safe random token used in the public /p/:token link + QR code.
+  // Must be unique across the tenant; the public route uses it as the only
+  // identifier so it must be unguessable (we generate 24 chars of urlsafe).
+  token: text("token").notNull().unique(),
+  // Team member who created this proposal — also becomes assignedTo on the
+  // case when the customer submits. Required (matches lead/case rule).
+  createdBy: varchar("created_by").notNull(),
+  // Optional link back to the originating lead so the agency can track
+  // proposal → application conversion on the lead.
+  leadId: varchar("lead_id"),
+  // Customer details the agency knows up-front. The applicant can override
+  // some of these (name, email, phone) on the apply form.
+  customerName: text("customer_name").notNull(),
+  customerEmail: text("customer_email"),
+  customerPhone: text("customer_phone"),
+  destinationCountry: text("destination_country").notNull(),
+  visaType: text("visa_type").notNull(),
+  // Optional message from the agency shown above the checklist.
+  notes: text("notes"),
+  status: text("status").notNull().default("sent"), // see PROPOSAL_STATUSES
+  expiresAt: timestamp("expires_at"),
+  // Set once the customer submits via the apply form. Lets the agency click
+  // through from the proposal to the resulting case.
+  appliedCaseId: varchar("applied_case_id"),
+  appliedAt: timestamp("applied_at"),
+  viewedAt: timestamp("viewed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertProposalSchema = createInsertSchema(proposals).omit({
+  id: true, createdAt: true, updatedAt: true, appliedCaseId: true, appliedAt: true, viewedAt: true,
+});
+export type InsertProposal = z.infer<typeof insertProposalSchema>;
+export type Proposal = typeof proposals.$inferSelect;
+
 // Cases table
 export const cases = pgTable("cases", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

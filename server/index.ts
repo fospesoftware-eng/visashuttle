@@ -100,7 +100,13 @@ app.use((req, res, next) => {
   if (req.path.startsWith("/api/site-auth")) {
     return next();
   }
-  
+
+  // Public, tokenized proposal endpoints — the token IS the credential, so
+  // these must work for unauthenticated end-customers clicking a share link.
+  if (req.path.startsWith("/api/proposals/")) {
+    return next();
+  }
+
   // Protect API routes - require site authentication
   if (req.path.startsWith("/api") && !req.session?.siteAuthenticated) {
     return res.status(401).json({ error: "Site authentication required" });

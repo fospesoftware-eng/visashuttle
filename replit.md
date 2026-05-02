@@ -333,6 +333,21 @@ The platform now includes a full B2C visa approval checker with:
 - **Email invoice dialog**: `EmailInvoiceDialog` in `accounting.tsx` — To/Subject/Message inputs, default email pre-filled from invoice, "send" calls the email endpoint and either toasts success or auto-opens the returned `mailto:` URL.
 - Dependencies: `pdfkit` + `@types/pdfkit`.
 
+### Proposals — Tokenized Apply Links (May 2026)
+Agencies can send a branded application link to a prospective client; the client clicks/scans, sees the document checklist, fills a short form, and is registered as a regular Case in the tenant — no signup required.
+
+- **Schema** (`shared/schema.ts`): new `proposals` table — `token` (24-byte base64url, the share credential), `createdBy`, `customerName/Email/Phone`, `destinationCountry`, `visaType`, `notes`, `status` (sent/viewed/applied/expired/revoked), `expiresAt`, `viewedAt`, `appliedCaseId`, `appliedAt`. `PROPOSAL_STATUSES` const + `insertProposalSchema` / `Proposal` / `InsertProposal` types.
+- **Storage** (`server/storage.ts`): `IStorage` extended with `getProposalsByTenantId / getProposal / getProposalByToken / createProposal / updateProposal / deleteProposal`. `MemStorage.proposals: Map<string, Proposal>` impl.
+- **Routes** (`server/routes.ts`):
+  - Agency CRUD: `GET/POST/PATCH/DELETE /api/tenants/:tenantId/proposals` guarded by new `requireTenantTeamMember()` (any team-role member of the tenant; `saas_admin` bypass; uses `resolveTenantAssignee` for `createdBy`). Token + `expiresAt` are server-generated; `expiresInDays` accepts a number or `null` for never-expires.
+  - Public anonymous: `GET /api/proposals/:token` (returns proposal + tenant branding, lazily marks `viewed` and `expired`); `POST /api/proposals/:token/apply` creates a Case (`generateReferenceId` + `CASE-NNNNN`), sets `assignedTo = proposal.createdBy`, status `pending`, then flips proposal → `applied` with `appliedCaseId/appliedAt`. Enforces the same monthly case limit as authenticated case creation.
+- **Site-auth bypass**: `server/index.ts` middleware lets `/api/proposals/*` through (token IS the credential); `client/src/components/password-gate.tsx` skips the password gate for `/p/` paths; `App.tsx` `PRODUCT_SHELL_PREFIXES` includes `/p/` so the marketing header/footer are hidden on the public apply page.
+- **Sidebar + routing**: new "Proposals" nav item (Send icon) between Leads and Applications in `dashboard-layout.tsx`. Routes registered: `/app/proposals` (agency) and public `/p/:token`.
+- **Pages**:
+  - `client/src/pages/agency/proposals.tsx` — list (search + status filter), create dialog with live document-checklist preview from `getDocumentChecklist(country, visaType)`, share dialog with QR code (`qrcode` lib) + copy/email/preview/download QR, delete confirm.
+  - `client/src/pages/proposal-apply.tsx` — public, tenant-branded apply page: hero (uses tenant primary color + logo), agent message, checklist preview, applicant form (pre-filled from proposal), submit → success state showing reference ID + link to white-label portal. Already-applied state on link reuse.
+- **Dependencies**: `qrcode` + `@types/qrcode`.
+
 ### Planned Integrations (not yet implemented)
 - **AI Provider**: Pluggable interface supporting OpenAI-compatible APIs via `AI_BASE_URL` and `AI_API_KEY` (mock fallback active)
 - **File Storage**: Abstraction for S3-compatible storage with signed URLs

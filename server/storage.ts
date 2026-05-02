@@ -2,6 +2,7 @@ import {
   type User, type InsertUser,
   type Tenant, type InsertTenant,
   type Lead, type InsertLead,
+  type Proposal, type InsertProposal,
   type Case, type InsertCase,
   type CaseCoTraveller, type InsertCaseCoTraveller,
   type Document, type InsertDocument,
@@ -71,6 +72,14 @@ export interface IStorage {
   createLead(lead: InsertLead): Promise<Lead>;
   updateLead(id: string, data: Partial<InsertLead>): Promise<Lead | undefined>;
   deleteLead(id: string): Promise<boolean>;
+
+  // Proposals — tokenized intake invitations sent to prospects.
+  getProposalsByTenantId(tenantId: string): Promise<Proposal[]>;
+  getProposal(id: string): Promise<Proposal | undefined>;
+  getProposalByToken(token: string): Promise<Proposal | undefined>;
+  createProposal(proposal: InsertProposal): Promise<Proposal>;
+  updateProposal(id: string, data: Partial<Proposal>): Promise<Proposal | undefined>;
+  deleteProposal(id: string): Promise<boolean>;
   
   getCasesByTenantId(tenantId: string): Promise<Case[]>;
   getCasesByCustomerId(customerId: string): Promise<Case[]>;
@@ -193,6 +202,7 @@ export class MemStorage implements IStorage {
   private users: Map<string, User>;
   private tenants: Map<string, Tenant>;
   private leads: Map<string, Lead>;
+  private proposals: Map<string, Proposal>;
   private cases: Map<string, Case>;
   private documents: Map<string, Document>;
   private messages: Map<string, Message>;
@@ -220,6 +230,7 @@ export class MemStorage implements IStorage {
     this.users = new Map();
     this.tenants = new Map();
     this.leads = new Map();
+    this.proposals = new Map();
     this.cases = new Map();
     this.documents = new Map();
     this.messages = new Map();
@@ -724,6 +735,60 @@ export class MemStorage implements IStorage {
 
   async deleteLead(id: string): Promise<boolean> {
     return this.leads.delete(id);
+  }
+
+  // ===== Proposals =====
+  async getProposalsByTenantId(tenantId: string): Promise<Proposal[]> {
+    return Array.from(this.proposals.values())
+      .filter(p => p.tenantId === tenantId)
+      .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+  }
+
+  async getProposal(id: string): Promise<Proposal | undefined> {
+    return this.proposals.get(id);
+  }
+
+  async getProposalByToken(token: string): Promise<Proposal | undefined> {
+    return Array.from(this.proposals.values()).find(p => p.token === token);
+  }
+
+  async createProposal(data: InsertProposal): Promise<Proposal> {
+    const id = randomUUID();
+    const now = new Date();
+    const proposal: Proposal = {
+      id,
+      tenantId: data.tenantId,
+      token: data.token,
+      createdBy: data.createdBy,
+      leadId: data.leadId ?? null,
+      customerName: data.customerName,
+      customerEmail: data.customerEmail ?? null,
+      customerPhone: data.customerPhone ?? null,
+      destinationCountry: data.destinationCountry,
+      visaType: data.visaType,
+      notes: data.notes ?? null,
+      status: data.status ?? "sent",
+      expiresAt: data.expiresAt ?? null,
+      appliedCaseId: null,
+      appliedAt: null,
+      viewedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.proposals.set(id, proposal);
+    return proposal;
+  }
+
+  async updateProposal(id: string, data: Partial<Proposal>): Promise<Proposal | undefined> {
+    const existing = this.proposals.get(id);
+    if (!existing) return undefined;
+    const updated: Proposal = { ...existing, ...data, updatedAt: new Date() };
+    this.proposals.set(id, updated);
+    return updated;
+  }
+
+  async deleteProposal(id: string): Promise<boolean> {
+    return this.proposals.delete(id);
   }
 
   // ===== Accounting: Fee Templates =====

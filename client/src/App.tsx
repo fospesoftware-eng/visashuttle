@@ -31,6 +31,8 @@ import VisaCheckPage from "@/pages/visa-check";
 import VisaCheckPublicPage from "@/pages/visa-check-public";
 import AgencyDashboard from "@/pages/agency/dashboard";
 import LeadsPage from "@/pages/agency/leads";
+import ProposalsPage from "@/pages/agency/proposals";
+import ProposalApplyPage from "@/pages/proposal-apply";
 import CasesPage from "@/pages/agency/cases";
 import NewCasePage from "@/pages/agency/case-new";
 import CaseDetailPage from "@/pages/agency/case-detail";
@@ -118,6 +120,11 @@ function Router() {
 
       <Route path="/app" component={AgencyDashboard} />
       <Route path="/app/leads" component={LeadsPage} />
+      <Route path="/app/proposals" component={ProposalsPage} />
+
+      {/* Public, tokenized proposal apply page — no auth, token IS the
+          credential. Sits at the top level so it doesn't need any layout. */}
+      <Route path="/p/:token" component={ProposalApplyPage} />
       <Route path="/app/cases" component={CasesPage} />
       <Route path="/app/cases/new" component={NewCasePage} />
       <Route path="/app/cases/processing">
@@ -195,6 +202,7 @@ const PRODUCT_SHELL_PREFIXES = [
   "/customer",
   "/admin",
   "/w/",
+  "/p/",
 ];
 
 function SiteChrome() {

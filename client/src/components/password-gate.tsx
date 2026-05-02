@@ -11,9 +11,20 @@ interface PasswordGateProps {
   children: React.ReactNode;
 }
 
+// Public routes that bypass the site-wide password gate. These either use
+// their own credential (e.g. proposal token) or are intended for fully
+// anonymous customer-facing flows.
+const PUBLIC_ROUTE_PREFIXES = ["/p/"];
+
+function isPublicRoute(): boolean {
+  if (typeof window === "undefined") return false;
+  return PUBLIC_ROUTE_PREFIXES.some((p) => window.location.pathname.startsWith(p));
+}
+
 export function PasswordGate({ children }: PasswordGateProps) {
   const [password, setPassword] = useState("");
   const { toast } = useToast();
+  const publicRoute = isPublicRoute();
 
   const { data: authStatus, isLoading } = useQuery<{ authenticated: boolean }>({
     queryKey: ["/api/site-auth/status"],
@@ -22,6 +33,7 @@ export function PasswordGate({ children }: PasswordGateProps) {
       return res.json();
     },
     staleTime: 1000 * 60 * 5,
+    enabled: !publicRoute,
   });
 
   const verifyMutation = useMutation({
@@ -48,6 +60,10 @@ export function PasswordGate({ children }: PasswordGateProps) {
       verifyMutation.mutate(password);
     }
   };
+
+  if (publicRoute) {
+    return <>{children}</>;
+  }
 
   if (isLoading) {
     return (
