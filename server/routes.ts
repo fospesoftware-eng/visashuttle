@@ -997,7 +997,7 @@ export async function registerRoutes(
 
   app.post("/api/tenants/:tenantId/leads", async (req, res) => {
     // Plan limit enforcement
-    const tenantForLeads = await storage.getTenantById(req.params.tenantId);
+    const tenantForLeads = await storage.getTenant(req.params.tenantId);
     if (tenantForLeads) {
       const planLeadLimits: Record<string, number> = { starter: 50, professional: 500, enterprise: 9999 };
       const leadLimit = planLeadLimits[tenantForLeads.plan ?? "starter"] ?? 50;
@@ -1594,14 +1594,49 @@ export async function registerRoutes(
   });
 
   // === Case Routes ===
+  // Date validation helpers — enforce travel >= today, DOB <= today
+  function startOfToday(): Date {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+  function validateCaseDates(body: any): string | null {
+    if (body?.travelDate) {
+      const td = new Date(body.travelDate);
+      if (isNaN(td.getTime())) return "Invalid travel date";
+      if (td < startOfToday()) return "Intended travel date cannot be in the past";
+    }
+    if (body?.applicantDob) {
+      // applicantDob is stored as a string (YYYY-MM-DD)
+      const dob = new Date(body.applicantDob);
+      if (isNaN(dob.getTime())) return "Invalid date of birth";
+      if (dob > new Date()) return "Date of birth cannot be in the future";
+    }
+    return null;
+  }
+  function validateCoTraveller(body: any): string | null {
+    if (!body?.name || typeof body.name !== "string" || !body.name.trim()) return "Co-traveller name is required";
+    if (!body?.relationship || typeof body.relationship !== "string") return "Relationship is required";
+    if (body?.dob) {
+      const dob = new Date(body.dob);
+      if (isNaN(dob.getTime())) return "Invalid co-traveller date of birth";
+      if (dob > new Date()) return "Co-traveller date of birth cannot be in the future";
+    }
+    return null;
+  }
+
   app.get("/api/tenants/:tenantId/cases", async (req, res) => {
     const cases = await storage.getCasesByTenantId(req.params.tenantId);
     res.json(cases);
   });
 
   app.post("/api/tenants/:tenantId/cases", async (req, res) => {
+    // Validate dates: travel date can't be in the past, DOB can't be in the future
+    const dateError = validateCaseDates(req.body);
+    if (dateError) return res.status(400).json({ error: dateError });
+
     // Plan limit enforcement (cases per month)
-    const tenantForCases = await storage.getTenantById(req.params.tenantId);
+    const tenantForCases = await storage.getTenant(req.params.tenantId);
     if (tenantForCases) {
       const planCaseLimits: Record<string, number> = { starter: 30, professional: 200, enterprise: 9999 };
       const caseLimit = planCaseLimits[tenantForCases.plan ?? "starter"] ?? 30;
@@ -1630,11 +1665,59 @@ export async function registerRoutes(
   });
 
   app.patch("/api/cases/:id", async (req, res) => {
+    const dateError = validateCaseDates(req.body);
+    if (dateError) return res.status(400).json({ error: dateError });
+
     const caseData = await storage.updateCase(req.params.id, req.body);
     if (!caseData) {
       return res.status(404).json({ error: "Case not found" });
     }
     res.json(caseData);
+  });
+
+  // === Case Co-Travellers (companions) ===
+  app.get("/api/cases/:caseId/co-travellers", async (req, res) => {
+    const caseRow = await storage.getCase(req.params.caseId);
+    if (!caseRow) return res.status(404).json({ error: "Case not found" });
+    if (!requireTenantAccess(req, res, caseRow.tenantId)) return;
+    const list = await storage.getCoTravellersByCaseId(req.params.caseId);
+    res.json(list);
+  });
+
+  app.post("/api/cases/:caseId/co-travellers", async (req, res) => {
+    const caseRow = await storage.getCase(req.params.caseId);
+    if (!caseRow) return res.status(404).json({ error: "Case not found" });
+    if (!requireTenantAccess(req, res, caseRow.tenantId)) return;
+    const err = validateCoTraveller(req.body);
+    if (err) return res.status(400).json({ error: err });
+    const created = await storage.createCoTraveller({
+      ...req.body,
+      caseId: req.params.caseId,
+      tenantId: caseRow.tenantId,
+    });
+    res.status(201).json(created);
+  });
+
+  app.patch("/api/co-travellers/:id", async (req, res) => {
+    const existing = await storage.getCoTraveller(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Co-traveller not found" });
+    if (!requireTenantAccess(req, res, existing.tenantId)) return;
+    const err = validateCoTraveller({ ...existing, ...req.body });
+    if (err) return res.status(400).json({ error: err });
+    // Disallow re-parenting to a different case/tenant via body
+    const { caseId: _ignoreCaseId, tenantId: _ignoreTenantId, ...safeBody } = req.body || {};
+    const updated = await storage.updateCoTraveller(req.params.id, safeBody);
+    if (!updated) return res.status(404).json({ error: "Co-traveller not found" });
+    res.json(updated);
+  });
+
+  app.delete("/api/co-travellers/:id", async (req, res) => {
+    const existing = await storage.getCoTraveller(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Co-traveller not found" });
+    if (!requireTenantAccess(req, res, existing.tenantId)) return;
+    const ok = await storage.deleteCoTraveller(req.params.id);
+    if (!ok) return res.status(404).json({ error: "Co-traveller not found" });
+    res.status(204).send();
   });
 
   app.get("/api/customers/:customerId/cases", async (req, res) => {

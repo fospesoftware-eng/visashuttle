@@ -3,6 +3,7 @@ import {
   type Tenant, type InsertTenant,
   type Lead, type InsertLead,
   type Case, type InsertCase,
+  type CaseCoTraveller, type InsertCaseCoTraveller,
   type Document, type InsertDocument,
   type Message, type InsertMessage,
   type VisaTemplate, type InsertVisaTemplate,
@@ -67,7 +68,14 @@ export interface IStorage {
   getCase(id: string): Promise<Case | undefined>;
   createCase(caseData: InsertCase): Promise<Case>;
   updateCase(id: string, data: Partial<InsertCase>): Promise<Case | undefined>;
-  
+
+  // Case Co-Travellers
+  getCoTravellersByCaseId(caseId: string): Promise<CaseCoTraveller[]>;
+  getCoTraveller(id: string): Promise<CaseCoTraveller | undefined>;
+  createCoTraveller(data: InsertCaseCoTraveller): Promise<CaseCoTraveller>;
+  updateCoTraveller(id: string, data: Partial<InsertCaseCoTraveller>): Promise<CaseCoTraveller | undefined>;
+  deleteCoTraveller(id: string): Promise<boolean>;
+
   getDocumentsByCaseId(caseId: string): Promise<Document[]>;
   getDocumentsByTenantId(tenantId: string): Promise<Document[]>;
   getDocument(id: string): Promise<Document | undefined>;
@@ -193,6 +201,7 @@ export class MemStorage implements IStorage {
   private invoices: Map<string, Invoice> = new Map();
   private invoiceItems: Map<string, InvoiceItem> = new Map();
   private payments: Map<string, Payment> = new Map();
+  private coTravellers: Map<string, CaseCoTraveller> = new Map();
 
   constructor() {
     this.users = new Map();
@@ -1004,6 +1013,47 @@ export class MemStorage implements IStorage {
     const updated = { ...caseData, ...data, updatedAt: new Date() };
     this.cases.set(id, updated);
     return updated;
+  }
+
+  // ----- Case Co-Travellers -----
+  async getCoTravellersByCaseId(caseId: string): Promise<CaseCoTraveller[]> {
+    return Array.from(this.coTravellers.values())
+      .filter(t => t.caseId === caseId)
+      .sort((a, b) => (a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0));
+  }
+
+  async getCoTraveller(id: string): Promise<CaseCoTraveller | undefined> {
+    return this.coTravellers.get(id);
+  }
+
+  async createCoTraveller(data: InsertCaseCoTraveller): Promise<CaseCoTraveller> {
+    const id = randomUUID();
+    const row: CaseCoTraveller = {
+      id,
+      caseId: data.caseId,
+      tenantId: data.tenantId,
+      name: data.name,
+      dob: data.dob ?? null,
+      relationship: data.relationship,
+      passportNumber: data.passportNumber ?? null,
+      nationality: data.nationality ?? null,
+      notes: data.notes ?? null,
+      createdAt: new Date(),
+    };
+    this.coTravellers.set(id, row);
+    return row;
+  }
+
+  async updateCoTraveller(id: string, data: Partial<InsertCaseCoTraveller>): Promise<CaseCoTraveller | undefined> {
+    const existing = this.coTravellers.get(id);
+    if (!existing) return undefined;
+    const updated: CaseCoTraveller = { ...existing, ...data };
+    this.coTravellers.set(id, updated);
+    return updated;
+  }
+
+  async deleteCoTraveller(id: string): Promise<boolean> {
+    return this.coTravellers.delete(id);
   }
 
   async getDocumentsByCaseId(caseId: string): Promise<Document[]> {

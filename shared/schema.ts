@@ -90,6 +90,30 @@ export const insertCaseSchema = createInsertSchema(cases).omit({ id: true, creat
 export type InsertCase = z.infer<typeof insertCaseSchema>;
 export type Case = typeof cases.$inferSelect;
 
+// Case Co-Travellers (companions on the same application/trip)
+export const CO_TRAVELLER_RELATIONSHIPS = [
+  "spouse", "child", "parent", "sibling", "grandparent",
+  "in_law", "partner", "friend", "colleague", "relative", "other",
+] as const;
+export type CoTravellerRelationship = typeof CO_TRAVELLER_RELATIONSHIPS[number];
+
+export const caseCoTravellers = pgTable("case_co_travellers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  caseId: varchar("case_id").notNull(),
+  tenantId: varchar("tenant_id").notNull(),
+  name: text("name").notNull(),
+  dob: text("dob"),
+  relationship: text("relationship").notNull(), // see CO_TRAVELLER_RELATIONSHIPS
+  passportNumber: text("passport_number"),
+  nationality: text("nationality"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCaseCoTravellerSchema = createInsertSchema(caseCoTravellers).omit({ id: true, createdAt: true });
+export type InsertCaseCoTraveller = z.infer<typeof insertCaseCoTravellerSchema>;
+export type CaseCoTraveller = typeof caseCoTravellers.$inferSelect;
+
 // Documents table
 export const documents = pgTable("documents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

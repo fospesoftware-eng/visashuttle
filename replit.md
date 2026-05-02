@@ -93,6 +93,23 @@ Three distinct auth systems coexist:
 2. **Agency/Admin Session Auth** — `POST /api/auth/login` validates email+password, sets `req.session.userId/userRole/userTenantId`; `GET /api/auth/me` returns current user; `POST /api/auth/logout` clears session
 3. **Customer OTP Auth (White-label)** — `POST /api/w/:slug/auth/request-otp` → `POST /api/w/:slug/auth/verify-otp` → `req.session.wlCustomerId/wlTenantId`
 
+### Case Co-Travellers (Companions)
+- New table `case_co_travellers` (`shared/schema.ts`) — one row per companion linked to a case: `id, caseId, tenantId, name, dob (text YYYY-MM-DD), relationship, passportNumber, nationality, notes, createdAt`. Allowed `relationship` values are exported as `CO_TRAVELLER_RELATIONSHIPS` (spouse, child, parent, sibling, grandparent, in_law, partner, friend, colleague, relative, other).
+- Storage: `MemStorage.coTravellers: Map<string, CaseCoTraveller>` with full CRUD on `IStorage` (`getCoTravellersByCaseId`, `getCoTraveller`, `createCoTraveller`, `updateCoTraveller`, `deleteCoTraveller`). `HybridStorage` inherits — same `MemStorage` persistence caveat.
+- API:
+  - `GET /api/cases/:caseId/co-travellers`
+  - `POST /api/cases/:caseId/co-travellers` — server enforces non-empty name, valid relationship, and DOB ≤ today; tenantId is taken from the parent case.
+  - `PATCH /api/co-travellers/:id` — same validation against merged record.
+  - `DELETE /api/co-travellers/:id` — 204 on success.
+- UI:
+  - **Create Application** (`client/src/pages/agency/case-new.tsx`): "Co-Travellers" card with add/remove rows; co-travellers are POSTed sequentially after the case is created.
+  - **Case Detail** (`client/src/pages/agency/case-detail.tsx`): `CoTravellersCard` in the left sidebar — list with edit/delete buttons and add-dialog.
+
+### Date Validation (forms + API)
+- All travel dates must be today or later; all DOBs (applicant + co-traveller) must be in the past or today.
+- Server: helpers `validateCaseDates` and `validateCoTraveller` in `server/routes.ts`; applied to POST/PATCH `/api/tenants/:tenantId/cases`, PATCH `/api/cases/:id`, POST/PATCH `/api/cases/:caseId/co-travellers` & `/api/co-travellers/:id`. Returns `400 { error: "..." }` on violation.
+- Client: `case-new.tsx` sets `min={today}` on travel-date inputs and `max={today}` on DOB inputs (applicant + co-travellers), plus a pre-submit `validate()` pass; `case-detail.tsx` co-traveller dialog mirrors the same constraints.
+
 ### Multi-Tenancy Design
 - Tenant isolation enforced via `tenantId` foreign key on all tenant-scoped records
 - Roles: `saas_admin`, `agency_owner`, `agency_staff`, `customer`

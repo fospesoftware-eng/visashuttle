@@ -5,7 +5,7 @@ import {
   ArrowLeft, User, Calendar, FileText, 
   CheckCircle, AlertCircle, Clock, Send, Paperclip, Download,
   Brain, Lightbulb, RefreshCw, Copy, Check, ExternalLink, Share2,
-  Loader2, MessageSquare, Flag
+  Loader2, MessageSquare, Flag, Users, Plus, Trash2, Pencil
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,7 +22,310 @@ import { UploadDropzone } from "@/components/upload-dropzone";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import type { Case, Document, Message, ActivityLog } from "@shared/schema";
+import type { Case, Document, Message, ActivityLog, CaseCoTraveller, CoTravellerRelationship } from "@shared/schema";
+import { CO_TRAVELLER_RELATIONSHIPS } from "@shared/schema";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { apiRequest } from "@/lib/queryClient";
+
+const RELATIONSHIP_LABELS: Record<CoTravellerRelationship, string> = {
+  spouse: "Spouse", child: "Child", parent: "Parent", sibling: "Sibling",
+  grandparent: "Grandparent", in_law: "In-law", partner: "Partner",
+  friend: "Friend", colleague: "Colleague", relative: "Other relative", other: "Other",
+};
+
+function todayISO(): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString().slice(0, 10);
+}
+
+type CoTravellerFormState = {
+  name: string;
+  relationship: CoTravellerRelationship | "";
+  dob: string;
+  passportNumber: string;
+  nationality: string;
+  notes: string;
+};
+
+const emptyCoTravellerForm: CoTravellerFormState = {
+  name: "", relationship: "", dob: "", passportNumber: "", nationality: "", notes: "",
+};
+
+function CoTravellersCard({ caseId }: { caseId: string }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const today = todayISO();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<CaseCoTraveller | null>(null);
+  const [form, setForm] = useState<CoTravellerFormState>(emptyCoTravellerForm);
+
+  const { data: travellers = [], isLoading } = useQuery<CaseCoTraveller[]>({
+    queryKey: ["/api/cases", caseId, "co-travellers"],
+    queryFn: async () => {
+      const res = await fetch(`/api/cases/${caseId}/co-travellers`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!caseId,
+  });
+
+  const openAdd = () => {
+    setEditing(null);
+    setForm(emptyCoTravellerForm);
+    setDialogOpen(true);
+  };
+
+  const openEdit = (t: CaseCoTraveller) => {
+    setEditing(t);
+    setForm({
+      name: t.name,
+      relationship: (t.relationship as CoTravellerRelationship) ?? "",
+      dob: t.dob ?? "",
+      passportNumber: t.passportNumber ?? "",
+      nationality: t.nationality ?? "",
+      notes: t.notes ?? "",
+    });
+    setDialogOpen(true);
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        name: form.name.trim(),
+        relationship: form.relationship,
+        dob: form.dob || null,
+        passportNumber: form.passportNumber.trim() || null,
+        nationality: form.nationality.trim() || null,
+        notes: form.notes.trim() || null,
+      };
+      if (editing) {
+        const res = await apiRequest("PATCH", `/api/co-travellers/${editing.id}`, payload);
+        return res.json();
+      }
+      const res = await apiRequest("POST", `/api/cases/${caseId}/co-travellers`, payload);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cases", caseId, "co-travellers"] });
+      setDialogOpen(false);
+      toast({ title: editing ? "Co-traveller updated" : "Co-traveller added" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Could not save co-traveller", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/co-travellers/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cases", caseId, "co-travellers"] });
+      toast({ title: "Co-traveller removed" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Could not remove", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const validateAndSubmit = () => {
+    if (!form.name.trim()) {
+      toast({ title: "Name is required", variant: "destructive" });
+      return;
+    }
+    if (!form.relationship) {
+      toast({ title: "Relationship is required", variant: "destructive" });
+      return;
+    }
+    if (form.dob) {
+      const d = new Date(form.dob);
+      if (isNaN(d.getTime()) || d > new Date()) {
+        toast({ title: "Date of birth cannot be in the future", variant: "destructive" });
+        return;
+      }
+    }
+    saveMutation.mutate();
+  };
+
+  return (
+    <Card data-testid="card-co-travellers">
+      <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <Users className="w-4 h-4" /> Co-Travellers
+          {travellers.length > 0 && (
+            <span className="text-xs bg-muted rounded-full px-1.5">{travellers.length}</span>
+          )}
+        </CardTitle>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={openAdd}
+              data-testid="button-add-co-traveller"
+            >
+              <Plus className="w-4 h-4" />
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md" data-testid="dialog-co-traveller">
+            <DialogHeader>
+              <DialogTitle>{editing ? "Edit co-traveller" : "Add co-traveller"}</DialogTitle>
+              <DialogDescription>
+                Anyone travelling on the same trip as the applicant.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label>Full name *</Label>
+                <Input
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="As written in passport"
+                  data-testid="input-dialog-co-name"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Relationship *</Label>
+                <Select
+                  value={form.relationship || undefined}
+                  onValueChange={(v) => setForm({ ...form, relationship: v as CoTravellerRelationship })}
+                >
+                  <SelectTrigger data-testid="select-dialog-co-relationship">
+                    <SelectValue placeholder="Select relationship" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CO_TRAVELLER_RELATIONSHIPS.map((r) => (
+                      <SelectItem key={r} value={r}>{RELATIONSHIP_LABELS[r]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>Date of birth</Label>
+                  <Input
+                    type="date"
+                    value={form.dob}
+                    max={today}
+                    onChange={(e) => setForm({ ...form, dob: e.target.value })}
+                    data-testid="input-dialog-co-dob"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Passport number</Label>
+                  <Input
+                    value={form.passportNumber}
+                    onChange={(e) => setForm({ ...form, passportNumber: e.target.value })}
+                    data-testid="input-dialog-co-passport"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Nationality</Label>
+                <Input
+                  value={form.nationality}
+                  onChange={(e) => setForm({ ...form, nationality: e.target.value })}
+                  data-testid="input-dialog-co-nationality"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Notes</Label>
+                <Textarea
+                  value={form.notes}
+                  rows={2}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                  data-testid="input-dialog-co-notes"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDialogOpen(false)} data-testid="button-dialog-cancel">
+                Cancel
+              </Button>
+              <Button
+                onClick={validateAndSubmit}
+                disabled={saveMutation.isPending}
+                data-testid="button-dialog-save"
+              >
+                {saveMutation.isPending ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : null}
+                {editing ? "Save changes" : "Add"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {isLoading ? (
+          <div className="flex justify-center py-2">
+            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+          </div>
+        ) : travellers.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            No co-travellers added. Click + to add a spouse, child or other companion.
+          </p>
+        ) : (
+          travellers.map((t) => (
+            <div
+              key={t.id}
+              className="rounded-lg border p-2.5 text-xs space-y-1 hover-elevate"
+              data-testid={`item-co-traveller-${t.id}`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-semibold truncate">{t.name}</p>
+                  <p className="text-muted-foreground capitalize">
+                    {RELATIONSHIP_LABELS[(t.relationship as CoTravellerRelationship)] ?? t.relationship}
+                  </p>
+                </div>
+                <div className="flex gap-0.5 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => openEdit(t)}
+                    data-testid={`button-edit-co-traveller-${t.id}`}
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-destructive hover:text-destructive"
+                    disabled={deleteMutation.isPending}
+                    onClick={() => {
+                      if (confirm(`Remove ${t.name} from this case?`)) deleteMutation.mutate(t.id);
+                    }}
+                    data-testid={`button-delete-co-traveller-${t.id}`}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+              {(t.dob || t.passportNumber || t.nationality) && (
+                <div className="text-muted-foreground space-y-0.5 pt-1 border-t">
+                  {t.dob && <p>DOB: {t.dob}</p>}
+                  {t.passportNumber && <p className="font-mono">{t.passportNumber}</p>}
+                  {t.nationality && <p>{t.nationality}</p>}
+                </div>
+              )}
+              {t.notes && (
+                <p className="text-muted-foreground italic pt-1 border-t">{t.notes}</p>
+              )}
+            </div>
+          ))
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 function computeReadiness(c: Case): number {
   if (c.status === "approved") return 100;
@@ -456,6 +759,9 @@ export default function CaseDetailPage() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Co-Travellers */}
+            <CoTravellersCard caseId={id!} />
 
             {/* Customer Self-Service link */}
             <Card className="border-primary/20 bg-primary/5">
