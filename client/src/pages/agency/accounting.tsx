@@ -175,11 +175,12 @@ function OverviewTab({ tenantId, onJump }: { tenantId: string; onJump: (t: strin
     }
   };
 
+  const displayCurrency = settings?.currency ?? "USD";
   const kpis = [
-    { label: "Total Billed",    value: fmtMoney(stats?.totalBilled ?? 0),      icon: Receipt,    color: "text-blue-600 dark:text-blue-400" },
-    { label: "Total Collected", value: fmtMoney(stats?.totalPaid ?? 0),        icon: Banknote,   color: "text-emerald-600 dark:text-emerald-400" },
-    { label: "Outstanding",     value: fmtMoney(stats?.totalOutstanding ?? 0), icon: Clock,      color: "text-amber-600 dark:text-amber-400" },
-    { label: "Overdue",         value: fmtMoney(stats?.totalOverdue ?? 0),     icon: AlertCircle, color: "text-red-600 dark:text-red-400" },
+    { label: "Total Billed",    value: fmtMoney(stats?.totalBilled ?? 0,      displayCurrency), icon: Receipt,    color: "text-blue-600 dark:text-blue-400" },
+    { label: "Total Collected", value: fmtMoney(stats?.totalPaid ?? 0,        displayCurrency), icon: Banknote,   color: "text-emerald-600 dark:text-emerald-400" },
+    { label: "Outstanding",     value: fmtMoney(stats?.totalOutstanding ?? 0, displayCurrency), icon: Clock,      color: "text-amber-600 dark:text-amber-400" },
+    { label: "Overdue",         value: fmtMoney(stats?.totalOverdue ?? 0,     displayCurrency), icon: AlertCircle, color: "text-red-600 dark:text-red-400" },
   ];
 
   const recent = invoices.slice(0, 5);
