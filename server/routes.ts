@@ -3892,67 +3892,211 @@ export async function registerRoutes(
 
   // Platform stats
   // Weekly activity breakdown for admin dashboard chart
+  // ============================================================
+  // Platform analytics — feeds the SaaS Admin dashboard.
+  // Plan pricing is hard-coded here (no per-tier pricing table yet);
+  // adjust if/when a `plans` table is introduced.
+  // ============================================================
+  const PLAN_PRICING_USD: Record<string, number> = {
+    free: 0,
+    starter: 49,
+    professional: 149,
+    enterprise: 499,
+  };
+  function planPrice(plan: string | null | undefined): number {
+    return PLAN_PRICING_USD[plan ?? ""] ?? 0;
+  }
+
+  // Shared calendar-day window helper. A "days=N" window covers the last N
+  // *full* calendar days ending tomorrow at 00:00 (i.e. today is included).
+  // Returns symmetric current and previous windows so period-over-period
+  // deltas compare equal-length spans.
+  function buildAnalyticsWindow(days: number) {
+    const todayMid = new Date();
+    todayMid.setHours(0, 0, 0, 0);
+    const endExclusive = new Date(todayMid);
+    endExclusive.setDate(todayMid.getDate() + 1);
+    const startNow = new Date(endExclusive);
+    startNow.setDate(endExclusive.getDate() - days);
+    const startPrev = new Date(startNow);
+    startPrev.setDate(startNow.getDate() - days);
+    return { days, startPrev, startNow, endExclusive };
+  }
+
   app.get("/api/admin/weekly-activity", requireAdminAuth, async (req, res) => {
-    const [allCases, activityLogs] = await Promise.all([
-      (async () => {
-        const tenants = await storage.getAllTenants();
-        const caseArrays = await Promise.all(tenants.map(t => storage.getCasesByTenantId(t.id)));
-        return caseArrays.flat();
-      })(),
+    const requestedDays = Math.max(7, Math.min(90, Number(req.query.days) || 7));
+    const { startNow } = buildAnalyticsWindow(requestedDays);
+    const [tenants, activityLogs] = await Promise.all([
+      storage.getAllTenants(),
       storage.getAllActivityLogs(),
     ]);
+    const allCases = (await Promise.all(tenants.map(t => storage.getCasesByTenantId(t.id)))).flat();
 
-    const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-    const now = new Date();
-    // Build 7-day window ending today
-    const result = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(now);
-      d.setDate(now.getDate() - (6 - i));
-      d.setHours(0, 0, 0, 0);
+    const dayLabels = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    const result = Array.from({ length: requestedDays }, (_, i) => {
+      const d = new Date(startNow);
+      d.setDate(startNow.getDate() + i);
       const nextDay = new Date(d);
       nextDay.setDate(d.getDate() + 1);
-      const dayLabel = days[d.getDay()];
-      const cases = allCases.filter(c => {
-        if (!c.createdAt) return false;
-        const t = new Date(c.createdAt);
+      const inWindow = (ts: Date | null | undefined) => {
+        if (!ts) return false;
+        const t = new Date(ts);
         return t >= d && t < nextDay;
-      }).length;
-      const checks = activityLogs.filter(l => {
-        if (!l.createdAt) return false;
-        const t = new Date(l.createdAt);
-        return t >= d && t < nextDay;
-      }).length;
-      return { day: dayLabel, cases, checks };
+      };
+      const cases = allCases.filter(c => inWindow(c.createdAt)).length;
+      const checks = activityLogs.filter(l => inWindow(l.createdAt)).length;
+      const newTenants = tenants.filter(t => inWindow(t.createdAt)).length;
+      // Approvals: only count cases whose visa stage was explicitly transitioned
+      // to "approved" in this window. Don't fall back to updatedAt — unrelated
+      // edits to an already-approved case would otherwise re-trigger the count.
+      const approvals = allCases.filter(c =>
+        c.visaStage === "approved" && inWindow(c.visaStatusUpdatedAt),
+      ).length;
+      // Short label: weekday for ≤14d windows, otherwise "MMM D".
+      const label = requestedDays <= 14
+        ? dayLabels[d.getDay()]
+        : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      return {
+        date: d.toISOString(),
+        day: label,
+        cases,
+        checks,
+        newTenants,
+        approvals,
+      };
     });
     res.json(result);
   });
 
   app.get("/api/admin/stats", requireAdminAuth, async (req, res) => {
-    const [tenants, users, b2cUsers, activityLogs] = await Promise.all([
+    const days = Math.max(7, Math.min(90, Number(req.query.days) || 30));
+    const { startNow, startPrev, endExclusive } = buildAnalyticsWindow(days);
+    const today = new Date(); today.setHours(0,0,0,0);
+
+    const [tenants, users, b2cUsers, activityLogs, smsCfg, aiCfg] = await Promise.all([
       storage.getAllTenants(),
       storage.getAllUsers(),
       storage.getAllB2cUsers(),
       storage.getAllActivityLogs(),
+      storage.getSmsConfig().catch(() => undefined),
+      storage.getPlatformAiConfig().catch(() => undefined),
     ]);
-    const allCaseCounts = await Promise.all(
-      tenants.map(t => storage.getCasesByTenantId(t.id))
-    );
-    const totalCases = allCaseCounts.reduce((acc, cases) => acc + cases.length, 0);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const activityToday = activityLogs.filter(l => l.createdAt && new Date(l.createdAt) >= today).length;
+
+    // All cases + per-tenant gateway config (parallel).
+    const [casesPerTenant, gatewayConfigs] = await Promise.all([
+      Promise.all(tenants.map(t => storage.getCasesByTenantId(t.id))),
+      Promise.all(tenants.map(t => storage.getTenantPaymentGatewayConfig(t.id).catch(() => undefined))),
+    ]);
+    const allCases = casesPerTenant.flat();
+
+    // Window helpers.
+    const inWindow = (ts: Date | null | undefined, from: Date, to: Date) => {
+      if (!ts) return false;
+      const t = new Date(ts);
+      return t >= from && t < to;
+    };
+    const decided = (cs: typeof allCases) => {
+      const approved = cs.filter(c => c.visaStage === "approved").length;
+      const rejected = cs.filter(c => c.visaStage === "rejected").length;
+      return { approved, rejected, rate: approved + rejected ? approved / (approved + rejected) : 0 };
+    };
+
+    const newTenantsThisPeriod = tenants.filter(t => inWindow(t.createdAt, startNow, endExclusive)).length;
+    const newTenantsPrev       = tenants.filter(t => inWindow(t.createdAt, startPrev, startNow)).length;
+    const newCasesThisPeriod   = allCases.filter(c => inWindow(c.createdAt, startNow, endExclusive)).length;
+    const newCasesPrev         = allCases.filter(c => inWindow(c.createdAt, startPrev, startNow)).length;
+    const newUsersThisPeriod   = users.filter(u => inWindow(u.createdAt, startNow, endExclusive)).length;
+    const newUsersPrev         = users.filter(u => inWindow(u.createdAt, startPrev, startNow)).length;
+
+    // Decided-this-period: only cases explicitly transitioned to approved/rejected
+    // in this window. We don't fall back to updatedAt because unrelated case edits
+    // would re-count an already-decided case.
+    const decidedNow  = decided(allCases.filter(c => inWindow(c.visaStatusUpdatedAt, startNow, endExclusive)));
+    const decidedPrev = decided(allCases.filter(c => inWindow(c.visaStatusUpdatedAt, startPrev, startNow)));
+
+    // MRR — sum of plan prices for non-suspended tenants.
+    // NOTE: `mrrPrev` is an approximation. We don't store historical plan/status
+    // changes, so we estimate by excluding tenants created during the current
+    // window. Mid-window plan upgrades or suspensions won't reflect in the delta.
+    const mrr     = tenants.filter(t => t.status !== "suspended").reduce((s, t) => s + planPrice(t.plan), 0);
+    const mrrPrev = tenants.filter(t =>
+      t.status !== "suspended" && (!t.createdAt || new Date(t.createdAt) < startNow),
+    ).reduce((s, t) => s + planPrice(t.plan), 0);
+
+    // Visa funnel across all cases.
+    const visaFunnel = {
+      notStarted: allCases.filter(c => !c.visaStage || c.visaStage === "not_started").length,
+      processing: allCases.filter(c => c.visaStage === "processing").length,
+      approved:   allCases.filter(c => c.visaStage === "approved").length,
+      rejected:   allCases.filter(c => c.visaStage === "rejected").length,
+    };
+
+    // Top destinations by case count.
+    const destCounts: Record<string, number> = {};
+    for (const c of allCases) {
+      const k = (c.destinationCountry || "Unknown").trim();
+      destCounts[k] = (destCounts[k] ?? 0) + 1;
+    }
+    const topDestinations = Object.entries(destCounts)
+      .map(([country, count]) => ({ country, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    // Top agencies by case volume (last 30d).
+    const tenantCaseCounts = tenants.map((t, i) => ({
+      id: t.id,
+      name: t.name,
+      plan: t.plan,
+      status: t.status,
+      caseCount: casesPerTenant[i].length,
+      recentCaseCount: casesPerTenant[i].filter(c => inWindow(c.createdAt, startNow, endExclusive)).length,
+    }));
+    const topAgencies = tenantCaseCounts
+      .slice()
+      .sort((a, b) => b.caseCount - a.caseCount)
+      .slice(0, 5);
+
+    // Integration health.
+    const gatewayCount = gatewayConfigs.filter(g => !!(g?.testClientId || g?.liveClientId)).length;
+    const liveGatewayCount = gatewayConfigs.filter(g => !!g?.liveClientId).length;
+    const integrationsHealth = {
+      gateway: {
+        configuredTenants: gatewayCount,
+        liveTenants: liveGatewayCount,
+        totalTenants: tenants.length,
+      },
+      sms: { configured: !!(smsCfg as any)?.apiKey || !!(smsCfg as any)?.mcCustomerId },
+      ai:  { configured: !!aiCfg?.anthropicApiKey || !!process.env.ANTHROPIC_API_KEY },
+    };
+
     res.json({
+      // existing fields (preserved for backward compat)
       tenantCount: tenants.length,
       activeTenantCount: tenants.filter(t => t.status === "active").length,
       agencyUserCount: users.filter(u => u.role !== "saas_admin").length,
       b2cUserCount: b2cUsers.length,
-      totalCases,
-      activityToday,
+      totalCases: allCases.length,
+      activityToday: activityLogs.filter(l => l.createdAt && new Date(l.createdAt) >= today).length,
       planBreakdown: {
         starter: tenants.filter(t => t.plan === "starter").length,
         professional: tenants.filter(t => t.plan === "professional").length,
         enterprise: tenants.filter(t => t.plan === "enterprise").length,
       },
+      // NEW analytics
+      window: { days, from: startNow.toISOString(), to: endExclusive.toISOString() },
+      mrr,
+      mrrPrev,
+      newTenantsThisPeriod, newTenantsPrev,
+      newCasesThisPeriod,   newCasesPrev,
+      newUsersThisPeriod,   newUsersPrev,
+      approvalRate:     decidedNow.rate,
+      approvalRatePrev: decidedPrev.rate,
+      decidedThisPeriod: decidedNow.approved + decidedNow.rejected,
+      visaFunnel,
+      topDestinations,
+      topAgencies,
+      integrationsHealth,
+      generatedAt: new Date().toISOString(),
     });
   });
 

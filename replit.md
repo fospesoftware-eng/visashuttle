@@ -395,6 +395,17 @@ The platform now includes a full B2C visa approval checker with:
 - `GET /api/admin/weekly-activity` — returns last 7 days of case + activity log counts
 - Admin dashboard "Platform Activity (This Week)" chart now uses real data with loading skeleton
 
+**SaaS Admin Dashboard — Executive Overview Rebuild (May 2026)**
+- `client/src/pages/admin/dashboard.tsx` rewritten as a denser executive overview with a period selector (7/30/90 days) and trailing-window deltas.
+- 6-tile KPI strip with sparklines: **Agencies**, **MRR**, **Cases**, **Approval %**, **Users**, **Events Today**. Each tile shows a `+/-N%` delta vs the previous equal-length window and a mini line sparkline driven by the timeseries.
+- Main row: **AreaChart** of cases / approvals / events for the selected window + **PieChart (donut)** for plan distribution with center label.
+- Operational health row: **Visa Funnel** (notStarted/processing/approved/rejected horizontal bars), **Top Destinations** (top 5 by case volume), **System Health** (Payment Gateway / SMS / AI integration status with Ready/Setup badges).
+- Bottom row: **Top Agencies** (ranked by case volume with recent-cases delta) + **Recent Activity** (last 6 audit events with semantic dot color).
+- Backend changes (`server/routes.ts`):
+  - `GET /api/admin/stats?days=7|30|90` — augmented (backward compatible). New fields: `mrr`, `mrrPrev`, `newTenants/Cases/UsersThisPeriod` + `*Prev`, `approvalRate`, `approvalRatePrev`, `decidedThisPeriod`, `visaFunnel`, `topDestinations`, `topAgencies`, `integrationsHealth { gateway, sms, ai }`, `window`, `generatedAt`.
+  - `GET /api/admin/weekly-activity?days=7|30|90` — now configurable; returns `{ date, day, cases, checks, newTenants, approvals }` per day. `day` label is weekday for ≤14d windows, else `MMM D`.
+  - Plan pricing constants live in `routes.ts` (`PLAN_PRICING_USD`): starter=$49, professional=$149, enterprise=$499. MRR sums non-suspended tenants.
+
 **All Mock Pages Wired to Real APIs**
 - Leads page: create/edit/delete/stage-move via real API + search/filter
 - Documents page: status stats, change-status actions, real document list
