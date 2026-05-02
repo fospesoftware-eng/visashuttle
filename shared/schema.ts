@@ -72,8 +72,20 @@ export const cases = pgTable("cases", {
   customerAccountId: varchar("customer_account_id"), // Link to white-label customer
   caseNumber: text("case_number").notNull(),
   referenceId: text("reference_id").notNull(), // For customer claim flow
-  applicantName: text("applicant_name"), // For claim verification
+  applicantName: text("applicant_name"), // For claim verification (kept in sync with passport given+middle+surname when present)
   applicantDob: text("applicant_dob"), // For claim verification (stored as string for simplicity)
+  // --- Passport details (Indian passport standard structure) ---
+  passportSurname: text("passport_surname"),
+  passportGivenName: text("passport_given_name"),
+  passportMiddleName: text("passport_middle_name"),
+  passportNumber: text("passport_number"),
+  passportNationality: text("passport_nationality"),
+  passportGender: text("passport_gender"), // M / F / X
+  passportDateOfIssue: text("passport_date_of_issue"), // ISO yyyy-mm-dd
+  passportDateOfExpiry: text("passport_date_of_expiry"), // ISO yyyy-mm-dd
+  passportPlaceOfIssue: text("passport_place_of_issue"),
+  passportPlaceOfBirth: text("passport_place_of_birth"),
+  passportFileUrl: text("passport_file_url"), // Optional: link to uploaded passport image
   visaType: text("visa_type").notNull(),
   destinationCountry: text("destination_country").notNull(),
   status: text("status").notNull().default("pending"), // pending, in_progress, documents_required, under_review, approved, rejected

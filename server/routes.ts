@@ -1,7 +1,8 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { runVisaCheck, runDeepCheck } from "./ai";
+import { runVisaCheck, runDeepCheck, scanPassportImage, isPassportScanConfigured } from "./ai";
+import express from "express";
 import { sendOtp, verifyOtp, getSmsProviderStatus } from "./sms";
 import { getEntryRequirement } from "@shared/visa-free";
 import indiaVisaChanceDataset from "@shared/india_visa_chance_dataset_non_visa_free_2026.json";
@@ -1697,6 +1698,46 @@ export async function registerRoutes(
     }
     res.json(caseData);
   });
+
+  // === Passport OCR (Claude vision) ===
+  // Body parser bumped on this route only — passport images can be a few MB
+  // base64-encoded — but we don't want to inflate global request limits.
+  app.post(
+    "/api/passport/scan",
+    requireAgencyAuth,
+    express.json({ limit: "10mb" }),
+    async (req, res) => {
+      const { imageBase64, mimeType } = req.body ?? {};
+      if (typeof imageBase64 !== "string" || imageBase64.length === 0) {
+        return res.status(400).json({ error: "imageBase64 is required" });
+      }
+      if (typeof mimeType !== "string" || !mimeType.startsWith("image/")) {
+        return res.status(400).json({ error: "mimeType must be an image/* type" });
+      }
+      // Strip a data URL prefix if the client included it.
+      const cleaned = imageBase64.includes(",") ? imageBase64.split(",").pop()! : imageBase64;
+      // Rough size cap: 8 MB raw → ~10.7 MB base64. Be defensive.
+      if (cleaned.length > 11 * 1024 * 1024) {
+        return res.status(413).json({ error: "Passport image is too large. Please upload an image under 8 MB." });
+      }
+
+      const aiConfig = await storage.getPlatformAiConfig();
+      if (!isPassportScanConfigured(aiConfig)) {
+        return res.status(503).json({
+          error: "Passport auto-scan is not configured. Ask your platform admin to set ANTHROPIC_API_KEY, or fill the form manually.",
+          code: "ai_not_configured",
+        });
+      }
+
+      try {
+        const result = await scanPassportImage(cleaned, mimeType, aiConfig);
+        res.json(result);
+      } catch (err: any) {
+        console.error("[passport-scan] failed:", err?.message ?? err);
+        res.status(502).json({ error: err?.message ?? "Passport scan failed. Please try again or fill the form manually." });
+      }
+    },
+  );
 
   app.patch("/api/cases/:id", async (req, res) => {
     const dateError = validateCaseDates(req.body);

@@ -4,8 +4,9 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft, ArrowRight, Check, Loader2, Plus, Save, Send, Trash2, Users,
   MapPin, FileText, User as UserIcon, Plane, ClipboardCheck, ListChecks,
-  Search, X, CircleDot, DollarSign,
+  Search, X, CircleDot, DollarSign, Upload, ScanLine, AlertTriangle, RotateCcw,
 } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -187,7 +188,41 @@ export default function NewCasePage() {
     travelDate: "",
     priority: "normal",
     notes: "",
+    // Passport details (Indian passport standard)
+    passportSurname: "",
+    passportGivenName: "",
+    passportMiddleName: "",
+    passportNumber: "",
+    passportNationality: "",
+    passportGender: "" as "" | "M" | "F" | "X",
+    passportDateOfIssue: "",
+    passportDateOfExpiry: "",
+    passportPlaceOfIssue: "",
+    passportPlaceOfBirth: "",
   });
+
+  // Passport upload + auto-scan state
+  const [passportMode, setPassportMode] = useState<"upload" | "manual">("upload");
+  const [passportPreview, setPassportPreview] = useState<string | null>(null);
+  const [passportMimeType, setPassportMimeType] = useState<string | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [scanWarnings, setScanWarnings] = useState<string[]>([]);
+  const [scanCompleted, setScanCompleted] = useState(false);
+  const passportFileRef = useRef<HTMLInputElement | null>(null);
+
+  // Auto-derive applicantName from "given middle surname" whenever any of those change.
+  // Only writes if user hasn't manually overridden the derived value.
+  useEffect(() => {
+    const derived = [form.passportGivenName, form.passportMiddleName, form.passportSurname]
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join(" ");
+    if (!derived) return;
+    setForm((f) => (f.applicantName === derived ? f : { ...f, applicantName: derived }));
+    // We deliberately depend only on the three name parts — manual edits to applicantName
+    // from a user typing in that field shouldn't trigger this effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.passportGivenName, form.passportMiddleName, form.passportSurname]);
 
   const [coTravellers, setCoTravellers] = useState<CoTravellerDraft[]>([]);
 
@@ -287,11 +322,28 @@ export default function NewCasePage() {
       if (!form.visaType) return "Please select a visa type.";
     }
     if (s === 2) {
-      if (!form.applicantName.trim()) return "Applicant name is required.";
+      // Either passport surname+given-name OR free-text applicant name must be present.
+      const hasPassportName = form.passportSurname.trim() && form.passportGivenName.trim();
+      if (!hasPassportName && !form.applicantName.trim()) {
+        return "Enter at least the surname and first name from the passport (or upload the passport to auto-fill).";
+      }
       if (form.applicantDob) {
         const dob = new Date(form.applicantDob);
         if (isNaN(dob.getTime())) return "Date of birth is invalid.";
         if (dob > new Date()) return "Date of birth cannot be in the future.";
+      }
+      // Date sanity for passport issue/expiry
+      if (form.passportDateOfIssue && form.passportDateOfExpiry) {
+        const di = new Date(form.passportDateOfIssue);
+        const de = new Date(form.passportDateOfExpiry);
+        if (!isNaN(di.getTime()) && !isNaN(de.getTime()) && de < di) {
+          return "Passport expiry date cannot be earlier than the issue date.";
+        }
+      }
+      if (form.passportDateOfIssue) {
+        const di = new Date(form.passportDateOfIssue);
+        if (isNaN(di.getTime())) return "Passport date of issue is invalid.";
+        if (di > new Date()) return "Passport date of issue cannot be in the future.";
       }
     }
     if (s === 3) {
@@ -343,6 +395,16 @@ export default function NewCasePage() {
   const buildPayload = (status: "draft" | "pending") => ({
     applicantName: form.applicantName.trim() || (status === "draft" ? "Untitled draft" : ""),
     applicantDob: form.applicantDob || null,
+    passportSurname: form.passportSurname.trim() || null,
+    passportGivenName: form.passportGivenName.trim() || null,
+    passportMiddleName: form.passportMiddleName.trim() || null,
+    passportNumber: form.passportNumber.trim() || null,
+    passportNationality: form.passportNationality.trim() || null,
+    passportGender: form.passportGender || null,
+    passportDateOfIssue: form.passportDateOfIssue || null,
+    passportDateOfExpiry: form.passportDateOfExpiry || null,
+    passportPlaceOfIssue: form.passportPlaceOfIssue.trim() || null,
+    passportPlaceOfBirth: form.passportPlaceOfBirth.trim() || null,
     visaType: form.visaType,
     destinationCountry: form.destinationCountry,
     travelDate: form.travelDate ? new Date(form.travelDate).toISOString() : null,
@@ -437,6 +499,63 @@ export default function NewCasePage() {
 
     return created;
   };
+
+  // === Passport scan mutation (Claude vision OCR) ===
+  const scanPassportMutation = useMutation({
+    mutationFn: async () => {
+      if (!passportPreview || !passportMimeType) {
+        throw new Error("Choose a passport image first.");
+      }
+      // passportPreview is a data URL — strip the prefix server-side too, but send clean.
+      const base64 = passportPreview.includes(",") ? passportPreview.split(",").pop()! : passportPreview;
+      const res = await apiRequest("POST", "/api/passport/scan", {
+        imageBase64: base64,
+        mimeType: passportMimeType,
+      });
+      return (await res.json()) as {
+        surname: string | null;
+        givenName: string | null;
+        middleName: string | null;
+        passportNumber: string | null;
+        nationality: string | null;
+        gender: "M" | "F" | "X" | null;
+        dateOfBirth: string | null;
+        dateOfIssue: string | null;
+        dateOfExpiry: string | null;
+        placeOfIssue: string | null;
+        placeOfBirth: string | null;
+        warnings: string[];
+      };
+    },
+    onSuccess: (data) => {
+      // Merge non-null fields into the form. We never blank out a field the user already filled.
+      setForm((f) => ({
+        ...f,
+        passportSurname: data.surname ?? f.passportSurname,
+        passportGivenName: data.givenName ?? f.passportGivenName,
+        passportMiddleName: data.middleName ?? f.passportMiddleName,
+        passportNumber: data.passportNumber ?? f.passportNumber,
+        passportNationality: data.nationality ?? f.passportNationality,
+        passportGender: (data.gender ?? f.passportGender) as "" | "M" | "F" | "X",
+        applicantDob: data.dateOfBirth ?? f.applicantDob,
+        passportDateOfIssue: data.dateOfIssue ?? f.passportDateOfIssue,
+        passportDateOfExpiry: data.dateOfExpiry ?? f.passportDateOfExpiry,
+        passportPlaceOfIssue: data.placeOfIssue ?? f.passportPlaceOfIssue,
+        passportPlaceOfBirth: data.placeOfBirth ?? f.passportPlaceOfBirth,
+      }));
+      setScanWarnings(data.warnings ?? []);
+      setScanError(null);
+      setScanCompleted(true);
+      toast({
+        title: "Passport scanned",
+        description: "Details extracted. Please review before continuing.",
+      });
+    },
+    onError: (err: Error) => {
+      setScanError(err.message);
+      setScanCompleted(false);
+    },
+  });
 
   const submitMutation = useMutation({
     mutationFn: () => createCaseAndCompanions("pending"),
@@ -627,32 +746,320 @@ export default function NewCasePage() {
                   <UserIcon className="w-4 h-4" /> Who is the main applicant?
                 </CardTitle>
                 <CardDescription>
-                  Use exactly what's on the passport. A reference ID will be generated automatically so the customer can claim and track this case.
+                  Upload the passport bio page to auto-fill, or enter the details manually. Indian passport layout (Surname / Given Names) is supported.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
-                <div className="space-y-2">
-                  <Label htmlFor="applicantName">Applicant Full Name *</Label>
-                  <Input
-                    id="applicantName"
-                    value={form.applicantName}
-                    onChange={(e) => setForm({ ...form, applicantName: e.target.value })}
-                    placeholder="As written in passport"
-                    data-testid="input-applicant-name"
-                    autoFocus
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="applicantDob">Date of Birth</Label>
-                  <Input
-                    id="applicantDob"
-                    type="date"
-                    value={form.applicantDob}
-                    max={today}
-                    onChange={(e) => setForm({ ...form, applicantDob: e.target.value })}
-                    data-testid="input-applicant-dob"
-                  />
-                  <p className="text-xs text-muted-foreground">Must be today or earlier.</p>
+                <Tabs value={passportMode} onValueChange={(v) => setPassportMode(v as "upload" | "manual")}>
+                  <TabsList className="grid grid-cols-2 w-full sm:w-auto">
+                    <TabsTrigger value="upload" className="gap-2" data-testid="tab-passport-upload">
+                      <Upload className="w-4 h-4" /> Upload passport
+                    </TabsTrigger>
+                    <TabsTrigger value="manual" className="gap-2" data-testid="tab-passport-manual">
+                      <FileText className="w-4 h-4" /> Enter manually
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="upload" className="space-y-4 mt-4">
+                    <div
+                      className="border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center text-center bg-muted/20 hover:bg-muted/30 transition cursor-pointer"
+                      onClick={() => passportFileRef.current?.click()}
+                      data-testid="dropzone-passport"
+                    >
+                      {passportPreview ? (
+                        <img
+                          src={passportPreview}
+                          alt="Passport preview"
+                          className="max-h-56 rounded-md shadow-sm object-contain"
+                          data-testid="img-passport-preview"
+                        />
+                      ) : (
+                        <>
+                          <Upload className="w-8 h-8 text-muted-foreground mb-2" />
+                          <p className="text-sm font-medium">Click to choose passport image</p>
+                          <p className="text-xs text-muted-foreground mt-1">PNG, JPG, or WebP · up to 8 MB · only the bio page is needed</p>
+                        </>
+                      )}
+                      <input
+                        ref={passportFileRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          if (file.size > 8 * 1024 * 1024) {
+                            toast({ title: "File too large", description: "Please upload an image under 8 MB.", variant: "destructive" });
+                            return;
+                          }
+                          setScanError(null);
+                          setScanWarnings([]);
+                          setScanCompleted(false);
+                          setPassportMimeType(file.type);
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            setPassportPreview(reader.result as string);
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                        data-testid="input-passport-file"
+                      />
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        onClick={() => scanPassportMutation.mutate()}
+                        disabled={!passportPreview || scanPassportMutation.isPending}
+                        className="gap-2"
+                        data-testid="button-scan-passport"
+                      >
+                        {scanPassportMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <ScanLine className="w-4 h-4" />
+                        )}
+                        {scanCompleted ? "Re-scan passport" : "Scan & extract details"}
+                      </Button>
+                      {passportPreview && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => {
+                            setPassportPreview(null);
+                            setPassportMimeType(null);
+                            setScanError(null);
+                            setScanWarnings([]);
+                            setScanCompleted(false);
+                            if (passportFileRef.current) passportFileRef.current.value = "";
+                          }}
+                          className="gap-2"
+                          data-testid="button-remove-passport"
+                        >
+                          <X className="w-4 h-4" /> Remove image
+                        </Button>
+                      )}
+                    </div>
+
+                    {scanError && (
+                      <div className="flex items-start gap-2 text-sm text-destructive border border-destructive/30 bg-destructive/10 rounded-md p-3" data-testid="text-scan-error">
+                        <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-medium">Couldn't auto-scan this passport</p>
+                          <p className="text-xs mt-0.5">{scanError}</p>
+                          <button
+                            type="button"
+                            className="text-xs underline mt-1 text-destructive hover:opacity-80"
+                            onClick={() => setPassportMode("manual")}
+                            data-testid="button-switch-to-manual"
+                          >
+                            Switch to manual entry
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {scanCompleted && !scanError && (
+                      <div className="flex items-start gap-2 text-sm border border-emerald-300/50 bg-emerald-50 dark:bg-emerald-950/30 dark:border-emerald-800/50 rounded-md p-3" data-testid="text-scan-success">
+                        <Check className="w-4 h-4 flex-shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
+                        <div className="space-y-1">
+                          <p className="font-medium text-emerald-800 dark:text-emerald-200">Passport details extracted. Review the fields below before continuing.</p>
+                          {scanWarnings.length > 0 && (
+                            <ul className="list-disc list-inside text-xs text-emerald-700 dark:text-emerald-300">
+                              {scanWarnings.map((w, i) => <li key={i}>{w}</li>)}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="manual" className="mt-4">
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Type details exactly as printed on the passport bio page.
+                    </p>
+                  </TabsContent>
+                </Tabs>
+
+                {/* === Passport detail fields (visible in both modes; populated by scan in upload mode) === */}
+                <div className="space-y-4 pt-2 border-t">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                      <UserIcon className="w-4 h-4" /> Passport details
+                    </h3>
+                    {(form.passportSurname || form.passportGivenName || form.passportNumber) && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1 text-xs h-7"
+                        onClick={() => {
+                          setForm((f) => ({
+                            ...f,
+                            applicantName: "",
+                            applicantDob: "",
+                            passportSurname: "",
+                            passportGivenName: "",
+                            passportMiddleName: "",
+                            passportNumber: "",
+                            passportNationality: "",
+                            passportGender: "",
+                            passportDateOfIssue: "",
+                            passportDateOfExpiry: "",
+                            passportPlaceOfIssue: "",
+                            passportPlaceOfBirth: "",
+                          }));
+                          setScanCompleted(false);
+                          setScanWarnings([]);
+                        }}
+                        data-testid="button-clear-passport-fields"
+                      >
+                        <RotateCcw className="w-3 h-3" /> Clear all
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="passportSurname">Surname *</Label>
+                      <Input
+                        id="passportSurname"
+                        value={form.passportSurname}
+                        onChange={(e) => setForm({ ...form, passportSurname: e.target.value.toUpperCase() })}
+                        placeholder="KUMAR"
+                        data-testid="input-passport-surname"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="passportGivenName">First name *</Label>
+                      <Input
+                        id="passportGivenName"
+                        value={form.passportGivenName}
+                        onChange={(e) => setForm({ ...form, passportGivenName: e.target.value.toUpperCase() })}
+                        placeholder="RAHUL"
+                        data-testid="input-passport-given-name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="passportMiddleName">Middle name</Label>
+                      <Input
+                        id="passportMiddleName"
+                        value={form.passportMiddleName}
+                        onChange={(e) => setForm({ ...form, passportMiddleName: e.target.value.toUpperCase() })}
+                        placeholder="PRATAP"
+                        data-testid="input-passport-middle-name"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="passportNumber">Passport number</Label>
+                      <Input
+                        id="passportNumber"
+                        value={form.passportNumber}
+                        onChange={(e) => setForm({ ...form, passportNumber: e.target.value.toUpperCase().replace(/\s+/g, "") })}
+                        placeholder="A1234567"
+                        data-testid="input-passport-number"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="passportNationality">Nationality</Label>
+                      <Input
+                        id="passportNationality"
+                        value={form.passportNationality}
+                        onChange={(e) => setForm({ ...form, passportNationality: e.target.value })}
+                        placeholder="Indian"
+                        data-testid="input-passport-nationality"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="applicantDob">Date of birth</Label>
+                      <Input
+                        id="applicantDob"
+                        type="date"
+                        value={form.applicantDob}
+                        max={today}
+                        onChange={(e) => setForm({ ...form, applicantDob: e.target.value })}
+                        data-testid="input-applicant-dob"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="passportGender">Gender</Label>
+                      <Select
+                        value={form.passportGender || undefined}
+                        onValueChange={(v) => setForm({ ...form, passportGender: v as "M" | "F" | "X" })}
+                      >
+                        <SelectTrigger id="passportGender" data-testid="select-passport-gender">
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="M">Male (M)</SelectItem>
+                          <SelectItem value="F">Female (F)</SelectItem>
+                          <SelectItem value="X">Other / X</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="passportPlaceOfBirth">Place of birth</Label>
+                      <Input
+                        id="passportPlaceOfBirth"
+                        value={form.passportPlaceOfBirth}
+                        onChange={(e) => setForm({ ...form, passportPlaceOfBirth: e.target.value })}
+                        placeholder="DELHI"
+                        data-testid="input-passport-place-of-birth"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="passportDateOfIssue">Date of issue</Label>
+                      <Input
+                        id="passportDateOfIssue"
+                        type="date"
+                        value={form.passportDateOfIssue}
+                        max={today}
+                        onChange={(e) => setForm({ ...form, passportDateOfIssue: e.target.value })}
+                        data-testid="input-passport-date-of-issue"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="passportDateOfExpiry">Date of expiry</Label>
+                      <Input
+                        id="passportDateOfExpiry"
+                        type="date"
+                        value={form.passportDateOfExpiry}
+                        onChange={(e) => setForm({ ...form, passportDateOfExpiry: e.target.value })}
+                        data-testid="input-passport-date-of-expiry"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="passportPlaceOfIssue">Place of issue</Label>
+                      <Input
+                        id="passportPlaceOfIssue"
+                        value={form.passportPlaceOfIssue}
+                        onChange={(e) => setForm({ ...form, passportPlaceOfIssue: e.target.value })}
+                        placeholder="DELHI"
+                        data-testid="input-passport-place-of-issue"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 pt-2 border-t">
+                    <Label htmlFor="applicantName">Full name (for the case record)</Label>
+                    <Input
+                      id="applicantName"
+                      value={form.applicantName}
+                      onChange={(e) => setForm({ ...form, applicantName: e.target.value })}
+                      placeholder="Auto-built from passport name"
+                      data-testid="input-applicant-name"
+                    />
+                    <p className="text-xs text-muted-foreground">Auto-built from First + Middle + Surname. You can override it if needed.</p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1103,6 +1510,16 @@ export default function NewCasePage() {
                   rows={[
                     ["Full Name", form.applicantName || "—"],
                     ["Date of Birth", form.applicantDob || "—"],
+                    ["Surname", form.passportSurname || "—"],
+                    ["First Name", form.passportGivenName || "—"],
+                    ["Middle Name", form.passportMiddleName || "—"],
+                    ["Passport Number", form.passportNumber || "—"],
+                    ["Nationality", form.passportNationality || "—"],
+                    ["Gender", form.passportGender || "—"],
+                    ["Date of Issue", form.passportDateOfIssue || "—"],
+                    ["Date of Expiry", form.passportDateOfExpiry || "—"],
+                    ["Place of Issue", form.passportPlaceOfIssue || "—"],
+                    ["Place of Birth", form.passportPlaceOfBirth || "—"],
                   ]}
                 />
                 <ReviewBlock

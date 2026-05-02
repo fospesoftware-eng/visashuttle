@@ -834,6 +834,137 @@ export async function runDeepCheck(form: DeepCheckFormData, config?: AnthropicRu
   return { result, provider: "claude" };
 }
 
+/* ===========================================================================
+ * Passport OCR via Claude vision
+ *
+ * Accepts a passport image (base64) and returns structured Indian-passport-style
+ * fields. Designed to be tolerant: any field that can't be read is returned as
+ * null so the agent can still fall back to manual entry.
+ * ========================================================================= */
+
+export interface PassportScanResult {
+  surname: string | null;
+  givenName: string | null;
+  middleName: string | null;
+  passportNumber: string | null;
+  nationality: string | null;
+  gender: string | null; // "M" | "F" | "X" | null
+  dateOfBirth: string | null; // ISO yyyy-mm-dd
+  dateOfIssue: string | null; // ISO yyyy-mm-dd
+  dateOfExpiry: string | null; // ISO yyyy-mm-dd
+  placeOfIssue: string | null;
+  placeOfBirth: string | null;
+  warnings: string[];
+}
+
+const PASSPORT_SCAN_SYSTEM = `You are an OCR assistant specialised in passport biographic pages, particularly Indian passports (which use a "Surname / Given Names" layout).
+
+Return a single JSON object — no prose, no code fences — matching exactly this TypeScript shape:
+
+{
+  "surname": string|null,            // Last/family name (e.g. "KUMAR")
+  "givenName": string|null,          // First given name only (e.g. "RAHUL")
+  "middleName": string|null,         // Any remaining given names joined by spaces (e.g. "PRATAP SINGH"), or null
+  "passportNumber": string|null,     // Alphanumeric passport number, no spaces
+  "nationality": string|null,        // Full country name (e.g. "Indian", "India")
+  "gender": "M"|"F"|"X"|null,        // Sex / gender code
+  "dateOfBirth": string|null,        // ISO yyyy-mm-dd
+  "dateOfIssue": string|null,        // ISO yyyy-mm-dd
+  "dateOfExpiry": string|null,       // ISO yyyy-mm-dd
+  "placeOfIssue": string|null,       // City as printed (e.g. "DELHI")
+  "placeOfBirth": string|null,       // City / district as printed
+  "warnings": string[]               // Human-readable notes about anything illegible or ambiguous
+}
+
+Rules:
+- Use ALL CAPS for names exactly as printed; do not "title-case" them.
+- Convert any date format (DD/MM/YYYY, DD-MM-YYYY, DD MMM YYYY, etc.) to ISO yyyy-mm-dd. Indian passports use day-month-year; never mistake the day for the month.
+- If a field is missing, illegible, or you are not confident, return null and add a short note to "warnings".
+- "givenName" must contain only the first word of the given names. The rest goes into "middleName".
+- Do NOT invent values. If the image is not a passport, return all nulls and one warning explaining why.`;
+
+export async function scanPassportImage(
+  imageBase64: string,
+  mimeType: string,
+  config?: AnthropicRuntimeConfig,
+): Promise<PassportScanResult> {
+  const apiKey = config?.anthropicApiKey || ANTHROPIC_API_KEY;
+  const model = config?.anthropicModel || ANTHROPIC_MODEL;
+  if (!apiKey) throw new Error("Anthropic API key not configured");
+
+  const supportedMime = ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(mimeType)
+    ? mimeType
+    : "image/jpeg";
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 1024,
+      system: PASSPORT_SCAN_SYSTEM,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "image",
+              source: { type: "base64", media_type: supportedMime, data: imageBase64 },
+            },
+            {
+              type: "text",
+              text: "Extract the passport biographic fields from this image. Return only the JSON object specified by your instructions.",
+            },
+          ],
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Claude passport scan error: ${response.status} ${errorText}`);
+  }
+
+  const data = await response.json() as any;
+  const content = data.content?.[0]?.text;
+  if (!content) throw new Error("No content from Claude passport scan");
+
+  const jsonStr = extractOutermostJson(content);
+  if (!jsonStr) throw new Error("Claude returned no JSON for passport scan");
+
+  const raw = JSON.parse(jsonStr);
+  // Normalise: trim strings, coerce empty string to null, validate gender enum.
+  const norm = (v: any): string | null => {
+    if (typeof v !== "string") return null;
+    const t = v.trim();
+    return t.length === 0 ? null : t;
+  };
+  const gender = norm(raw.gender)?.toUpperCase();
+  return {
+    surname: norm(raw.surname),
+    givenName: norm(raw.givenName),
+    middleName: norm(raw.middleName),
+    passportNumber: norm(raw.passportNumber)?.replace(/\s+/g, "") ?? null,
+    nationality: norm(raw.nationality),
+    gender: gender === "M" || gender === "F" || gender === "X" ? gender : null,
+    dateOfBirth: norm(raw.dateOfBirth),
+    dateOfIssue: norm(raw.dateOfIssue),
+    dateOfExpiry: norm(raw.dateOfExpiry),
+    placeOfIssue: norm(raw.placeOfIssue),
+    placeOfBirth: norm(raw.placeOfBirth),
+    warnings: Array.isArray(raw.warnings) ? raw.warnings.filter((w: any) => typeof w === "string") : [],
+  };
+}
+
+export function isPassportScanConfigured(config?: AnthropicRuntimeConfig): boolean {
+  return !!(config?.anthropicApiKey || ANTHROPIC_API_KEY);
+}
+
 export async function runVisaCheck(form: VisaCheckFormData, config?: AnthropicRuntimeConfig): Promise<{ result: AIVisaResult; provider: string }> {
   const hasAnthropicConfig = !!(config?.anthropicApiKey || ANTHROPIC_API_KEY);
   if ((AI_PROVIDER === "anthropic" || !OPENAI_API_KEY) && hasAnthropicConfig) {
