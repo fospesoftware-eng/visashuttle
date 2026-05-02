@@ -39,6 +39,19 @@ app.use(
   }),
 );
 
+// Document upload endpoint also receives base64 file payloads (passport pages,
+// checklist attachments uploaded by the agent in the case-creation wizard).
+// Mounted before the global parser so the bigger limit wins for this path only.
+app.use(
+  /^\/api\/cases\/[^/]+\/documents$/,
+  express.json({
+    limit: "12mb",
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  }),
+);
+
 app.use(
   express.json({
     limit: "1mb",
@@ -124,10 +137,20 @@ app.use((req, res, next) => {
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       // Suppress response body in logs for endpoints that return PII
-      // (e.g. extracted passport details).
-      const isSensitiveResponse = path === "/api/passport/scan";
+      // (e.g. extracted passport details, uploaded document images).
+      const isSensitiveResponse =
+        path === "/api/passport/scan" ||
+        /^\/api\/cases\/[^/]+\/documents$/.test(path);
       if (capturedJsonResponse && !isSensitiveResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        // Belt-and-braces: scrub any `fileUrl` field anywhere in the response
+        // before logging, in case other endpoints surface document records.
+        // base64 data URLs are huge and contain personal data — never log them.
+        const safe = JSON.parse(JSON.stringify(capturedJsonResponse), (k, v) =>
+          k === "fileUrl" && typeof v === "string" && v.startsWith("data:")
+            ? "[redacted-data-url]"
+            : v,
+        );
+        logLine += ` :: ${JSON.stringify(safe)}`;
       }
 
       log(logLine);

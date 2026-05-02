@@ -156,8 +156,11 @@ type CoTravellerDraft = {
   notes: string;
   // --- Per-row passport upload + scan state ---
   passportMode: "upload" | "manual";
-  passportPreview: string | null;
+  passportPageView: "first" | "last"; // which sub-page the agent is currently looking at
+  passportPreview: string | null; // first page (bio) — also fed to OCR
   passportMimeType: string | null;
+  passportLastPagePreview: string | null; // last page (address) — saved as attachment, not OCR'd
+  passportLastPageMimeType: string | null;
   scanStatus: ScanStatus | null;
   scanWarnings: string[];
   scanError: string | null;
@@ -184,8 +187,11 @@ function emptyCoTraveller(): CoTravellerDraft {
     nationality: "",
     notes: "",
     passportMode: "upload",
+    passportPageView: "first",
     passportPreview: null,
     passportMimeType: null,
+    passportLastPagePreview: null,
+    passportLastPageMimeType: null,
     scanStatus: null,
     scanWarnings: [],
     scanError: null,
@@ -283,6 +289,12 @@ export default function NewCasePage() {
   const [passportMode, setPassportMode] = useState<"upload" | "manual">("upload");
   const [passportPreview, setPassportPreview] = useState<string | null>(null);
   const [passportMimeType, setPassportMimeType] = useState<string | null>(null);
+  // Last page (address page) is an optional attachment — saved with the case
+  // as a document but never sent to OCR.
+  const [passportLastPagePreview, setPassportLastPagePreview] = useState<string | null>(null);
+  const [passportLastPageMimeType, setPassportLastPageMimeType] = useState<string | null>(null);
+  const passportLastPageFileRef = useRef<HTMLInputElement>(null);
+  const [passportPageView, setPassportPageView] = useState<"first" | "last">("first");
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanWarnings, setScanWarnings] = useState<string[]>([]);
   const [scanCompleted, setScanCompleted] = useState(false);
@@ -380,8 +392,40 @@ export default function NewCasePage() {
   // Document checklist: maps requirement.type -> whether to include for this case
   // Defaults: all required items checked, optional items unchecked
   const [docChecks, setDocChecks] = useState<Record<string, boolean>>({});
+  // Per-checklist-item file attachment (data URL + meta). Null = no file attached.
+  type DocFileAttachment = { dataUrl: string; mimeType: string; fileName: string };
+  const [docFiles, setDocFiles] = useState<Record<string, DocFileAttachment | null>>({});
+  // Hidden <input type="file"> per checklist row.
+  const docFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
   // Track which checklist signature we've seeded (so user toggles aren't blown away on rerender)
   const seededKeyRef = useRef<string>("");
+
+  const handleDocFile = (type: string, file: File | undefined) => {
+    if (!file) return;
+    const isImage = file.type.startsWith("image/");
+    const isPdf = file.type === "application/pdf";
+    if (!isImage && !isPdf) {
+      toast({ title: "Wrong file type", description: "Please upload an image (JPG/PNG/WebP) or a PDF.", variant: "destructive" });
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Please upload a file under 8 MB.", variant: "destructive" });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setDocFiles((d) => ({
+        ...d,
+        [type]: { dataUrl: reader.result as string, mimeType: file.type, fileName: file.name },
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const clearDocFile = (type: string) => {
+    setDocFiles((d) => ({ ...d, [type]: null }));
+    if (docFileRefs.current[type]) docFileRefs.current[type]!.value = "";
+  };
 
   const checklist = useMemo<DocumentRequirement[]>(
     () => getDocumentChecklist(form.destinationCountry, form.visaType),
@@ -396,6 +440,15 @@ export default function NewCasePage() {
     const seed: Record<string, boolean> = {};
     for (const req of checklist) seed[req.type] = req.required;
     setDocChecks(seed);
+    // Drop any previously-attached files — they belonged to the old checklist
+    // and would silently re-attach if a same-typed item happens to exist in
+    // the new one.
+    setDocFiles({});
+    // Reset the hidden file inputs so the agent can re-pick the same filename.
+    for (const k of Object.keys(docFileRefs.current)) {
+      const el = docFileRefs.current[k];
+      if (el) el.value = "";
+    }
   }, [form.destinationCountry, form.visaType, checklist]);
 
   // === Per-step validation ===
@@ -507,6 +560,55 @@ export default function NewCasePage() {
     const res = await apiRequest("POST", `/api/tenants/${tenantId}/cases`, buildPayload(status));
     const created = await res.json();
 
+    // Helper: upload a file as a document record on the new case. Sized payloads
+    // (passport pages, checklist attachments) all flow through here so the
+    // 12 MB body-limit override on /api/cases/:id/documents is the only ceiling.
+    const uploadDocument = async (doc: {
+      name: string;
+      type: string;
+      fileUrl?: string | null;
+      status?: string;
+      notes?: string | null;
+    }) => {
+      await apiRequest("POST", `/api/cases/${created.id}/documents`, {
+        tenantId: created.tenantId,
+        name: doc.name,
+        type: doc.type,
+        status: doc.status ?? "pending",
+        fileUrl: doc.fileUrl ?? null,
+        notes: doc.notes ?? null,
+      });
+    };
+
+    // Applicant passport pages — saved as document attachments after case creation
+    // so they don't bloat the main case-create body (which uses the 1 MB limit).
+    if (passportPreview) {
+      try {
+        await uploadDocument({
+          name: "Passport — Bio Page (First)",
+          type: "passport_first_page",
+          status: "approved",
+          fileUrl: passportPreview,
+          notes: "Uploaded with the application",
+        });
+      } catch (err: any) {
+        toast({ title: "Could not save passport bio page", description: err?.message ?? "Unknown error", variant: "destructive" });
+      }
+    }
+    if (passportLastPagePreview) {
+      try {
+        await uploadDocument({
+          name: "Passport — Address Page (Last)",
+          type: "passport_last_page",
+          status: "approved",
+          fileUrl: passportLastPagePreview,
+          notes: "Uploaded with the application",
+        });
+      } catch (err: any) {
+        toast({ title: "Could not save passport address page", description: err?.message ?? "Unknown error", variant: "destructive" });
+      }
+    }
+
     for (const ct of coTravellers) {
       try {
         await apiRequest("POST", `/api/cases/${created.id}/co-travellers`, {
@@ -532,17 +634,51 @@ export default function NewCasePage() {
           variant: "destructive",
         });
       }
+
+      // Per-co-traveller passport pages → also stored as document records,
+      // tagged in `notes` with the companion's name so the case Document Center
+      // can show them grouped.
+      const ctLabel = ct.name.trim() || "Co-traveller";
+      if (ct.passportPreview) {
+        try {
+          await uploadDocument({
+            name: `Passport — Bio Page (${ctLabel})`,
+            type: "passport_first_page",
+            status: "approved",
+            fileUrl: ct.passportPreview,
+            notes: `Co-traveller: ${ctLabel}`,
+          });
+        } catch (err: any) {
+          toast({ title: `Could not save bio page for ${ctLabel}`, description: err?.message ?? "Unknown error", variant: "destructive" });
+        }
+      }
+      if (ct.passportLastPagePreview) {
+        try {
+          await uploadDocument({
+            name: `Passport — Address Page (${ctLabel})`,
+            type: "passport_last_page",
+            status: "approved",
+            fileUrl: ct.passportLastPagePreview,
+            notes: `Co-traveller: ${ctLabel}`,
+          });
+        } catch (err: any) {
+          toast({ title: `Could not save address page for ${ctLabel}`, description: err?.message ?? "Unknown error", variant: "destructive" });
+        }
+      }
     }
 
-    // Persist document checklist as pending document records on the case
+    // Persist document checklist. If the agent attached a file in step 5,
+    // the document is stored with the file's data URL and marked "approved"
+    // (the agency vouched for it by uploading). Unattached items remain
+    // "pending" with no fileUrl — same as before.
     for (const req of selectedDocs) {
       try {
-        await apiRequest("POST", `/api/cases/${created.id}/documents`, {
-          tenantId: created.tenantId,
+        const file = docFiles[req.type];
+        await uploadDocument({
           name: req.name,
           type: req.type,
-          status: "pending",
-          fileUrl: null,
+          status: file ? "approved" : "pending",
+          fileUrl: file ? file.dataUrl : null,
           notes: req.description,
         });
       } catch (err: any) {
@@ -727,8 +863,9 @@ export default function NewCasePage() {
 
   // Keeps a hidden <input type="file"> per row so each card has its own picker.
   const coTravellerFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const coTravellerLastPageFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
-  const handleCoTravellerFile = (key: string, file: File | undefined) => {
+  const handleCoTravellerFile = (key: string, page: "first" | "last", file: File | undefined) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       toast({ title: "Wrong file type", description: "Please upload an image file (JPG/PNG/WebP).", variant: "destructive" });
@@ -740,14 +877,24 @@ export default function NewCasePage() {
     }
     const reader = new FileReader();
     reader.onload = () => {
-      setCoTravellers((arr) => arr.map((c) => c.key === key ? {
-        ...c,
-        passportPreview: reader.result as string,
-        passportMimeType: file.type,
-        scanStatus: null,
-        scanWarnings: [],
-        scanError: null,
-      } : c));
+      setCoTravellers((arr) => arr.map((c) => {
+        if (c.key !== key) return c;
+        if (page === "first") {
+          return {
+            ...c,
+            passportPreview: reader.result as string,
+            passportMimeType: file.type,
+            scanStatus: null,
+            scanWarnings: [],
+            scanError: null,
+          };
+        }
+        return {
+          ...c,
+          passportLastPagePreview: reader.result as string,
+          passportLastPageMimeType: file.type,
+        };
+      }));
     };
     reader.readAsDataURL(file);
   };
@@ -970,6 +1117,20 @@ export default function NewCasePage() {
                   </TabsList>
 
                   <TabsContent value="upload" className="space-y-4 mt-4">
+                    {/* Sub-toggle: First Page (Bio) — mandatory + scannable / Last Page (Address) — optional */}
+                    <Tabs value={passportPageView} onValueChange={(v) => setPassportPageView(v as "first" | "last")}>
+                      <TabsList className="grid grid-cols-2 w-full sm:w-auto h-9">
+                        <TabsTrigger value="first" className="gap-1.5 text-xs" data-testid="tab-passport-page-first">
+                          First Page (Bio / Photo)
+                          <Badge variant="secondary" className="h-4 px-1 text-[9px] ml-1">Required</Badge>
+                        </TabsTrigger>
+                        <TabsTrigger value="last" className="gap-1.5 text-xs" data-testid="tab-passport-page-last">
+                          Last Page (Address)
+                          <Badge variant="outline" className="h-4 px-1 text-[9px] ml-1">Optional</Badge>
+                        </TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent value="first" className="space-y-4 mt-3">
                     <div
                       className="border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center text-center bg-muted/20 hover:bg-muted/30 transition cursor-pointer"
                       onClick={() => passportFileRef.current?.click()}
@@ -978,15 +1139,15 @@ export default function NewCasePage() {
                       {passportPreview ? (
                         <img
                           src={passportPreview}
-                          alt="Passport preview"
+                          alt="Passport bio page preview"
                           className="max-h-56 rounded-md shadow-sm object-contain"
                           data-testid="img-passport-preview"
                         />
                       ) : (
                         <>
                           <Upload className="w-8 h-8 text-muted-foreground mb-2" />
-                          <p className="text-sm font-medium">Click to choose passport image</p>
-                          <p className="text-xs text-muted-foreground mt-1">PNG, JPG, or WebP · up to 8 MB · only the bio page is needed</p>
+                          <p className="text-sm font-medium">Click to choose the bio page</p>
+                          <p className="text-xs text-muted-foreground mt-1">PNG, JPG, or WebP · up to 8 MB · the page with the photo, surname and given name(s)</p>
                         </>
                       )}
                       <input
@@ -1115,6 +1276,72 @@ export default function NewCasePage() {
                         </div>
                       </div>
                     )}
+                      </TabsContent>
+
+                      <TabsContent value="last" className="space-y-3 mt-3">
+                        <div
+                          className="border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center text-center bg-muted/20 hover:bg-muted/30 transition cursor-pointer"
+                          onClick={() => passportLastPageFileRef.current?.click()}
+                          data-testid="dropzone-passport-last-page"
+                        >
+                          {passportLastPagePreview ? (
+                            <img
+                              src={passportLastPagePreview}
+                              alt="Passport address page preview"
+                              className="max-h-56 rounded-md shadow-sm object-contain"
+                              data-testid="img-passport-last-page-preview"
+                            />
+                          ) : (
+                            <>
+                              <Upload className="w-8 h-8 text-muted-foreground mb-2" />
+                              <p className="text-sm font-medium">Click to choose the address page</p>
+                              <p className="text-xs text-muted-foreground mt-1">PNG, JPG, or WebP · up to 8 MB · the back of the passport (address, parents' names, file number)</p>
+                            </>
+                          )}
+                          <input
+                            ref={passportLastPageFileRef}
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              if (file.size > 8 * 1024 * 1024) {
+                                toast({ title: "File too large", description: "Please upload an image under 8 MB.", variant: "destructive" });
+                                return;
+                              }
+                              setPassportLastPageMimeType(file.type);
+                              const reader = new FileReader();
+                              reader.onload = () => setPassportLastPagePreview(reader.result as string);
+                              reader.readAsDataURL(file);
+                            }}
+                            data-testid="input-passport-last-page-file"
+                          />
+                        </div>
+
+                        {passportLastPagePreview && (
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              onClick={() => {
+                                setPassportLastPagePreview(null);
+                                setPassportLastPageMimeType(null);
+                                if (passportLastPageFileRef.current) passportLastPageFileRef.current.value = "";
+                              }}
+                              className="gap-2"
+                              data-testid="button-remove-passport-last-page"
+                            >
+                              <X className="w-4 h-4" /> Remove image
+                            </Button>
+                          </div>
+                        )}
+
+                        <p className="text-xs text-muted-foreground">
+                          Optional. Saved as an attachment alongside the case — not used for OCR.
+                        </p>
+                      </TabsContent>
+                    </Tabs>
                   </TabsContent>
 
                   <TabsContent value="manual" className="mt-4">
@@ -1398,6 +1625,7 @@ export default function NewCasePage() {
                           onClick={() => {
                             setCoTravellers((arr) => arr.filter((c) => c.key !== ct.key));
                             delete coTravellerFileRefs.current[ct.key];
+                            delete coTravellerLastPageFileRefs.current[ct.key];
                           }}
                           data-testid={`button-remove-co-traveller-${idx}`}
                         >
@@ -1466,13 +1694,29 @@ export default function NewCasePage() {
                           </TabsList>
 
                           <TabsContent value="upload" className="space-y-3 mt-3">
+                            <Tabs
+                              value={ct.passportPageView}
+                              onValueChange={(v) => updateCoTraveller(ct.key, { passportPageView: v as "first" | "last" })}
+                            >
+                              <TabsList className="grid grid-cols-2 w-full sm:w-auto h-8">
+                                <TabsTrigger value="first" className="gap-1 text-[11px]" data-testid={`tab-co-traveller-page-first-${idx}`}>
+                                  First Page (Bio)
+                                  <Badge variant="secondary" className="h-3.5 px-1 text-[9px] ml-0.5">Required</Badge>
+                                </TabsTrigger>
+                                <TabsTrigger value="last" className="gap-1 text-[11px]" data-testid={`tab-co-traveller-page-last-${idx}`}>
+                                  Last Page (Address)
+                                  <Badge variant="outline" className="h-3.5 px-1 text-[9px] ml-0.5">Optional</Badge>
+                                </TabsTrigger>
+                              </TabsList>
+
+                              <TabsContent value="first" className="space-y-3 mt-3">
                             <input
                               type="file"
                               accept="image/*"
                               className="hidden"
                               ref={(el) => { coTravellerFileRefs.current[ct.key] = el; }}
                               onChange={(e) => {
-                                handleCoTravellerFile(ct.key, e.target.files?.[0]);
+                                handleCoTravellerFile(ct.key, "first", e.target.files?.[0]);
                                 e.target.value = "";
                               }}
                               data-testid={`input-co-traveller-passport-file-${idx}`}
@@ -1483,7 +1727,7 @@ export default function NewCasePage() {
                               data-testid={`dropzone-co-traveller-passport-${idx}`}
                             >
                               {ct.passportPreview ? (
-                                <img src={ct.passportPreview} alt="Passport preview" className="max-h-32 rounded-md object-contain" />
+                                <img src={ct.passportPreview} alt="Passport bio page preview" className="max-h-32 rounded-md object-contain" />
                               ) : (
                                 <>
                                   <Upload className="w-5 h-5 text-muted-foreground mb-1" />
@@ -1571,6 +1815,61 @@ export default function NewCasePage() {
                                 <p className="font-medium text-emerald-800 dark:text-emerald-200">Passport details extracted. Review the fields below before continuing.</p>
                               </div>
                             )}
+                              </TabsContent>
+
+                              <TabsContent value="last" className="space-y-3 mt-3">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  ref={(el) => { coTravellerLastPageFileRefs.current[ct.key] = el; }}
+                                  onChange={(e) => {
+                                    handleCoTravellerFile(ct.key, "last", e.target.files?.[0]);
+                                    e.target.value = "";
+                                  }}
+                                  data-testid={`input-co-traveller-passport-last-file-${idx}`}
+                                />
+                                <div
+                                  className="border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center text-center bg-background/40 hover:bg-background/60 transition cursor-pointer"
+                                  onClick={() => coTravellerLastPageFileRefs.current[ct.key]?.click()}
+                                  data-testid={`dropzone-co-traveller-passport-last-${idx}`}
+                                >
+                                  {ct.passportLastPagePreview ? (
+                                    <img src={ct.passportLastPagePreview} alt="Passport address page preview" className="max-h-32 rounded-md object-contain" />
+                                  ) : (
+                                    <>
+                                      <Upload className="w-5 h-5 text-muted-foreground mb-1" />
+                                      <p className="text-xs font-medium">Click to upload address page</p>
+                                      <p className="text-[11px] text-muted-foreground">JPG / PNG / WebP, up to 8 MB</p>
+                                    </>
+                                  )}
+                                </div>
+
+                                {ct.passportLastPagePreview && (
+                                  <div className="flex flex-wrap gap-2">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        updateCoTraveller(ct.key, {
+                                          passportLastPagePreview: null,
+                                          passportLastPageMimeType: null,
+                                        });
+                                        if (coTravellerLastPageFileRefs.current[ct.key]) coTravellerLastPageFileRefs.current[ct.key]!.value = "";
+                                      }}
+                                      data-testid={`button-remove-co-traveller-passport-last-${idx}`}
+                                    >
+                                      <X className="w-3.5 h-3.5 mr-1" /> Remove image
+                                    </Button>
+                                  </div>
+                                )}
+
+                                <p className="text-[11px] text-muted-foreground">
+                                  Optional. Saved as an attachment alongside the case — not used for OCR.
+                                </p>
+                              </TabsContent>
+                            </Tabs>
                           </TabsContent>
 
                           <TabsContent value="manual" className="mt-3">
@@ -1733,7 +2032,17 @@ export default function NewCasePage() {
                         type="button"
                         variant="ghost"
                         size="sm"
-                        onClick={() => setDocChecks(Object.fromEntries(checklist.map((r) => [r.type, r.required])))}
+                        onClick={() => {
+                          setDocChecks(Object.fromEntries(checklist.map((r) => [r.type, r.required])));
+                          // Drop attachments for items that just became unchecked.
+                          setDocFiles((d) => {
+                            const next: typeof d = {};
+                            for (const r of checklist) {
+                              if (r.required) next[r.type] = d[r.type] ?? null;
+                            }
+                            return next;
+                          });
+                        }}
                         data-testid="button-checklist-reset"
                       >
                         Reset to recommended
@@ -1742,7 +2051,14 @@ export default function NewCasePage() {
                         type="button"
                         variant="ghost"
                         size="sm"
-                        onClick={() => setDocChecks({})}
+                        onClick={() => {
+                          setDocChecks({});
+                          setDocFiles({});
+                          for (const k of Object.keys(docFileRefs.current)) {
+                            const el = docFileRefs.current[k];
+                            if (el) el.value = "";
+                          }
+                        }}
                         data-testid="button-checklist-clear"
                       >
                         Clear
@@ -1751,32 +2067,109 @@ export default function NewCasePage() {
                     <ul className="divide-y border rounded-xl overflow-hidden">
                       {checklist.map((req) => {
                         const checked = !!docChecks[req.type];
+                        const attached = docFiles[req.type];
                         return (
                           <li
                             key={req.type}
-                            className="flex items-start gap-3 p-3 bg-card hover:bg-muted/40 transition-colors"
+                            className="p-3 bg-card hover:bg-muted/40 transition-colors space-y-2"
                             data-testid={`checklist-row-${req.type}`}
                           >
-                            <Checkbox
-                              id={`doc-${req.type}`}
-                              checked={checked}
-                              onCheckedChange={(v) =>
-                                setDocChecks((d) => ({ ...d, [req.type]: v === true }))
-                              }
-                              className="mt-0.5"
-                              data-testid={`checkbox-doc-${req.type}`}
-                            />
-                            <label htmlFor={`doc-${req.type}`} className="flex-1 cursor-pointer space-y-0.5">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-sm font-medium">{req.name}</span>
-                                {req.required ? (
-                                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Recommended</Badge>
+                            <div className="flex items-start gap-3">
+                              <Checkbox
+                                id={`doc-${req.type}`}
+                                checked={checked}
+                                onCheckedChange={(v) => {
+                                  const nowChecked = v === true;
+                                  setDocChecks((d) => ({ ...d, [req.type]: nowChecked }));
+                                  if (!nowChecked) clearDocFile(req.type);
+                                }}
+                                className="mt-0.5"
+                                data-testid={`checkbox-doc-${req.type}`}
+                              />
+                              <label htmlFor={`doc-${req.type}`} className="flex-1 cursor-pointer space-y-0.5">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-sm font-medium">{req.name}</span>
+                                  {req.required ? (
+                                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Recommended</Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">Optional</Badge>
+                                  )}
+                                  {attached && (
+                                    <Badge variant="default" className="text-[10px] px-1.5 py-0 bg-emerald-600 hover:bg-emerald-600">
+                                      File attached
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="text-xs text-muted-foreground">{req.description}</p>
+                              </label>
+                            </div>
+
+                            {checked && (
+                              <div className="ml-7 flex flex-wrap items-center gap-2">
+                                <input
+                                  type="file"
+                                  accept="image/*,application/pdf"
+                                  className="hidden"
+                                  ref={(el) => { docFileRefs.current[req.type] = el; }}
+                                  onChange={(e) => {
+                                    handleDocFile(req.type, e.target.files?.[0]);
+                                    e.target.value = "";
+                                  }}
+                                  data-testid={`input-doc-file-${req.type}`}
+                                />
+                                {attached ? (
+                                  <>
+                                    {attached.mimeType.startsWith("image/") ? (
+                                      <img
+                                        src={attached.dataUrl}
+                                        alt=""
+                                        className="h-9 w-9 rounded object-cover border"
+                                        data-testid={`img-doc-thumb-${req.type}`}
+                                      />
+                                    ) : (
+                                      <div className="h-9 w-9 rounded border bg-muted flex items-center justify-center">
+                                        <FileText className="w-4 h-4 text-muted-foreground" />
+                                      </div>
+                                    )}
+                                    <span className="text-xs truncate max-w-[180px]" data-testid={`text-doc-filename-${req.type}`}>
+                                      {attached.fileName}
+                                    </span>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="gap-1.5 h-7 text-xs"
+                                      onClick={() => docFileRefs.current[req.type]?.click()}
+                                      data-testid={`button-doc-replace-${req.type}`}
+                                    >
+                                      <Upload className="w-3 h-3" /> Replace
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      className="gap-1 h-7 text-xs text-muted-foreground"
+                                      onClick={() => clearDocFile(req.type)}
+                                      data-testid={`button-doc-remove-${req.type}`}
+                                    >
+                                      <X className="w-3 h-3" /> Remove
+                                    </Button>
+                                  </>
                                 ) : (
-                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0">Optional</Badge>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="gap-1.5 h-7 text-xs"
+                                    onClick={() => docFileRefs.current[req.type]?.click()}
+                                    data-testid={`button-doc-attach-${req.type}`}
+                                  >
+                                    <Upload className="w-3 h-3" /> Attach file
+                                    <span className="text-muted-foreground font-normal">· optional</span>
+                                  </Button>
                                 )}
                               </div>
-                              <p className="text-xs text-muted-foreground">{req.description}</p>
-                            </label>
+                            )}
                           </li>
                         );
                       })}
