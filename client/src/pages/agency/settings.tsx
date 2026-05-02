@@ -255,6 +255,15 @@ const PLAN_DETAILS = {
 };
 
 function BillingTab({ tenantId }: { tenantId?: string }) {
+  const { toast } = useToast();
+  const handleUpgrade = (planLabel?: string) => {
+    toast({
+      title: planLabel ? `Upgrade to ${planLabel}` : "Upgrade your plan",
+      description: "Contact support@visashuttle.com to enable this plan for your account. Self-serve checkout coming soon.",
+      duration: 6000,
+    });
+  };
+
   const { data: usageData, isLoading } = useQuery<any>({
     queryKey: ["/api/tenants", tenantId, "usage"],
     queryFn: async () => {
@@ -314,7 +323,12 @@ function BillingTab({ tenantId }: { tenantId?: string }) {
                   </div>
                 </div>
                 {plan !== "enterprise" && (
-                  <Button size="sm" className="gap-1.5 shrink-0" data-testid="button-upgrade">
+                  <Button
+                    size="sm"
+                    className="gap-1.5 shrink-0"
+                    onClick={() => handleUpgrade()}
+                    data-testid="button-upgrade"
+                  >
                     Upgrade
                     <ArrowUpRight className="w-3.5 h-3.5" />
                   </Button>
@@ -404,7 +418,12 @@ function BillingTab({ tenantId }: { tenantId?: string }) {
                     ))}
                   </ul>
                   {!isCurrent && key !== "starter" && (
-                    <Button size="sm" className="w-full mt-4 gap-1.5" data-testid={`button-plan-${key}`}>
+                    <Button
+                      size="sm"
+                      className="w-full mt-4 gap-1.5"
+                      onClick={() => handleUpgrade(p.label)}
+                      data-testid={`button-plan-${key}`}
+                    >
                       Upgrade to {p.label}
                       <ArrowUpRight className="w-3.5 h-3.5" />
                     </Button>
@@ -426,12 +445,31 @@ export default function AgencySettingsPage() {
   const queryClient = useQueryClient();
   const { data: authData } = useCurrentUser();
   
-  const [notifications, setNotifications] = useState({
-    newLead: true,
-    documentUploaded: true,
-    caseUpdated: true,
-    customerMessage: true
+  const NOTIF_KEY = "agency_notification_prefs";
+  const [notifications, setNotifications] = useState(() => {
+    if (typeof window === "undefined") {
+      return { newLead: true, documentUploaded: true, caseUpdated: true, customerMessage: true };
+    }
+    try {
+      const saved = localStorage.getItem(NOTIF_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return { newLead: true, documentUploaded: true, caseUpdated: true, customerMessage: true };
   });
+
+  const handleSaveNotifications = () => {
+    try {
+      localStorage.setItem(NOTIF_KEY, JSON.stringify(notifications));
+      toast({ title: "Saved", description: "Notification preferences updated." });
+    } catch (e) {
+      toast({ title: "Error", description: "Could not save preferences.", variant: "destructive" });
+    }
+  };
+
+  const goToBilling = () => {
+    const trigger = document.querySelector<HTMLButtonElement>('[data-testid="tab-billing"]');
+    trigger?.click();
+  };
 
   // Get tenant slug from localStorage (set during login) or default to demo-agency
   const tenantSlug = localStorage.getItem("agency_tenant_slug") || "demo-agency";
@@ -996,6 +1034,12 @@ export default function AgencySettingsPage() {
                     onCheckedChange={(checked) => setNotifications({ ...notifications, customerMessage: checked })}
                     data-testid="switch-customer-message"
                   />
+                </div>
+                <div className="pt-2 border-t">
+                  <Button onClick={handleSaveNotifications} className="gap-2" data-testid="button-save-notifications">
+                    <Save className="w-4 h-4" />
+                    Save Preferences
+                  </Button>
                 </div>
               </CardContent>
             </Card>

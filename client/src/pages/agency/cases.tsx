@@ -45,6 +45,7 @@ export default function CasesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const { toast } = useToast();
 
   const { data: authData } = useCurrentUser();
@@ -71,16 +72,21 @@ export default function CasesPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const filteredCases = cases.filter(c => {
-    const term = searchTerm.toLowerCase();
-    const matchesSearch =
-      c.applicantName.toLowerCase().includes(term) ||
-      c.caseNumber.toLowerCase().includes(term) ||
-      (c.referenceId || "").toLowerCase().includes(term) ||
-      c.visaType.toLowerCase().includes(term);
-    const matchesStatus = statusFilter === "all" || c.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredCases = cases
+    .filter(c => {
+      const term = searchTerm.toLowerCase();
+      const matchesSearch =
+        c.applicantName.toLowerCase().includes(term) ||
+        c.caseNumber.toLowerCase().includes(term) ||
+        (c.referenceId || "").toLowerCase().includes(term) ||
+        c.visaType.toLowerCase().includes(term);
+      const matchesStatus = statusFilter === "all" || c.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => {
+      const cmp = a.caseNumber.localeCompare(b.caseNumber, undefined, { numeric: true });
+      return sortDir === "asc" ? cmp : -cmp;
+    });
 
   return (
     <DashboardLayout type="agency">
@@ -154,8 +160,14 @@ export default function CasesPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[140px]">
-                        <Button variant="ghost" size="sm" className="gap-1 -ml-3">
-                          Case #
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="gap-1 -ml-3"
+                          onClick={() => setSortDir(sortDir === "asc" ? "desc" : "asc")}
+                          data-testid="button-sort-case-number"
+                        >
+                          Case # {sortDir === "asc" ? "↑" : "↓"}
                           <ArrowUpDown className="w-3 h-3" />
                         </Button>
                       </TableHead>

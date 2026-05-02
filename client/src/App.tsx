@@ -32,6 +32,7 @@ import VisaCheckPublicPage from "@/pages/visa-check-public";
 import AgencyDashboard from "@/pages/agency/dashboard";
 import LeadsPage from "@/pages/agency/leads";
 import CasesPage from "@/pages/agency/cases";
+import NewCasePage from "@/pages/agency/case-new";
 import CaseDetailPage from "@/pages/agency/case-detail";
 import DocumentsPage from "@/pages/agency/documents";
 import ReportsPage from "@/pages/agency/reports";
@@ -117,6 +118,7 @@ function Router() {
       <Route path="/app" component={AgencyDashboard} />
       <Route path="/app/leads" component={LeadsPage} />
       <Route path="/app/cases" component={CasesPage} />
+      <Route path="/app/cases/new" component={NewCasePage} />
       <Route path="/app/cases/:id" component={CaseDetailPage} />
       <Route path="/app/documents" component={DocumentsPage} />
       <Route path="/app/reports" component={ReportsPage} />

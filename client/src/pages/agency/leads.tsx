@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Filter, MoreVertical, Mail, Phone, Loader2, AlertCircle } from "lucide-react";
+import { useLocation } from "wouter";
+import { Plus, Search, Filter, MoreVertical, Mail, Phone, Loader2, AlertCircle, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -68,11 +69,31 @@ const STAGE_DOT: Record<string, string> = {
 
 const emptyForm = { name: "", email: "", phone: "", source: "", notes: "", value: "" };
 
+function generateCaseNumber(): string {
+  const year = new Date().getFullYear();
+  const rand = Math.floor(Math.random() * 9000) + 1000;
+  return `VS-${year}-${rand}`;
+}
+
+const VISA_TYPES_LEAD = [
+  "Tourist Visa", "Business Visa", "Student Visa", "Work Visa",
+  "Transit Visa", "Family Visa", "Schengen Visa", "Investor Visa",
+];
+
+const COUNTRIES_LEAD = [
+  "United States", "United Kingdom", "Canada", "Australia", "Germany",
+  "France", "Spain", "Italy", "Netherlands", "Switzerland",
+  "Japan", "South Korea", "Singapore", "United Arab Emirates", "Turkey",
+  "Schengen Area", "Other",
+];
+
 export default function LeadsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
   const { data: authData } = useCurrentUser();
   const tenantId = authData?.user?.tenantId;
+  const [convertForm, setConvertForm] = useState({ visaType: "", destinationCountry: "", priority: "normal" });
 
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -141,6 +162,37 @@ export default function LeadsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "leads"] });
     },
+  });
+
+  const convertMutation = useMutation({
+    mutationFn: async () => {
+      if (!convertLead || !tenantId) throw new Error("Lead not selected");
+      if (!convertForm.visaType || !convertForm.destinationCountry) {
+        throw new Error("Visa type and destination are required");
+      }
+      const res = await apiRequest("POST", `/api/tenants/${tenantId}/cases`, {
+        applicantName: convertLead.name,
+        visaType: convertForm.visaType,
+        destinationCountry: convertForm.destinationCountry,
+        priority: convertForm.priority,
+        status: "pending",
+        caseNumber: generateCaseNumber(),
+        notes: `Converted from lead: ${convertLead.email}${convertLead.phone ? ` · ${convertLead.phone}` : ""}${convertLead.notes ? `\n\nLead notes: ${convertLead.notes}` : ""}`,
+      });
+      const created = await res.json();
+      // Mark the lead as won
+      await apiRequest("PATCH", `/api/leads/${convertLead.id}`, { stage: "won" });
+      return created;
+    },
+    onSuccess: (created) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "leads"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "cases"] });
+      setConvertLead(null);
+      setConvertForm({ visaType: "", destinationCountry: "", priority: "normal" });
+      toast({ title: "Lead converted", description: `Case ${created.caseNumber} created and lead marked as won.` });
+      setLocation(`/app/cases/${created.id}`);
+    },
+    onError: (e: Error) => toast({ title: "Could not convert", description: e.message, variant: "destructive" }),
   });
 
   const filteredLeads = leads.filter(lead =>
@@ -331,7 +383,14 @@ export default function LeadsPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-48">
-                              <DropdownMenuItem onClick={() => openEdit(lead)}>Edit Lead</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openEdit(lead)} data-testid={`button-edit-lead-${lead.id}`}>Edit Lead</DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => { setConvertLead(lead); setConvertForm({ visaType: "", destinationCountry: "", priority: "normal" }); }}
+                                data-testid={`button-convert-lead-${lead.id}`}
+                              >
+                                <Briefcase className="w-3.5 h-3.5 mr-2" />
+                                Convert to Case
+                              </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <p className="text-xs text-muted-foreground px-2 py-1">Move to stage</p>
                               {stages.filter(s => s !== stage).map(s => (
@@ -377,6 +436,65 @@ export default function LeadsPage() {
           />
         )}
       </div>
+
+      {/* Convert to case dialog */}
+      <Dialog open={!!convertLead} onOpenChange={(open) => !open && setConvertLead(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Convert Lead to Case</DialogTitle>
+            <DialogDescription>
+              Create a new visa application case for <span className="font-medium">{convertLead?.name}</span> ({convertLead?.email}). The lead will be marked as won.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div className="space-y-2">
+              <Label>Visa Type *</Label>
+              <Select value={convertForm.visaType} onValueChange={(v) => setConvertForm({ ...convertForm, visaType: v })}>
+                <SelectTrigger data-testid="select-convert-visa-type">
+                  <SelectValue placeholder="Select visa type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {VISA_TYPES_LEAD.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Destination Country *</Label>
+              <Select value={convertForm.destinationCountry} onValueChange={(v) => setConvertForm({ ...convertForm, destinationCountry: v })}>
+                <SelectTrigger data-testid="select-convert-destination">
+                  <SelectValue placeholder="Select destination" />
+                </SelectTrigger>
+                <SelectContent>
+                  {COUNTRIES_LEAD.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Priority</Label>
+              <Select value={convertForm.priority} onValueChange={(v) => setConvertForm({ ...convertForm, priority: v })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="normal">Normal</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="urgent">Urgent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              className="w-full gap-2"
+              onClick={() => convertMutation.mutate()}
+              disabled={convertMutation.isPending || !convertForm.visaType || !convertForm.destinationCountry}
+              data-testid="button-confirm-convert"
+            >
+              {convertMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Briefcase className="w-4 h-4" />}
+              Create Case from Lead
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete confirmation */}
       <AlertDialog open={!!deleteLeadId} onOpenChange={(open) => !open && setDeleteLeadId(null)}>

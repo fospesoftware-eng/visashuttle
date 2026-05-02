@@ -157,6 +157,91 @@ export default function CaseDetailPage() {
     },
   });
 
+  function inferDocType(filename: string): string {
+    const lower = filename.toLowerCase();
+    if (lower.includes("passport")) return "passport";
+    if (lower.includes("photo") || /\.(jpg|jpeg|png)$/i.test(filename)) return "photo";
+    if (lower.includes("bank") || lower.includes("statement")) return "bank_statement";
+    if (lower.includes("employ") || lower.includes("letter")) return "employment_letter";
+    if (lower.includes("invit")) return "invitation_letter";
+    if (lower.includes("itinerary") || lower.includes("flight")) return "flight_itinerary";
+    if (lower.includes("hotel") || lower.includes("accommodation")) return "hotel_booking";
+    return "other";
+  }
+
+  const uploadDocumentsMutation = useMutation({
+    mutationFn: async (files: File[]) => {
+      if (!caseData) throw new Error("Case not loaded");
+      const results = await Promise.all(
+        files.map(async (file) => {
+          const res = await fetch(`/api/cases/${id}/documents`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              tenantId: caseData.tenantId,
+              name: file.name,
+              type: inferDocType(file.name),
+              status: "pending",
+              fileUrl: null,
+              notes: `Uploaded by agent (${(file.size / 1024).toFixed(0)} KB)`,
+            }),
+          });
+          if (!res.ok) throw new Error(`Failed to upload ${file.name}`);
+          return res.json();
+        })
+      );
+      return results;
+    },
+    onSuccess: (results) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cases", id, "documents"] });
+      toast({
+        title: "Documents added",
+        description: `${results.length} file${results.length !== 1 ? "s" : ""} attached to this case.`,
+      });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Upload failed", description: e.message, variant: "destructive" });
+    },
+  });
+
+  const requestDocumentsMutation = useMutation({
+    mutationFn: async () => {
+      const content = `Hello ${caseData?.applicantName || ""}, please upload the remaining documents for your ${caseData?.visaType || "visa"} application via your portal at your earliest convenience. Let us know if you have any questions.`;
+      const msgRes = await fetch(`/api/cases/${id}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ content, senderRole: "agent", senderId: authData?.user?.id }),
+      });
+      if (!msgRes.ok) throw new Error("Failed to send message to customer");
+      // Also flip case status so it shows up correctly
+      const patchRes = await fetch(`/api/cases/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status: "documents_required" }),
+      });
+      if (!patchRes.ok) throw new Error("Message sent, but failed to update case status");
+      return msgRes.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cases", id, "messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cases", id] });
+      if (caseData?.tenantId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/tenants", caseData.tenantId, "cases"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/tenants", caseData.tenantId, "activity-logs"] });
+      }
+      toast({
+        title: "Request sent",
+        description: "Customer notified via portal message and case marked as documents required.",
+      });
+    },
+    onError: (e: Error) => {
+      toast({ title: "Could not send request", description: e.message, variant: "destructive" });
+    },
+  });
+
   if (caseLoading) {
     return (
       <DashboardLayout type="agency">
@@ -417,12 +502,23 @@ export default function CaseDetailPage() {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between gap-4">
                     <CardTitle className="text-base">Document Center</CardTitle>
-                    <Button variant="outline" size="sm" data-testid="button-request-documents">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => requestDocumentsMutation.mutate()}
+                      disabled={requestDocumentsMutation.isPending}
+                      data-testid="button-request-documents"
+                    >
+                      {requestDocumentsMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      ) : (
+                        <MessageSquare className="w-4 h-4 mr-2" />
+                      )}
                       Request Documents
                     </Button>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <UploadDropzone onUpload={(files) => console.log("Upload:", files)} />
+                    <UploadDropzone onUpload={(files) => files.length > 0 && uploadDocumentsMutation.mutate(files)} />
 
                     {docsLoading ? (
                       <div className="flex justify-center py-8">
