@@ -156,7 +156,7 @@ export default function AgencyDashboard() {
                               <ProgressRing value={computeReadiness(c)} size={48} strokeWidth={4} />
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-medium truncate">{c.applicantName}</span>
+                                  <span className="font-medium truncate">{c.applicantName || "Untitled draft"}</span>
                                   <StatusBadge status={c.status} />
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-muted-foreground">

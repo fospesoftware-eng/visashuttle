@@ -619,7 +619,7 @@ export default function CaseDetailPage() {
         : "default" as const,
     }));
 
-  const initials = caseData.applicantName.split(" ").map(n => n[0]).join("").toUpperCase();
+  const initials = (caseData.applicantName || "Untitled draft").split(" ").map(n => n[0]).join("").toUpperCase();
 
   return (
     <DashboardLayout type="agency">
@@ -686,7 +686,7 @@ export default function CaseDetailPage() {
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="font-semibold">{caseData.applicantName}</p>
+                    <p className="font-semibold">{caseData.applicantName || "Untitled draft"}</p>
                     <p className="text-xs text-muted-foreground">{caseData.visaType}</p>
                   </div>
                 </div>
@@ -773,7 +773,7 @@ export default function CaseDetailPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-xs text-muted-foreground">
-                  Share with <span className="font-medium text-foreground">{caseData.applicantName}</span> to let them upload docs and track progress.
+                  Share with <span className="font-medium text-foreground">{caseData.applicantName || "this applicant"}</span> to let them upload docs and track progress.
                 </p>
                 <div className="flex gap-1.5">
                   <Input
@@ -971,7 +971,7 @@ export default function CaseDetailPage() {
                   <CardHeader>
                     <CardTitle className="text-base flex items-center gap-2">
                       <MessageSquare className="w-4 h-4" />
-                      Conversation with {caseData.applicantName}
+                      Conversation with {caseData.applicantName || "applicant"}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -1004,7 +1004,7 @@ export default function CaseDetailPage() {
                                   {msg.content}
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1 px-1">
-                                  {isAgent ? "You" : caseData.applicantName} · {timeAgo(msg.createdAt)}
+                                  {isAgent ? "You" : (caseData.applicantName || "Applicant")} · {timeAgo(msg.createdAt)}
                                 </p>
                               </div>
                               {isAgent && (

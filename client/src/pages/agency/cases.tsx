@@ -85,10 +85,10 @@ export default function CasesPage() {
     .filter(c => {
       const term = searchTerm.toLowerCase();
       const matchesSearch =
-        c.applicantName.toLowerCase().includes(term) ||
-        c.caseNumber.toLowerCase().includes(term) ||
+        (c.applicantName || "").toLowerCase().includes(term) ||
+        (c.caseNumber || "").toLowerCase().includes(term) ||
         (c.referenceId || "").toLowerCase().includes(term) ||
-        c.visaType.toLowerCase().includes(term);
+        (c.visaType || "").toLowerCase().includes(term);
       const matchesStatus = statusFilter === "all" || c.status === statusFilter;
       return matchesSearch && matchesStatus;
     })
@@ -203,7 +203,9 @@ export default function CasesPage() {
                         </TableCell>
                         <TableCell>
                           <div>
-                            <p className="font-medium">{c.applicantName}</p>
+                            <p className="font-medium">
+                              {c.applicantName || <span className="text-muted-foreground italic">Untitled draft</span>}
+                            </p>
                             {c.applicantDob && (
                               <p className="text-xs text-muted-foreground">DOB: {c.applicantDob}</p>
                             )}
