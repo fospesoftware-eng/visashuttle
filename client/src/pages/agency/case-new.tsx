@@ -321,6 +321,27 @@ export default function NewCasePage() {
 
   const [coTravellers, setCoTravellers] = useState<CoTravellerDraft[]>([]);
 
+  // Auto-derive each co-traveller's full name from their passport given-name +
+  // surname — same rule as the applicant: skip rows the agent has manually
+  // typed into. Returning the same array reference when nothing changes lets
+  // React bail out of re-rendering, so this can't loop.
+  useEffect(() => {
+    setCoTravellers((arr) => {
+      let changed = false;
+      const next = arr.map((c) => {
+        if (c.nameTouched) return c;
+        const derived = [c.passportGivenName, c.passportSurname]
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .join(" ");
+        if (!derived || c.name === derived) return c;
+        changed = true;
+        return { ...c, name: derived };
+      });
+      return changed ? next : arr;
+    });
+  }, [coTravellers]);
+
   // Fees step state
   const [feeItems, setFeeItems] = useState<FeeDraft[]>([]);
   const [appliedTemplateId, setAppliedTemplateId] = useState<string>("");
@@ -493,13 +514,32 @@ export default function NewCasePage() {
     }
     if (s === 4) {
       for (const ct of coTravellers) {
+        const label = ct.name.trim() || "Unnamed co-traveller";
         if (!ct.name.trim() || !ct.relationship) {
           return "Each co-traveller needs a name and relationship.";
         }
+        // Bio page upload is mandatory for every co-traveller — agencies need
+        // a record of the actual passport image, regardless of whether the
+        // structured fields were typed manually or auto-extracted.
+        // (Wording includes "required" so handleSaveDraft can skip it — drafts
+        // are allowed to be missing this; full submit still enforces it.)
+        if (!ct.passportPreview) {
+          return `Passport bio (first) page is required for co-traveller "${label}".`;
+        }
+        if (!ct.passportSurname.trim() || !ct.passportGivenName.trim()) {
+          return `Passport surname and given name(s) are required for co-traveller "${label}".`;
+        }
         if (ct.dob) {
           const d = new Date(ct.dob);
-          if (isNaN(d.getTime())) return `Co-traveller "${ct.name}" has an invalid date of birth.`;
-          if (d > new Date()) return `Co-traveller "${ct.name}" date of birth cannot be in the future.`;
+          if (isNaN(d.getTime())) return `Co-traveller "${label}" has an invalid date of birth.`;
+          if (d > new Date()) return `Co-traveller "${label}" date of birth cannot be in the future.`;
+        }
+        if (ct.passportDateOfIssue && ct.passportDateOfExpiry) {
+          const issue = new Date(ct.passportDateOfIssue);
+          const expiry = new Date(ct.passportDateOfExpiry);
+          if (!isNaN(issue.getTime()) && !isNaN(expiry.getTime()) && issue > expiry) {
+            return `Co-traveller "${label}" passport: date of issue cannot be after date of expiry.`;
+          }
         }
       }
     }
@@ -1676,7 +1716,7 @@ export default function NewCasePage() {
                       <div className="space-y-3 pt-3 border-t">
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-sm font-semibold flex items-center gap-2">
-                            <UserIcon className="w-4 h-4" /> Passport <span className="text-xs font-normal text-muted-foreground">(optional)</span>
+                            <UserIcon className="w-4 h-4" /> Passport <span className="text-xs font-normal text-destructive">*</span>
                           </p>
                         </div>
 
@@ -1880,7 +1920,7 @@ export default function NewCasePage() {
                         {/* Passport detail fields — visible in both modes (auto-filled by scan, editable always) */}
                         <div className="grid gap-3 sm:grid-cols-2">
                           <div className="space-y-1.5">
-                            <Label>Surname</Label>
+                            <Label>Surname *</Label>
                             <Input
                               value={ct.passportSurname}
                               onChange={(e) => updateCoTraveller(ct.key, { passportSurname: e.target.value.toUpperCase() })}
@@ -1889,7 +1929,7 @@ export default function NewCasePage() {
                             />
                           </div>
                           <div className="space-y-1.5">
-                            <Label>Given Name(s)</Label>
+                            <Label>Given Name(s) *</Label>
                             <Input
                               value={ct.passportGivenName}
                               onChange={(e) => updateCoTraveller(ct.key, { passportGivenName: e.target.value.toUpperCase() })}
