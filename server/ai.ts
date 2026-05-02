@@ -862,9 +862,9 @@ const PASSPORT_SCAN_SYSTEM = `You are an OCR assistant specialised in passport b
 Return a single JSON object — no prose, no code fences — matching exactly this TypeScript shape:
 
 {
-  "surname": string|null,            // Last/family name (e.g. "KUMAR")
-  "givenName": string|null,          // First given name only (e.g. "RAHUL")
-  "middleName": string|null,         // Any remaining given names joined by spaces (e.g. "PRATAP SINGH"), or null
+  "surname": string|null,            // Last/family name from the "Surname" field (e.g. "KUMAR")
+  "givenName": string|null,          // The COMPLETE "Given Name(s)" field as printed, ALL words joined by single spaces (e.g. "RAHUL PRATAP SINGH")
+  "middleName": null,                // Always null — Indian passports do not separate a middle name; everything except the surname belongs in "givenName"
   "passportNumber": string|null,     // Alphanumeric passport number, no spaces
   "nationality": string|null,        // Full country name (e.g. "Indian", "India")
   "gender": "M"|"F"|"X"|null,        // Sex / gender code
@@ -880,7 +880,7 @@ Rules:
 - Use ALL CAPS for names exactly as printed; do not "title-case" them.
 - Convert any date format (DD/MM/YYYY, DD-MM-YYYY, DD MMM YYYY, etc.) to ISO yyyy-mm-dd. Indian passports use day-month-year; never mistake the day for the month.
 - If a field is missing, illegible, or you are not confident, return null and add a short note to "warnings".
-- "givenName" must contain only the first word of the given names. The rest goes into "middleName".
+- Indian passports use a "Surname / Given Name(s)" layout — there is NO separate middle-name field. Put the entire given-names line into "givenName" verbatim and always set "middleName" to null.
 - Do NOT invent values. If the image is not a passport, return all nulls and one warning explaining why.`;
 
 export async function scanPassportImage(

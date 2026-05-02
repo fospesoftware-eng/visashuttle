@@ -213,18 +213,18 @@ export default function NewCasePage() {
   const applicantNameTouchedRef = useRef(false);
   const passportFileRef = useRef<HTMLInputElement | null>(null);
 
-  // Auto-derive applicantName from "given middle surname" — but only when the
+  // Auto-derive applicantName from "given-names + surname" — but only when the
   // user hasn't manually edited the applicant-name field.
   useEffect(() => {
     if (applicantNameTouchedRef.current) return;
-    const derived = [form.passportGivenName, form.passportMiddleName, form.passportSurname]
+    const derived = [form.passportGivenName, form.passportSurname]
       .map((s) => s.trim())
       .filter(Boolean)
       .join(" ");
     if (!derived) return;
     setForm((f) => (f.applicantName === derived ? f : { ...f, applicantName: derived }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.passportGivenName, form.passportMiddleName, form.passportSurname]);
+  }, [form.passportGivenName, form.passportSurname]);
 
   const [coTravellers, setCoTravellers] = useState<CoTravellerDraft[]>([]);
 
@@ -327,7 +327,7 @@ export default function NewCasePage() {
       // Either passport surname+given-name OR free-text applicant name must be present.
       const hasPassportName = form.passportSurname.trim() && form.passportGivenName.trim();
       if (!hasPassportName && !form.applicantName.trim()) {
-        return "Enter at least the surname and first name from the passport (or upload the passport to auto-fill).";
+        return "Enter at least the surname and given name(s) from the passport (or upload the passport to auto-fill).";
       }
       if (form.applicantDob) {
         const dob = new Date(form.applicantDob);
@@ -923,7 +923,7 @@ export default function NewCasePage() {
                     )}
                   </div>
 
-                  <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="passportSurname">Surname *</Label>
                       <Input
@@ -935,24 +935,15 @@ export default function NewCasePage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="passportGivenName">First name *</Label>
+                      <Label htmlFor="passportGivenName">Given Name(s) *</Label>
                       <Input
                         id="passportGivenName"
                         value={form.passportGivenName}
                         onChange={(e) => setForm({ ...form, passportGivenName: e.target.value.toUpperCase() })}
-                        placeholder="RAHUL"
+                        placeholder="RAHUL PRATAP"
                         data-testid="input-passport-given-name"
                       />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="passportMiddleName">Middle name</Label>
-                      <Input
-                        id="passportMiddleName"
-                        value={form.passportMiddleName}
-                        onChange={(e) => setForm({ ...form, passportMiddleName: e.target.value.toUpperCase() })}
-                        placeholder="PRATAP"
-                        data-testid="input-passport-middle-name"
-                      />
+                      <p className="text-xs text-muted-foreground">As printed in the "Given Name(s)" field — include any middle names here.</p>
                     </div>
                   </div>
 
@@ -1065,7 +1056,7 @@ export default function NewCasePage() {
                       placeholder="Auto-built from passport name"
                       data-testid="input-applicant-name"
                     />
-                    <p className="text-xs text-muted-foreground">Auto-built from First + Middle + Surname. You can override it if needed.</p>
+                    <p className="text-xs text-muted-foreground">Auto-built from Given Name(s) + Surname. You can override it if needed.</p>
                   </div>
                 </div>
               </CardContent>
@@ -1518,8 +1509,7 @@ export default function NewCasePage() {
                     ["Full Name", form.applicantName || "—"],
                     ["Date of Birth", form.applicantDob || "—"],
                     ["Surname", form.passportSurname || "—"],
-                    ["First Name", form.passportGivenName || "—"],
-                    ["Middle Name", form.passportMiddleName || "—"],
+                    ["Given Name(s)", form.passportGivenName || "—"],
                     ["Passport Number", form.passportNumber || "—"],
                     ["Nationality", form.passportNationality || "—"],
                     ["Gender", form.passportGender || "—"],
