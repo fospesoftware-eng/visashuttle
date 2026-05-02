@@ -208,19 +208,21 @@ export default function NewCasePage() {
   const [scanError, setScanError] = useState<string | null>(null);
   const [scanWarnings, setScanWarnings] = useState<string[]>([]);
   const [scanCompleted, setScanCompleted] = useState(false);
+  // Tracks whether the user has manually edited the full applicant name. Once they
+  // do, the auto-derive-from-passport-name effect stops touching it.
+  const applicantNameTouchedRef = useRef(false);
   const passportFileRef = useRef<HTMLInputElement | null>(null);
 
-  // Auto-derive applicantName from "given middle surname" whenever any of those change.
-  // Only writes if user hasn't manually overridden the derived value.
+  // Auto-derive applicantName from "given middle surname" — but only when the
+  // user hasn't manually edited the applicant-name field.
   useEffect(() => {
+    if (applicantNameTouchedRef.current) return;
     const derived = [form.passportGivenName, form.passportMiddleName, form.passportSurname]
       .map((s) => s.trim())
       .filter(Boolean)
       .join(" ");
     if (!derived) return;
     setForm((f) => (f.applicantName === derived ? f : { ...f, applicantName: derived }));
-    // We deliberately depend only on the three name parts — manual edits to applicantName
-    // from a user typing in that field shouldn't trigger this effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.passportGivenName, form.passportMiddleName, form.passportSurname]);
 
@@ -528,20 +530,22 @@ export default function NewCasePage() {
       };
     },
     onSuccess: (data) => {
-      // Merge non-null fields into the form. We never blank out a field the user already filled.
+      // Only fill fields the user hasn't already typed into. Existing typed values win.
+      const pickEmpty = (current: string, incoming: string | null | undefined): string =>
+        current && current.trim() ? current : (incoming ?? current);
       setForm((f) => ({
         ...f,
-        passportSurname: data.surname ?? f.passportSurname,
-        passportGivenName: data.givenName ?? f.passportGivenName,
-        passportMiddleName: data.middleName ?? f.passportMiddleName,
-        passportNumber: data.passportNumber ?? f.passportNumber,
-        passportNationality: data.nationality ?? f.passportNationality,
-        passportGender: (data.gender ?? f.passportGender) as "" | "M" | "F" | "X",
-        applicantDob: data.dateOfBirth ?? f.applicantDob,
-        passportDateOfIssue: data.dateOfIssue ?? f.passportDateOfIssue,
-        passportDateOfExpiry: data.dateOfExpiry ?? f.passportDateOfExpiry,
-        passportPlaceOfIssue: data.placeOfIssue ?? f.passportPlaceOfIssue,
-        passportPlaceOfBirth: data.placeOfBirth ?? f.passportPlaceOfBirth,
+        passportSurname: pickEmpty(f.passportSurname, data.surname),
+        passportGivenName: pickEmpty(f.passportGivenName, data.givenName),
+        passportMiddleName: pickEmpty(f.passportMiddleName, data.middleName),
+        passportNumber: pickEmpty(f.passportNumber, data.passportNumber),
+        passportNationality: pickEmpty(f.passportNationality, data.nationality),
+        passportGender: (f.passportGender || data.gender || "") as "" | "M" | "F" | "X",
+        applicantDob: pickEmpty(f.applicantDob, data.dateOfBirth),
+        passportDateOfIssue: pickEmpty(f.passportDateOfIssue, data.dateOfIssue),
+        passportDateOfExpiry: pickEmpty(f.passportDateOfExpiry, data.dateOfExpiry),
+        passportPlaceOfIssue: pickEmpty(f.passportPlaceOfIssue, data.placeOfIssue),
+        passportPlaceOfBirth: pickEmpty(f.passportPlaceOfBirth, data.placeOfBirth),
       }));
       setScanWarnings(data.warnings ?? []);
       setScanError(null);
@@ -1054,7 +1058,10 @@ export default function NewCasePage() {
                     <Input
                       id="applicantName"
                       value={form.applicantName}
-                      onChange={(e) => setForm({ ...form, applicantName: e.target.value })}
+                      onChange={(e) => {
+                        applicantNameTouchedRef.current = true;
+                        setForm({ ...form, applicantName: e.target.value });
+                      }}
                       placeholder="Auto-built from passport name"
                       data-testid="input-applicant-name"
                     />

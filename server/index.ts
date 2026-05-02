@@ -27,15 +27,28 @@ declare module "express-session" {
   }
 }
 
+// Passport scan endpoint accepts large base64 images — bump just that path so
+// the rest of the platform keeps a conservative body limit.
 app.use(
+  "/api/passport/scan",
   express.json({
+    limit: "12mb",
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
   }),
 );
 
-app.use(express.urlencoded({ extended: false }));
+app.use(
+  express.json({
+    limit: "1mb",
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  }),
+);
+
+app.use(express.urlencoded({ extended: false, limit: "1mb" }));
 
 // Session middleware
 const sessionOptions: session.SessionOptions = {
@@ -110,7 +123,10 @@ app.use((req, res, next) => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
+      // Suppress response body in logs for endpoints that return PII
+      // (e.g. extracted passport details).
+      const isSensitiveResponse = path === "/api/passport/scan";
+      if (capturedJsonResponse && !isSensitiveResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
 

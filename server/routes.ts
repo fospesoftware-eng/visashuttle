@@ -1733,8 +1733,12 @@ export async function registerRoutes(
         const result = await scanPassportImage(cleaned, mimeType, aiConfig);
         res.json(result);
       } catch (err: any) {
+        // Log the upstream detail server-side, but never echo it to the client —
+        // upstream errors can include API keys, prompts, or model output text.
         console.error("[passport-scan] failed:", err?.message ?? err);
-        res.status(502).json({ error: err?.message ?? "Passport scan failed. Please try again or fill the form manually." });
+        res.status(502).json({
+          error: "Passport scan failed. Please try again, or switch to manual entry.",
+        });
       }
     },
   );
