@@ -317,10 +317,13 @@ export const insertSavedProfileSchema = createInsertSchema(savedProfiles).omit({
 export type InsertSavedProfile = z.infer<typeof insertSavedProfileSchema>;
 export type SavedProfile = typeof savedProfiles.$inferSelect;
 
-// OTP Codes table
+// OTP Codes table — exactly one of `email` or `phone` is set (the identifier
+// the customer signed in with). Both nullable so a single table can serve
+// either flow on the white-label customer portal.
 export const otpCodes = pgTable("otp_codes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: text("email").notNull(),
+  email: text("email"),
+  phone: text("phone"),
   code: text("code").notNull(),
   tenantId: varchar("tenant_id").notNull(),
   attempts: integer("attempts").default(0),

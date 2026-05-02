@@ -389,32 +389,26 @@ export default function LeadsPage() {
     },
   });
 
+  // "Convert to Case" now routes through the New Case wizard so the agent can
+  // review/edit the lead's email + mobile (and add passport/travel/fees) before
+  // a case is actually created. The wizard reads `?leadId=` to pre-fill the
+  // first step and PATCHes the lead to stage="won" after a successful save.
   const convertMutation = useMutation({
     mutationFn: async () => {
       if (!convertLead || !tenantId) throw new Error("Lead not selected");
-      if (!convertForm.visaType || !convertForm.destinationCountry) {
-        throw new Error("Visa type and destination are required");
-      }
-      const res = await apiRequest("POST", `/api/tenants/${tenantId}/cases`, {
-        applicantName: convertLead.name,
-        visaType: convertForm.visaType,
-        destinationCountry: convertForm.destinationCountry,
-        priority: convertForm.priority,
-        status: "pending",
-        caseNumber: generateCaseNumber(),
-        notes: `Converted from lead: ${convertLead.email}${convertLead.phone ? ` · ${convertLead.phone}` : ""}${convertLead.notes ? `\n\nLead notes: ${convertLead.notes}` : ""}`,
-      });
-      const created = await res.json();
-      await apiRequest("PATCH", `/api/leads/${convertLead.id}`, { stage: "won" });
-      return created;
+      // We don't strictly need visa/destination here because the wizard will
+      // collect them, but we still pass them via the URL so step-1 can seed
+      // them directly when the user already chose them in the modal.
+      return convertLead;
     },
-    onSuccess: (created) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "leads"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "cases"] });
+    onSuccess: (lead) => {
+      const params = new URLSearchParams({ leadId: lead.id });
+      if (convertForm.visaType) params.set("visaType", convertForm.visaType);
+      if (convertForm.destinationCountry) params.set("destinationCountry", convertForm.destinationCountry);
+      if (convertForm.priority) params.set("priority", convertForm.priority);
       setConvertLead(null);
       setConvertForm({ visaType: "", destinationCountry: "", priority: "normal" });
-      toast({ title: "Lead converted", description: `Case ${created.caseNumber} created and lead marked as won.` });
-      setLocation(`/app/cases/${created.id}`);
+      setLocation(`/app/cases/new?${params.toString()}`);
     },
     onError: (e: Error) => toast({ title: "Could not convert", description: e.message, variant: "destructive" }),
   });
@@ -699,15 +693,19 @@ export default function LeadsPage() {
           <DialogHeader>
             <DialogTitle>Convert Lead to Case</DialogTitle>
             <DialogDescription>
-              Create a new visa application case for <span className="font-medium">{convertLead?.name}</span> ({convertLead?.email}). The lead will be marked as won.
+              Continue to the New Case wizard for <span className="font-medium">{convertLead?.name}</span> ({convertLead?.email}). Email + mobile + destination will be pre-filled on the first step. The lead is marked as won once the case is saved.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
+            <p className="text-xs text-muted-foreground">
+              These fields are optional pre-fills — you can leave them blank and pick them inside the wizard.
+              The lead's email + mobile are always passed through automatically.
+            </p>
             <div className="space-y-2">
-              <Label>Visa Type *</Label>
+              <Label>Visa Type</Label>
               <Select value={convertForm.visaType} onValueChange={(v) => setConvertForm({ ...convertForm, visaType: v })}>
                 <SelectTrigger data-testid="select-convert-visa-type">
-                  <SelectValue placeholder="Select visa type" />
+                  <SelectValue placeholder="Optional — pick later in the wizard" />
                 </SelectTrigger>
                 <SelectContent>
                   {VISA_TYPES_LEAD.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
@@ -715,10 +713,10 @@ export default function LeadsPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Destination Country *</Label>
+              <Label>Destination Country</Label>
               <Select value={convertForm.destinationCountry} onValueChange={(v) => setConvertForm({ ...convertForm, destinationCountry: v })}>
                 <SelectTrigger data-testid="select-convert-destination">
-                  <SelectValue placeholder="Select destination" />
+                  <SelectValue placeholder="Optional — pick later in the wizard" />
                 </SelectTrigger>
                 <SelectContent>
                   {COUNTRIES_LEAD.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
@@ -742,11 +740,11 @@ export default function LeadsPage() {
             <Button
               className="w-full gap-2"
               onClick={() => convertMutation.mutate()}
-              disabled={convertMutation.isPending || !convertForm.visaType || !convertForm.destinationCountry}
+              disabled={convertMutation.isPending}
               data-testid="button-confirm-convert"
             >
               {convertMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Briefcase className="w-4 h-4" />}
-              Create Case from Lead
+              Continue in New Case wizard
             </Button>
           </div>
         </DialogContent>

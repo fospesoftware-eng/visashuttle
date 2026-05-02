@@ -35,6 +35,17 @@ import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
 import { db, hasDatabase } from "./db";
 
+// Canonicalize a phone number for equality comparison: digits only, leading
+// "+" / spaces / dashes / parens stripped. Used for OTP + customer-account
+// phone lookups so all of "+1 (234) 567-8900", "+12345678900", "12345678900",
+// and "1-234-567-8900" collapse to the same identity. Callers are expected
+// to ask for a country code in the input, but we don't enforce that here —
+// we just need a deterministic key.
+function normalizePhone(input: string | null | undefined): string {
+  if (!input) return "";
+  return input.replace(/[^\d]/g, "");
+}
+
 function isMissingRelationError(error: unknown): boolean {
   return Boolean(error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "42P01");
 }
@@ -97,6 +108,7 @@ export interface IStorage {
 
   getCustomerAccount(id: string): Promise<CustomerAccount | undefined>;
   getCustomerAccountByEmail(email: string): Promise<CustomerAccount | undefined>;
+  getCustomerAccountByPhone(phone: string): Promise<CustomerAccount | undefined>;
   createCustomerAccount(account: InsertCustomerAccount): Promise<CustomerAccount>;
   updateCustomerAccount(id: string, data: Partial<InsertCustomerAccount>): Promise<CustomerAccount | undefined>;
 
@@ -106,6 +118,7 @@ export interface IStorage {
 
   createOTPCode(otp: InsertOTPCode): Promise<OTPCode>;
   getActiveOTPCode(email: string, tenantId: string): Promise<OTPCode | undefined>;
+  getActiveOTPCodeByPhone(phone: string, tenantId: string): Promise<OTPCode | undefined>;
   markOTPUsed(id: string): Promise<void>;
   incrementOTPAttempts(id: string): Promise<void>;
 
@@ -1238,6 +1251,12 @@ export class MemStorage implements IStorage {
     return Array.from(this.customerAccounts.values()).find(a => a.email.toLowerCase() === email.toLowerCase());
   }
 
+  async getCustomerAccountByPhone(phone: string): Promise<CustomerAccount | undefined> {
+    const norm = normalizePhone(phone);
+    if (!norm) return undefined;
+    return Array.from(this.customerAccounts.values()).find(a => a.phone && normalizePhone(a.phone) === norm);
+  }
+
   async createCustomerAccount(insertAccount: InsertCustomerAccount): Promise<CustomerAccount> {
     const id = randomUUID();
     const account: CustomerAccount = { 
@@ -1290,7 +1309,8 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const otp: OTPCode = { 
       id, 
-      email: insertOTP.email,
+      email: insertOTP.email ?? null,
+      phone: insertOTP.phone ?? null,
       code: insertOTP.code,
       tenantId: insertOTP.tenantId,
       attempts: insertOTP.attempts ?? 0,
@@ -1305,9 +1325,24 @@ export class MemStorage implements IStorage {
   async getActiveOTPCode(email: string, tenantId: string): Promise<OTPCode | undefined> {
     const now = new Date();
     return Array.from(this.otpCodes.values()).find(
-      otp => otp.email.toLowerCase() === email.toLowerCase() && 
+      otp => !!otp.email &&
+             otp.email.toLowerCase() === email.toLowerCase() &&
              otp.tenantId === tenantId && 
              otp.expiresAt > now && 
+             !otp.usedAt &&
+             (otp.attempts || 0) < 5
+    );
+  }
+
+  async getActiveOTPCodeByPhone(phone: string, tenantId: string): Promise<OTPCode | undefined> {
+    const norm = normalizePhone(phone);
+    if (!norm) return undefined;
+    const now = new Date();
+    return Array.from(this.otpCodes.values()).find(
+      otp => !!otp.phone &&
+             normalizePhone(otp.phone) === norm &&
+             otp.tenantId === tenantId &&
+             otp.expiresAt > now &&
              !otp.usedAt &&
              (otp.attempts || 0) < 5
     );

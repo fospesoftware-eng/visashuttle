@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Mail, ArrowRight, Loader2, Plane, Shield, Clock, Globe } from "lucide-react";
+import { Mail, Smartphone, ArrowRight, Loader2, Plane, Shield, Clock, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,11 +10,14 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { Tenant } from "@shared/schema";
 
+type AuthMethod = "email" | "phone";
+
 export default function WhiteLabelLoginPage() {
   const { slug } = useParams<{ slug: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [method, setMethod] = useState<AuthMethod>("email");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -35,13 +38,16 @@ export default function WhiteLabelLoginPage() {
   });
 
   const requestOTPMutation = useMutation({
-    mutationFn: async (data: { email: string; name?: string; phone?: string }) => {
+    mutationFn: async (data: { email?: string; phone?: string; name?: string }) => {
       return apiRequest("POST", `/api/w/${slug}/auth/request-otp`, data);
     },
     onSuccess: () => {
+      // Persist whichever identifier the user picked, plus the chosen method,
+      // so the verify page knows what to display + which payload to send.
+      sessionStorage.setItem("wl_method", method);
       sessionStorage.setItem("wl_email", email);
-      sessionStorage.setItem("wl_name", name);
       sessionStorage.setItem("wl_phone", phone);
+      sessionStorage.setItem("wl_name", name);
       setLocation(`/w/${slug}/verify`);
     },
     onError: (error: Error) => {
@@ -55,11 +61,20 @@ export default function WhiteLabelLoginPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) {
-      toast({ title: "Email required", description: "Please enter your email address", variant: "destructive" });
-      return;
+    if (method === "email") {
+      if (!email.trim()) {
+        toast({ title: "Email required", description: "Please enter your email address", variant: "destructive" });
+        return;
+      }
+      requestOTPMutation.mutate({ email: email.trim(), name: name.trim() || undefined, phone: phone.trim() || undefined });
+    } else {
+      const cleaned = phone.replace(/[^\d+]/g, "");
+      if (cleaned.length < 7) {
+        toast({ title: "Mobile number required", description: "Please enter a valid mobile number with country code", variant: "destructive" });
+        return;
+      }
+      requestOTPMutation.mutate({ phone: phone.trim(), name: name.trim() || undefined, email: email.trim() || undefined });
     }
-    requestOTPMutation.mutate({ email, name, phone });
   };
 
   if (tenantLoading) {
@@ -223,21 +238,67 @@ export default function WhiteLabelLoginPage() {
                   </button>
                 </div>
 
+                {/* Method picker — Email vs Mobile. The chosen method drives
+                    which input is shown + which payload key the request uses. */}
+                <div className="flex rounded-lg border bg-background p-1 mb-5">
+                  <button
+                    type="button"
+                    onClick={() => setMethod("email")}
+                    className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                      method === "email"
+                        ? "bg-muted text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                    data-testid="tab-method-email"
+                  >
+                    <Mail className="w-4 h-4" /> Email
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMethod("phone")}
+                    className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                      method === "phone"
+                        ? "bg-muted text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                    data-testid="tab-method-phone"
+                  >
+                    <Smartphone className="w-4 h-4" /> Mobile
+                  </button>
+                </div>
+
                 <form onSubmit={handleSubmit} className="space-y-5">
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="text-sm font-medium">Email Address</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="you@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      className="h-12"
-                      data-testid="input-email"
-                    />
-                  </div>
-                  
+                  {method === "email" ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="text-sm font-medium">Email Address</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="you@example.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        className="h-12"
+                        data-testid="input-email"
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label htmlFor="phone-primary" className="text-sm font-medium">Mobile Number</Label>
+                      <Input
+                        id="phone-primary"
+                        type="tel"
+                        placeholder="+1 234 567 8900"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        required
+                        className="h-12"
+                        data-testid="input-phone-primary"
+                      />
+                      <p className="text-xs text-muted-foreground">Include the country code (e.g. +91 for India, +1 for US).</p>
+                    </div>
+                  )}
+
                   {mode === "signup" && (
                     <>
                       <div className="space-y-2">
@@ -253,21 +314,38 @@ export default function WhiteLabelLoginPage() {
                           data-testid="input-name"
                         />
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="phone" className="text-sm font-medium">Phone Number</Label>
-                        <Input
-                          id="phone"
-                          type="tel"
-                          placeholder="+1 234 567 8900"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          className="h-12"
-                          data-testid="input-phone"
-                        />
-                      </div>
+                      {/* Optional secondary identifier — agency keeps both email
+                          + phone on file even when only one was used to sign in. */}
+                      {method === "email" ? (
+                        <div className="space-y-2">
+                          <Label htmlFor="phone" className="text-sm font-medium">Mobile Number <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                          <Input
+                            id="phone"
+                            type="tel"
+                            placeholder="+1 234 567 8900"
+                            value={phone}
+                            onChange={(e) => setPhone(e.target.value)}
+                            className="h-12"
+                            data-testid="input-phone"
+                          />
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <Label htmlFor="email-secondary" className="text-sm font-medium">Email Address <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                          <Input
+                            id="email-secondary"
+                            type="email"
+                            placeholder="you@example.com"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            className="h-12"
+                            data-testid="input-email-secondary"
+                          />
+                        </div>
+                      )}
                     </>
                   )}
-                  
+
                   <Button 
                     type="submit" 
                     className="w-full h-12 text-base font-medium gap-2"
@@ -293,7 +371,7 @@ export default function WhiteLabelLoginPage() {
                 </div>
                 
                 <p className="text-xs text-muted-foreground text-center mt-4">
-                  We'll send you a one-time code to verify your email. No password required.
+                  We'll send you a one-time code to verify your {method === "email" ? "email" : "mobile number"}. No password required.
                 </p>
               </CardContent>
             </Card>

@@ -1,29 +1,41 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Loader2, Mail, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Loader2, Mail, Smartphone, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { Tenant } from "@shared/schema";
 
+type AuthMethod = "email" | "phone";
+
+// Read the stored auth method synchronously during initial render so the UI
+// never flickers from "email" → "phone" + can't fire a Resend with the wrong
+// payload during the hydration window. Guarded for SSR.
+function readStored(key: string): string {
+  if (typeof window === "undefined") return "";
+  return sessionStorage.getItem(key) ?? "";
+}
+
 export default function WhiteLabelVerifyPage() {
   const { slug } = useParams<{ slug: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [code, setCode] = useState(["", "", "", "", "", ""]);
-  const [email, setEmail] = useState("");
+  const [method] = useState<AuthMethod>(() => (readStored("wl_method") as AuthMethod) || "email");
+  const [email] = useState(() => readStored("wl_email"));
+  const [phone] = useState(() => readStored("wl_phone"));
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
+  // If we landed on /verify without an identifier in sessionStorage (deep
+  // link, refresh after cleanup, cleared storage), bounce back to login.
   useEffect(() => {
-    const storedEmail = sessionStorage.getItem("wl_email");
-    if (!storedEmail) {
+    const hasIdentifier = method === "email" ? email.trim() : phone.trim();
+    if (!hasIdentifier) {
       setLocation(`/w/${slug}/login`);
-      return;
     }
-    setEmail(storedEmail);
-  }, [slug, setLocation]);
+  }, [slug, setLocation, method, email, phone]);
 
   const { data: tenant } = useQuery<Tenant>({
     queryKey: ["/api/w", slug, "tenant"],
@@ -34,15 +46,28 @@ export default function WhiteLabelVerifyPage() {
     }
   });
 
+  // Build the request payload based on which method the user signed in with.
+  // Always includes the chosen identifier; passes the optional secondary one
+  // so the server can backfill the customer record (e.g. email-signin user
+  // who also gave their phone for SMS notifications).
+  const buildAuthPayload = (verificationCode: string) => {
+    const name = sessionStorage.getItem("wl_name") || undefined;
+    if (method === "email") {
+      return { email, code: verificationCode, name, phone: phone || undefined };
+    }
+    return { phone, code: verificationCode, name, email: email || undefined };
+  };
+
   const verifyOTPMutation = useMutation({
-    mutationFn: async (data: { email: string; code: string; name?: string; phone?: string }) => {
+    mutationFn: async (data: { email?: string; phone?: string; code: string; name?: string }) => {
       const res = await apiRequest("POST", `/api/w/${slug}/auth/verify-otp`, data);
       return res.json();
     },
     onSuccess: () => {
+      sessionStorage.removeItem("wl_method");
       sessionStorage.removeItem("wl_email");
-      sessionStorage.removeItem("wl_name");
       sessionStorage.removeItem("wl_phone");
+      sessionStorage.removeItem("wl_name");
       const ref = sessionStorage.getItem("wl_ref");
       toast({
         title: "Welcome!",
@@ -78,9 +103,7 @@ export default function WhiteLabelVerifyPage() {
     
     if (newCode.every(digit => digit) && newCode.join("").length === 6) {
       const fullCode = newCode.join("");
-      const name = sessionStorage.getItem("wl_name") || undefined;
-      const phone = sessionStorage.getItem("wl_phone") || undefined;
-      verifyOTPMutation.mutate({ email, code: fullCode, name, phone });
+      verifyOTPMutation.mutate(buildAuthPayload(fullCode));
     }
   };
 
@@ -97,17 +120,20 @@ export default function WhiteLabelVerifyPage() {
       const newCode = pastedData.split("");
       setCode(newCode);
       inputRefs.current[5]?.focus();
-      
-      const name = sessionStorage.getItem("wl_name") || undefined;
-      const phone = sessionStorage.getItem("wl_phone") || undefined;
-      verifyOTPMutation.mutate({ email, code: pastedData, name, phone });
+      verifyOTPMutation.mutate(buildAuthPayload(pastedData));
     }
   };
 
   const handleResend = async () => {
     try {
-      await apiRequest("POST", `/api/w/${slug}/auth/request-otp`, { email });
-      toast({ title: "Code Sent", description: "A new verification code has been sent to your email" });
+      const payload = method === "email" ? { email } : { phone };
+      await apiRequest("POST", `/api/w/${slug}/auth/request-otp`, payload);
+      toast({
+        title: "Code Sent",
+        description: method === "email"
+          ? "A new verification code has been sent to your email"
+          : "A new verification code has been sent to your mobile number",
+      });
     } catch {
       toast({ title: "Error", description: "Failed to resend code", variant: "destructive" });
     }
@@ -123,6 +149,9 @@ export default function WhiteLabelVerifyPage() {
 
   const primaryColor = tenant.primaryColor || "#00B4D8";
   const secondaryColor = tenant.secondaryColor || "#E056A0";
+  const Icon = method === "email" ? Mail : Smartphone;
+  const identifier = method === "email" ? email : phone;
+  const targetLabel = method === "email" ? "email" : "mobile number";
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -159,12 +188,12 @@ export default function WhiteLabelVerifyPage() {
                 className="w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center"
                 style={{ backgroundColor: `${primaryColor}15` }}
               >
-                <Mail className="w-10 h-10" style={{ color: primaryColor }} />
+                <Icon className="w-10 h-10" style={{ color: primaryColor }} />
               </div>
-              <CardTitle className="text-2xl">Check your email</CardTitle>
+              <CardTitle className="text-2xl">Check your {targetLabel}</CardTitle>
               <CardDescription className="text-base">
                 We sent a 6-digit code to<br />
-                <span className="font-semibold text-foreground">{email}</span>
+                <span className="font-semibold text-foreground" data-testid="text-identifier">{identifier}</span>
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">

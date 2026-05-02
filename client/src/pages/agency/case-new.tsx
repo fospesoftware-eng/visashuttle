@@ -21,7 +21,7 @@ import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { CO_TRAVELLER_RELATIONSHIPS, type CoTravellerRelationship, type FeeTemplate, type InvoiceSettings } from "@shared/schema";
+import { CO_TRAVELLER_RELATIONSHIPS, type CoTravellerRelationship, type FeeTemplate, type InvoiceSettings, type Lead } from "@shared/schema";
 import { getDocumentChecklist, type DocumentRequirement } from "@/data/document-checklists";
 import { getCountryVisaConfig } from "@/data/country-visa-types";
 
@@ -264,13 +264,32 @@ export default function NewCasePage() {
 
   const [step, setStep] = useState<StepId>(1);
 
+  // ── Lead pre-fill: when the wizard is opened from "Convert to Case" we
+  // get a `?leadId=<id>` query param; the lead is fetched once here and
+  // its name/email/phone/destination/visa are seeded into the form state.
+  // After a successful case create the lead is PATCHed to stage="won".
+  const queryParams = useMemo(() => {
+    if (typeof window === "undefined") return new URLSearchParams();
+    return new URLSearchParams(window.location.search);
+  }, []);
+  const leadIdParam = queryParams.get("leadId");
+  const seedVisaTypeParam = queryParams.get("visaType") ?? "";
+  const seedDestinationParam = queryParams.get("destinationCountry") ?? "";
+  const seedPriorityParam = queryParams.get("priority") ?? "";
+
+  // Track whether we've already seeded the form from the lead so the user can
+  // edit fields without us clobbering their changes when the query revalidates.
+  const leadSeededRef = useRef(false);
+
   const [form, setForm] = useState({
     destinationCountry: "",
     visaType: "",
     applicantName: "",
     applicantDob: "",
+    customerEmail: "",
+    customerPhone: "",
     travelDate: "",
-    priority: "normal",
+    priority: seedPriorityParam || "normal",
     notes: "",
     // Passport details (Indian passport standard)
     passportSurname: "",
@@ -305,6 +324,54 @@ export default function NewCasePage() {
   // do, the auto-derive-from-passport-name effect stops touching it.
   const applicantNameTouchedRef = useRef(false);
   const passportFileRef = useRef<HTMLInputElement | null>(null);
+
+  // Seed visa/destination from the convert-modal URL params on first mount —
+  // these are independent from the lead fetch so they apply even before the
+  // lead query resolves. Visa type depends on destinationCountry, so we only
+  // set visaType if a destination was also provided.
+  useEffect(() => {
+    if (!seedDestinationParam && !seedVisaTypeParam) return;
+    setForm((f) => {
+      const next = { ...f };
+      let changed = false;
+      if (seedDestinationParam && !f.destinationCountry) {
+        next.destinationCountry = seedDestinationParam;
+        changed = true;
+      }
+      if (seedVisaTypeParam && !f.visaType) {
+        next.visaType = seedVisaTypeParam;
+        changed = true;
+      }
+      return changed ? next : f;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Fetch the originating lead (if any) so step 1 can show the pre-filled
+  // customer email + mobile. Only fires when ?leadId= is present in the URL.
+  const { data: originatingLead } = useQuery<Lead>({
+    queryKey: ["/api/leads", leadIdParam],
+    enabled: !!leadIdParam,
+  });
+
+  // Pre-fill the form from the lead exactly once. Each field is only seeded
+  // when its current value is empty so we never clobber what the user has
+  // already typed.
+  useEffect(() => {
+    if (!originatingLead || leadSeededRef.current) return;
+    leadSeededRef.current = true;
+    setForm((f) => ({
+      ...f,
+      applicantName: f.applicantName || originatingLead.name || "",
+      customerEmail: f.customerEmail || originatingLead.email || "",
+      customerPhone: f.customerPhone || originatingLead.phone || "",
+      destinationCountry: f.destinationCountry || originatingLead.destinationCountry || "",
+      visaType: f.visaType || originatingLead.visaType || "",
+    }));
+    // The applicant name now has a real value, so the passport-name auto-derive
+    // effect should leave it alone unless the agent clears it.
+    if (originatingLead.name) applicantNameTouchedRef.current = true;
+  }, [originatingLead]);
 
   // Auto-derive applicantName from "given-names + surname" — but only when the
   // user hasn't manually edited the applicant-name field.
@@ -723,6 +790,8 @@ export default function NewCasePage() {
   const buildPayload = (status: "draft" | "pending") => ({
     applicantName: form.applicantName.trim() || (status === "draft" ? "Untitled draft" : ""),
     applicantDob: form.applicantDob || null,
+    customerEmail: form.customerEmail.trim() || null,
+    customerPhone: form.customerPhone.trim() || null,
     passportSurname: form.passportSurname.trim() || null,
     passportGivenName: form.passportGivenName.trim() || null,
     passportMiddleName: form.passportMiddleName.trim() || null,
@@ -995,6 +1064,25 @@ export default function NewCasePage() {
     const res = await apiRequest("POST", `/api/tenants/${tenantId}/cases`, buildPayload(status));
     const created = await res.json();
 
+    // If we came in from a lead, mark it as won so it leaves the open pipeline.
+    // We fail-open here — the case was created successfully and we don't want
+    // the lead-stage update to block the user's redirect to the case detail
+    // page. We do surface a non-blocking warning so the agent knows the lead
+    // may still be in its previous stage and can fix it manually.
+    if (leadIdParam) {
+      try {
+        await apiRequest("PATCH", `/api/leads/${leadIdParam}`, { stage: "won" });
+        queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "leads"] });
+      } catch (err) {
+        console.warn("[case-new] could not mark originating lead as won:", err);
+        toast({
+          title: "Lead stage not updated",
+          description: "Case was created, but the originating lead could not be marked as won. Please update its stage manually.",
+          variant: "destructive",
+        });
+      }
+    }
+
     // Helper: upload a file as a document record on the new case. Sized payloads
     // (passport pages, checklist attachments) all flow through here so the
     // 12 MB body-limit override on /api/cases/:id/documents is the only ceiling.
@@ -1167,7 +1255,7 @@ export default function NewCasePage() {
         await apiRequest("POST", `/api/tenants/${tenantId}/invoices`, {
           caseId: created.id,
           customerName: form.applicantName.trim() || "Applicant",
-          customerEmail: null,
+          customerEmail: form.customerEmail.trim() || null,
           destinationCountry: form.destinationCountry,
           visaType: form.visaType,
           status: "draft",
@@ -1511,6 +1599,36 @@ export default function NewCasePage() {
                     testId="select-destination"
                   />
                 </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="customer-email">Customer Email</Label>
+                    <Input
+                      id="customer-email"
+                      type="email"
+                      placeholder="customer@example.com"
+                      value={form.customerEmail}
+                      onChange={(e) => setForm({ ...form, customerEmail: e.target.value })}
+                      data-testid="input-customer-email"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="customer-phone">Customer Mobile</Label>
+                    <Input
+                      id="customer-phone"
+                      type="tel"
+                      placeholder="+1 234 567 8900"
+                      value={form.customerPhone}
+                      onChange={(e) => setForm({ ...form, customerPhone: e.target.value })}
+                      data-testid="input-customer-phone"
+                    />
+                  </div>
+                </div>
+                {leadIdParam && (
+                  <p className="text-xs text-muted-foreground -mt-2">
+                    Pre-filled from the originating lead — edit if needed before continuing.
+                  </p>
+                )}
+
                 <div className="space-y-2">
                   <Label>Visa Type *</Label>
                   <Select

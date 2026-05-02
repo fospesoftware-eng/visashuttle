@@ -16,7 +16,14 @@ import {
   insertInvoiceItemSchema,
   insertInvoiceSettingsSchema,
   insertPaymentSchema,
+  type InsertCustomerAccount,
 } from "@shared/schema";
+
+// Strip everything that isn't a digit. Used to build the deterministic
+// placeholder email for phone-only customer accounts.
+function normalizePhoneDigits(input: string): string {
+  return input.replace(/[^\d]/g, "");
+}
 
 // Indian state codes for GST place-of-supply lookups.
 const INDIAN_STATE_NAME_BY_CODE: Record<string, string> = {
@@ -557,12 +564,17 @@ export async function registerRoutes(
     res.json(tenant);
   });
 
-  // Request OTP
+  // Request OTP — accepts either `email` or `phone` (one is required).
+  // The white-label customer portal lets the customer pick which identifier
+  // they want to receive the code on, so this endpoint serves both flows.
   app.post("/api/w/:slug/auth/request-otp", async (req, res) => {
-    const { email, phone, name } = req.body;
-    
-    if (!email) {
-      return res.status(400).json({ error: "Email is required" });
+    const { email, phone, name } = req.body ?? {};
+
+    const emailNorm = typeof email === "string" && email.trim() ? email.trim().toLowerCase() : null;
+    const phoneNorm = typeof phone === "string" && phone.trim() ? phone.trim() : null;
+
+    if (!emailNorm && !phoneNorm) {
+      return res.status(400).json({ error: "Email or phone number is required" });
     }
 
     const tenant = await storage.getTenantBySlug(req.params.slug);
@@ -573,9 +585,12 @@ export async function registerRoutes(
     // Generate OTP
     const code = generateOTP();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    const method = emailNorm ? "email" : "phone";
+    const identifier = (emailNorm ?? phoneNorm)!;
 
     await storage.createOTPCode({
-      email,
+      email: emailNorm,
+      phone: phoneNorm,
       code,
       tenantId: tenant.id,
       attempts: 0,
@@ -589,22 +604,29 @@ export async function registerRoutes(
       userId: null,
       action: "otp.requested",
       entityType: "auth",
-      entityId: email,
-      details: { email, phone }
+      entityId: identifier,
+      details: { method, email: emailNorm, phone: phoneNorm }
     });
 
     // In development, log OTP to console
-    console.log(`[OTP] Code for ${email} at ${tenant.slug}: ${code}`);
+    console.log(`[OTP] Code for ${method}:${identifier} at ${tenant.slug}: ${code}`);
 
-    res.json({ message: "OTP sent successfully", email });
+    res.json({ message: "OTP sent successfully", method, email: emailNorm, phone: phoneNorm });
   });
 
-  // Verify OTP
+  // Verify OTP — same shape as request-otp: caller passes whichever identifier
+  // they used, plus the 6-digit code.
   app.post("/api/w/:slug/auth/verify-otp", async (req, res) => {
-    const { email, code, name, phone } = req.body;
+    const { email, code, name, phone } = req.body ?? {};
 
-    if (!email || !code) {
-      return res.status(400).json({ error: "Email and code are required" });
+    const emailNorm = typeof email === "string" && email.trim() ? email.trim().toLowerCase() : null;
+    const phoneNorm = typeof phone === "string" && phone.trim() ? phone.trim() : null;
+
+    if (!emailNorm && !phoneNorm) {
+      return res.status(400).json({ error: "Email or phone number is required" });
+    }
+    if (!code) {
+      return res.status(400).json({ error: "Verification code is required" });
     }
 
     const tenant = await storage.getTenantBySlug(req.params.slug);
@@ -614,9 +636,11 @@ export async function registerRoutes(
 
     // Demo OTP code for testing - only enabled in development mode
     const isDemoCode = process.env.NODE_ENV !== "production" && code === "123456";
-    
-    const otp = await storage.getActiveOTPCode(email, tenant.id);
-    
+
+    const otp = emailNorm
+      ? await storage.getActiveOTPCode(emailNorm, tenant.id)
+      : await storage.getActiveOTPCodeByPhone(phoneNorm!, tenant.id);
+
     if (!otp && !isDemoCode) {
       return res.status(400).json({ error: "No active OTP found. Please request a new one." });
     }
@@ -631,19 +655,42 @@ export async function registerRoutes(
       await storage.markOTPUsed(otp.id);
     }
 
-    // Get or create customer account
-    let customerAccount = await storage.getCustomerAccountByEmail(email);
-    
+    // Get or create customer account. We look up by BOTH identifiers when
+    // available (email first, then phone) so a returning customer who first
+    // signed in phone-only and is now signing in with email+phone is found
+    // and updated rather than creating a duplicate placeholder account.
+    let customerAccount = emailNorm ? await storage.getCustomerAccountByEmail(emailNorm) : undefined;
+    if (!customerAccount && phoneNorm) {
+      customerAccount = await storage.getCustomerAccountByPhone(phoneNorm);
+    }
+
     if (!customerAccount) {
+      // Phone-only sign-ins synthesize a placeholder email so the existing
+      // email column (NOT NULL on customer_accounts) stays satisfied. The
+      // placeholder is never surfaced in the UI; it's a database sentinel.
+      const placeholderEmail = emailNorm ?? `phone+${normalizePhoneDigits(phoneNorm!)}@whitelabel.local`;
       customerAccount = await storage.createCustomerAccount({
-        email,
-        phone: phone || null,
+        email: placeholderEmail,
+        phone: phoneNorm || null,
         name: name || null,
         avatarUrl: null,
         isVerified: true
       });
-    } else if (!customerAccount.isVerified) {
-      await storage.updateCustomerAccount(customerAccount.id, { isVerified: true });
+    } else {
+      const patch: Partial<InsertCustomerAccount> = {};
+      if (!customerAccount.isVerified) patch.isVerified = true;
+      // Backfill missing identifier when the customer signed in with the OTHER
+      // method on a later visit (e.g. email-first user now adding their phone).
+      if (phoneNorm && !customerAccount.phone) patch.phone = phoneNorm;
+      // Upgrade a placeholder email to a real one if the customer now provides
+      // it. We never overwrite a real email with another real email here —
+      // that's an account-merge scenario the agent should handle manually.
+      if (emailNorm && customerAccount.email.endsWith("@whitelabel.local")) {
+        patch.email = emailNorm;
+      }
+      if (Object.keys(patch).length > 0) {
+        await storage.updateCustomerAccount(customerAccount.id, patch);
+      }
     }
 
     // Ensure customer-tenant link exists
