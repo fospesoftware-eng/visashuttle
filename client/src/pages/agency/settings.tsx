@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Building2, Users, Bell, CreditCard, Save, Palette, Eye, Loader2, Check, ExternalLink, Copy, Globe, Link2, Plus, Trash2, ChevronRight, UserCheck, UserX, Zap, Crown, Shield, ArrowUpRight } from "lucide-react";
+import { Building2, Users, Bell, CreditCard, Save, Palette, Eye, EyeOff, Loader2, Check, ExternalLink, Copy, Globe, Link2, Plus, Trash2, ChevronRight, UserCheck, UserX, Zap, Crown, Shield, ArrowUpRight, MessageSquare, Send, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -224,6 +224,457 @@ function TeamTab({ tenantId, currentUserId }: { tenantId?: string; currentUserId
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+// ─── Payments (Cashfree) Tab ───────────────────────────────────────────────────
+
+function PaymentsTab({ tenantId }: { tenantId?: string }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { data: cfg, isLoading } = useQuery<any>({
+    queryKey: ["/api/tenants", tenantId, "payment-gateway-config"],
+    queryFn: async () => {
+      const res = await fetch(`/api/tenants/${tenantId}/payment-gateway-config`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load payment gateway config");
+      return res.json();
+    },
+    enabled: !!tenantId,
+  });
+
+  const [form, setForm] = useState({
+    enabled: false, mode: "test" as "test" | "live", apiVersion: "2023-08-01",
+    testClientId: "", testClientSecret: "", liveClientId: "", liveClientSecret: "", webhookSecret: "",
+  });
+  const [showSecret, setShowSecret] = useState({ test: false, live: false, webhook: false });
+
+  useEffect(() => {
+    if (cfg) {
+      setForm({
+        enabled: !!cfg.enabled,
+        mode: cfg.mode === "live" ? "live" : "test",
+        apiVersion: cfg.apiVersion || "2023-08-01",
+        testClientId: cfg.testClientId || "",
+        testClientSecret: cfg.testClientSecret || "",
+        liveClientId: cfg.liveClientId || "",
+        liveClientSecret: cfg.liveClientSecret || "",
+        webhookSecret: cfg.webhookSecret || "",
+      });
+    }
+  }, [cfg]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      // Don't send back masked placeholders (•) — server-side will ignore them, but cleaner to omit.
+      const isMasked = (v: string) => v.includes("•");
+      const payload: Record<string, any> = {
+        enabled: form.enabled,
+        mode: form.mode,
+        apiVersion: form.apiVersion,
+      };
+      if (form.testClientId && !isMasked(form.testClientId)) payload.testClientId = form.testClientId;
+      if (form.testClientSecret && !isMasked(form.testClientSecret)) payload.testClientSecret = form.testClientSecret;
+      if (form.liveClientId && !isMasked(form.liveClientId)) payload.liveClientId = form.liveClientId;
+      if (form.liveClientSecret && !isMasked(form.liveClientSecret)) payload.liveClientSecret = form.liveClientSecret;
+      if (form.webhookSecret && !isMasked(form.webhookSecret)) payload.webhookSecret = form.webhookSecret;
+      const res = await apiRequest("POST", `/api/tenants/${tenantId}/payment-gateway-config`, payload);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "payment-gateway-config"] });
+      toast({ title: "Saved", description: "Cashfree settings updated." });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  if (isLoading) {
+    return <Card><CardContent className="p-8 text-center text-muted-foreground">Loading...</CardContent></Card>;
+  }
+
+  const activeReady = !!cfg?.activeReady;
+
+  return (
+    <div className="space-y-6 max-w-3xl">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <CreditCard className="w-4 h-4" />
+            Cashfree Payment Gateway
+          </CardTitle>
+          <CardDescription>
+            Accept online payments from your customers using Cashfree. Your credentials are stored securely
+            and only used to create payment orders for your agency.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div>
+              <Label>Enable Cashfree</Label>
+              <p className="text-xs text-muted-foreground">Turn on to start accepting payments via Cashfree.</p>
+            </div>
+            <Switch
+              checked={form.enabled}
+              onCheckedChange={(v) => setForm({ ...form, enabled: v })}
+              data-testid="switch-cashfree-enabled"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Badge variant={form.mode === "live" ? "default" : "outline"} data-testid="badge-cashfree-mode">
+              Mode: {form.mode === "live" ? "Live" : "Test (Sandbox)"}
+            </Badge>
+            {activeReady ? (
+              <Badge variant="outline" className="border-emerald-300 text-emerald-700 dark:text-emerald-400">
+                <Check className="w-3 h-3 mr-1" /> Ready
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="border-amber-300 text-amber-700 dark:text-amber-400">
+                <AlertCircle className="w-3 h-3 mr-1" /> Credentials missing
+              </Badge>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Mode</Label>
+              <Select value={form.mode} onValueChange={(v: "test" | "live") => setForm({ ...form, mode: v })}>
+                <SelectTrigger data-testid="select-cashfree-mode"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="test">Test (Sandbox)</SelectItem>
+                  <SelectItem value="live">Live (Production)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>API Version</Label>
+              <Input
+                value={form.apiVersion}
+                onChange={(e) => setForm({ ...form, apiVersion: e.target.value })}
+                data-testid="input-cashfree-api-version"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Test (Sandbox) Credentials</CardTitle>
+          <CardDescription>
+            Get these from <a href="https://merchant.cashfree.com" target="_blank" rel="noreferrer" className="text-primary underline">Cashfree Merchant Dashboard → Developers → API Keys</a>.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-2">
+            <Label>Test Client ID</Label>
+            <Input
+              value={form.testClientId}
+              onChange={(e) => setForm({ ...form, testClientId: e.target.value })}
+              placeholder="TEST..."
+              className="font-mono text-sm"
+              data-testid="input-cashfree-test-client-id"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Test Client Secret</Label>
+            <div className="relative">
+              <Input
+                type={showSecret.test ? "text" : "password"}
+                value={form.testClientSecret}
+                onChange={(e) => setForm({ ...form, testClientSecret: e.target.value })}
+                placeholder={cfg?.hasTestCredentials ? "Saved — enter new value to update" : "cfsk_ma_test_..."}
+                className="pr-10 font-mono text-sm"
+                data-testid="input-cashfree-test-client-secret"
+              />
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setShowSecret({ ...showSecret, test: !showSecret.test })}
+              >
+                {showSecret.test ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Live (Production) Credentials</CardTitle>
+          <CardDescription>Only required when you switch the mode above to Live.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-2">
+            <Label>Live Client ID</Label>
+            <Input
+              value={form.liveClientId}
+              onChange={(e) => setForm({ ...form, liveClientId: e.target.value })}
+              placeholder="PROD..."
+              className="font-mono text-sm"
+              data-testid="input-cashfree-live-client-id"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Live Client Secret</Label>
+            <div className="relative">
+              <Input
+                type={showSecret.live ? "text" : "password"}
+                value={form.liveClientSecret}
+                onChange={(e) => setForm({ ...form, liveClientSecret: e.target.value })}
+                placeholder={cfg?.hasLiveCredentials ? "Saved — enter new value to update" : "cfsk_ma_prod_..."}
+                className="pr-10 font-mono text-sm"
+                data-testid="input-cashfree-live-client-secret"
+              />
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setShowSecret({ ...showSecret, live: !showSecret.live })}
+              >
+                {showSecret.live ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Webhook Secret (optional)</CardTitle>
+          <CardDescription>Used to verify Cashfree webhook signatures for payment status updates.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-2">
+            <Label>Webhook Secret</Label>
+            <div className="relative">
+              <Input
+                type={showSecret.webhook ? "text" : "password"}
+                value={form.webhookSecret}
+                onChange={(e) => setForm({ ...form, webhookSecret: e.target.value })}
+                placeholder={cfg?.hasWebhookSecret ? "Saved — enter new value to update" : "Paste your webhook signing secret"}
+                className="pr-10 font-mono text-sm"
+                data-testid="input-cashfree-webhook-secret"
+              />
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setShowSecret({ ...showSecret, webhook: !showSecret.webhook })}
+              >
+                {showSecret.webhook ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="flex justify-end">
+        <Button
+          onClick={() => saveMutation.mutate()}
+          disabled={saveMutation.isPending}
+          className="gap-2"
+          data-testid="button-save-cashfree"
+        >
+          {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          Save Cashfree Settings
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── SMS (MessageCentral) Tab ──────────────────────────────────────────────────
+
+function SmsTab({ tenantId }: { tenantId?: string }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { data: cfg, isLoading } = useQuery<any>({
+    queryKey: ["/api/tenants", tenantId, "sms-config"],
+    queryFn: async () => {
+      const res = await fetch(`/api/tenants/${tenantId}/sms-config`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load SMS config");
+      return res.json();
+    },
+    enabled: !!tenantId,
+  });
+
+  const [form, setForm] = useState({
+    enabled: false, mcCustomerId: "", mcAuthToken: "", senderId: "",
+  });
+  const [showToken, setShowToken] = useState(false);
+  const [testPhone, setTestPhone] = useState("");
+
+  useEffect(() => {
+    if (cfg) {
+      setForm({
+        enabled: !!cfg.enabled,
+        mcCustomerId: cfg.mcCustomerId || "",
+        mcAuthToken: cfg.mcAuthToken || "",
+        senderId: cfg.senderId || "",
+      });
+    }
+  }, [cfg]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const isMasked = (v: string) => v.includes("•");
+      const payload: Record<string, any> = {
+        enabled: form.enabled,
+        mcCustomerId: form.mcCustomerId,
+        senderId: form.senderId,
+      };
+      if (form.mcAuthToken && !isMasked(form.mcAuthToken)) payload.mcAuthToken = form.mcAuthToken;
+      const res = await apiRequest("POST", `/api/tenants/${tenantId}/sms-config`, payload);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "sms-config"] });
+      toast({ title: "Saved", description: "MessageCentral settings updated." });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const testMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/tenants/${tenantId}/sms-config/test`, { phone: testPhone });
+      return res.json();
+    },
+    onSuccess: (data) => toast({ title: "Test sent", description: data.message ?? "Test OTP delivered." }),
+    onError: (e: Error) => toast({ title: "Test failed", description: e.message, variant: "destructive" }),
+  });
+
+  if (isLoading) {
+    return <Card><CardContent className="p-8 text-center text-muted-foreground">Loading...</CardContent></Card>;
+  }
+
+  const ready = !!cfg?.activeReady;
+
+  return (
+    <div className="space-y-6 max-w-3xl">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <MessageSquare className="w-4 h-4" />
+            MessageCentral SMS Gateway
+          </CardTitle>
+          <CardDescription>
+            Send OTPs and transactional SMS to your customers using your own MessageCentral account.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div>
+              <Label>Enable MessageCentral</Label>
+              <p className="text-xs text-muted-foreground">Turn on to use these credentials for outgoing SMS.</p>
+            </div>
+            <Switch
+              checked={form.enabled}
+              onCheckedChange={(v) => setForm({ ...form, enabled: v })}
+              data-testid="switch-mc-enabled"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            {ready ? (
+              <Badge variant="outline" className="border-emerald-300 text-emerald-700 dark:text-emerald-400">
+                <Check className="w-3 h-3 mr-1" /> Active
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="border-amber-300 text-amber-700 dark:text-amber-400">
+                <AlertCircle className="w-3 h-3 mr-1" /> Not configured
+              </Badge>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Customer ID <span className="text-destructive">*</span></Label>
+            <Input
+              value={form.mcCustomerId}
+              onChange={(e) => setForm({ ...form, mcCustomerId: e.target.value })}
+              placeholder="C-XXXXXXXXXXXX"
+              className="font-mono text-sm"
+              data-testid="input-mc-customer-id"
+            />
+            <p className="text-xs text-muted-foreground">
+              From the <a href="https://www.messagecentral.com" target="_blank" rel="noreferrer" className="text-primary underline">MessageCentral dashboard</a> (starts with C-).
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Auth Token <span className="text-destructive">*</span></Label>
+            <div className="relative">
+              <Input
+                type={showToken ? "text" : "password"}
+                value={form.mcAuthToken}
+                onChange={(e) => setForm({ ...form, mcAuthToken: e.target.value })}
+                placeholder={cfg?.hasMcCredentials ? "Token saved — enter new value to update" : "Paste your MessageCentral Auth Token"}
+                className="pr-10 font-mono text-sm"
+                data-testid="input-mc-auth-token"
+              />
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setShowToken((s) => !s)}
+              >
+                {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">Long-lived JWT auth token from your MessageCentral dashboard.</p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Sender ID (optional)</Label>
+            <Input
+              value={form.senderId}
+              onChange={(e) => setForm({ ...form, senderId: e.target.value })}
+              placeholder="e.g. VISASH"
+              maxLength={11}
+              data-testid="input-mc-sender-id"
+            />
+            <p className="text-xs text-muted-foreground">6-character alphanumeric sender ID (DLT-registered for India).</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Test OTP delivery</CardTitle>
+          <CardDescription>Save your credentials first, then send a test OTP to verify the setup.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex gap-2">
+            <Input
+              type="tel"
+              value={testPhone}
+              onChange={(e) => setTestPhone(e.target.value)}
+              placeholder="+91 98765 43210 (with country code)"
+              className="flex-1"
+              data-testid="input-mc-test-phone"
+            />
+            <Button
+              variant="outline"
+              onClick={() => testMutation.mutate()}
+              disabled={!testPhone || testMutation.isPending}
+              className="gap-2"
+              data-testid="button-mc-test-send"
+            >
+              {testMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              Send Test
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="flex justify-end">
+        <Button
+          onClick={() => saveMutation.mutate()}
+          disabled={saveMutation.isPending}
+          className="gap-2"
+          data-testid="button-save-mc"
+        >
+          {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          Save SMS Settings
+        </Button>
+      </div>
     </div>
   );
 }
@@ -571,6 +1022,14 @@ export default function AgencySettingsPage() {
             <TabsTrigger value="general" data-testid="tab-general">General</TabsTrigger>
             <TabsTrigger value="notifications" data-testid="tab-notifications">Notifications</TabsTrigger>
             <TabsTrigger value="team" data-testid="tab-team">Team</TabsTrigger>
+            <TabsTrigger value="payments" data-testid="tab-payments">
+              <CreditCard className="w-4 h-4 mr-2" />
+              Payments
+            </TabsTrigger>
+            <TabsTrigger value="sms" data-testid="tab-sms">
+              <MessageSquare className="w-4 h-4 mr-2" />
+              SMS
+            </TabsTrigger>
             <TabsTrigger value="billing" data-testid="tab-billing">Billing</TabsTrigger>
           </TabsList>
 
@@ -1047,6 +1506,14 @@ export default function AgencySettingsPage() {
 
           <TabsContent value="team" className="space-y-4">
             <TeamTab tenantId={tenant?.id} currentUserId={authData?.user?.id} />
+          </TabsContent>
+
+          <TabsContent value="payments" className="space-y-4">
+            <PaymentsTab tenantId={tenant?.id} />
+          </TabsContent>
+
+          <TabsContent value="sms" className="space-y-4">
+            <SmsTab tenantId={tenant?.id} />
           </TabsContent>
 
           <TabsContent value="billing" className="space-y-4">

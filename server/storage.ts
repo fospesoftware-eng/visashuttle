@@ -16,6 +16,8 @@ import {
   type SmsConfig, type InsertSmsConfig,
   type PlatformAiConfig, type InsertPlatformAiConfig,
   type PaymentGatewayConfig, type InsertPaymentGatewayConfig,
+  type TenantPaymentGatewayConfig, type InsertTenantPaymentGatewayConfig,
+  type TenantSmsConfig, type InsertTenantSmsConfig,
   type FeeTemplate, type InsertFeeTemplate,
   type InvoiceSettings, type InsertInvoiceSettings,
   type Invoice, type InsertInvoice,
@@ -24,6 +26,8 @@ import {
   b2cUsers, visaChecks, savedProfiles, smsConfig as smsConfigTable,
   platformAiConfig as platformAiConfigTable,
   paymentGatewayConfig as paymentGatewayConfigTable,
+  tenantPaymentGatewayConfig as tenantPaymentGatewayConfigTable,
+  tenantSmsConfig as tenantSmsConfigTable,
 } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -127,6 +131,14 @@ export interface IStorage {
   getPaymentGatewayConfig(): Promise<PaymentGatewayConfig | undefined>;
   upsertPaymentGatewayConfig(data: Partial<InsertPaymentGatewayConfig>): Promise<PaymentGatewayConfig>;
 
+  // Per-tenant Payment Gateway Config (Cashfree)
+  getTenantPaymentGatewayConfig(tenantId: string): Promise<TenantPaymentGatewayConfig | undefined>;
+  upsertTenantPaymentGatewayConfig(tenantId: string, data: Partial<InsertTenantPaymentGatewayConfig>): Promise<TenantPaymentGatewayConfig>;
+
+  // Per-tenant SMS Config (MessageCentral)
+  getTenantSmsConfig(tenantId: string): Promise<TenantSmsConfig | undefined>;
+  upsertTenantSmsConfig(tenantId: string, data: Partial<InsertTenantSmsConfig>): Promise<TenantSmsConfig>;
+
   // Fee Templates
   getFeeTemplatesByTenantId(tenantId: string): Promise<FeeTemplate[]>;
   getFeeTemplate(id: string): Promise<FeeTemplate | undefined>;
@@ -174,6 +186,8 @@ export class MemStorage implements IStorage {
   private smsConfigRecord?: SmsConfig;
   private platformAiConfigRecord?: PlatformAiConfig;
   private paymentGatewayConfigRecord?: PaymentGatewayConfig;
+  private tenantPaymentGatewayConfigByTenant: Map<string, TenantPaymentGatewayConfig> = new Map();
+  private tenantSmsConfigByTenant: Map<string, TenantSmsConfig> = new Map();
   private feeTemplates: Map<string, FeeTemplate> = new Map();
   private invoiceSettingsByTenant: Map<string, InvoiceSettings> = new Map();
   private invoices: Map<string, Invoice> = new Map();
@@ -1371,6 +1385,48 @@ export class MemStorage implements IStorage {
     };
     return this.platformAiConfigRecord;
   }
+  async getTenantPaymentGatewayConfig(tenantId: string): Promise<TenantPaymentGatewayConfig | undefined> {
+    return this.tenantPaymentGatewayConfigByTenant.get(tenantId);
+  }
+  async upsertTenantPaymentGatewayConfig(tenantId: string, data: Partial<InsertTenantPaymentGatewayConfig>): Promise<TenantPaymentGatewayConfig> {
+    const existing = this.tenantPaymentGatewayConfigByTenant.get(tenantId);
+    const next: TenantPaymentGatewayConfig = {
+      id: existing?.id ?? randomUUID(),
+      tenantId,
+      provider: data.provider !== undefined ? data.provider : existing?.provider ?? "cashfree",
+      mode: data.mode !== undefined ? data.mode : existing?.mode ?? "test",
+      apiVersion: data.apiVersion !== undefined ? data.apiVersion : existing?.apiVersion ?? "2023-08-01",
+      testClientId: data.testClientId !== undefined ? data.testClientId : existing?.testClientId ?? null,
+      testClientSecret: data.testClientSecret !== undefined ? data.testClientSecret : existing?.testClientSecret ?? null,
+      liveClientId: data.liveClientId !== undefined ? data.liveClientId : existing?.liveClientId ?? null,
+      liveClientSecret: data.liveClientSecret !== undefined ? data.liveClientSecret : existing?.liveClientSecret ?? null,
+      webhookSecret: data.webhookSecret !== undefined ? data.webhookSecret : existing?.webhookSecret ?? null,
+      enabled: data.enabled !== undefined ? !!data.enabled : existing?.enabled ?? false,
+      updatedAt: new Date(),
+    };
+    this.tenantPaymentGatewayConfigByTenant.set(tenantId, next);
+    return next;
+  }
+
+  async getTenantSmsConfig(tenantId: string): Promise<TenantSmsConfig | undefined> {
+    return this.tenantSmsConfigByTenant.get(tenantId);
+  }
+  async upsertTenantSmsConfig(tenantId: string, data: Partial<InsertTenantSmsConfig>): Promise<TenantSmsConfig> {
+    const existing = this.tenantSmsConfigByTenant.get(tenantId);
+    const next: TenantSmsConfig = {
+      id: existing?.id ?? randomUUID(),
+      tenantId,
+      provider: data.provider !== undefined ? data.provider : existing?.provider ?? "messagecentral",
+      mcCustomerId: data.mcCustomerId !== undefined ? data.mcCustomerId : existing?.mcCustomerId ?? null,
+      mcAuthToken: data.mcAuthToken !== undefined ? data.mcAuthToken : existing?.mcAuthToken ?? null,
+      senderId: data.senderId !== undefined ? data.senderId : existing?.senderId ?? null,
+      enabled: data.enabled !== undefined ? !!data.enabled : existing?.enabled ?? false,
+      updatedAt: new Date(),
+    };
+    this.tenantSmsConfigByTenant.set(tenantId, next);
+    return next;
+  }
+
   async getPaymentGatewayConfig(): Promise<PaymentGatewayConfig | undefined> { return this.paymentGatewayConfigRecord; }
   async upsertPaymentGatewayConfig(data: Partial<InsertPaymentGatewayConfig>): Promise<PaymentGatewayConfig> {
     const existing = this.paymentGatewayConfigRecord;

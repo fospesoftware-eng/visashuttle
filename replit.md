@@ -47,8 +47,19 @@ Preferred communication style: Simple, everyday language.
 - UI: Compose Invoice dialog shows a GST Details card (customer GSTIN, place of supply, reverse charge, intra/inter badge), HSN + GST-rate inputs per line item, and a CGST/SGST/IGST breakdown in the totals. Overview tab shows a "GST monthly report" card with year/month picker and Download Excel button (only when `gstEnabled`).
 - Same `MemStorage` persistence caveat applies — GST data lives in memory and resets on restart.
 
+### Per-Tenant Payment Gateway (Cashfree)
+- Each agency can configure its own Cashfree credentials, separate from the global SaaS-admin config. Schema: `tenant_payment_gateway_config` (`shared/schema.ts`) — one row per tenantId (UNIQUE), stores `mode` (test/live), `apiVersion`, test/live `clientId`+`clientSecret`, optional `webhookSecret`, and `enabled` flag.
+- API: `GET/POST /api/tenants/:tenantId/payment-gateway-config` — protected by `requireTenantAccess`. GET masks all secret fields via `maskKey` and returns `hasTestCredentials`/`hasLiveCredentials`/`hasWebhookSecret`/`activeReady` booleans plus `sandboxBaseUrl`/`productionBaseUrl`/`activeBaseUrl`. POST uses bullet-guard (`String(v).includes("•")` → ignore) so masked values never overwrite real secrets.
+- Storage: `MemStorage` keeps `tenantPaymentGatewayConfigByTenant: Map<tenantId, TenantPaymentGatewayConfig>`. `HybridStorage` inherits — same `MemStorage` persistence caveat applies.
+- UI: `/agency/settings` → Payments tab — enable toggle, mode select (Test/Live), API version, separate cards for Test/Live credentials and Webhook Secret. Each secret has show/hide eye toggle and shows "Saved — enter new value to update" placeholder when already configured.
+
+### Per-Tenant SMS Gateway (MessageCentral)
+- Each agency can configure its own MessageCentral credentials for sending OTPs/transactional SMS to its customers. Schema: `tenant_sms_config` — one row per tenantId (UNIQUE), stores `provider` (default `messagecentral`), `mcCustomerId` (C-…), `mcAuthToken` (long-lived JWT), optional `senderId`, and `enabled` flag.
+- API: `GET/POST /api/tenants/:tenantId/sms-config` (protected by `requireTenantAccess`); GET masks `mcAuthToken` and returns `hasMcCredentials`/`activeReady`. POST applies bullet-guard to `mcAuthToken` so masked tokens are never written back. `POST /api/tenants/:tenantId/sms-config/test` sends a test OTP using the tenant's own credentials by reusing `sendOtp` with a tenant-scoped SmsConfig-shaped object (never falls back to the global SMS config).
+- UI: `/agency/settings` → SMS tab — enable toggle, Customer ID input, Auth Token input with show/hide, optional Sender ID, plus a "Test OTP delivery" card with phone input + Send Test button.
+
 ### Accounting Module
-- Tables (`shared/schema.ts`): `feeTemplates`, `invoiceSettings`, `invoices`, `invoiceItems`, `payments`. All money in INTEGER cents; `taxRate` in basis points (1800 = 18%).
+- Tables (`shared/schema.ts`): `feeTemplates`, `invoiceSettings`, `invoices`, `invoiceItems`, `payments`. All money in INTEGER cents; `taxRate` in basis points (1800 = 18%). Currency dropdown in `client/src/pages/agency/accounting.tsx` covers global majors (USD/EUR/GBP/CAD/AUD/JPY/SGD/CHF/HKD) plus India + GCC (INR/AED/SAR/QAR/KWD/BHD/OMR).
 - API base: `/api/tenants/:tenantId/{fee-templates,invoice-settings,invoices,invoices/stats}`, plus ID-based `/api/{fee-templates,invoices,payments}/:id` and `/api/invoices/:id/payments`. All accounting routes require session auth + tenant ownership (or `saas_admin` role) and validate bodies via Zod. Invoice totals are server-computed and recomputed on item changes; payment create/delete auto-updates `paidAmount` + status (draft→sent→partial→paid).
 - UI page: `/agency/accounting` — Overview/Invoices/Fee Templates/Settings tabs.
 - Persistence note: accounting uses `MemStorage` (cleared on restart). DB tables exist but `HybridStorage` does not yet override accounting methods — same pattern as cases/leads.

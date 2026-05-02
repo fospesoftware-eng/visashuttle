@@ -1566,7 +1566,12 @@ function InvoiceSettingsTab({ tenantId }: { tenantId: string }) {
               <Select value={form.currency} onValueChange={(v) => setForm({ ...form, currency: v })}>
                 <SelectTrigger data-testid="select-currency"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {["USD", "EUR", "GBP", "CAD", "AUD", "INR", "AED", "SGD", "JPY"].map((c) =>
+                  {[
+                    // Common globals
+                    "USD", "EUR", "GBP", "CAD", "AUD", "JPY", "SGD", "CHF", "HKD",
+                    // India + GCC / Middle East (covers AED, BHD, SAR, OMR + neighbours)
+                    "INR", "AED", "SAR", "QAR", "KWD", "BHD", "OMR",
+                  ].map((c) =>
                     <SelectItem key={c} value={c}>{c}</SelectItem>
                   )}
                 </SelectContent>

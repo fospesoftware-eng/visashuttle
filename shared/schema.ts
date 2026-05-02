@@ -333,6 +333,45 @@ export const insertPaymentGatewayConfigSchema = createInsertSchema(paymentGatewa
 export type InsertPaymentGatewayConfig = z.infer<typeof insertPaymentGatewayConfigSchema>;
 export type PaymentGatewayConfig = typeof paymentGatewayConfig.$inferSelect;
 
+// ── Per-Tenant Payment Gateway Config (Cashfree) ─────────────────────────────
+// Per-agency override of the global payment gateway config. When a tenant has
+// credentials configured here, agency-scoped flows should prefer these over the
+// global SaaS-admin config. Stored as a single row per tenant.
+export const tenantPaymentGatewayConfig = pgTable("tenant_payment_gateway_config", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().unique(),
+  provider: text("provider").notNull().default("cashfree"),
+  mode: text("mode").notNull().default("test"), // "test" | "live"
+  apiVersion: text("api_version").notNull().default("2023-08-01"),
+  testClientId: text("test_client_id"),
+  testClientSecret: text("test_client_secret"),
+  liveClientId: text("live_client_id"),
+  liveClientSecret: text("live_client_secret"),
+  webhookSecret: text("webhook_secret"),
+  enabled: boolean("enabled").notNull().default(false),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export const insertTenantPaymentGatewayConfigSchema = createInsertSchema(tenantPaymentGatewayConfig).omit({ id: true, updatedAt: true });
+export type InsertTenantPaymentGatewayConfig = z.infer<typeof insertTenantPaymentGatewayConfigSchema>;
+export type TenantPaymentGatewayConfig = typeof tenantPaymentGatewayConfig.$inferSelect;
+
+// ── Per-Tenant SMS Config (MessageCentral) ───────────────────────────────────
+// Per-agency MessageCentral credentials for sending OTP / transactional SMS to
+// the agency's own customers (separate from the global SaaS-level SMS config).
+export const tenantSmsConfig = pgTable("tenant_sms_config", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().unique(),
+  provider: text("provider").notNull().default("messagecentral"),
+  mcCustomerId: text("mc_customer_id"),
+  mcAuthToken: text("mc_auth_token"),
+  senderId: text("sender_id"),
+  enabled: boolean("enabled").notNull().default(false),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export const insertTenantSmsConfigSchema = createInsertSchema(tenantSmsConfig).omit({ id: true, updatedAt: true });
+export type InsertTenantSmsConfig = z.infer<typeof insertTenantSmsConfigSchema>;
+export type TenantSmsConfig = typeof tenantSmsConfig.$inferSelect;
+
 // ===== Accounting =====
 // All monetary values are stored as INTEGER CENTS for precision.
 // e.g. $200.50 -> 20050

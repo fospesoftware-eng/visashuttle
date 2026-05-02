@@ -1906,6 +1906,144 @@ export async function registerRoutes(
     });
   });
 
+  // ── Agency: Per-Tenant Payment Gateway Config (Cashfree) ─────────────────
+  // Each agency can configure its own Cashfree credentials. When `enabled=true`
+  // and credentials are present, agency-scoped flows should prefer this over
+  // the global SaaS-admin config.
+  app.get("/api/tenants/:tenantId/payment-gateway-config", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
+    const cfg = await storage.getTenantPaymentGatewayConfig(req.params.tenantId);
+    const mode = cfg?.mode === "live" ? "live" : "test";
+    const hasTestCredentials = !!(cfg?.testClientId && cfg?.testClientSecret);
+    const hasLiveCredentials = !!(cfg?.liveClientId && cfg?.liveClientSecret);
+    res.json({
+      provider: cfg?.provider || "cashfree",
+      mode,
+      apiVersion: cfg?.apiVersion || "2023-08-01",
+      enabled: !!cfg?.enabled,
+      // Mask all secret-bearing fields so the client never gets raw values.
+      testClientId: cfg?.testClientId ? maskKey(cfg.testClientId) : "",
+      testClientSecret: cfg?.testClientSecret ? maskKey(cfg.testClientSecret) : "",
+      liveClientId: cfg?.liveClientId ? maskKey(cfg.liveClientId) : "",
+      liveClientSecret: cfg?.liveClientSecret ? maskKey(cfg.liveClientSecret) : "",
+      webhookSecret: cfg?.webhookSecret ? maskKey(cfg.webhookSecret) : "",
+      sandboxBaseUrl: "https://sandbox.cashfree.com/pg",
+      productionBaseUrl: "https://api.cashfree.com/pg",
+      activeBaseUrl: mode === "live" ? "https://api.cashfree.com/pg" : "https://sandbox.cashfree.com/pg",
+      hasTestCredentials,
+      hasLiveCredentials,
+      hasWebhookSecret: !!cfg?.webhookSecret,
+      activeReady: mode === "live" ? hasLiveCredentials : hasTestCredentials,
+    });
+  });
+
+  app.post("/api/tenants/:tenantId/payment-gateway-config", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
+    try {
+      const {
+        mode, apiVersion, enabled,
+        testClientId, testClientSecret, liveClientId, liveClientSecret, webhookSecret,
+      } = req.body ?? {};
+      const patch: Record<string, any> = { provider: "cashfree" };
+      if (mode !== undefined) patch.mode = mode === "live" ? "live" : "test";
+      if (apiVersion !== undefined) patch.apiVersion = apiVersion || "2023-08-01";
+      if (enabled !== undefined) patch.enabled = !!enabled;
+      // Only overwrite a secret field if the value is not a masked placeholder.
+      const writeSecret = (v: any) => v !== undefined && !String(v).includes("•");
+      if (writeSecret(testClientId)) patch.testClientId = testClientId || null;
+      if (writeSecret(testClientSecret)) patch.testClientSecret = testClientSecret || null;
+      if (writeSecret(liveClientId)) patch.liveClientId = liveClientId || null;
+      if (writeSecret(liveClientSecret)) patch.liveClientSecret = liveClientSecret || null;
+      if (writeSecret(webhookSecret)) patch.webhookSecret = webhookSecret || null;
+      const updated = await storage.upsertTenantPaymentGatewayConfig(req.params.tenantId, patch);
+      const activeMode = updated.mode === "live" ? "live" : "test";
+      res.json({
+        success: true,
+        provider: updated.provider || "cashfree",
+        mode: activeMode,
+        apiVersion: updated.apiVersion || "2023-08-01",
+        enabled: !!updated.enabled,
+        hasTestCredentials: !!(updated.testClientId && updated.testClientSecret),
+        hasLiveCredentials: !!(updated.liveClientId && updated.liveClientSecret),
+        hasWebhookSecret: !!updated.webhookSecret,
+        activeBaseUrl: activeMode === "live" ? "https://api.cashfree.com/pg" : "https://sandbox.cashfree.com/pg",
+      });
+    } catch (e: any) {
+      res.status(400).json({ error: e?.message ?? "Invalid payment gateway config" });
+    }
+  });
+
+  // ── Agency: Per-Tenant SMS Config (MessageCentral) ───────────────────────
+  app.get("/api/tenants/:tenantId/sms-config", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
+    const cfg = await storage.getTenantSmsConfig(req.params.tenantId);
+    const hasMcCredentials = !!(cfg?.mcCustomerId && cfg?.mcAuthToken);
+    res.json({
+      provider: cfg?.provider || "messagecentral",
+      enabled: !!cfg?.enabled,
+      mcCustomerId: cfg?.mcCustomerId ?? "",
+      // Mask the auth token; customer ID is not secret per MessageCentral docs.
+      mcAuthToken: cfg?.mcAuthToken ? maskKey(cfg.mcAuthToken) : "",
+      senderId: cfg?.senderId ?? "",
+      hasMcCredentials,
+      activeReady: hasMcCredentials && !!cfg?.enabled,
+    });
+  });
+
+  app.post("/api/tenants/:tenantId/sms-config", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
+    try {
+      const { provider, mcCustomerId, mcAuthToken, senderId, enabled } = req.body ?? {};
+      const patch: Record<string, any> = { provider: provider || "messagecentral" };
+      if (mcCustomerId !== undefined) patch.mcCustomerId = mcCustomerId || null;
+      if (senderId !== undefined) patch.senderId = senderId || null;
+      if (enabled !== undefined) patch.enabled = !!enabled;
+      // Only overwrite the auth token if the new value is not a masked placeholder.
+      if (mcAuthToken !== undefined && !String(mcAuthToken).includes("•")) {
+        patch.mcAuthToken = mcAuthToken || null;
+      }
+      const updated = await storage.upsertTenantSmsConfig(req.params.tenantId, patch);
+      const hasMcCredentials = !!(updated.mcCustomerId && updated.mcAuthToken);
+      res.json({
+        success: true,
+        provider: updated.provider || "messagecentral",
+        enabled: !!updated.enabled,
+        hasMcCredentials,
+        activeReady: hasMcCredentials && !!updated.enabled,
+      });
+    } catch (e: any) {
+      res.status(400).json({ error: e?.message ?? "Invalid SMS config" });
+    }
+  });
+
+  // Send a test OTP using the tenant's MessageCentral credentials.
+  app.post("/api/tenants/:tenantId/sms-config/test", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
+    const { phone } = req.body ?? {};
+    if (!phone || typeof phone !== "string") {
+      return res.status(400).json({ error: "Phone number is required for testing" });
+    }
+    const cfg = await storage.getTenantSmsConfig(req.params.tenantId);
+    if (!cfg?.mcCustomerId || !cfg?.mcAuthToken) {
+      return res.status(400).json({ error: "MessageCentral credentials are not configured for this agency." });
+    }
+    // Reuse the global sendOtp helper but pass a SmsConfig-shaped object built
+    // from this tenant's MessageCentral credentials so we don't accidentally
+    // fall back to the global SMS config.
+    const tenantSmsConfig: any = {
+      id: 0,
+      provider: "messagecentral",
+      msg91AuthKey: null, msg91TemplateId: null, msg91SenderId: null,
+      zauvApiKey: null,
+      mcCustomerId: cfg.mcCustomerId,
+      mcAuthToken: cfg.mcAuthToken,
+      updatedAt: new Date(),
+    };
+    const result = await sendOtp(phone, tenantSmsConfig);
+    if (!result.success) return res.status(502).json({ error: result.error || "Failed to send test OTP" });
+    res.json({ success: true, message: `Test OTP sent to ${phone}` });
+  });
+
   // ── B2C Register ──────────────────────────────────────────────────────────
   app.post("/api/b2c/auth/register", async (req, res) => {
     const { email, password, fullName, phone, otp } = req.body;
