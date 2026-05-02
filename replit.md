@@ -606,10 +606,46 @@ logging in.
   strips `id` and `invoiceId` from each line item, returning only
   `{description, quantity, unitPrice, amount}` to the customer.
 
-### Pending follow-up
+### Proposal payment link (T007 — May 2026)
 
-- **Proposal payment link (T007)** — backend `POST
-  /api/public/proposal/:token/initiate-payment` and the post-submission CTA on
-  `client/src/pages/proposal-apply.tsx` are not yet wired. The plan is to
-  reuse the same `/pay/invoice/:token` page once the proposal flow auto-mints
-  an invoice on submission.
+Lets the agency attach an estimate amount to a proposal so the customer can
+pay the moment they finish applying — no extra invoice plumbing on the
+agency side, no separate page on the customer side.
+
+- **Schema** (`shared/schema.ts`): `proposals.estimateAmountCents integer
+  null` — smallest currency unit, kept as `null` when the agency leaves the
+  field blank or enters `0`.
+- **Backend** (`server/routes.ts`):
+  - `POST /api/tenants/:tenantId/proposals` and the `PATCH` counterpart now
+    accept `estimateAmountCents` (validated as a non-negative integer; `0`
+    coerces to `null`).
+  - `GET /api/proposals/:token` adds `estimateAmountCents` plus the agency's
+    `currency` (from invoice settings, default `USD`) to the public payload.
+  - **New** `POST /api/public/proposal/:token/initiate-payment` — requires
+    `appliedCaseId` to exist (so the customer must have submitted first) and
+    `estimateAmountCents > 0`. Lazily creates a draft `sent` invoice attached
+    to the case (line item: `"<country> <visaType> — service estimate"`,
+    `category=agency_fee`, `taxable=false`), generates `publicToken`, and
+    returns `{invoiceToken, url, amountCents, currency}`.
+  - **Lifecycle gates** (mirrors `/api/proposals/:token/apply`): rejects
+    `revoked` (410), expired (410), no-application-yet (409), no estimate
+    set (400). Revoked / expired tokens cannot mint new payment links even
+    after the customer has already applied.
+  - **Concurrency-safe idempotency**: in-process `proposalPaymentInFlight`
+    Set (same pattern as `proposalApplyInFlight`) blocks two near-simultaneous
+    customer clicks from racing the read-then-create window. Reuse of
+    existing invoices is restricted to *collectible* statuses
+    (`draft|sent|partial|overdue`); a `paid` match short-circuits with a
+    `409 "already been paid"` so the customer is never invited to pay twice.
+  - `server/index.ts` adds `/api/public/proposal/` to the site-auth bypass
+    list so unauthenticated customers can call the new endpoint.
+- **Frontend**:
+  - `client/src/pages/agency/proposals.tsx` — `ProposalCreateDialog` adds an
+    "Estimated total (optional)" decimal input. Form-side conversion to
+    integer cents (`Math.round(value * 100)`) before POST.
+  - `client/src/pages/proposal-apply.tsx` — extends `ProposalPublicData.proposal`
+    with `estimateAmountCents | null` and `currency`. The success state
+    renders a tinted "Pay your estimate" card (only when the amount is set)
+    that calls `initiate-payment` and redirects to `/pay/invoice/<token>`.
+    The "Track your application" CTA stays visible underneath as a secondary
+    action.

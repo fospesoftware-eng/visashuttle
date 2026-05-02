@@ -3,7 +3,7 @@ import { useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Loader2, CheckCircle2, AlertCircle, ClipboardList, Building2,
-  Mail, Phone, Globe, Calendar, FileText, ArrowRight, ShieldCheck,
+  Mail, Phone, Globe, Calendar, FileText, ArrowRight, ShieldCheck, CreditCard,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,8 @@ interface ProposalPublicData {
     destinationCountry: string;
     visaType: string;
     notes: string | null;
+    estimateAmountCents: number | null;
+    currency: string;
     status: string;
     appliedCaseId: string | null;
     expiresAt: string | null;
@@ -98,6 +100,35 @@ export default function ProposalApplyPage() {
     },
   });
 
+  // Pay-estimate CTA on the success screen — fires `/initiate-payment` to
+  // get a public invoice token, then redirects to the standard pay page.
+  const initiatePaymentMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/public/proposal/${token}/initiate-payment`, {});
+      return res.json() as Promise<{ invoiceToken: string; url: string; amountCents: number; currency: string }>;
+    },
+    onSuccess: (r) => {
+      window.location.href = `/pay/invoice/${r.invoiceToken}`;
+    },
+    onError: (e: any) => {
+      toast({ title: "Could not open payment", description: e?.message, variant: "destructive" });
+    },
+  });
+
+  // Format the proposal estimate for display on the success screen.
+  // Uses Intl.NumberFormat with the agency's currency from the public payload.
+  const formatEstimate = (cents: number, currency: string) => {
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: "currency",
+        currency,
+        minimumFractionDigits: 2,
+      }).format(cents / 100);
+    } catch {
+      return `${(cents / 100).toFixed(2)} ${currency}`;
+    }
+  };
+
   const primary = tenant?.primaryColor || "#00B4D8";
   const accent = tenant?.accentColor || "#0096C7";
 
@@ -150,9 +181,53 @@ export default function ProposalApplyPage() {
                 {submitted.referenceId}
               </div>
             </div>
+
+            {/* Pay-estimate CTA — only when the agency set an estimate amount
+                on the proposal. Routes to the public /pay/invoice/:token page. */}
+            {proposal && proposal.estimateAmountCents && proposal.estimateAmountCents > 0 && (
+              <div
+                className="rounded-lg border p-4 mb-6 text-left"
+                style={{ borderColor: `${primary}40`, backgroundColor: `${primary}08` }}
+                data-testid="card-pay-estimate"
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className="w-9 h-9 rounded-md flex items-center justify-center shrink-0"
+                    style={{ backgroundColor: `${primary}20`, color: primary }}
+                  >
+                    <CreditCard className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold">Pay your estimate</div>
+                    <div className="text-sm text-muted-foreground">
+                      {tenant!.name} has prepared an estimate of{" "}
+                      <span className="font-semibold text-foreground" data-testid="text-estimate-amount">
+                        {formatEstimate(proposal.estimateAmountCents, proposal.currency)}
+                      </span>{" "}
+                      for this application. You can pay now via bank transfer, UPI, or online.
+                    </div>
+                    <Button
+                      className="mt-3"
+                      style={{ backgroundColor: primary }}
+                      onClick={() => initiatePaymentMutation.mutate()}
+                      disabled={initiatePaymentMutation.isPending}
+                      data-testid="button-pay-estimate"
+                    >
+                      {initiatePaymentMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <CreditCard className="w-4 h-4 mr-2" />
+                      )}
+                      Pay {formatEstimate(proposal.estimateAmountCents, proposal.currency)}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {submitted.tenantSlug && (
               <div>
-                <Button asChild style={{ backgroundColor: primary }} data-testid="button-go-portal">
+                <Button asChild style={{ backgroundColor: primary }} variant="outline" data-testid="button-go-portal">
                   <a href={`/w/${submitted.tenantSlug}/login`}>
                     Track your application <ArrowRight className="w-4 h-4 ml-1.5" />
                   </a>

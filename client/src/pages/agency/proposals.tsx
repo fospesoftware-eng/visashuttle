@@ -338,6 +338,10 @@ function ProposalCreateDialog({
     destinationCountry: "",
     visaType: "",
     notes: "",
+    // Estimate amount the customer is shown after applying — they can pay
+    // it via the public payment page. Stored as a string in form state for
+    // input UX; converted to cents on submit.
+    estimateAmount: "",
     expiresInDays: "30",
     assignedTo: defaultAssignee,
   });
@@ -355,6 +359,14 @@ function ProposalCreateDialog({
 
   const createMutation = useMutation({
     mutationFn: async () => {
+      // Convert estimate-amount text → integer cents/paise for the server.
+      // Empty / invalid / zero → null so "no estimate" sticks.
+      const estTrim = form.estimateAmount.trim();
+      const estParsed = estTrim ? Number(estTrim) : NaN;
+      const estimateAmountCents = Number.isFinite(estParsed) && estParsed > 0
+        ? Math.round(estParsed * 100)
+        : null;
+
       const res = await apiRequest("POST", `/api/tenants/${tenantId}/proposals`, {
         customerName: form.customerName,
         customerEmail: form.customerEmail || null,
@@ -362,6 +374,7 @@ function ProposalCreateDialog({
         destinationCountry: form.destinationCountry,
         visaType: form.visaType,
         notes: form.notes || null,
+        estimateAmountCents,
         expiresInDays: form.expiresInDays === "never" ? null : Number(form.expiresInDays),
         assignedTo: form.assignedTo || null,
       });
@@ -495,6 +508,24 @@ function ProposalCreateDialog({
               </SelectContent>
             </Select>
           </div>
+        </div>
+
+        <div>
+          <Label htmlFor="p-estimate">Estimated total (optional)</Label>
+          <Input
+            id="p-estimate"
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step="0.01"
+            value={form.estimateAmount}
+            onChange={(e) => setForm({ ...form, estimateAmount: e.target.value })}
+            placeholder="e.g. 250.00"
+            data-testid="input-estimate-amount"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            When set, the customer sees a "Pay estimate" button after submitting — collects payment via bank, UPI, or online gateway.
+          </p>
         </div>
 
         <div>

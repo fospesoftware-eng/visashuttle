@@ -1299,7 +1299,7 @@ export async function registerRoutes(
     const {
       customerName, customerEmail, customerPhone,
       destinationCountry, visaType, notes, leadId,
-      expiresInDays,
+      expiresInDays, estimateAmountCents,
     } = req.body ?? {};
 
     if (!customerName || typeof customerName !== "string" || !customerName.trim()) {
@@ -1334,6 +1334,17 @@ export async function registerRoutes(
       expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
     }
 
+    // Estimate amount (cents/paise). Optional. Coerce numeric input,
+    // reject negatives, and ignore zero so "no estimate" stays null.
+    let estCents: number | null = null;
+    if (estimateAmountCents !== undefined && estimateAmountCents !== null && estimateAmountCents !== "") {
+      const n = Math.round(Number(estimateAmountCents));
+      if (!Number.isFinite(n) || n < 0) {
+        return res.status(400).json({ error: "Estimate amount must be a non-negative number." });
+      }
+      estCents = n > 0 ? n : null;
+    }
+
     const proposal = await storage.createProposal({
       tenantId,
       token: generateProposalToken(),
@@ -1345,6 +1356,7 @@ export async function registerRoutes(
       destinationCountry: destinationCountry.trim(),
       visaType: visaType.trim(),
       notes: notes?.trim() || null,
+      estimateAmountCents: estCents,
       status: "sent",
       expiresAt,
     });
@@ -1372,7 +1384,7 @@ export async function registerRoutes(
     // Only allow safe fields. Don't let the client rewrite the token, the
     // tenant binding, or the applied-case linkage.
     const patch: Partial<Proposal> = {};
-    const { status, notes, customerEmail, customerPhone } = req.body ?? {};
+    const { status, notes, customerEmail, customerPhone, estimateAmountCents } = req.body ?? {};
     if (status !== undefined) {
       if (!["sent", "viewed", "applied", "expired", "revoked"].includes(status)) {
         return res.status(400).json({ error: "Invalid status" });
@@ -1382,6 +1394,17 @@ export async function registerRoutes(
     if (notes !== undefined) patch.notes = notes || null;
     if (customerEmail !== undefined) patch.customerEmail = customerEmail || null;
     if (customerPhone !== undefined) patch.customerPhone = customerPhone || null;
+    if (estimateAmountCents !== undefined) {
+      if (estimateAmountCents === null || estimateAmountCents === "") {
+        patch.estimateAmountCents = null;
+      } else {
+        const n = Math.round(Number(estimateAmountCents));
+        if (!Number.isFinite(n) || n < 0) {
+          return res.status(400).json({ error: "Estimate amount must be a non-negative number." });
+        }
+        patch.estimateAmountCents = n > 0 ? n : null;
+      }
+    }
 
     const updated = await storage.updateProposal(req.params.id, patch);
     res.json(updated);
@@ -1425,6 +1448,11 @@ export async function registerRoutes(
     const tenant = await storage.getTenant(proposal.tenantId);
     if (!tenant) return res.status(404).json({ error: "Agency not found" });
 
+    // Surface the agency's currency so the public apply page can format the
+    // estimate amount correctly (falls back to USD if no settings row yet).
+    const settings = await storage.getInvoiceSettings(proposal.tenantId);
+    const currency = settings?.currency || "USD";
+
     res.json({
       proposal: {
         id: proposal.id,
@@ -1435,6 +1463,8 @@ export async function registerRoutes(
         destinationCountry: proposal.destinationCountry,
         visaType: proposal.visaType,
         notes: proposal.notes,
+        estimateAmountCents: proposal.estimateAmountCents,
+        currency,
         status: proposal.status === "sent" ? "viewed" : proposal.status,
         appliedCaseId: proposal.appliedCaseId,
         expiresAt: proposal.expiresAt,
@@ -1601,6 +1631,141 @@ export async function registerRoutes(
     });
     } finally {
       proposalApplyInFlight.delete(proposal.id);
+    }
+  });
+
+  // Per-proposal in-flight guard for payment initiation. Stops two near-
+  // simultaneous "Pay estimate" clicks from racing past the read-then-create
+  // window in `getInvoicesByCaseId` → `createInvoice` and minting two
+  // duplicate draft invoices for the same proposal/case.
+  // (MemStorage is single-process; for a real DB this would be a DB-level
+  //  unique index on (caseId, notes) or a SELECT FOR UPDATE.)
+  const proposalPaymentInFlight = new Set<string>();
+
+  // POST /api/public/proposal/:token/initiate-payment — customer-facing
+  // "Pay estimate" CTA on the proposal-apply success screen. Requires the
+  // customer to have already applied (so we have a case to attach the
+  // invoice to) AND the proposal to carry an estimateAmountCents > 0.
+  // Idempotent: re-calling returns the same unpaid invoice's public URL
+  // instead of stacking duplicates.
+  app.post("/api/public/proposal/:token/initiate-payment", async (req, res) => {
+    const proposal = await storage.getProposalByToken(req.params.token);
+    if (!proposal) return res.status(404).json({ error: "Invalid proposal link." });
+
+    // Mirror the lifecycle gates on the other public proposal endpoints —
+    // a revoked or expired proposal shouldn't be able to spawn fresh
+    // payment links even after the customer has already applied.
+    if (proposal.status === "revoked") {
+      return res.status(410).json({ error: "This proposal has been revoked." });
+    }
+    if (proposal.expiresAt && proposal.expiresAt.getTime() < Date.now()) {
+      return res.status(410).json({ error: "This proposal has expired." });
+    }
+    if (!proposal.appliedCaseId) {
+      return res.status(409).json({ error: "Submit the application before paying the estimate." });
+    }
+    if (!proposal.estimateAmountCents || proposal.estimateAmountCents <= 0) {
+      return res.status(400).json({ error: "This proposal has no estimate amount to collect." });
+    }
+    if (proposalPaymentInFlight.has(proposal.id)) {
+      return res.status(409).json({ error: "Your payment link is being prepared. Please try again in a moment." });
+    }
+    proposalPaymentInFlight.add(proposal.id);
+
+    try {
+      const tenantId = proposal.tenantId;
+      const settings = await storage.getInvoiceSettings(tenantId);
+      const currency = settings?.currency || "USD";
+      const prefix = settings?.invoicePrefix ?? "INV";
+      const origin = getRequestOrigin(req);
+
+      // Idempotency: reuse an outstanding estimate-invoice for this same
+      // proposal/case if one already exists. We *only* match collectible
+      // statuses — a paid/cancelled invoice from a prior attempt should
+      // never be re-served as a payment link.
+      const REUSABLE_STATUSES = new Set(["draft", "sent", "partial", "overdue"]);
+      const existingInvoices = await storage.getInvoicesByCaseId(proposal.appliedCaseId);
+      let invoice = existingInvoices.find(
+        (inv) =>
+          inv.notes?.startsWith(`Estimate from proposal ${proposal.token}`) &&
+          inv.total === proposal.estimateAmountCents &&
+          REUSABLE_STATUSES.has(inv.status),
+      );
+
+      // If a paid invoice exists for this exact estimate, surface that
+      // explicitly instead of silently minting a duplicate the customer
+      // would pay twice.
+      if (!invoice) {
+        const alreadyPaid = existingInvoices.find(
+          (inv) =>
+            inv.notes?.startsWith(`Estimate from proposal ${proposal.token}`) &&
+            inv.total === proposal.estimateAmountCents &&
+            inv.status === "paid",
+        );
+        if (alreadyPaid) {
+          return res.status(409).json({ error: "This estimate has already been paid. Thank you!" });
+        }
+      }
+
+      if (!invoice) {
+        const allTenantInvoices = await storage.getInvoicesByTenantId(tenantId);
+        const year = new Date().getFullYear();
+        const seq = allTenantInvoices.length + 1;
+        const invoiceNumber = `${prefix}-${year}-${String(seq).padStart(4, "0")}`;
+        const total = proposal.estimateAmountCents;
+        invoice = await storage.createInvoice(
+          {
+            tenantId,
+            invoiceNumber,
+            caseId: proposal.appliedCaseId,
+            leadId: proposal.leadId ?? null,
+            customerName: proposal.customerName,
+            customerEmail: proposal.customerEmail,
+            customerPhone: proposal.customerPhone,
+            destinationCountry: proposal.destinationCountry,
+            visaType: proposal.visaType,
+            status: "sent",
+            paymentType: "upfront",
+            currency,
+            subtotal: total,
+            taxAmount: 0,
+            total,
+            paidAmount: 0,
+            issuedAt: new Date(),
+            notes: `Estimate from proposal ${proposal.token}`,
+          } as any,
+          [
+            {
+              description: `${proposal.destinationCountry} ${proposal.visaType} — service estimate`,
+              quantity: 1,
+              unitPrice: total,
+              amount: total,
+              category: "agency_fee",
+              taxable: false,
+              taxRate: 0,
+            } as any,
+          ],
+        );
+      }
+
+      // Lazily generate the invoice's public token so the customer can pay it
+      // through the standard /pay/invoice/:token page.
+      let payToken = invoice.publicToken;
+      if (!payToken) {
+        payToken = randomUUID().replace(/-/g, "");
+        await storage.updateInvoice(invoice.id, { publicToken: payToken } as any);
+      }
+
+      res.json({
+        invoiceToken: payToken,
+        url: `${origin}/pay/invoice/${payToken}`,
+        amountCents: invoice.total,
+        currency,
+      });
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message ?? "Failed to initiate payment" });
+    } finally {
+      proposalPaymentInFlight.delete(proposal.id);
     }
   });
 

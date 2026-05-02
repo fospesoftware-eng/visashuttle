@@ -796,6 +796,7 @@ export class MemStorage implements IStorage {
       destinationCountry: data.destinationCountry,
       visaType: data.visaType,
       notes: data.notes ?? null,
+      estimateAmountCents: data.estimateAmountCents ?? null,
       status: data.status ?? "sent",
       expiresAt: data.expiresAt ?? null,
       appliedCaseId: null,

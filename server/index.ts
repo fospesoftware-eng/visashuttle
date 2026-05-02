@@ -125,6 +125,12 @@ app.use((req, res, next) => {
     return next();
   }
 
+  // Public, tokenized proposal-payment endpoints (the customer-facing
+  // "Pay estimate" CTA shown after applying via a proposal link).
+  if (req.path.startsWith("/api/public/proposal/")) {
+    return next();
+  }
+
   // Protect API routes - require site authentication
   if (req.path.startsWith("/api") && !req.session?.siteAuthenticated) {
     return res.status(401).json({ error: "Site authentication required" });

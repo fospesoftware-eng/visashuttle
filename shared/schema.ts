@@ -114,6 +114,11 @@ export const proposals = pgTable("proposals", {
   visaType: text("visa_type").notNull(),
   // Optional message from the agency shown above the checklist.
   notes: text("notes"),
+  // Optional upfront estimate (smallest currency unit — cents/paise).
+  // When > 0, the public apply page shows a "Pay estimate" CTA after submit
+  // that creates a draft invoice for this amount and redirects the customer
+  // to the public invoice payment page.
+  estimateAmountCents: integer("estimate_amount_cents"),
   status: text("status").notNull().default("sent"), // see PROPOSAL_STATUSES
   expiresAt: timestamp("expires_at"),
   // Set once the customer submits via the apply form. Lets the agency click
