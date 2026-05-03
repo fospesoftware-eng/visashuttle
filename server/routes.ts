@@ -3455,6 +3455,18 @@ export async function registerRoutes(
     return null;
   }
 
+  // Tenant-wide list of appointments — used by the agency dashboard for the
+  // "Upcoming appointments" panel.
+  app.get("/api/tenants/:tenantId/appointments", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
+    try {
+      const list = await storage.getAppointmentsByTenantId(req.params.tenantId);
+      res.json(list);
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message ?? "Failed to load appointments" });
+    }
+  });
+
   app.get("/api/cases/:caseId/appointments", async (req, res) => {
     try {
       const c = await storage.getCase(req.params.caseId);
