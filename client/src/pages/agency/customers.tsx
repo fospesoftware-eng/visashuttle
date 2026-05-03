@@ -156,7 +156,7 @@ export default function CustomersPage() {
             title={customers && customers.length === 0 ? "No customers yet" : "No matches"}
             description={
               customers && customers.length === 0
-                ? "Customers appear here once they sign in to your white-label portal or you link them to a case."
+                ? "Customers appear here once they sign in to your white-label portal or you link them to an application."
                 : "Try a different search term."
             }
           />
@@ -233,8 +233,8 @@ export default function CustomersPage() {
                       </div>
                     </div>
                     <div className="hidden sm:flex flex-col items-end gap-1 text-xs text-muted-foreground">
-                      <Badge variant="outline" data-testid={`badge-cases-${c.id}`}>
-                        {c.caseCount} case{c.caseCount === 1 ? "" : "s"}
+                      <Badge variant="outline" data-testid={`badge-applications-${c.id}`}>
+                        {c.caseCount} application{c.caseCount === 1 ? "" : "s"}
                       </Badge>
                       <span>Last activity: {fmtDate(c.latestActivityAt)}</span>
                     </div>

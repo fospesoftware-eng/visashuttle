@@ -136,7 +136,7 @@ function PassportFileLink({ c }: { c: Case }) {
 }
 
 function PassportBlock({ c }: { c: Case }) {
-  // Only render if at least one passport field is set on this case.
+  // Only render if at least one passport field is set on this application.
   const hasAny = !!(
     c.passportNumber || c.passportSurname || c.passportGivenName ||
     c.passportNationality || c.passportDateOfExpiry || c.passportDateOfIssue ||
@@ -146,7 +146,7 @@ function PassportBlock({ c }: { c: Case }) {
   if (!hasAny) {
     return (
       <div className="text-xs text-muted-foreground italic">
-        No passport on file for this case.
+        No passport on file for this application.
       </div>
     );
   }
@@ -250,7 +250,7 @@ export default function CustomerDetailPage() {
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-2">
-                  <Badge variant="outline" data-testid="badge-total-cases">
+                  <Badge variant="outline" data-testid="badge-total-applications">
                     {data.cases.length} application{data.cases.length === 1 ? "" : "s"}
                   </Badge>
                 </div>
@@ -266,13 +266,13 @@ export default function CustomerDetailPage() {
               ) : (
                 <div className="grid gap-4">
                   {data.cases.map((c) => (
-                    <Card key={c.id} className="p-5" data-testid={`card-case-${c.id}`}>
+                    <Card key={c.id} className="p-5" data-testid={`card-application-${c.id}`}>
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0">
                           <Link href={`/app/cases/${c.id}`}>
                             <div className="flex items-center gap-2 hover:underline cursor-pointer">
                               <Briefcase className="h-4 w-4 text-muted-foreground" />
-                              <span className="font-medium" data-testid={`text-case-number-${c.id}`}>
+                              <span className="font-medium" data-testid={`text-application-number-${c.id}`}>
                                 {c.caseNumber}
                               </span>
                               <ChevronRight className="h-3 w-3 text-muted-foreground" />
@@ -287,7 +287,7 @@ export default function CustomerDetailPage() {
                             <span>Applicant: {c.applicantName}</span>
                           </div>
                         </div>
-                        <div className="flex flex-col items-end gap-1">
+                        <div className="flex flex-col items-end gap-2">
                           <Badge
                             className={STATUS_COLORS[c.status] ?? "bg-slate-100 text-slate-800"}
                             data-testid={`badge-status-${c.id}`}
@@ -299,6 +299,16 @@ export default function CustomerDetailPage() {
                               Travel: {fmtDate(c.travelDate)}
                             </span>
                           )}
+                          <Link href={`/app/cases/${c.id}`}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              data-testid={`button-open-application-${c.id}`}
+                            >
+                              Open application
+                              <ChevronRight className="h-3 w-3 ml-1" />
+                            </Button>
+                          </Link>
                         </div>
                       </div>
                       <Separator className="my-4" />
