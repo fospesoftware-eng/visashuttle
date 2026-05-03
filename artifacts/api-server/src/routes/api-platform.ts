@@ -706,9 +706,13 @@ export async function registerApiPlatformRoutes(
       res.status(gatewayRes.status >= 500 ? 503 : gatewayRes.status).json({ error: data?.message || "Unable to verify payment" });
       return;
     }
-    // Bind the order to THIS tenant via order_tags.
+    // Strict tenant binding. Every order minted by /initiate-topup carries
+    // an `order_tags.tenant_id` matching the tenant that requested it.
+    // We REQUIRE this tag to be present and equal to the URL tenant — even
+    // a paid Cashfree order from a different tenant cannot be used to
+    // credit this wallet.
     const tagTenantId = data?.order_tags?.tenant_id;
-    if (tagTenantId && tagTenantId !== req.params.tenantId) {
+    if (!tagTenantId || tagTenantId !== req.params.tenantId) {
       res.status(400).json({ error: "Order does not belong to this tenant" });
       return;
     }

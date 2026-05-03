@@ -5839,7 +5839,7 @@ export async function registerRoutes(
       getCredentials: async (tenantId: string) => {
         // Prefer tenant-scoped credentials (matches the invoice flow).
         // Fall back to platform creds via the same helper signature.
-        const cfg = (await storage.getTenantPaymentGatewayConfig(tenantId)) as any
+        const cfg = (await storage.getTenantPaymentGatewayConfig(tenantId))
           ?? (await storage.getPaymentGatewayConfig());
         return getCashfreeCredentials(cfg);
       },
