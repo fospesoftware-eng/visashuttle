@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/visashuttle-mobile/"
+title = "VisaShuttle Mobile"
+version = "1.0.0"
+id = "artifacts/visashuttle-mobile"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/visashuttle-mobile/" ]
+localPort = 24990
+
+[services.development]
+run = "pnpm --filter @workspace/visashuttle-mobile run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/visashuttle-mobile", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/visashuttle-mobile", "run", "serve" ]
+
+[services.env]
+PORT = "24990"
+BASE_PATH = "/visashuttle-mobile/"

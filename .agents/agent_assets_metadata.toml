@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "MgB5_StU9AuZS1F3PT053"
+uri = "file://artifacts/visashuttle-mobile/assets/images/icon.png"
+type = "image"
+title = "visashuttle app icon"
