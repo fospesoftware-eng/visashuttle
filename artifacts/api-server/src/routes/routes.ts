@@ -277,8 +277,15 @@ type CashfreeConfigShape = {
   liveClientId?: string | null;
   liveClientSecret?: string | null;
 };
-function getCashfreeCredentials(cfg: CashfreeConfigShape | undefined) {
-  const mode = cfg?.mode === "live" || process.env.CASHFREE_MODE === "live" ? "live" : "test";
+function getCashfreeCredentials(cfg: CashfreeConfigShape | undefined): {
+  mode: "live" | "test";
+  baseUrl: string;
+  apiVersion: string;
+  clientId?: string;
+  clientSecret?: string;
+} {
+  const mode: "live" | "test" =
+    cfg?.mode === "live" || process.env.CASHFREE_MODE === "live" ? "live" : "test";
   const clientId = mode === "live"
     ? cfg?.liveClientId || process.env.CASHFREE_LIVE_CLIENT_ID
     : cfg?.testClientId || process.env.CASHFREE_TEST_CLIENT_ID;
@@ -314,7 +321,7 @@ function getCashfreePhone(phone?: string | null): string {
   return "9999999999";
 }
 
-async function readCashfreeBody(response: Response) {
+async function readCashfreeBody(response: globalThis.Response) {
   const text = await response.text();
   if (!text) return {};
   try {
