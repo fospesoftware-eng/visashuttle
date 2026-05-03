@@ -1,0 +1,162 @@
+{
+  "region": "Schengen Area",
+  "applicant_nationality": "India",
+  "common_schengen_visa_types": [
+    {
+      "code": "A",
+      "name": "Airport Transit Visa",
+      "purpose": "Transit through the international transit area of a Schengen airport"
+    },
+    {
+      "code": "C",
+      "name": "Short Stay Schengen Visa",
+      "max_stay": "90 days in any 180-day period",
+      "sub_types": [
+        "Tourist Visa",
+        "Business Visa",
+        "Family/Friend Visit Visa",
+        "Medical Visa",
+        "Conference/Event Visa",
+        "Cultural Visa",
+        "Sports Visa",
+        "Short Study/Training Visa",
+        "Seafarer Visa",
+        "Official Visit Visa"
+      ]
+    },
+    {
+      "code": "D",
+      "name": "National Long Stay Visa",
+      "stay": "More than 90 days",
+      "sub_types": [
+        "Student Visa",
+        "Work Visa",
+        "Family Reunion Visa",
+        "Research Visa",
+        "Residence Visa",
+        "Au Pair Visa",
+        "Internship Visa",
+        "Self-employed Visa",
+        "Entrepreneur Visa"
+      ]
+    }
+  ],
+  "countries": [
+    {
+      "country": "Austria",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Work Visa", "Family Reunion Visa", "Residence Visa"]
+    },
+    {
+      "country": "Belgium",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Work Visa", "Family Reunion Visa", "Residence Visa"]
+    },
+    {
+      "country": "Bulgaria",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Work Visa", "Family Reunion Visa", "Residence Visa"]
+    },
+    {
+      "country": "Croatia",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Work Visa", "Family Reunion Visa", "Residence Visa"]
+    },
+    {
+      "country": "Czech Republic",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Work Visa", "Family Reunion Visa", "Residence Visa"]
+    },
+    {
+      "country": "Denmark",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Work Visa", "Family Reunion Visa", "Residence Visa"]
+    },
+    {
+      "country": "Estonia",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Work Visa", "Family Reunion Visa", "Residence Visa"]
+    },
+    {
+      "country": "Finland",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Work Visa", "Family Reunion Visa", "Residence Visa"]
+    },
+    {
+      "country": "France",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Work Visa", "Talent Passport Visa", "Family Reunion Visa", "Residence Visa"]
+    },
+    {
+      "country": "Germany",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Job Seeker Visa", "Employment Visa", "EU Blue Card", "Family Reunion Visa", "Residence Visa"]
+    },
+    {
+      "country": "Greece",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Work Visa", "Family Reunion Visa", "Residence Visa"]
+    },
+    {
+      "country": "Hungary",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Work Visa", "Family Reunion Visa", "Residence Visa"]
+    },
+    {
+      "country": "Iceland",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Work Visa", "Family Reunion Visa", "Residence Visa"]
+    },
+    {
+      "country": "Italy",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Work Visa", "Self-employed Visa", "Family Reunion Visa", "Residence Visa"]
+    },
+    {
+      "country": "Latvia",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Work Visa", "Family Reunion Visa", "Residence Visa"]
+    },
+    {
+      "country": "Liechtenstein",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Work Visa", "Family Reunion Visa", "Residence Visa"]
+    },
+    {
+      "country": "Lithuania",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Work Visa", "Family Reunion Visa", "Residence Visa"]
+    },
+    {
+      "country": "Luxembourg",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Work Visa", "Family Reunion Visa", "Residence Visa"]
+    },
+    {
+      "country": "Malta",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Work Visa", "Family Reunion Visa", "Residence Visa"]
+    },
+    {
+      "country": "Netherlands",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Work Visa", "Startup Visa", "Highly Skilled Migrant Visa", "Family Reunion Visa", "Residence Visa"]
+    },
+    {
+      "country": "Norway",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Skilled Worker Visa", "Family Immigration Visa", "Residence Visa"]
+    },
+    {
+      "country": "Poland",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Work Visa", "Family Reunion Visa", "Residence Visa"]
+    },
+    {
+      "country": "Portugal",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Work Visa", "Job Seeker Visa", "D7 Visa", "Digital Nomad Visa", "Family Reunion Visa", "Residence Visa"]
+    },
+    {
+      "country": "Romania",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Work Visa", "Family Reunion Visa", "Residence Visa"]
+    },
+    {
+      "country": "Slovakia",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Work Visa", "Family Reunion Visa", "Residence Visa"]
+    },
+    {
+      "country": "Slovenia",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Work Visa", "Family Reunion Visa", "Residence Visa"]
+    },
+    {
+      "country": "Spain",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Work Visa", "Self-employed Visa", "Digital Nomad Visa", "Non-lucrative Visa", "Family Reunion Visa", "Residence Visa"]
+    },
+    {
+      "country": "Sweden",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Work Visa", "Job Seeker Visa", "Family Reunion Visa", "Residence Visa"]
+    },
+    {
+      "country": "Switzerland",
+      "visa_types": ["Airport Transit Visa", "Tourist Visa", "Business Visa", "Family/Friend Visit Visa", "Medical Visa", "Student Visa", "Work Visa", "Family Reunion Visa", "Residence Visa"]
+    }
+  ]
+}

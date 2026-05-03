@@ -1,0 +1,176 @@
+### Feature List for Visa Shuttle Update
+
+#### 1. Smart Dropdown / Auto-Fill Fields
+
+* If any dropdown has more than 10 items, convert it into searchable auto-fill/select input.
+* Use auto-complete for:
+
+  * Nationality
+  * Destination country
+  * Passport country
+  * Countries visited
+  * Visa type if list grows
+* User can type and filter results instantly.
+* Multi-select auto-fill for “Countries visited in last 3 years”.
+
+#### 2. Dashboard Layout Fix
+
+* Fix right-side white space issue in user dashboard.
+* Dashboard must use full available width properly.
+* Sidebar + main content should be responsive.
+* No unwanted empty margins on desktop or mobile.
+* Cards should align neatly in grid layout.
+* Content should expand fluidly based on screen size.
+
+#### 3. Auto-Save Traveler Profile
+
+When user enters these details once, save them automatically for next visa check:
+
+* Nationality
+* Date of birth
+* Gender
+* Passport country
+* Employment status
+* Job title
+* Monthly income range
+* Bank balance range
+* Previous travel history
+
+For future searches:
+
+* Pre-fill saved details automatically.
+* Allow user to edit saved details.
+* Show “Using saved profile” badge.
+
+#### 4. More Visa Approval Questions
+
+##### Personal Details
+
+* Nationality
+* Passport country
+* Date of birth
+* Gender
+* Marital status
+* Country of residence
+* Current city
+* Dependents in home country
+
+##### Travel Basics
+
+* Destination country
+* Visa type
+* Purpose of travel
+* Planned travel date
+* Trip duration
+* Single entry or multiple entry
+* First-time visitor to destination?
+
+##### Employment & Income
+
+* Employment status
+* Job title
+* Company name
+* Years in current job/business
+* Monthly income
+* Source of income
+* Tax returns available?
+* Salary slips available?
+* Business registration available?
+
+##### Financial Profile
+
+* Approximate bank balance
+* Bank statement available?
+* Bank statement duration
+* Any large recent deposits?
+* Credit card available?
+* Assets/property ownership
+* Who is funding the trip?
+* Sponsor details if applicable
+
+##### Travel History
+
+* Countries visited in last 3 years
+* Number of international trips
+* Previous visa approvals
+* Previous visa refusals
+* Refusal reason if any
+* Any previous overstays?
+* Any deportation history?
+
+##### Trip Documentation
+
+* Return ticket booked?
+* Hotel booking available?
+* Invitation letter available?
+* Travel insurance available?
+* Day-wise itinerary available?
+* Leave approval letter available?
+* Cover letter available?
+
+##### Home Country Ties
+
+* Family staying in home country?
+* Own property in home country?
+* Stable employment/business?
+* Ongoing education?
+* Financial commitments in home country?
+
+##### Risk & Compliance
+
+* Criminal record declaration
+* Immigration violation history
+* Previous false document issue
+* Medical condition requiring declaration, if applicable
+
+#### 5. Creative Step-by-Step Form
+
+Use multi-step form with progress indicator:
+
+1. Personal Profile
+2. Travel Plan
+3. Employment & Income
+4. Financial Strength
+5. Travel History
+6. Documents
+7. Home Ties
+8. Review & AI Check
+
+#### 6. AI Result Improvements
+
+AI should analyze all questions and generate:
+
+* Approval chance percentage
+* Chance category
+* Profile strengths
+* Risk factors
+* Missing documents
+* Country-specific concerns
+* Improvement tips
+* Suggested documents
+* Final recommendation
+* Disclaimer
+
+#### 7. Saved Profile Management
+
+Dashboard should include:
+
+* Saved Profile section
+* Profile completion percentage
+* Edit profile button
+* Last updated date
+* Auto-fill status
+* Clear saved data option
+
+#### 8. User Experience Features
+
+* Auto-save form progress
+* Continue incomplete check
+* Mobile-friendly step form
+* Smooth animations
+* Form validation
+* Tooltips for complex questions
+* Smart hints based on destination country
+* Clean modern corporate UI
+* No dashboard white-space issue
+* Fully responsive layout

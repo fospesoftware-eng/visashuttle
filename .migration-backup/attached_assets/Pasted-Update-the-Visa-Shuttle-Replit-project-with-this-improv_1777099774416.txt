@@ -1,0 +1,215 @@
+Update the Visa Shuttle Replit project with this improved dashboard and user flow.
+
+Main Flow:
+After login, users must land directly on a modern user dashboard.
+
+Dashboard must show:
+- Welcome message
+- Free check status
+- Total checks completed
+- Recent visa checks
+- Saved traveler profile status
+- Button: “Start Visa Approval Check”
+- Button: “Start Deep Check”
+- Paid upgrade banner
+- Saved data/profile shortcut
+- Subscription status
+
+Dashboard UI/UX:
+Create a very modern, corporate, minimal dashboard.
+Use:
+- Clean white background
+- Navy and blue accent colors
+- Minimal cards
+- Soft shadows
+- Rounded corners
+- Professional SaaS layout
+- Sidebar navigation
+- Mobile responsive design
+- Smooth transitions
+- Premium corporate feel
+
+Sidebar Menu:
+- Dashboard
+- New Visa Check
+- Deep Check
+- Saved Profile
+- Check History
+- Pricing
+- Settings
+- Logout
+
+Visa Approval Check:
+When user clicks “Start Visa Approval Check”, open a step-by-step multi-step form.
+
+Step 1: Travel Basics
+- Nationality
+- Destination country
+- Visa type
+- Purpose of travel
+
+Step 2: Personal Details
+- Age
+- Employment status
+- Job title
+- Monthly income
+- Who is funding the trip?
+
+Step 3: Financial Strength
+- Approximate bank balance
+- Bank statement available?
+- Income proof available?
+- Tax return available?
+
+Step 4: Travel History
+- Previous international travel?
+- Countries visited
+- Previous visa approvals
+- Previous visa refusals
+- Overstay history
+
+Step 5: Trip Details
+- Trip duration
+- Return ticket status
+- Hotel booking
+- Invitation letter
+- Travel insurance
+
+Step 6: Review & Submit
+Show all answers clearly.
+Button: “Generate AI Visa Chance”
+
+AI must calculate approval chance using ChatGPT or Claude API only.
+No hardcoded final scoring logic.
+
+Deep Check:
+Add a paid “Deep Check” option in dashboard.
+
+Deep Check should look premium and locked for free users.
+Show:
+- Advanced AI visa risk review
+- Embassy-style analysis
+- Red flag detection
+- Document gap analysis
+- Personalized improvement plan
+- Downloadable PDF report
+
+If user is not paid:
+Show upgrade modal or redirect to pricing page.
+
+Saved Data Feature:
+Add “Saved Profile” option.
+
+User can save reusable traveler details:
+- Full name
+- Nationality
+- Date of birth
+- Passport country
+- Employment status
+- Job title
+- Monthly income range
+- Bank balance range
+- Travel history
+- Common documents available
+
+When starting a new visa check, allow:
+- “Use Saved Profile”
+- “Edit for this check”
+
+Additional Features:
+Add these features to make the platform richer:
+
+1. Check History
+Users can view all previous visa checks.
+
+2. Compare Checks
+User can compare approval chance for different destination countries.
+
+3. Document Checklist
+After AI result, generate personalized document checklist.
+
+4. Visa Risk Meter
+Show visual score meter:
+- High Chance
+- Good Chance
+- Moderate Chance
+- Low Chance
+- Very Risky
+
+5. AI Improvement Tips
+Show practical steps to improve approval chance before applying.
+
+6. Download PDF Report
+Available for paid users only.
+
+7. Upgrade Prompts
+Show upgrade prompts after free check is used.
+
+8. Profile Completion Score
+Dashboard should show how complete the saved traveler profile is.
+
+9. Smart Suggestions
+Dashboard should suggest:
+- Complete saved profile
+- Try Deep Check
+- Compare another destination
+- Upgrade for PDF report
+
+10. Notifications Area
+Show simple in-app alerts:
+- Free check available
+- Upgrade needed
+- Deep Check unlocked
+- Profile incomplete
+
+AI Result Page:
+Show:
+- Approval chance percentage
+- Status label
+- AI summary
+- Strengths
+- Risk factors
+- Missing documents
+- Required documents
+- Improvement tips
+- Next steps
+- Disclaimer
+
+AI JSON response format:
+{
+  "approvalChance": 78,
+  "statusLabel": "Good Chance",
+  "summary": "...",
+  "strengths": ["..."],
+  "riskFactors": ["..."],
+  "missingDocuments": ["..."],
+  "requiredDocuments": ["..."],
+  "improvementTips": ["..."],
+  "nextSteps": ["..."],
+  "disclaimer": "Visa Shuttle provides AI-based estimation only and does not guarantee visa approval."
+}
+
+Important Rules:
+- Login required before any check.
+- First basic check is free.
+- Second basic check requires paid plan.
+- Deep Check requires paid plan.
+- Saved profile can be used to prefill forms.
+- AI API calls must happen only on backend.
+- Never expose OpenAI or Claude keys in frontend.
+- No B2B or agency features for now.
+- Keep the full platform B2C only.
+
+Final Requirement:
+Generate a full production-ready SaaS application with:
+- React + Vite + TypeScript
+- Tailwind CSS
+- shadcn/ui
+- Supabase auth and database
+- Stripe payment placeholder
+- OpenAI/Claude backend AI integration
+- Protected dashboard routes
+- Step-by-step creative forms
+- Saved profile system
+- Modern corporate minimal dashboard
+- Responsive mobile-first UI

@@ -1,0 +1,107 @@
+Create a modern B2C-style frontend homepage for “Visa Shuttle” — an AI-powered Visa Approval Chance Checker.
+
+Goal:
+Users should be able to check their estimated visa approval chance by entering basic travel and visa details.
+
+Design Style:
+Clean, premium, trustworthy, travel-tech / AI startup look.
+Use a modern SaaS landing page style with soft gradients, rounded cards, subtle shadows, and responsive mobile-first design.
+Color theme: Blue, white, dark navy, and light cyan accents.
+
+Homepage Sections:
+
+1. Hero Section
+Headline:
+“Check Your Visa Approval Chances Before You Apply”
+
+Subheadline:
+“Visa Shuttle helps travelers understand their visa approval probability using AI-powered insights based on nationality, visa type, destination, and travel purpose.”
+
+CTA:
+“Check My Visa Chance”
+
+Add a hero form card on the right or below the headline.
+
+2. Visa Approval Chance Checker Form
+
+Form Fields:
+- Nationality
+  Dropdown/search select
+  Placeholder: “Select your nationality”
+
+- Visa Type
+  Dropdown
+  Options:
+  Tourist Visa
+  Business Visa
+  Student Visa
+  Work Visa
+  Visit Visa
+  Transit Visa
+
+- Country Going To
+  Dropdown/search select
+  Placeholder: “Select destination country”
+
+- Purpose of Travel
+  Textarea or dropdown
+  Options:
+  Tourism
+  Business Meeting
+  Study
+  Employment
+  Family Visit
+  Medical Treatment
+  Conference/Event
+  Other
+
+- Agency Applied
+  Text input
+  Optional field
+  Placeholder: “Agency name if already applied”
+
+Submit Button:
+“Check Approval Chance”
+
+After submit, show a result card:
+- Approval Chance Score: example “78%”
+- Status badge: “Good Chance”
+- Short AI-style explanation
+- Suggested next steps:
+  “Review your documents”
+  “Check financial proof”
+  “Confirm travel history”
+  “Consult an expert if needed”
+
+This can be frontend-only with mock result logic.
+
+3. Trust Section
+Add 3 cards:
+- AI-Based Visa Insights
+- Fast Pre-Assessment
+- Built for Travelers & Agencies
+
+4. How It Works
+Step 1: Enter your travel details
+Step 2: AI checks key visa factors
+Step 3: Get your approval chance instantly
+
+5. CTA Section
+Headline:
+“Planning to Apply for a Visa?”
+Button:
+“Start Free Visa Check”
+
+Technical Requirements:
+- Build using React with Vite
+- Use Tailwind CSS
+- Fully responsive for mobile, tablet, and desktop
+- Use clean reusable components
+- Add form validation
+- Use mock data for countries and nationalities
+- No backend required
+- Keep UI polished and production-ready
+
+Important:
+The app must feel like a B2C consumer product, not an admin dashboard.
+Make the form simple, friendly, and easy for normal travelers to use.

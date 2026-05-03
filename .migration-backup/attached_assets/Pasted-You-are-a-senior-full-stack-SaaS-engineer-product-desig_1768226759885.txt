@@ -1,0 +1,210 @@
+You are a senior full-stack SaaS engineer + product designer. Build a FULL PRODUCTION-READY multi-tenant SaaS named “VisaShuttle” (AI-powered visa processing platform for travel agencies) with 4 interfaces:
+1) SaaS Admin
+2) Public SaaS marketing website
+3) Travel Agency dashboard (tenant)
+4) Customer dashboard (applicant)
+
+GOALS:
+- Production-grade architecture, secure authentication, multi-tenancy, RBAC, audit logs, billing-ready structure.
+- AI-first workflows: document intelligence, checklist personalization, readiness score, letter drafting, requirement ingestion + change detection queue.
+- Most advanced and creative UI/UX: modern, minimal, animated, responsive, accessible, with premium components and clear information architecture.
+- Color theme must match the logo: if a logo file is present in /assets/logo.(png|svg), extract 3-5 dominant colors and generate a design token palette. If not present, use a premium fallback theme and clearly centralize theme in /apps/web/src/theme/tokens.ts so user can adjust later.
+- Deliver a working MVP with realistic, extensible codebase and seed data.
+
+STACK (use exactly this unless impossible):
+- Monorepo
+- Frontend: Next.js (App Router) + TypeScript + Tailwind CSS + shadcn/ui + framer-motion + lucide-react
+- Backend: Next.js API routes OR separate Node/NestJS service (choose best for speed; prefer Next.js API routes for single-deploy simplicity)
+- DB: PostgreSQL with Prisma ORM
+- Auth: NextAuth (Credentials + Email magic link optional) OR Clerk (if available). Prefer NextAuth for self-contained.
+- Storage: Local dev storage + abstraction for S3-compatible later. Use signed URLs pattern.
+- Queue/Jobs: simple cron-like job runner in app + DB job table (no external infra needed), later replaceable.
+- AI: Provide a pluggable provider interface with OpenAI-compatible API. Use env var AI_BASE_URL + AI_API_KEY. Must support “mock mode” if keys not present.
+
+NON-NEGOTIABLE FEATURES:
+A) Multi-tenancy:
+- Tenant = Agency
+- Data isolation enforced via tenantId on all records + Prisma middleware or query guard.
+- RBAC: SaaS roles + Agency roles + Customer role.
+- Audit log for sensitive actions (document download, status change, AI suggestions applied).
+
+B) Interfaces:
+1) Public Website:
+- Landing, Pricing, Features, Security/Trust, Blog/Guides placeholders, Sign up / Login.
+- SEO-ready pages and metadata.
+- CTA flows for agency signup.
+
+2) SaaS Admin:
+- Tenant management: create/approve/suspend, plan limits, usage.
+- Visa Knowledge Base (VKB) admin: countries, nationalities, visa types, template versions.
+- VKB Sources: add source URL/PDF metadata; create “Update Proposals” queue.
+- AI Governance: quotas, feature toggles, confidence threshold, human-review settings.
+- Support tools: impersonate agency (read-only), view audit logs, basic ticket placeholder.
+
+3) Agency Dashboard:
+- CRM: leads pipeline with stages, tasks, reminders, assignments, activity timeline.
+- Case management: cases with statuses, applicants, checklist, messaging, payments placeholders, pack generation.
+- Document center: upload, classification, extracted fields, quality score, issues, request re-upload.
+- AI readiness score and recommended actions.
+- AI drafting: cover letter, sponsor letter, explanation letter.
+- Reporting: funnel and performance metrics.
+
+4) Customer Dashboard:
+- Simple step-based progress.
+- Profile completion wizard.
+- Upload documents with real-time “AI feedback” (mock if no key).
+- Secure chat with agency.
+- View checklist + status updates + download generated pack.
+
+C) AI Modules (must be implemented with real code + mocks):
+1) Document Intelligence:
+- Ingest uploaded docs (PDF/images).
+- “Classifier” returns docType + confidence.
+- “Extractor” returns structured fields (passport MRZ fields, names, dates).
+- “Quality checks”: blur, crop, expiry, missing pages (approximate heuristics ok; do not rely on heavy CV libs—use lightweight checks and allow manual override).
+- Store extractedFields JSON + qualityScore + flags in DB.
+- UI to review and approve extracted fields.
+
+2) Visa Knowledge Base AI:
+- Template format in DB:
+  Country -> Nationality -> VisaType -> Requirements rules -> Document checklist -> Forms -> Notes -> Version.
+- “AI Template Builder”: takes pasted text (or uploaded PDF text) and outputs structured template draft.
+- “Change Detection Queue”: when a source is updated (simulate by editing source content), create proposal with diff view (previous vs proposed), admin approves -> new version published.
+
+3) Application Copilot:
+- Checklist personalization based on applicant profile (employed/student/self-employed).
+- Readiness score (explainable):
+  Completion %, document quality avg, risk flags count, profile consistency.
+- Recommended actions list.
+
+4) Messaging Assistant:
+- Summarize conversation into CRM notes.
+- Generate customer reminders in polite tone.
+
+AI SAFETY/GUARDRAILS:
+- Never reveal secrets/PII in logs.
+- Redact sensitive fields in debug output.
+- Always mark AI outputs as “suggestions” requiring human review where appropriate.
+- Add a “Human Approval” toggle per tenant and default to ON.
+
+D) Production readiness:
+- Environment config with .env.example
+- Database migrations
+- Seed script to create:
+  - SaaS admin user
+  - 1 demo agency with users
+  - 1 demo customer
+  - 2-3 demo visa templates (e.g., UAE tourist, Schengen tourist, UK visitor) with fake data
+  - 3 demo leads, 2 demo cases, sample documents metadata
+- Error handling, loading states, empty states.
+- Pagination, filtering, search in key lists.
+- Activity feed/timeline components.
+- Basic rate limiting for auth + AI endpoints.
+- File upload validation (size/type) and virus-scan placeholder hook.
+- Audit logs for key actions.
+
+UI/UX REQUIREMENTS (must look premium):
+- Use Tailwind + shadcn/ui components; create a design system:
+  - /theme/tokens.ts with colors from logo extraction or fallback.
+  - Typography scale, spacing, radius, shadows.
+- Use Framer Motion for micro-interactions:
+  - page transitions
+  - hover/press
+  - progress step animations
+- Layout:
+  - Sidebar navigation for Admin and Agency
+  - Top bar with search + notifications + user menu
+  - Responsive mobile layout with bottom nav for Customer dashboard
+- Data visualization:
+  - Use Recharts for a few charts in Reporting.
+- Add a “Command Palette” (⌘K) to navigate quickly (cases, leads, templates).
+- Add dark mode toggle.
+- Creative but usable: avoid clutter; prioritize clarity.
+
+COLOR THEME FROM LOGO:
+- If /assets/logo.svg or /assets/logo.png exists:
+  - Extract dominant palette (primary, secondary, accent, neutral, background).
+  - Apply across Tailwind via CSS variables (shadcn theme approach).
+- If not found:
+  - Use fallback palette:
+    primary: deep blue
+    secondary: teal
+    accent: cyan
+    neutrals: slate
+  - Provide clear instructions in README on updating tokens.
+
+ROUTING (minimum):
+Public:
+- /
+- /pricing
+- /features
+- /security
+- /login
+- /signup
+
+App:
+- /admin (SaaS admin dashboard)
+- /admin/tenants
+- /admin/vkb
+- /admin/vkb/sources
+- /admin/ai-governance
+- /admin/audit
+
+Agency:
+- /app (agency home)
+- /app/crm/leads
+- /app/crm/pipeline
+- /app/cases
+- /app/cases/[id]
+- /app/documents
+- /app/reports
+- /app/settings
+
+Customer:
+- /c (customer home)
+- /c/case/[id]
+- /c/profile
+- /c/uploads
+- /c/messages
+- /c/payments (placeholder)
+- /c/downloads
+
+DATABASE MODELS (Prisma):
+- Tenant, User, Role, Permission (or role enum), Membership
+- Lead, LeadActivity, Task
+- CustomerProfile, Applicant
+- Case, CaseStatusHistory
+- Document, DocumentExtraction, DocumentFlag
+- MessageThread, Message
+- VisaTemplate, VisaTemplateVersion, VisaTemplateSource, VisaUpdateProposal
+- Invoice, Payment (placeholders)
+- AuditLog
+- AiUsageLog
+
+IMPLEMENTATION NOTES:
+- Enforce tenant scoping in API routes.
+- Use server actions or API routes consistently.
+- Build reusable components: DataTable, StatusPill, Stepper, Timeline, UploadDropzone, DiffViewer.
+- Build “DiffViewer” for VKB proposals (highlight changes).
+- Provide a “Demo Mode” where AI calls return deterministic mock outputs.
+
+DELIVERABLES:
+- Fully running app in Replit with one command:
+  - pnpm install
+  - pnpm db:push (or migrate)
+  - pnpm seed
+  - pnpm dev
+- README with:
+  - setup steps
+  - demo credentials
+  - how to configure AI keys
+  - how to replace local storage with S3
+  - where to change theme colors
+- Ensure the UI is polished, consistent, and advanced.
+
+DEMO CREDENTIALS (seed):
+- SaaS Admin: admin@visashuttle.com / Admin@12345
+- Agency Owner: owner@demoagency.com / Demo@12345
+- Customer: customer@demo.com / Demo@12345
+
+BUILD IT NOW. Provide code only, with explanations in README. Ensure everything compiles and pages load.

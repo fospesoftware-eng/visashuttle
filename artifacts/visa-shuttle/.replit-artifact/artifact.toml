@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "VisaShuttle"
+version = "1.0.0"
+id = "artifacts/visa-shuttle"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25211
+
+[services.development]
+run = "pnpm --filter @workspace/visa-shuttle run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/visa-shuttle", "run", "build" ]
+publicDir = "artifacts/visa-shuttle/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25211"
+BASE_PATH = "/"
