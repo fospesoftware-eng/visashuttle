@@ -414,6 +414,51 @@ export const insertCustomerTenantLinkSchema = createInsertSchema(customerTenantL
 export type InsertCustomerTenantLink = z.infer<typeof insertCustomerTenantLinkSchema>;
 export type CustomerTenantLink = typeof customerTenantLinks.$inferSelect;
 
+// --- Passport library (customer-owned, reusable across applications) ---
+// A passport here is a first-class entity owned by a customer rather than a
+// snapshot embedded in a single case. The same row can be reused across
+// every future application — that's the whole point ("master database").
+// Co-travellers' passports (spouse, kids, parents) also live in this library
+// under the same customer, distinguished by `holderName`/`relationship`,
+// so an agency can prep an entire family from one customer record.
+export const PASSPORT_RELATIONSHIPS = [
+  "self", "spouse", "child", "parent", "sibling", "partner", "relative", "other",
+] as const;
+export type PassportRelationship = typeof PASSPORT_RELATIONSHIPS[number];
+
+export const passports = pgTable("passports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerAccountId: varchar("customer_account_id").notNull(),
+  tenantId: varchar("tenant_id").notNull(),
+  // Whose passport this is. holderName is what the agency types in
+  // ("John Smith", "Tom Jr."); relationship is the structured tag.
+  holderName: text("holder_name"),
+  relationship: text("relationship").default("self"), // see PASSPORT_RELATIONSHIPS
+  isPrimary: boolean("is_primary").default(false),    // customer's main passport
+  // Passport bio-page fields (same shape as we used to keep on cases).
+  passportSurname: text("passport_surname"),
+  passportGivenName: text("passport_given_name"),
+  passportMiddleName: text("passport_middle_name"),
+  passportNumber: text("passport_number"),
+  passportNationality: text("passport_nationality"),
+  passportGender: text("passport_gender"),
+  passportDateOfBirth: text("passport_date_of_birth"),
+  passportDateOfIssue: text("passport_date_of_issue"),
+  passportDateOfExpiry: text("passport_date_of_expiry"),
+  passportPlaceOfIssue: text("passport_place_of_issue"),
+  passportPlaceOfBirth: text("passport_place_of_birth"),
+  passportFileUrl: text("passport_file_url"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPassportSchema = createInsertSchema(passports).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export type InsertPassport = z.infer<typeof insertPassportSchema>;
+export type Passport = typeof passports.$inferSelect;
+
 // B2C User Profiles (Visa Checker users — separate from agency users)
 export const b2cUsers = pgTable("b2c_users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

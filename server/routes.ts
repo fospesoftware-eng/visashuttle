@@ -48,7 +48,7 @@ const siteAuthRateLimiter = rateLimit({
   message: { error: "Too many attempts. Please try again later." },
 });
 import type { Proposal, InsertAppointment } from "@shared/schema";
-import { VISA_STAGES, VISA_PROCESSING_STATUSES, SUBMISSION_METHODS, APPOINTMENT_TYPES, APPOINTMENT_STATUSES, PAYMENT_METHODS } from "@shared/schema";
+import { VISA_STAGES, VISA_PROCESSING_STATUSES, SUBMISSION_METHODS, APPOINTMENT_TYPES, APPOINTMENT_STATUSES, PAYMENT_METHODS, PASSPORT_RELATIONSHIPS, insertPassportSchema, type InsertPassport } from "@shared/schema";
 import { VISA_TYPES } from "@shared/destinations";
 import { isValidVisaTypeForCountry, getCountryVisaTypes } from "@shared/visa-catalog";
 import { z } from "zod";
@@ -2785,9 +2785,10 @@ export async function registerRoutes(
   app.get("/api/tenants/:tenantId/customers", async (req, res) => {
     if (!requireTenantAccess(req, res, req.params.tenantId)) return;
     const tenantId = req.params.tenantId;
-    const [customers, allCases] = await Promise.all([
+    const [customers, allCases, allPassports] = await Promise.all([
       storage.getCustomersByTenantId(tenantId),
       storage.getCasesByTenantId(tenantId),
+      storage.getPassportsByTenantId(tenantId),
     ]);
     const casesByCust = new Map<string, typeof allCases>();
     for (const c of allCases) {
@@ -2796,37 +2797,56 @@ export async function registerRoutes(
       arr.push(c);
       casesByCust.set(c.customerAccountId, arr);
     }
+    const passportsByCust = new Map<string, typeof allPassports>();
+    for (const p of allPassports) {
+      const arr = passportsByCust.get(p.customerAccountId) ?? [];
+      arr.push(p);
+      passportsByCust.set(p.customerAccountId, arr);
+    }
     const enriched = customers.map(cust => {
       const cs = casesByCust.get(cust.id) ?? [];
+      const ps = passportsByCust.get(cust.id) ?? [];
       const latest = cs.reduce<Date | null>((acc, c) => {
         const d = c.updatedAt ? new Date(c.updatedAt) : (c.createdAt ? new Date(c.createdAt) : null);
         if (!d) return acc;
         return !acc || d > acc ? d : acc;
       }, null);
-      // Surface the MOST RECENT passport snapshot (not just the first one in
-      // array order) — pick the case with the latest updatedAt/createdAt that
-      // actually has a passport number on it.
-      const withPassport = cs
+      // Prefer the customer's passport library (master record). If no
+      // library entry exists yet, fall back to the most recent case
+      // snapshot for backwards compatibility with legacy data.
+      const libraryPrimary = ps
+        .filter(p => p.passportNumber)
+        .sort((a, b) => {
+          if ((b.isPrimary ? 1 : 0) !== (a.isPrimary ? 1 : 0)) {
+            return (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0);
+          }
+          const ta = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+          const tb = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+          return tb - ta;
+        })[0];
+      const caseFallback = cs
         .filter(c => c.passportNumber)
         .sort((a, b) => {
           const ta = (a.updatedAt ?? a.createdAt) ? new Date(a.updatedAt ?? a.createdAt!).getTime() : 0;
           const tb = (b.updatedAt ?? b.createdAt) ? new Date(b.updatedAt ?? b.createdAt!).getTime() : 0;
           return tb - ta;
         })[0];
+      const passportSrc = libraryPrimary ?? caseFallback;
+      // Earliest expiry across both the library AND legacy case snapshots
+      // (so an expired passport anywhere flags the customer).
+      const allExpiries = [
+        ...ps.map(p => p.passportDateOfExpiry),
+        ...cs.map(c => c.passportDateOfExpiry),
+      ].filter((d): d is string => !!d).sort();
       return {
         ...cust,
         caseCount: cs.length,
         activeCaseCount: cs.filter(c => !["approved", "rejected"].includes(c.status)).length,
         latestActivityAt: latest,
-        latestPassportNumber: withPassport?.passportNumber ?? null,
-        latestPassportNationality: withPassport?.passportNationality ?? null,
-        // Earliest expiry across all of this customer's passports — used by
-        // the list page to flag expired / expiring-soon customers without
-        // having to open the detail view.
-        earliestPassportExpiry: cs
-          .map(c => c.passportDateOfExpiry)
-          .filter((d): d is string => !!d)
-          .sort()[0] ?? null,
+        passportCount: ps.length,
+        latestPassportNumber: passportSrc?.passportNumber ?? null,
+        latestPassportNationality: passportSrc?.passportNationality ?? null,
+        earliestPassportExpiry: allExpiries[0] ?? null,
       };
     });
     // Most recent activity first.
@@ -2838,14 +2858,13 @@ export async function registerRoutes(
     res.json(enriched);
   });
 
-  // Single customer with their cases (each case carries its own passport
-  // snapshot — multiple passports per customer are normal because the
-  // customer can have separate applications under different passports).
+  // Single customer with their applications and full passport library.
+  // Passports live at the customer level (master record reused across
+  // applications, including co-travellers' passports), not on individual
+  // cases. The case snapshot fields are still returned for legacy data.
   app.get("/api/tenants/:tenantId/customers/:customerId", async (req, res) => {
     if (!requireTenantAccess(req, res, req.params.tenantId)) return;
     const { tenantId, customerId } = req.params;
-    // Belt-and-braces: verify the customer is actually linked to this tenant
-    // before exposing their account record.
     const link = await storage.getCustomerTenantLink(customerId, tenantId);
     if (!link) {
       return res.status(404).json({ error: "Customer not found in this agency" });
@@ -2854,8 +2873,114 @@ export async function registerRoutes(
     if (!account) {
       return res.status(404).json({ error: "Customer not found" });
     }
-    const cases = await storage.getCasesByCustomerAccountId(customerId, tenantId);
-    res.json({ account, cases });
+    const [cases, passports] = await Promise.all([
+      storage.getCasesByCustomerAccountId(customerId, tenantId),
+      storage.getPassportsByCustomerId(customerId, tenantId),
+    ]);
+    res.json({ account, cases, passports });
+  });
+
+  // === Customer passport library (CRUD) ===
+  // Schema-shape for what an agency-side caller is allowed to send. We
+  // never trust customerAccountId/tenantId from the body — those come
+  // from the URL and are verified against the tenant link.
+  const passportBodyShape = insertPassportSchema
+    .omit({ customerAccountId: true, tenantId: true })
+    .partial();
+
+  // Cheap consistency guards on date fields the UI is allowed to send.
+  function validatePassportDates(body: any): string | null {
+    const ymd = /^\d{4}-\d{2}-\d{2}$/;
+    for (const f of ["passportDateOfIssue", "passportDateOfExpiry", "passportDateOfBirth"]) {
+      const v = body?.[f];
+      if (v != null && v !== "" && (typeof v !== "string" || !ymd.test(v))) {
+        return `${f} must be a YYYY-MM-DD date`;
+      }
+    }
+    if (body?.passportDateOfIssue && body?.passportDateOfExpiry &&
+        body.passportDateOfIssue > body.passportDateOfExpiry) {
+      return "passportDateOfIssue cannot be after passportDateOfExpiry";
+    }
+    return null;
+  }
+  function validatePassportRelationship(body: any): string | null {
+    if (body?.relationship != null && !PASSPORT_RELATIONSHIPS.includes(body.relationship)) {
+      return `relationship must be one of: ${PASSPORT_RELATIONSHIPS.join(", ")}`;
+    }
+    return null;
+  }
+  function validatePassportFileUrl(body: any): string | null {
+    const v = body?.passportFileUrl;
+    if (v == null || v === "") return null;
+    if (typeof v !== "string") return "passportFileUrl must be a string";
+    // Match the client-side allowlist: https?:// or data:image/<safe>;base64,…
+    if (/^https?:\/\//i.test(v)) return null;
+    if (/^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/i.test(v)) return null;
+    return "passportFileUrl must be an http(s) URL or data:image/* base64 URI";
+  }
+
+  app.get("/api/tenants/:tenantId/customers/:customerId/passports", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
+    const { tenantId, customerId } = req.params;
+    const link = await storage.getCustomerTenantLink(customerId, tenantId);
+    if (!link) return res.status(404).json({ error: "Customer not found in this agency" });
+    const passports = await storage.getPassportsByCustomerId(customerId, tenantId);
+    res.json(passports);
+  });
+
+  app.post("/api/tenants/:tenantId/customers/:customerId/passports", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
+    const { tenantId, customerId } = req.params;
+    const link = await storage.getCustomerTenantLink(customerId, tenantId);
+    if (!link) return res.status(404).json({ error: "Customer not found in this agency" });
+    const parsed = passportBodyShape.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid passport data", details: parsed.error.flatten() });
+    }
+    const dateErr = validatePassportDates(parsed.data);
+    if (dateErr) return res.status(400).json({ error: dateErr });
+    const relErr = validatePassportRelationship(parsed.data);
+    if (relErr) return res.status(400).json({ error: relErr });
+    const fileErr = validatePassportFileUrl(parsed.data);
+    if (fileErr) return res.status(400).json({ error: fileErr });
+    const created = await storage.createPassport({
+      ...parsed.data,
+      customerAccountId: customerId,
+      tenantId,
+    } as InsertPassport);
+    res.status(201).json(created);
+  });
+
+  app.patch("/api/tenants/:tenantId/customers/:customerId/passports/:passportId", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
+    const { tenantId, customerId, passportId } = req.params;
+    const existing = await storage.getPassport(passportId);
+    if (!existing || existing.tenantId !== tenantId || existing.customerAccountId !== customerId) {
+      return res.status(404).json({ error: "Passport not found" });
+    }
+    const parsed = passportBodyShape.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid passport data", details: parsed.error.flatten() });
+    }
+    const dateErr = validatePassportDates(parsed.data);
+    if (dateErr) return res.status(400).json({ error: dateErr });
+    const relErr = validatePassportRelationship(parsed.data);
+    if (relErr) return res.status(400).json({ error: relErr });
+    const fileErr = validatePassportFileUrl(parsed.data);
+    if (fileErr) return res.status(400).json({ error: fileErr });
+    const updated = await storage.updatePassport(passportId, parsed.data);
+    res.json(updated);
+  });
+
+  app.delete("/api/tenants/:tenantId/customers/:customerId/passports/:passportId", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
+    const { tenantId, customerId, passportId } = req.params;
+    const existing = await storage.getPassport(passportId);
+    if (!existing || existing.tenantId !== tenantId || existing.customerAccountId !== customerId) {
+      return res.status(404).json({ error: "Passport not found" });
+    }
+    await storage.deletePassport(passportId);
+    res.status(204).end();
   });
 
   app.post("/api/tenants/:tenantId/cases", async (req, res) => {

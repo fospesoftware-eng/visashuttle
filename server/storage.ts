@@ -12,6 +12,7 @@ import {
   type ActivityLog, type InsertActivityLog,
   type CustomerAccount, type InsertCustomerAccount,
   type CustomerTenantLink, type InsertCustomerTenantLink,
+  type Passport, type InsertPassport,
   type OTPCode, type InsertOTPCode,
   type B2cUser, type InsertB2cUser,
   type VisaCheck, type InsertVisaCheck,
@@ -143,6 +144,16 @@ export interface IStorage {
   // agency-side Customers module).
   getCustomersByTenantId(tenantId: string): Promise<CustomerAccount[]>;
 
+  // Customer-owned passport library. Passports are stored at the customer
+  // level (not per case) so they can be reused across applications, and
+  // co-travellers' passports live under the same customer.
+  getPassportsByCustomerId(customerAccountId: string, tenantId: string): Promise<Passport[]>;
+  getPassportsByTenantId(tenantId: string): Promise<Passport[]>;
+  getPassport(id: string): Promise<Passport | undefined>;
+  createPassport(passport: InsertPassport): Promise<Passport>;
+  updatePassport(id: string, data: Partial<InsertPassport>): Promise<Passport | undefined>;
+  deletePassport(id: string): Promise<boolean>;
+
   createOTPCode(otp: InsertOTPCode): Promise<OTPCode>;
   getActiveOTPCode(email: string, tenantId: string): Promise<OTPCode | undefined>;
   getActiveOTPCodeByPhone(phone: string, tenantId: string): Promise<OTPCode | undefined>;
@@ -245,6 +256,7 @@ export class MemStorage implements IStorage {
   private payments: Map<string, Payment> = new Map();
   private coTravellers: Map<string, CaseCoTraveller> = new Map();
   private appointments: Map<string, Appointment> = new Map();
+  private passportsMap: Map<string, Passport> = new Map();
 
   constructor() {
     this.users = new Map();
@@ -1532,6 +1544,79 @@ export class MemStorage implements IStorage {
       if (acct) out.push(acct);
     }
     return out;
+  }
+
+  async getPassportsByCustomerId(customerAccountId: string, tenantId: string): Promise<Passport[]> {
+    return Array.from(this.passportsMap.values())
+      .filter(p => p.customerAccountId === customerAccountId && p.tenantId === tenantId)
+      .sort((a, b) => {
+        // Primary first, then most recent on top.
+        if ((b.isPrimary ? 1 : 0) !== (a.isPrimary ? 1 : 0)) {
+          return (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0);
+        }
+        const ta = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const tb = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        return tb - ta;
+      });
+  }
+
+  async getPassportsByTenantId(tenantId: string): Promise<Passport[]> {
+    return Array.from(this.passportsMap.values()).filter(p => p.tenantId === tenantId);
+  }
+
+  async getPassport(id: string): Promise<Passport | undefined> {
+    return this.passportsMap.get(id);
+  }
+
+  async createPassport(insertP: InsertPassport): Promise<Passport> {
+    const id = randomUUID();
+    const now = new Date();
+    const passport: Passport = {
+      id,
+      customerAccountId: insertP.customerAccountId,
+      tenantId: insertP.tenantId,
+      holderName: insertP.holderName ?? null,
+      relationship: insertP.relationship ?? "self",
+      isPrimary: insertP.isPrimary ?? false,
+      passportSurname: insertP.passportSurname ?? null,
+      passportGivenName: insertP.passportGivenName ?? null,
+      passportMiddleName: insertP.passportMiddleName ?? null,
+      passportNumber: insertP.passportNumber ?? null,
+      passportNationality: insertP.passportNationality ?? null,
+      passportGender: insertP.passportGender ?? null,
+      passportDateOfBirth: insertP.passportDateOfBirth ?? null,
+      passportDateOfIssue: insertP.passportDateOfIssue ?? null,
+      passportDateOfExpiry: insertP.passportDateOfExpiry ?? null,
+      passportPlaceOfIssue: insertP.passportPlaceOfIssue ?? null,
+      passportPlaceOfBirth: insertP.passportPlaceOfBirth ?? null,
+      passportFileUrl: insertP.passportFileUrl ?? null,
+      notes: insertP.notes ?? null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.passportsMap.set(id, passport);
+    return passport;
+  }
+
+  async updatePassport(id: string, data: Partial<InsertPassport>): Promise<Passport | undefined> {
+    const existing = this.passportsMap.get(id);
+    if (!existing) return undefined;
+    const updated: Passport = {
+      ...existing,
+      ...data,
+      // Don't let an update relocate the passport to a different customer/tenant.
+      customerAccountId: existing.customerAccountId,
+      tenantId: existing.tenantId,
+      id: existing.id,
+      createdAt: existing.createdAt,
+      updatedAt: new Date(),
+    };
+    this.passportsMap.set(id, updated);
+    return updated;
+  }
+
+  async deletePassport(id: string): Promise<boolean> {
+    return this.passportsMap.delete(id);
   }
 
   async createOTPCode(insertOTP: InsertOTPCode): Promise<OTPCode> {

@@ -1,9 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useParams } from "wouter";
 import {
-  ArrowLeft, Mail, Phone, BadgeCheck, FileText, Calendar, MapPin,
+  ArrowLeft, Mail, Phone, BadgeCheck, FileText, Calendar,
   Briefcase, ChevronRight, User as UserIcon, Globe2,
   AlertTriangle, Clock, Download, ExternalLink,
+  Plus, Pencil, Trash2, Star, BookUser,
 } from "lucide-react";
 import { getPassportExpiryStatus, fmtPassportExpiry } from "@/pages/agency/customers";
 import { Button } from "@/components/ui/button";
@@ -11,13 +13,45 @@ import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle, DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import type { CustomerAccount, Case } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import {
+  PASSPORT_RELATIONSHIPS,
+  type CustomerAccount, type Case, type Passport, type PassportRelationship,
+} from "@shared/schema";
 
 type CustomerDetailResponse = {
   account: CustomerAccount;
   cases: Case[];
+  passports: Passport[];
+};
+
+const RELATIONSHIP_LABELS: Record<PassportRelationship, string> = {
+  self: "Self",
+  spouse: "Spouse",
+  child: "Child",
+  parent: "Parent",
+  sibling: "Sibling",
+  partner: "Partner",
+  relative: "Relative",
+  other: "Other",
 };
 
 function initials(name?: string | null, email?: string | null) {
@@ -53,7 +87,7 @@ function ExpiryBadge({ expiry }: { expiry: string | null | undefined }) {
       >
         <AlertTriangle className="h-4 w-4 shrink-0" />
         <span>
-          Passport expired on {fmtPassportExpiry(expiry)}. Customer must renew
+          Passport expired on {fmtPassportExpiry(expiry)}. Holder must renew
           before any new application can be lodged.
         </span>
       </div>
@@ -77,8 +111,8 @@ function ExpiryBadge({ expiry }: { expiry: string | null | undefined }) {
 //   - http(s)://… (real network URLs)
 //   - data:image/<png|jpeg|jpg|webp|gif>;base64,…  (inline scans)
 // Anything else (`javascript:`, `data:text/html`, `file:`, blob:, etc.) is
-// rejected so a malicious value in passportFileUrl can never run script in
-// an agency staff session.
+// rejected so a malicious passportFileUrl can never run script in an agency
+// staff session.
 function sanitizePassportUrl(raw: string | null | undefined): string | null {
   if (!raw) return null;
   const url = raw.trim();
@@ -87,12 +121,10 @@ function sanitizePassportUrl(raw: string | null | undefined): string | null {
   return null;
 }
 
-function PassportFileLink({ c }: { c: Case }) {
-  const url = sanitizePassportUrl(c.passportFileUrl);
+function PassportFileLink({ rawUrl }: { rawUrl: string | null | undefined }) {
+  const url = sanitizePassportUrl(rawUrl);
   if (!url) {
-    if (c.passportFileUrl) {
-      // We have a value but it failed the safety check — surface a hint
-      // rather than silently dropping it, so staff aren't confused.
+    if (rawUrl) {
       return (
         <div className="text-[11px] text-muted-foreground italic" data-testid="text-passport-file-blocked">
           Passport file is attached but could not be displayed (unsupported URL type).
@@ -101,8 +133,6 @@ function PassportFileLink({ c }: { c: Case }) {
     }
     return null;
   }
-  // Render an inline image preview for image MIME types, otherwise an
-  // open / download pair so PDFs and other formats still work.
   const isImage = /^data:image\//i.test(url) || /\.(png|jpe?g|webp|gif)(\?|$)/i.test(url);
   return (
     <div className="space-y-2">
@@ -135,44 +165,6 @@ function PassportFileLink({ c }: { c: Case }) {
   );
 }
 
-function PassportBlock({ c }: { c: Case }) {
-  // Only render if at least one passport field is set on this application.
-  const hasAny = !!(
-    c.passportNumber || c.passportSurname || c.passportGivenName ||
-    c.passportNationality || c.passportDateOfExpiry || c.passportDateOfIssue ||
-    c.passportPlaceOfIssue || c.passportPlaceOfBirth || c.passportGender ||
-    c.passportFileUrl
-  );
-  if (!hasAny) {
-    return (
-      <div className="text-xs text-muted-foreground italic">
-        No passport on file for this application.
-      </div>
-    );
-  }
-  const fullName = [c.passportSurname, c.passportGivenName, c.passportMiddleName]
-    .filter(Boolean).join(" ");
-  return (
-    <div className="space-y-3">
-      <ExpiryBadge expiry={c.passportDateOfExpiry} />
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 text-xs">
-        {fullName && (
-          <Field label="Name on passport" value={fullName} />
-        )}
-        <Field label="Passport #" value={c.passportNumber} mono />
-        <Field label="Nationality" value={c.passportNationality} />
-        <Field label="Gender" value={c.passportGender} />
-        <Field label="Date of birth" value={c.applicantDob} />
-        <Field label="Place of birth" value={c.passportPlaceOfBirth} />
-        <Field label="Date of issue" value={c.passportDateOfIssue} />
-        <Field label="Date of expiry" value={c.passportDateOfExpiry} />
-        <Field label="Place of issue" value={c.passportPlaceOfIssue} />
-      </div>
-      <PassportFileLink c={c} />
-    </div>
-  );
-}
-
 function Field({ label, value, mono }: { label: string; value?: string | null; mono?: boolean }) {
   return (
     <div>
@@ -184,11 +176,492 @@ function Field({ label, value, mono }: { label: string; value?: string | null; m
   );
 }
 
+// --- Passport library ---
+
+type PassportFormState = {
+  holderName: string;
+  relationship: PassportRelationship;
+  isPrimary: boolean;
+  passportSurname: string;
+  passportGivenName: string;
+  passportMiddleName: string;
+  passportNumber: string;
+  passportNationality: string;
+  passportGender: string;
+  passportDateOfBirth: string;
+  passportDateOfIssue: string;
+  passportDateOfExpiry: string;
+  passportPlaceOfIssue: string;
+  passportPlaceOfBirth: string;
+  passportFileUrl: string;
+  notes: string;
+};
+
+const emptyPassportForm: PassportFormState = {
+  holderName: "",
+  relationship: "self",
+  isPrimary: false,
+  passportSurname: "",
+  passportGivenName: "",
+  passportMiddleName: "",
+  passportNumber: "",
+  passportNationality: "",
+  passportGender: "",
+  passportDateOfBirth: "",
+  passportDateOfIssue: "",
+  passportDateOfExpiry: "",
+  passportPlaceOfIssue: "",
+  passportPlaceOfBirth: "",
+  passportFileUrl: "",
+  notes: "",
+};
+
+function passportToForm(p: Passport): PassportFormState {
+  return {
+    holderName: p.holderName ?? "",
+    relationship: (p.relationship as PassportRelationship) ?? "self",
+    isPrimary: !!p.isPrimary,
+    passportSurname: p.passportSurname ?? "",
+    passportGivenName: p.passportGivenName ?? "",
+    passportMiddleName: p.passportMiddleName ?? "",
+    passportNumber: p.passportNumber ?? "",
+    passportNationality: p.passportNationality ?? "",
+    passportGender: p.passportGender ?? "",
+    passportDateOfBirth: p.passportDateOfBirth ?? "",
+    passportDateOfIssue: p.passportDateOfIssue ?? "",
+    passportDateOfExpiry: p.passportDateOfExpiry ?? "",
+    passportPlaceOfIssue: p.passportPlaceOfIssue ?? "",
+    passportPlaceOfBirth: p.passportPlaceOfBirth ?? "",
+    passportFileUrl: p.passportFileUrl ?? "",
+    notes: p.notes ?? "",
+  };
+}
+
+// Trim + drop empty strings so the API doesn't store "" for missing fields.
+function formToPayload(f: PassportFormState) {
+  const payload: Record<string, any> = {
+    relationship: f.relationship,
+    isPrimary: f.isPrimary,
+  };
+  const stringFields: (keyof PassportFormState)[] = [
+    "holderName", "passportSurname", "passportGivenName", "passportMiddleName",
+    "passportNumber", "passportNationality", "passportGender",
+    "passportDateOfBirth", "passportDateOfIssue", "passportDateOfExpiry",
+    "passportPlaceOfIssue", "passportPlaceOfBirth", "passportFileUrl", "notes",
+  ];
+  for (const k of stringFields) {
+    const v = (f[k] as string).trim();
+    payload[k] = v || null;
+  }
+  return payload;
+}
+
+function PassportFormDialog({
+  open, onOpenChange, initial, mode, tenantId, customerId,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  initial: PassportFormState & { id?: string };
+  mode: "create" | "edit";
+  tenantId: string;
+  customerId: string;
+}) {
+  const { toast } = useToast();
+  const [form, setForm] = useState<PassportFormState>(initial);
+
+  // Re-sync the form whenever the dialog is reopened for a different
+  // passport (or freshly opened for "create"). useEffect rather than a
+  // render-phase setState so we don't trigger extra renders or warnings.
+  useEffect(() => {
+    if (open) setForm(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initial]);
+
+  const set = (patch: Partial<PassportFormState>) =>
+    setForm(prev => ({ ...prev, ...patch }));
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const payload = formToPayload(form);
+      if (mode === "create") {
+        return apiRequest(
+          "POST",
+          `/api/tenants/${tenantId}/customers/${customerId}/passports`,
+          payload,
+        );
+      }
+      return apiRequest(
+        "PATCH",
+        `/api/tenants/${tenantId}/customers/${customerId}/passports/${initial.id}`,
+        payload,
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["/api/tenants", tenantId, "customers", customerId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/tenants", tenantId, "customers"],
+      });
+      toast({
+        title: mode === "create" ? "Passport added" : "Passport updated",
+      });
+      onOpenChange(false);
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Couldn't save passport",
+        description: err?.message ?? "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="dialog-passport-form">
+        <DialogHeader>
+          <DialogTitle>
+            {mode === "create" ? "Add passport" : "Edit passport"}
+          </DialogTitle>
+          <DialogDescription>
+            Stored in this customer's master library so it can be reused across
+            future applications and shared between co-travellers.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+          <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="md:col-span-1">
+              <Label>Holder name</Label>
+              <Input
+                value={form.holderName}
+                onChange={e => set({ holderName: e.target.value })}
+                placeholder="e.g. John Smith"
+                data-testid="input-holder-name"
+              />
+            </div>
+            <div>
+              <Label>Relationship</Label>
+              <Select
+                value={form.relationship}
+                onValueChange={v => set({ relationship: v as PassportRelationship })}
+              >
+                <SelectTrigger data-testid="select-relationship">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PASSPORT_RELATIONSHIPS.map(r => (
+                    <SelectItem key={r} value={r}>{RELATIONSHIP_LABELS[r]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-end">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.isPrimary}
+                  onChange={e => set({ isPrimary: e.target.checked })}
+                  data-testid="checkbox-is-primary"
+                />
+                Mark as primary passport
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <Label>Surname</Label>
+            <Input
+              value={form.passportSurname}
+              onChange={e => set({ passportSurname: e.target.value })}
+              data-testid="input-passport-surname"
+            />
+          </div>
+          <div>
+            <Label>Given name</Label>
+            <Input
+              value={form.passportGivenName}
+              onChange={e => set({ passportGivenName: e.target.value })}
+              data-testid="input-passport-given-name"
+            />
+          </div>
+          <div>
+            <Label>Middle name</Label>
+            <Input
+              value={form.passportMiddleName}
+              onChange={e => set({ passportMiddleName: e.target.value })}
+              data-testid="input-passport-middle-name"
+            />
+          </div>
+          <div>
+            <Label>Passport number</Label>
+            <Input
+              value={form.passportNumber}
+              onChange={e => set({ passportNumber: e.target.value })}
+              className="font-mono"
+              data-testid="input-passport-number"
+            />
+          </div>
+          <div>
+            <Label>Nationality</Label>
+            <Input
+              value={form.passportNationality}
+              onChange={e => set({ passportNationality: e.target.value })}
+              data-testid="input-nationality"
+            />
+          </div>
+          <div>
+            <Label>Gender</Label>
+            <Select
+              value={form.passportGender || "_none_"}
+              onValueChange={v => set({ passportGender: v === "_none_" ? "" : v })}
+            >
+              <SelectTrigger data-testid="select-gender">
+                <SelectValue placeholder="Not specified" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_none_">Not specified</SelectItem>
+                <SelectItem value="M">Male</SelectItem>
+                <SelectItem value="F">Female</SelectItem>
+                <SelectItem value="X">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Date of birth</Label>
+            <Input
+              type="date"
+              value={form.passportDateOfBirth}
+              onChange={e => set({ passportDateOfBirth: e.target.value })}
+              data-testid="input-dob"
+            />
+          </div>
+          <div>
+            <Label>Place of birth</Label>
+            <Input
+              value={form.passportPlaceOfBirth}
+              onChange={e => set({ passportPlaceOfBirth: e.target.value })}
+              data-testid="input-place-of-birth"
+            />
+          </div>
+          <div>
+            <Label>Date of issue</Label>
+            <Input
+              type="date"
+              value={form.passportDateOfIssue}
+              onChange={e => set({ passportDateOfIssue: e.target.value })}
+              data-testid="input-date-of-issue"
+            />
+          </div>
+          <div>
+            <Label>Date of expiry</Label>
+            <Input
+              type="date"
+              value={form.passportDateOfExpiry}
+              onChange={e => set({ passportDateOfExpiry: e.target.value })}
+              data-testid="input-date-of-expiry"
+            />
+          </div>
+          <div>
+            <Label>Place of issue</Label>
+            <Input
+              value={form.passportPlaceOfIssue}
+              onChange={e => set({ passportPlaceOfIssue: e.target.value })}
+              data-testid="input-place-of-issue"
+            />
+          </div>
+          <div className="md:col-span-2">
+            <Label>Passport file URL</Label>
+            <Input
+              value={form.passportFileUrl}
+              onChange={e => set({ passportFileUrl: e.target.value })}
+              placeholder="https://… or data:image/png;base64,…"
+              data-testid="input-file-url"
+            />
+            <div className="text-[11px] text-muted-foreground mt-1">
+              Only http(s) links and inline image data URIs are accepted.
+            </div>
+          </div>
+          <div className="md:col-span-2">
+            <Label>Notes</Label>
+            <Textarea
+              value={form.notes}
+              onChange={e => set({ notes: e.target.value })}
+              rows={2}
+              data-testid="input-notes"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            data-testid="button-cancel-passport"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={() => mutation.mutate()}
+            disabled={mutation.isPending}
+            data-testid="button-save-passport"
+          >
+            {mutation.isPending ? "Saving…" : (mode === "create" ? "Add passport" : "Save changes")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function PassportCard({
+  passport, tenantId, customerId,
+}: {
+  passport: Passport;
+  tenantId: string;
+  customerId: string;
+}) {
+  const { toast } = useToast();
+  const [editOpen, setEditOpen] = useState(false);
+  const fullName = [passport.passportSurname, passport.passportGivenName, passport.passportMiddleName]
+    .filter(Boolean).join(" ");
+  const holder = passport.holderName || fullName || "Unnamed";
+  const rel = (passport.relationship as PassportRelationship) ?? "self";
+
+  const deleteM = useMutation({
+    mutationFn: async () => {
+      return apiRequest(
+        "DELETE",
+        `/api/tenants/${tenantId}/customers/${customerId}/passports/${passport.id}`,
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["/api/tenants", tenantId, "customers", customerId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/tenants", tenantId, "customers"],
+      });
+      toast({ title: "Passport removed" });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Couldn't delete passport",
+        description: err?.message ?? "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  return (
+    <Card className="p-5" data-testid={`card-passport-${passport.id}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-medium" data-testid={`text-passport-holder-${passport.id}`}>
+              {holder}
+            </span>
+            <Badge variant="outline" data-testid={`badge-relationship-${passport.id}`}>
+              {RELATIONSHIP_LABELS[rel] ?? rel}
+            </Badge>
+            {passport.isPrimary && (
+              <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                <Star className="h-3 w-3 mr-1" /> Primary
+              </Badge>
+            )}
+          </div>
+          {passport.passportNumber && (
+            <div className="text-xs text-muted-foreground font-mono mt-1">
+              {passport.passportNumber}
+              {passport.passportNationality && (
+                <span className="text-muted-foreground/70"> · {passport.passportNationality}</span>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setEditOpen(true)}
+            data-testid={`button-edit-passport-${passport.id}`}
+          >
+            <Pencil className="h-3 w-3 mr-1" /> Edit
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-red-600 hover:text-red-700"
+                data-testid={`button-delete-passport-${passport.id}`}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Remove this passport?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will delete the passport from {holder}'s record. Any
+                  applications that referenced it will keep their own snapshot.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => deleteM.mutate()}
+                  className="bg-red-600 hover:bg-red-700"
+                  data-testid={`button-confirm-delete-${passport.id}`}
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </div>
+      <ExpiryBadge expiry={passport.passportDateOfExpiry} />
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 text-xs mt-3">
+        {fullName && <Field label="Name on passport" value={fullName} />}
+        <Field label="Passport #" value={passport.passportNumber} mono />
+        <Field label="Nationality" value={passport.passportNationality} />
+        <Field label="Gender" value={passport.passportGender} />
+        <Field label="Date of birth" value={passport.passportDateOfBirth} />
+        <Field label="Place of birth" value={passport.passportPlaceOfBirth} />
+        <Field label="Date of issue" value={passport.passportDateOfIssue} />
+        <Field label="Date of expiry" value={passport.passportDateOfExpiry} />
+        <Field label="Place of issue" value={passport.passportPlaceOfIssue} />
+      </div>
+      {passport.notes && (
+        <div className="mt-3 text-xs text-muted-foreground">
+          <span className="uppercase tracking-wide text-[10px] mr-2">Notes</span>
+          {passport.notes}
+        </div>
+      )}
+      <div className="mt-3">
+        <PassportFileLink rawUrl={passport.passportFileUrl} />
+      </div>
+
+      <PassportFormDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        mode="edit"
+        initial={{ ...passportToForm(passport), id: passport.id }}
+        tenantId={tenantId}
+        customerId={customerId}
+      />
+    </Card>
+  );
+}
+
+// --- Main page ---
+
 export default function CustomerDetailPage() {
   const params = useParams<{ id: string }>();
   const customerId = params.id;
   const { data: authData } = useCurrentUser();
   const tenantId = authData?.user?.tenantId;
+  const [createOpen, setCreateOpen] = useState(false);
 
   const { data, isLoading, error } = useQuery<CustomerDetailResponse>({
     queryKey: ["/api/tenants", tenantId, "customers", customerId],
@@ -198,7 +671,7 @@ export default function CustomerDetailPage() {
   return (
     <DashboardLayout type="agency">
       <div className="container mx-auto px-4 py-6 space-y-6">
-        <div className="flex items-center gap-3">
+        <div>
           <Link href="/app/customers">
             <Button variant="ghost" size="sm" data-testid="button-back-customers">
               <ArrowLeft className="h-4 w-4 mr-1" /> Back to customers
@@ -206,59 +679,119 @@ export default function CustomerDetailPage() {
           </Link>
         </div>
 
-        {isLoading ? (
-          <Card className="p-8 text-center text-sm text-muted-foreground">
-            Loading customer…
+        {isLoading && (
+          <Card className="p-6">
+            <div className="animate-pulse text-sm text-muted-foreground">Loading customer…</div>
           </Card>
-        ) : error || !data ? (
-          <Card className="p-8 text-center text-sm text-muted-foreground">
-            Customer not found, or you don't have access.
+        )}
+        {error && (
+          <Card className="p-6">
+            <div className="text-sm text-red-600">
+              Couldn't load this customer. {(error as Error).message}
+            </div>
           </Card>
-        ) : (
+        )}
+        {data && tenantId && customerId && (
           <>
-            <Card className="p-6">
-              <div className="flex flex-wrap items-start gap-6">
-                <Avatar className="h-16 w-16">
-                  <AvatarFallback className="text-lg">
-                    {initials(data.account.name, data.account.email)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-[260px]">
-                  <div className="flex items-center gap-2">
-                    <h1 className="text-2xl font-semibold" data-testid="text-customer-name">
-                      {data.account.name || "Unnamed customer"}
-                    </h1>
-                    {data.account.isVerified && (
-                      <BadgeCheck className="h-5 w-5 text-emerald-500" aria-label="Verified" />
-                    )}
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1 mt-3 text-sm">
-                    <span className="inline-flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
-                      <span data-testid="text-customer-email">{data.account.email}</span>
-                    </span>
-                    {data.account.phone && (
+            <Card className="p-6" data-testid="card-customer-header">
+              <div className="flex flex-wrap gap-4 items-start justify-between">
+                <div className="flex gap-4 items-start">
+                  <Avatar className="h-14 w-14">
+                    <AvatarFallback>
+                      {initials(data.account.name, data.account.email)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h1 className="text-xl font-semibold" data-testid="text-customer-name">
+                        {data.account.name || data.account.email}
+                      </h1>
+                      {data.account.isVerified && (
+                        <Badge variant="outline" className="text-xs">
+                          <BadgeCheck className="h-3 w-3 mr-1" /> Verified
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                       <span className="inline-flex items-center gap-2">
-                        <Phone className="h-4 w-4 text-muted-foreground" />
-                        <span data-testid="text-customer-phone">{data.account.phone}</span>
+                        <Mail className="h-4 w-4" />
+                        <span data-testid="text-customer-email">{data.account.email}</span>
                       </span>
-                    )}
-                    <span className="inline-flex items-center gap-2 text-muted-foreground">
-                      <Calendar className="h-4 w-4" />
-                      Joined {fmtDate(data.account.createdAt)}
-                    </span>
+                      {data.account.phone && (
+                        <span className="inline-flex items-center gap-2">
+                          <Phone className="h-4 w-4" />
+                          <span data-testid="text-customer-phone">{data.account.phone}</span>
+                        </span>
+                      )}
+                      <span className="inline-flex items-center gap-2 text-muted-foreground">
+                        <Calendar className="h-4 w-4" />
+                        Joined {fmtDate(data.account.createdAt)}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-2">
                   <Badge variant="outline" data-testid="badge-total-applications">
                     {data.cases.length} application{data.cases.length === 1 ? "" : "s"}
                   </Badge>
+                  <Badge variant="outline" data-testid="badge-total-passports">
+                    {data.passports.length} passport{data.passports.length === 1 ? "" : "s"}
+                  </Badge>
                 </div>
               </div>
             </Card>
 
+            {/* === Passport library === */}
             <div>
-              <h2 className="text-lg font-semibold mb-3">Applications & passports</h2>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h2 className="text-lg font-semibold flex items-center gap-2">
+                    <BookUser className="h-5 w-5" /> Passport library
+                  </h2>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Master record for this customer and their co-travellers.
+                    Reused automatically across future applications.
+                  </p>
+                </div>
+                <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                  <DialogTrigger asChild>
+                    <Button data-testid="button-add-passport">
+                      <Plus className="h-4 w-4 mr-1" /> Add passport
+                    </Button>
+                  </DialogTrigger>
+                  <PassportFormDialog
+                    open={createOpen}
+                    onOpenChange={setCreateOpen}
+                    mode="create"
+                    initial={emptyPassportForm}
+                    tenantId={tenantId}
+                    customerId={customerId}
+                  />
+                </Dialog>
+              </div>
+              {data.passports.length === 0 ? (
+                <Card className="p-6 text-sm text-muted-foreground" data-testid="empty-passports">
+                  No passports stored yet. Add the customer's passport (and any
+                  co-travellers' passports) so they can be reused across every
+                  future application.
+                </Card>
+              ) : (
+                <div className="grid gap-4">
+                  {data.passports.map(p => (
+                    <PassportCard
+                      key={p.id}
+                      passport={p}
+                      tenantId={tenantId}
+                      customerId={customerId}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* === Applications === */}
+            <div>
+              <h2 className="text-lg font-semibold mb-3">Applications</h2>
               {data.cases.length === 0 ? (
                 <Card className="p-6 text-sm text-muted-foreground">
                   This customer has no applications yet.
@@ -311,11 +844,20 @@ export default function CustomerDetailPage() {
                           </Link>
                         </div>
                       </div>
-                      <Separator className="my-4" />
-                      <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground mb-3">
-                        <FileText className="h-3 w-3" /> Passport
-                      </div>
-                      <PassportBlock c={c} />
+                      {c.passportNumber && (
+                        <>
+                          <Separator className="my-4" />
+                          <div className="flex items-center justify-between gap-2 text-xs uppercase tracking-wide text-muted-foreground mb-2">
+                            <span className="flex items-center gap-2">
+                              <FileText className="h-3 w-3" /> Passport snapshot on this application
+                            </span>
+                            <span className="font-mono normal-case text-foreground">{c.passportNumber}</span>
+                          </div>
+                          <div className="text-[11px] text-muted-foreground italic">
+                            Legacy snapshot stored when the application was created. Going forward, applications use the customer's passport library above.
+                          </div>
+                        </>
+                      )}
                     </Card>
                   ))}
                 </div>
@@ -327,3 +869,6 @@ export default function CustomerDetailPage() {
     </DashboardLayout>
   );
 }
+
+// Surface unused import warnings cleanly
+void UserIcon;

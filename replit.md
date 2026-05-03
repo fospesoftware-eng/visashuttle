@@ -854,3 +854,44 @@ agency side, no separate page on the customer side.
     that calls `initiate-payment` and redirects to `/pay/invoice/<token>`.
     The "Track your application" CTA stays visible underneath as a secondary
     action.
+
+### Customer-owned passport library (May 2026)
+Passports are now master records on the customer (not per-case snapshots),
+reusable across every application, and the same library holds co-travellers'
+passports (spouse, child, parent…). The legacy per-case passport fields stay
+intact for historical data and as a fallback.
+
+- **Schema** (`shared/schema.ts`): new `passports` table — `customerAccountId`,
+  `tenantId`, `holderName`, `relationship` (see `PASSPORT_RELATIONSHIPS`:
+  self/spouse/child/parent/sibling/partner/relative/other), `isPrimary`, full
+  passport bio fields incl. `passportDateOfBirth` and `passportFileUrl`,
+  `notes`, plus `createdAt`/`updatedAt`. Exports `insertPassportSchema`,
+  `InsertPassport`, `Passport`.
+- **Storage** (`server/storage.ts`): `passportsMap` + 6 IStorage methods
+  (`getPassportsByCustomerId`/`ByTenantId`, `getPassport`, `createPassport`,
+  `updatePassport`, `deletePassport`). List sort: primary first then most
+  recent. `updatePassport` refuses to relocate a passport to a different
+  customer or tenant.
+- **Routes** (`server/routes.ts`):
+  - `GET /api/tenants/:tid/customers/:cid` now returns
+    `{account, cases, passports}`.
+  - 4 CRUD endpoints under `/api/tenants/:tid/customers/:cid/passports[/:pid]`,
+    all gated by `requireTenantAccess` + `getCustomerTenantLink` + (on
+    PATCH/DELETE) tenant/customer ownership check on the passport row.
+  - Body validated with `insertPassportSchema.omit({customerAccountId,tenantId}).partial()`
+    plus three guards: dates must be `YYYY-MM-DD` and issue ≤ expiry,
+    relationship within `PASSPORT_RELATIONSHIPS`, `passportFileUrl` matches
+    the same `https?://` or `data:image/<png|jpeg|webp|gif>;base64,…`
+    allowlist as the renderer.
+  - The customers list endpoint now joins library passports too: it prefers
+    the library's primary passport for `latestPassportNumber` /
+    `latestPassportNationality`, falls back to the most recent case snapshot
+    only when the library is empty, and computes `earliestPassportExpiry`
+    across both sources. Adds `passportCount`.
+- **Frontend** (`client/src/pages/agency/customer-detail.tsx`): new
+  "Passport library" section above Applications. Each passport card shows
+  holder + relationship + primary badge, the expiry warning, the bio fields
+  and the (sanitized) file link, with edit/delete actions. The add dialog
+  posts via `apiRequest` and invalidates both the detail and list query
+  keys. Application cards keep showing their legacy passport snapshot with
+  an explanatory note that future applications draw from the library.
