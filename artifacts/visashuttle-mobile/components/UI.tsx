@@ -141,43 +141,91 @@ export function Field({
   autoCapitalize,
   error,
   testID,
+  icon,
   ...rest
 }: {
   label?: string;
   error?: string;
+  icon?: keyof typeof Feather.glyphMap;
 } & TextInputProps) {
   const colors = useColors();
+  const [focused, setFocused] = useState(false);
+  const borderColor = error
+    ? colors.destructive
+    : focused
+      ? colors.primary
+      : colors.border;
   return (
     <View style={{ marginBottom: 14 }}>
       {label ? (
-        <Text style={{ fontFamily: "Inter_500Medium", fontSize: 13, color: colors.foreground, marginBottom: 6 }}>
+        <Text
+          style={{
+            fontFamily: "Inter_600SemiBold",
+            fontSize: 12,
+            color: focused && !error ? colors.primary : colors.foreground,
+            marginBottom: 6,
+            letterSpacing: 0.3,
+            textTransform: "uppercase",
+          }}
+        >
           {label}
         </Text>
       ) : null}
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={colors.mutedForeground}
-        secureTextEntry={secureTextEntry}
-        keyboardType={keyboardType}
-        autoCapitalize={autoCapitalize}
-        testID={testID}
+      <View
         style={{
-          borderWidth: 1,
-          borderColor: error ? colors.destructive : colors.input,
-          backgroundColor: colors.muted,
-          borderRadius: 12,
+          flexDirection: "row",
+          alignItems: "center",
+          borderWidth: 1.5,
+          borderColor,
+          backgroundColor: colors.card,
+          borderRadius: 14,
           paddingHorizontal: 14,
-          paddingVertical: Platform.OS === "ios" ? 14 : 10,
-          fontSize: 15,
-          fontFamily: "Inter_400Regular",
-          color: colors.foreground,
+          shadowColor: focused ? colors.primary : "#000",
+          shadowOpacity: focused ? 0.18 : 0.04,
+          shadowRadius: focused ? 10 : 4,
+          shadowOffset: { width: 0, height: focused ? 4 : 2 },
+          elevation: focused ? 3 : 1,
         }}
-        {...rest}
-      />
+      >
+        {icon ? (
+          <Feather
+            name={icon}
+            size={16}
+            color={focused ? colors.primary : colors.mutedForeground}
+            style={{ marginRight: 10 }}
+          />
+        ) : null}
+        <TextInput
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={colors.mutedForeground}
+          secureTextEntry={secureTextEntry}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+          testID={testID}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          style={{
+            flex: 1,
+            paddingVertical: Platform.OS === "ios" ? 14 : 12,
+            fontSize: 15,
+            fontFamily: "Inter_500Medium",
+            color: colors.foreground,
+            ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : null),
+          }}
+          {...rest}
+        />
+      </View>
       {error ? (
-        <Text style={{ color: colors.destructive, fontSize: 12, marginTop: 4, fontFamily: "Inter_400Regular" }}>
+        <Text
+          style={{
+            color: colors.destructive,
+            fontSize: 12,
+            marginTop: 6,
+            fontFamily: "Inter_500Medium",
+          }}
+        >
           {error}
         </Text>
       ) : null}
@@ -212,22 +260,36 @@ export function Picker({
   return (
     <View style={{ marginBottom: 14 }}>
       {label ? (
-        <Text style={{ fontFamily: "Inter_500Medium", fontSize: 13, color: colors.foreground, marginBottom: 6 }}>
+        <Text
+          style={{
+            fontFamily: "Inter_600SemiBold",
+            fontSize: 12,
+            color: colors.foreground,
+            marginBottom: 6,
+            letterSpacing: 0.3,
+            textTransform: "uppercase",
+          }}
+        >
           {label}
         </Text>
       ) : null}
       <Pressable
         onPress={() => setOpen(true)}
         style={{
-          borderWidth: 1,
-          borderColor: colors.input,
-          backgroundColor: colors.muted,
-          borderRadius: 12,
+          borderWidth: 1.5,
+          borderColor: colors.border,
+          backgroundColor: colors.card,
+          borderRadius: 14,
           paddingHorizontal: 14,
           paddingVertical: 14,
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "space-between",
+          shadowColor: "#000",
+          shadowOpacity: 0.04,
+          shadowRadius: 4,
+          shadowOffset: { width: 0, height: 2 },
+          elevation: 1,
         }}
       >
         <Text

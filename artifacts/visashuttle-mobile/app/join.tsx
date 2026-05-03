@@ -16,6 +16,7 @@ import { Feather } from "@expo/vector-icons";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 
 import { AnimatedOrbs } from "@/components/AnimatedOrbs";
+import { Starfield } from "@/components/Starfield";
 import { Field, PrimaryButton } from "@/components/UI";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { apiPost } from "@/lib/api";
@@ -144,6 +145,14 @@ export default function Join() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <LinearGradient
+        colors={[colors.accent + "14", colors.background, colors.background]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[StyleSheet.absoluteFill, { top: 220 }]}
+        pointerEvents="none"
+      />
+
       <View style={styles.header}>
         <LinearGradient
           colors={[colors.gradientStart, colors.gradientMid, colors.gradientEnd]}
@@ -152,6 +161,7 @@ export default function Join() {
           style={StyleSheet.absoluteFill}
         />
         <AnimatedOrbs variant="header" />
+        <Starfield count={18} seed={7} />
         <View style={[styles.headerInner, { paddingTop: insets.top + 12 }]}>
           <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn} hitSlop={8}>
             <Feather name="x" size={20} color="#fff" />
@@ -197,6 +207,7 @@ export default function Join() {
                 onChangeText={(v) => setForm({ ...form, fullName: v })}
                 placeholder="John Smith"
                 error={errors.fullName}
+                icon="user"
               />
               <Field
                 label="Email"
@@ -206,6 +217,7 @@ export default function Join() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 error={errors.email}
+                icon="mail"
               />
               <Field
                 label="Phone (with country code)"
@@ -214,6 +226,7 @@ export default function Join() {
                 placeholder="+1 555 123 4567"
                 keyboardType="phone-pad"
                 error={errors.phone}
+                icon="phone"
               />
               <Field
                 label="Password"
@@ -222,16 +235,33 @@ export default function Join() {
                 placeholder="At least 8 characters"
                 secureTextEntry
                 error={errors.password}
+                icon="lock"
               />
               <PrimaryButton title="Send verification code" onPress={sendOtp} loading={loading} icon="send" />
             </Animated.View>
 
-            <Animated.View entering={FadeInUp.duration(600).delay(250)} style={styles.footerRow}>
-              <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14 }}>
+            <Animated.View entering={FadeInUp.duration(600).delay(220)} style={styles.perksRow}>
+              {[
+                { icon: "gift", label: "1 free check" },
+                { icon: "credit-card", label: "No card" },
+                { icon: "shield", label: "Encrypted" },
+              ].map((p) => (
+                <View
+                  key={p.label}
+                  style={[styles.perk, { borderColor: colors.border, backgroundColor: colors.card }]}
+                >
+                  <Feather name={p.icon as keyof typeof Feather.glyphMap} size={14} color={colors.primary} />
+                  <Text style={[styles.perkText, { color: colors.foreground }]}>{p.label}</Text>
+                </View>
+              ))}
+            </Animated.View>
+
+            <Animated.View entering={FadeInUp.duration(600).delay(280)} style={styles.footerRow}>
+              <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 14 }}>
                 Already have an account?{" "}
               </Text>
               <TouchableOpacity onPress={() => router.replace("/sign-in")}>
-                <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>Sign in</Text>
+                <Text style={{ color: colors.primary, fontFamily: "Inter_700Bold", fontSize: 14 }}>Sign in</Text>
               </TouchableOpacity>
             </Animated.View>
           </>
@@ -240,9 +270,19 @@ export default function Join() {
             entering={FadeInUp.duration(600).delay(150)}
             style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
           >
-            <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 13, marginBottom: 12 }}>
-              Sent to {fullPhone()}
-            </Text>
+            <View style={styles.otpHeader}>
+              <View style={[styles.otpIcon, { backgroundColor: colors.primary + "14" }]}>
+                <Feather name="message-circle" size={18} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 14 }}>
+                  Code sent
+                </Text>
+                <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 12, marginTop: 2 }}>
+                  to {fullPhone()}
+                </Text>
+              </View>
+            </View>
             <View style={styles.otpRow}>
               {otp.map((d, i) => (
                 <TextInput
@@ -259,7 +299,7 @@ export default function Join() {
                     styles.otpInput,
                     {
                       borderColor: d ? colors.primary : colors.border,
-                      backgroundColor: colors.muted,
+                      backgroundColor: colors.card,
                       color: colors.foreground,
                     },
                   ]}
@@ -319,20 +359,34 @@ const styles = StyleSheet.create({
   },
   brandText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 18 },
   headline: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 26, marginTop: 16, letterSpacing: -0.3 },
-  headlineSub: { color: "rgba(255,255,255,0.88)", fontFamily: "Inter_400Regular", fontSize: 14, marginTop: 6 },
+  headlineSub: { color: "rgba(255,255,255,0.92)", fontFamily: "Inter_500Medium", fontSize: 14, marginTop: 6 },
   card: {
-    borderRadius: 20,
+    borderRadius: 22,
     borderWidth: 1,
-    padding: 18,
-    marginTop: -28,
+    padding: 20,
+    marginTop: -32,
     shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 6,
+    shadowOpacity: 0.12,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 8,
   },
+  perksRow: { flexDirection: "row", gap: 10, marginTop: 18 },
+  perk: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  perkText: { fontFamily: "Inter_600SemiBold", fontSize: 12 },
   footerRow: { flexDirection: "row", justifyContent: "center", marginTop: 22 },
-  otpRow: { flexDirection: "row", justifyContent: "space-between", marginVertical: 18 },
+  otpHeader: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 18 },
+  otpIcon: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  otpRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 18 },
   otpInput: {
     width: 64,
     height: 64,
@@ -341,5 +395,10 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: 26,
     fontFamily: "Inter_700Bold",
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
 });

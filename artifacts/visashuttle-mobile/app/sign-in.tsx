@@ -8,6 +8,7 @@ import { Feather } from "@expo/vector-icons";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 
 import { AnimatedOrbs } from "@/components/AnimatedOrbs";
+import { Starfield } from "@/components/Starfield";
 import { Field, PrimaryButton } from "@/components/UI";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useAuth } from "@/lib/auth";
@@ -48,6 +49,15 @@ export default function SignIn() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {/* Soft gradient watermark behind body so the brand color bleeds into the form area */}
+      <LinearGradient
+        colors={[colors.primary + "14", colors.background, colors.background]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[StyleSheet.absoluteFill, { top: 240 }]}
+        pointerEvents="none"
+      />
+
       {/* Animated gradient header */}
       <View style={styles.header}>
         <LinearGradient
@@ -57,6 +67,7 @@ export default function SignIn() {
           style={StyleSheet.absoluteFill}
         />
         <AnimatedOrbs variant="header" />
+        <Starfield count={18} seed={3} />
         <View style={[styles.headerInner, { paddingTop: insets.top + 12 }]}>
           <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn} hitSlop={8}>
             <Feather name="x" size={20} color="#fff" />
@@ -98,6 +109,7 @@ export default function SignIn() {
             keyboardType="email-address"
             autoCapitalize="none"
             error={errors.email}
+            icon="mail"
             testID="signin-email"
           />
           <Field
@@ -107,35 +119,60 @@ export default function SignIn() {
             placeholder="Your password"
             secureTextEntry
             error={errors.password}
+            icon="lock"
             testID="signin-password"
           />
           <PrimaryButton title="Sign in" onPress={submit} loading={loading} icon="log-in" />
         </Animated.View>
 
-        <Animated.View entering={FadeInUp.duration(600).delay(250)} style={styles.dividerRow}>
+        <Animated.View entering={FadeInUp.duration(600).delay(220)} style={styles.trustRow}>
+          {[
+            { icon: "shield", label: "Bank-grade\nencryption" },
+            { icon: "zap", label: "Results in\n<60 seconds" },
+            { icon: "users", label: "Trusted by\n10k+ users" },
+          ].map((t) => (
+            <View key={t.label} style={[styles.trustItem, { borderColor: colors.border, backgroundColor: colors.card }]}>
+              <View style={[styles.trustIcon, { backgroundColor: colors.primary + "14" }]}>
+                <Feather name={t.icon as keyof typeof Feather.glyphMap} size={14} color={colors.primary} />
+              </View>
+              <Text style={[styles.trustLabel, { color: colors.foreground }]}>{t.label}</Text>
+            </View>
+          ))}
+        </Animated.View>
+
+        <Animated.View entering={FadeInUp.duration(600).delay(280)} style={styles.dividerRow}>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          <Text style={[styles.dividerText, { color: colors.mutedForeground }]}>or</Text>
+          <View style={[styles.dividerDiamond, { backgroundColor: colors.primary }]}>
+            <Feather name="star" size={10} color="#fff" />
+          </View>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
         </Animated.View>
 
         <Animated.View entering={FadeInUp.duration(600).delay(350)}>
           <TouchableOpacity
             onPress={() => router.replace("/join")}
-            activeOpacity={0.8}
-            style={[styles.signupCard, { borderColor: colors.border, backgroundColor: colors.muted }]}
+            activeOpacity={0.85}
+            style={[styles.signupCard, { borderColor: colors.primary + "30", backgroundColor: colors.card }]}
           >
-            <View style={[styles.signupIcon, { backgroundColor: colors.primary + "1a" }]}>
-              <Feather name="user-plus" size={18} color={colors.primary} />
-            </View>
+            <LinearGradient
+              colors={[colors.gradientStart, colors.gradientMid]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.signupIcon}
+            >
+              <Feather name="user-plus" size={18} color="#fff" />
+            </LinearGradient>
             <View style={{ flex: 1 }}>
-              <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>
+              <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold", fontSize: 14 }}>
                 New to VisaShuttle?
               </Text>
-              <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 2 }}>
-                Create a free account · 1 free AI check included
+              <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 12, marginTop: 2 }}>
+                Create a free account · 1 free AI check
               </Text>
             </View>
-            <Feather name="arrow-right" size={18} color={colors.mutedForeground} />
+            <View style={[styles.signupArrow, { backgroundColor: colors.primary + "12" }]}>
+              <Feather name="arrow-right" size={16} color={colors.primary} />
+            </View>
           </TouchableOpacity>
         </Animated.View>
       </KeyboardAwareScrollViewCompat>
@@ -176,29 +213,65 @@ const styles = StyleSheet.create({
   },
   brandText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 18, letterSpacing: 0.2 },
   headline: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 30, marginTop: 18, letterSpacing: -0.4 },
-  headlineSub: { color: "rgba(255,255,255,0.88)", fontFamily: "Inter_400Regular", fontSize: 14, marginTop: 6 },
+  headlineSub: { color: "rgba(255,255,255,0.92)", fontFamily: "Inter_500Medium", fontSize: 14, marginTop: 6 },
   card: {
-    borderRadius: 20,
+    borderRadius: 22,
     borderWidth: 1,
-    padding: 18,
-    marginTop: -28,
+    padding: 20,
+    marginTop: -32,
     shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 6,
+    shadowOpacity: 0.12,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 8,
+  },
+  trustRow: { flexDirection: "row", gap: 10, marginTop: 18 },
+  trustItem: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    alignItems: "center",
+    gap: 8,
+  },
+  trustIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  trustLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    textAlign: "center",
+    lineHeight: 14,
   },
   dividerRow: { flexDirection: "row", alignItems: "center", marginTop: 22, gap: 10 },
   divider: { flex: 1, height: 1 },
-  dividerText: { fontFamily: "Inter_500Medium", fontSize: 12 },
+  dividerDiamond: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    transform: [{ rotate: "45deg" }],
+    alignItems: "center",
+    justifyContent: "center",
+  },
   signupCard: {
     marginTop: 16,
     flexDirection: "row",
     alignItems: "center",
     padding: 14,
-    borderWidth: 1,
-    borderRadius: 16,
+    borderWidth: 1.5,
+    borderRadius: 18,
     gap: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
-  signupIcon: { width: 38, height: 38, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  signupIcon: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  signupArrow: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
 });
