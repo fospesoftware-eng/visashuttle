@@ -126,8 +126,12 @@ function Router() {
       <Route path="/terms-and-conditions" component={TermsAndConditionsPage} />
       <Route path="/refund-policy" component={RefundPolicyPage} />
       <Route path="/schengen-slots" component={SchengenSlotsPage} />
+      {/* Public marketing routes for the Agency API platform.
+          Note: the api-server (mounted at /api) serves the canonical
+          server-rendered pricing page at GET /api. The route below
+          (/api-pricing) is a frontend mirror only used for in-app links. */}
+      <Route path="/docs/api" component={ApiDocsPublicPage} />
       <Route path="/api-pricing" component={ApiPricingPublicPage} />
-      <Route path="/api-docs" component={ApiDocsPublicPage} />
 
       <Route path="/app" component={AgencyDashboard} />
       <Route path="/app/leads" component={LeadsPage} />

@@ -97,7 +97,7 @@ export default function ApiDocsPage() {
         </Card>
 
         <div className="text-center mt-10 space-x-3">
-          <Link href="/api-pricing"><Button variant="outline">See pricing</Button></Link>
+          <Link href="/api"><Button variant="outline">See pricing</Button></Link>
           <Link href="/agency-register">
             <Button style={{ backgroundImage: BRAND_GRADIENT }} className="text-white border-0">Get an API key</Button>
           </Link>

@@ -10,6 +10,9 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: agency-api
+    description: Agency API Platform — paid pay-per-call public APIs
+security: []
 paths:
   /healthz:
     get:
@@ -24,13 +27,240 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /api-pricing:
+    get:
+      operationId: getApiPricing
+      tags: [agency-api]
+      summary: Public price table
+      description: Per-endpoint per-call price for the Agency API Platform.
+      responses:
+        "200":
+          description: Pricing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PricingResponse"
+
+  /v1/deep-check:
+    post:
+      operationId: postV1DeepCheck
+      tags: [agency-api]
+      summary: Deep Check API
+      description: |
+        AI-powered embassy-style risk assessment. Billed per successful call
+        from the caller's tenant wallet. Rate-limited per API key; on hit,
+        returns 429 with a `Retry-After` header.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeepCheckRequest"
+      responses:
+        "200":
+          description: Deep check result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeepCheckResponse"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "402": { $ref: "#/components/responses/InsufficientBalance" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "502": { $ref: "#/components/responses/UpstreamError" }
+
+  /v1/visa-requirements:
+    post:
+      operationId: postV1VisaRequirements
+      tags: [agency-api]
+      summary: Visa Requirement API
+      description: |
+        Visa requirement lookup by nationality + destination. Returns the
+        required documents, allowed visa types, and visa-free / e-visa
+        status. Billed per successful call from the caller's tenant wallet.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VisaRequirementRequest"
+      responses:
+        "200":
+          description: Visa requirement result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VisaRequirementResponse"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "402": { $ref: "#/components/responses/InsufficientBalance" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: vs_<prefix>_<secret>
+      description: |
+        VisaShuttle API key. Created in the agency dashboard; the plaintext
+        secret is shown only once at creation. Send as
+        `Authorization: Bearer vs_<prefix>_<secret>`.
   schemas:
     HealthStatus:
       type: object
       properties:
-        status:
-          type: string
-      required:
-        - status
+        status: { type: string }
+      required: [status]
 
+    PricingEndpoint:
+      type: object
+      properties:
+        endpoint: { type: string, example: deep-check }
+        priceCents: { type: integer, example: 199 }
+        currency: { type: string, example: USD }
+        description: { type: string, nullable: true }
+      required: [endpoint, priceCents, currency]
+    PricingResponse:
+      type: object
+      properties:
+        currency: { type: string, example: USD }
+        endpoints:
+          type: array
+          items: { $ref: "#/components/schemas/PricingEndpoint" }
+      required: [currency, endpoints]
+
+    CallMeta:
+      type: object
+      properties:
+        endpoint: { type: string }
+        costCents: { type: integer }
+        currency: { type: string }
+        balanceCents: { type: integer, description: "Wallet balance after this call." }
+        latencyMs: { type: integer }
+        usageId: { type: string, description: "Stable id for this call's api_usage row." }
+      required: [endpoint, costCents, currency, balanceCents, latencyMs]
+
+    DeepCheckFormData:
+      type: object
+      additionalProperties: true
+      properties:
+        nationality: { type: string }
+        destinationCountry: { type: string }
+        visaType: { type: string }
+      required: [nationality, destinationCountry, visaType]
+    DeepCheckRequest:
+      type: object
+      properties:
+        formData: { $ref: "#/components/schemas/DeepCheckFormData" }
+      required: [formData]
+    DeepCheckResult:
+      type: object
+      additionalProperties: true
+      properties:
+        approvalChance: { type: integer }
+        profileGrade: { type: string }
+        statusLabel: { type: string }
+        confidenceLevel: { type: string }
+        summary: { type: string }
+        dimensionScores:
+          type: object
+          additionalProperties: { type: integer }
+        riskDetails:
+          type: array
+          items: { type: object, additionalProperties: true }
+        actionPlan:
+          type: array
+          items: { type: object, additionalProperties: true }
+    DeepCheckResponse:
+      type: object
+      properties:
+        meta: { $ref: "#/components/schemas/CallMeta" }
+        result: { $ref: "#/components/schemas/DeepCheckResult" }
+      required: [meta, result]
+
+    VisaRequirementRequest:
+      type: object
+      properties:
+        nationality: { type: string }
+        destinationCountry: { type: string }
+        visaType: { type: string }
+      required: [nationality, destinationCountry]
+    VisaRequirementTemplate:
+      type: object
+      properties:
+        visaType: { type: string }
+        processingTime: { type: string, nullable: true }
+        validity: { type: string, nullable: true }
+        fee: { type: string, nullable: true }
+        requiredDocuments:
+          type: array
+          items: { type: string }
+        notes: { type: string, nullable: true }
+    VisaRequirementResult:
+      type: object
+      properties:
+        nationality: { type: string }
+        destinationCountry: { type: string }
+        visaType: { type: string, nullable: true }
+        entryRequirement:
+          type: object
+          additionalProperties: true
+        allowedVisaTypes:
+          type: array
+          items: { type: string }
+        template:
+          oneOf:
+            - $ref: "#/components/schemas/VisaRequirementTemplate"
+            - type: "null"
+    VisaRequirementResponse:
+      type: object
+      properties:
+        meta: { $ref: "#/components/schemas/CallMeta" }
+        result: { $ref: "#/components/schemas/VisaRequirementResult" }
+      required: [meta, result]
+
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+          required: [code, message]
+      required: [error]
+
+  responses:
+    BadRequest:
+      description: Invalid request body
+      content: { application/json: { schema: { $ref: "#/components/schemas/ApiError" } } }
+    Unauthorized:
+      description: Missing or invalid API key
+      content: { application/json: { schema: { $ref: "#/components/schemas/ApiError" } } }
+    InsufficientBalance:
+      description: Wallet balance is below the per-call price.
+      content: { application/json: { schema: { $ref: "#/components/schemas/ApiError" } } }
+    RateLimited:
+      description: Per-key rate limit exceeded.
+      headers:
+        Retry-After:
+          schema: { type: integer }
+          description: Seconds to wait before retrying.
+        X-RateLimit-Limit:
+          schema: { type: integer }
+        X-RateLimit-Remaining:
+          schema: { type: integer }
+      content: { application/json: { schema: { $ref: "#/components/schemas/ApiError" } } }
+    UpstreamError:
+      description: Upstream provider failed; the call was not billed.
+      content: { application/json: { schema: { $ref: "#/components/schemas/ApiError" } } }
+    InternalError:
+      description: Unexpected server error; the call was not billed.
+      content: { application/json: { schema: { $ref: "#/components/schemas/ApiError" } } }

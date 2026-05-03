@@ -394,9 +394,16 @@ function DocsView() {
 // ── Resellers ────────────────────────────────────────────────────────────
 function ResellersView({ tenantId }: { tenantId: string }) {
   const toast = useToast();
-  const { data: links = [] } = useQuery<any[]>({ queryKey: [`/api/agency/${tenantId}/api/resellers`] });
+  const { data } = useQuery<{ links: any[]; totalCommissionCents: number }>({
+    queryKey: [`/api/agency/${tenantId}/api/resellers`],
+  });
+  const links = data?.links ?? [];
+  const totalCommissionCents = data?.totalCommissionCents ?? 0;
   const [childTenantId, setChildTenantId] = useState("");
   const [commission, setCommission] = useState("10");
+  const [mintFor, setMintFor] = useState<string | null>(null);
+  const [mintName, setMintName] = useState("");
+  const [mintRevealed, setMintRevealed] = useState<{ secret: string; prefix: string } | null>(null);
 
   const addMut = useMutation({
     mutationFn: async () => (await apiRequest("POST", `/api/agency/${tenantId}/api/resellers`, {
@@ -409,42 +416,106 @@ function ResellersView({ tenantId }: { tenantId: string }) {
     mutationFn: async (id: string) => (await apiRequest("DELETE", `/api/agency/${tenantId}/api/resellers/${id}`)).json(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/agency/${tenantId}/api/resellers`] }),
   });
+  const mintMut = useMutation({
+    mutationFn: async () => (await apiRequest("POST", `/api/agency/${tenantId}/api/resellers/${mintFor}/keys`, { name: mintName })).json(),
+    onSuccess: (d: any) => setMintRevealed({ secret: d.secret, prefix: d.prefix }),
+    onError: (e: any) => toast.toast({ title: "Failed", description: e?.message, variant: "destructive" }),
+  });
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Resellers under you</CardTitle>
-        <CardDescription>Earn a fixed commission (in cents) every time a sub-tenant's key is used.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div>
-            <Label>Sub-tenant ID</Label>
-            <Input value={childTenantId} onChange={(e) => setChildTenantId(e.target.value)} placeholder="tenant uuid" />
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Total commission earned</CardTitle>
+          <CardDescription>Across all sub-tenant API usage.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="text-3xl font-bold bg-clip-text text-transparent" style={{ backgroundImage: BRAND_GRADIENT }}>
+            {fmt(totalCommissionCents)}
           </div>
-          <div>
-            <Label>Commission per call (USD)</Label>
-            <Input type="number" step="0.01" value={commission} onChange={(e) => setCommission(e.target.value)} />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Resellers under you</CardTitle>
+          <CardDescription>Earn a fixed markup (in USD) every time a sub-tenant's key is used.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <Label>Sub-tenant ID</Label>
+              <Input value={childTenantId} onChange={(e) => setChildTenantId(e.target.value)} placeholder="tenant uuid" />
+            </div>
+            <div>
+              <Label>Markup per call (USD)</Label>
+              <Input type="number" step="0.01" value={commission} onChange={(e) => setCommission(e.target.value)} />
+            </div>
+            <div className="flex items-end">
+              <Button disabled={!childTenantId || addMut.isPending} onClick={() => addMut.mutate()}>Link reseller</Button>
+            </div>
           </div>
-          <div className="flex items-end">
-            <Button disabled={!childTenantId || addMut.isPending} onClick={() => addMut.mutate()}>Add reseller</Button>
-          </div>
-        </div>
-        <Table>
-          <TableHeader><TableRow><TableHead>Child tenant</TableHead><TableHead>Commission/call</TableHead><TableHead>Active</TableHead><TableHead></TableHead></TableRow></TableHeader>
-          <TableBody>
-            {links.length === 0 && <TableRow><TableCell colSpan={4} className="text-muted-foreground py-6 flex items-center gap-2"><Users className="w-4 h-4" /> No reseller links yet.</TableCell></TableRow>}
-            {links.map((l: any) => (
-              <TableRow key={l.id}>
-                <TableCell className="font-mono text-xs">{l.childTenantId}</TableCell>
-                <TableCell>{fmt(l.commissionCents)}</TableCell>
-                <TableCell><Badge variant={l.active ? "default" : "secondary"}>{l.active ? "active" : "inactive"}</Badge></TableCell>
-                <TableCell className="text-right"><Button size="sm" variant="ghost" onClick={() => removeMut.mutate(l.id)}><Trash2 className="w-4 h-4" /></Button></TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+          <Table>
+            <TableHeader><TableRow><TableHead>Child tenant</TableHead><TableHead>Markup/call</TableHead><TableHead>Active</TableHead><TableHead></TableHead></TableRow></TableHeader>
+            <TableBody>
+              {links.length === 0 && <TableRow><TableCell colSpan={4} className="text-muted-foreground py-6 flex items-center gap-2"><Users className="w-4 h-4" /> No reseller links yet.</TableCell></TableRow>}
+              {links.map((l: any) => (
+                <TableRow key={l.id}>
+                  <TableCell className="font-mono text-xs">{l.childTenantId}</TableCell>
+                  <TableCell>{fmt(l.commissionCents)}</TableCell>
+                  <TableCell><Badge variant={l.active ? "default" : "secondary"}>{l.active ? "active" : "inactive"}</Badge></TableCell>
+                  <TableCell className="text-right space-x-1">
+                    <Button size="sm" variant="outline" onClick={() => { setMintFor(l.childTenantId); setMintName(""); setMintRevealed(null); }}>
+                      <KeyRound className="w-4 h-4 mr-1" /> Mint sub-key
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => removeMut.mutate(l.id)}><Trash2 className="w-4 h-4" /></Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Dialog open={!!mintFor} onOpenChange={(o) => { if (!o) { setMintFor(null); setMintRevealed(null); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{mintRevealed ? "Save the sub-key secret" : "Mint a sub-key for this reseller"}</DialogTitle>
+            <DialogDescription>
+              {mintRevealed
+                ? "Give this secret to your customer. We will not show it again."
+                : "Sub-key calls debit the sub-tenant's wallet. Your markup is credited to your wallet automatically per call."}
+            </DialogDescription>
+          </DialogHeader>
+          {!mintRevealed ? (
+            <>
+              <div className="space-y-2">
+                <Label>Key name (for your records)</Label>
+                <Input placeholder="Acme Travel Production" value={mintName} onChange={(e) => setMintName(e.target.value)} />
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setMintFor(null)}>Cancel</Button>
+                <Button disabled={!mintName || mintMut.isPending} onClick={() => mintMut.mutate()}>Mint</Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">Copy it now — this is the last time it will be shown.</p>
+                <div className="flex gap-2">
+                  <Input readOnly value={mintRevealed.secret} className="font-mono text-xs" />
+                  <Button variant="outline" onClick={() => { navigator.clipboard.writeText(mintRevealed.secret); toast.toast({ title: "Copied" }); }}>
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">Prefix: <code>{mintRevealed.prefix}</code></p>
+              </div>
+              <DialogFooter>
+                <Button onClick={() => { setMintFor(null); setMintRevealed(null); }}>Done</Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

@@ -5819,7 +5819,23 @@ export async function registerRoutes(
   });
 
   // ── Agency API Platform (paid pay-per-call public APIs + dashboard CRUD)
-  await registerApiPlatformRoutes(app, { requireTenantAccess });
+  // Wire the Agency API Platform with Cashfree helpers so it can offer
+  // tenants a self-serve wallet top-up reusing this app's existing gateway
+  // integration (no second Cashfree client).
+  await registerApiPlatformRoutes(app, {
+    requireTenantAccess,
+    cashfree: {
+      getCredentials: async (tenantId: string) => {
+        // Prefer tenant-scoped credentials (matches the invoice flow).
+        // Fall back to platform creds via the same helper signature.
+        const cfg = (await storage.getTenantPaymentGatewayConfig(tenantId)) as any
+          ?? (await storage.getPaymentGatewayConfig());
+        return getCashfreeCredentials(cfg as any);
+      },
+      getRequestOrigin,
+      readBody: readCashfreeBody,
+    },
+  });
 
   return httpServer;
 }

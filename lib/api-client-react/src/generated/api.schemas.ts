@@ -8,3 +8,130 @@
 export interface HealthStatus {
   status: string;
 }
+
+export interface PricingEndpoint {
+  endpoint: string;
+  priceCents: number;
+  currency: string;
+  description?: string | null;
+}
+
+export interface PricingResponse {
+  currency: string;
+  endpoints: PricingEndpoint[];
+}
+
+export interface CallMeta {
+  endpoint: string;
+  costCents: number;
+  currency: string;
+  /** Wallet balance after this call. */
+  balanceCents: number;
+  latencyMs: number;
+  /** Stable id for this call's api_usage row. */
+  usageId?: string;
+}
+
+export interface DeepCheckFormData {
+  nationality: string;
+  destinationCountry: string;
+  visaType: string;
+  [key: string]: unknown;
+}
+
+export interface DeepCheckRequest {
+  formData: DeepCheckFormData;
+}
+
+export type DeepCheckResultDimensionScores = { [key: string]: number };
+
+export type DeepCheckResultRiskDetailsItem = { [key: string]: unknown };
+
+export type DeepCheckResultActionPlanItem = { [key: string]: unknown };
+
+export interface DeepCheckResult {
+  approvalChance?: number;
+  profileGrade?: string;
+  statusLabel?: string;
+  confidenceLevel?: string;
+  summary?: string;
+  dimensionScores?: DeepCheckResultDimensionScores;
+  riskDetails?: DeepCheckResultRiskDetailsItem[];
+  actionPlan?: DeepCheckResultActionPlanItem[];
+  [key: string]: unknown;
+}
+
+export interface DeepCheckResponse {
+  meta: CallMeta;
+  result: DeepCheckResult;
+}
+
+export interface VisaRequirementRequest {
+  nationality: string;
+  destinationCountry: string;
+  visaType?: string;
+}
+
+export interface VisaRequirementTemplate {
+  visaType?: string;
+  processingTime?: string | null;
+  validity?: string | null;
+  fee?: string | null;
+  requiredDocuments?: string[];
+  notes?: string | null;
+}
+
+export type VisaRequirementResultEntryRequirement = { [key: string]: unknown };
+
+export interface VisaRequirementResult {
+  nationality?: string;
+  destinationCountry?: string;
+  visaType?: string | null;
+  entryRequirement?: VisaRequirementResultEntryRequirement;
+  allowedVisaTypes?: string[];
+  template?: VisaRequirementTemplate | null;
+}
+
+export interface VisaRequirementResponse {
+  meta: CallMeta;
+  result: VisaRequirementResult;
+}
+
+export type ApiErrorError = {
+  code: string;
+  message: string;
+};
+
+export interface ApiError {
+  error: ApiErrorError;
+}
+
+/**
+ * Invalid request body
+ */
+export type BadRequestResponse = ApiError;
+
+/**
+ * Missing or invalid API key
+ */
+export type UnauthorizedResponse = ApiError;
+
+/**
+ * Wallet balance is below the per-call price.
+ */
+export type InsufficientBalanceResponse = ApiError;
+
+/**
+ * Per-key rate limit exceeded.
+ */
+export type RateLimitedResponse = ApiError;
+
+/**
+ * Upstream provider failed; the call was not billed.
+ */
+export type UpstreamErrorResponse = ApiError;
+
+/**
+ * Unexpected server error; the call was not billed.
+ */
+export type InternalErrorResponse = ApiError;

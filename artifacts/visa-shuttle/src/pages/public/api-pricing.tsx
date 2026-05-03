@@ -46,7 +46,7 @@ export default function ApiPricingPage() {
           ))}
         </div>
         <div className="text-center mt-12 space-x-3">
-          <Link href="/api-docs"><Button size="lg" variant="outline">Read the docs</Button></Link>
+          <Link href="/docs/api"><Button size="lg" variant="outline">Read the docs</Button></Link>
           <Link href="/agency-register">
             <Button size="lg" style={{ backgroundImage: BRAND_GRADIENT }} className="text-white border-0">
               Get an API key

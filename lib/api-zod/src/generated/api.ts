@@ -14,3 +14,105 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * Per-endpoint per-call price for the Agency API Platform.
+ * @summary Public price table
+ */
+export const GetApiPricingResponse = zod.object({
+  currency: zod.string(),
+  endpoints: zod.array(
+    zod.object({
+      endpoint: zod.string(),
+      priceCents: zod.number(),
+      currency: zod.string(),
+      description: zod.string().nullish(),
+    }),
+  ),
+});
+
+/**
+ * AI-powered embassy-style risk assessment. Billed per successful call
+from the caller's tenant wallet. Rate-limited per API key; on hit,
+returns 429 with a `Retry-After` header.
+
+ * @summary Deep Check API
+ */
+export const PostV1DeepCheckBody = zod.object({
+  formData: zod.object({
+    nationality: zod.string(),
+    destinationCountry: zod.string(),
+    visaType: zod.string(),
+  }),
+});
+
+export const PostV1DeepCheckResponse = zod.object({
+  meta: zod.object({
+    endpoint: zod.string(),
+    costCents: zod.number(),
+    currency: zod.string(),
+    balanceCents: zod.number().describe("Wallet balance after this call."),
+    latencyMs: zod.number(),
+    usageId: zod
+      .string()
+      .optional()
+      .describe("Stable id for this call's api_usage row."),
+  }),
+  result: zod.object({
+    approvalChance: zod.number().optional(),
+    profileGrade: zod.string().optional(),
+    statusLabel: zod.string().optional(),
+    confidenceLevel: zod.string().optional(),
+    summary: zod.string().optional(),
+    dimensionScores: zod.record(zod.string(), zod.number()).optional(),
+    riskDetails: zod.array(zod.record(zod.string(), zod.unknown())).optional(),
+    actionPlan: zod.array(zod.record(zod.string(), zod.unknown())).optional(),
+  }),
+});
+
+/**
+ * Visa requirement lookup by nationality + destination. Returns the
+required documents, allowed visa types, and visa-free / e-visa
+status. Billed per successful call from the caller's tenant wallet.
+
+ * @summary Visa Requirement API
+ */
+export const PostV1VisaRequirementsBody = zod.object({
+  nationality: zod.string(),
+  destinationCountry: zod.string(),
+  visaType: zod.string().optional(),
+});
+
+export const PostV1VisaRequirementsResponse = zod.object({
+  meta: zod.object({
+    endpoint: zod.string(),
+    costCents: zod.number(),
+    currency: zod.string(),
+    balanceCents: zod.number().describe("Wallet balance after this call."),
+    latencyMs: zod.number(),
+    usageId: zod
+      .string()
+      .optional()
+      .describe("Stable id for this call's api_usage row."),
+  }),
+  result: zod.object({
+    nationality: zod.string().optional(),
+    destinationCountry: zod.string().optional(),
+    visaType: zod.string().nullish(),
+    entryRequirement: zod.record(zod.string(), zod.unknown()).optional(),
+    allowedVisaTypes: zod.array(zod.string()).optional(),
+    template: zod
+      .union([
+        zod.object({
+          visaType: zod.string().optional(),
+          processingTime: zod.string().nullish(),
+          validity: zod.string().nullish(),
+          fee: zod.string().nullish(),
+          requiredDocuments: zod.array(zod.string()).optional(),
+          notes: zod.string().nullish(),
+        }),
+        zod.null(),
+      ])
+      .optional(),
+  }),
+});

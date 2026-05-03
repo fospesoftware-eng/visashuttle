@@ -5,18 +5,34 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
+  MutationFunction,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { HealthStatus } from "./api.schemas";
+import type {
+  BadRequestResponse,
+  DeepCheckRequest,
+  DeepCheckResponse,
+  HealthStatus,
+  InsufficientBalanceResponse,
+  InternalErrorResponse,
+  PricingResponse,
+  RateLimitedResponse,
+  UnauthorizedResponse,
+  UpstreamErrorResponse,
+  VisaRequirementRequest,
+  VisaRequirementResponse,
+} from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
-import type { ErrorType } from "../custom-fetch";
+import type { ErrorType, BodyType } from "../custom-fetch";
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
@@ -99,3 +115,296 @@ export function useHealthCheck<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * Per-endpoint per-call price for the Agency API Platform.
+ * @summary Public price table
+ */
+export const getGetApiPricingUrl = () => {
+  return `/api/api-pricing`;
+};
+
+export const getApiPricing = async (
+  options?: RequestInit,
+): Promise<PricingResponse> => {
+  return customFetch<PricingResponse>(getGetApiPricingUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetApiPricingQueryKey = () => {
+  return [`/api/api-pricing`] as const;
+};
+
+export const getGetApiPricingQueryOptions = <
+  TData = Awaited<ReturnType<typeof getApiPricing>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getApiPricing>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetApiPricingQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getApiPricing>>> = ({
+    signal,
+  }) => getApiPricing({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getApiPricing>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetApiPricingQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getApiPricing>>
+>;
+export type GetApiPricingQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Public price table
+ */
+
+export function useGetApiPricing<
+  TData = Awaited<ReturnType<typeof getApiPricing>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getApiPricing>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetApiPricingQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * AI-powered embassy-style risk assessment. Billed per successful call
+from the caller's tenant wallet. Rate-limited per API key; on hit,
+returns 429 with a `Retry-After` header.
+
+ * @summary Deep Check API
+ */
+export const getPostV1DeepCheckUrl = () => {
+  return `/api/v1/deep-check`;
+};
+
+export const postV1DeepCheck = async (
+  deepCheckRequest: DeepCheckRequest,
+  options?: RequestInit,
+): Promise<DeepCheckResponse> => {
+  return customFetch<DeepCheckResponse>(getPostV1DeepCheckUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(deepCheckRequest),
+  });
+};
+
+export const getPostV1DeepCheckMutationOptions = <
+  TError = ErrorType<
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | InsufficientBalanceResponse
+    | RateLimitedResponse
+    | UpstreamErrorResponse
+  >,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postV1DeepCheck>>,
+    TError,
+    { data: BodyType<DeepCheckRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof postV1DeepCheck>>,
+  TError,
+  { data: BodyType<DeepCheckRequest> },
+  TContext
+> => {
+  const mutationKey = ["postV1DeepCheck"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof postV1DeepCheck>>,
+    { data: BodyType<DeepCheckRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return postV1DeepCheck(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PostV1DeepCheckMutationResult = NonNullable<
+  Awaited<ReturnType<typeof postV1DeepCheck>>
+>;
+export type PostV1DeepCheckMutationBody = BodyType<DeepCheckRequest>;
+export type PostV1DeepCheckMutationError = ErrorType<
+  | BadRequestResponse
+  | UnauthorizedResponse
+  | InsufficientBalanceResponse
+  | RateLimitedResponse
+  | UpstreamErrorResponse
+>;
+
+/**
+ * @summary Deep Check API
+ */
+export const usePostV1DeepCheck = <
+  TError = ErrorType<
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | InsufficientBalanceResponse
+    | RateLimitedResponse
+    | UpstreamErrorResponse
+  >,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postV1DeepCheck>>,
+    TError,
+    { data: BodyType<DeepCheckRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof postV1DeepCheck>>,
+  TError,
+  { data: BodyType<DeepCheckRequest> },
+  TContext
+> => {
+  return useMutation(getPostV1DeepCheckMutationOptions(options));
+};
+
+/**
+ * Visa requirement lookup by nationality + destination. Returns the
+required documents, allowed visa types, and visa-free / e-visa
+status. Billed per successful call from the caller's tenant wallet.
+
+ * @summary Visa Requirement API
+ */
+export const getPostV1VisaRequirementsUrl = () => {
+  return `/api/v1/visa-requirements`;
+};
+
+export const postV1VisaRequirements = async (
+  visaRequirementRequest: VisaRequirementRequest,
+  options?: RequestInit,
+): Promise<VisaRequirementResponse> => {
+  return customFetch<VisaRequirementResponse>(getPostV1VisaRequirementsUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(visaRequirementRequest),
+  });
+};
+
+export const getPostV1VisaRequirementsMutationOptions = <
+  TError = ErrorType<
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | InsufficientBalanceResponse
+    | RateLimitedResponse
+    | InternalErrorResponse
+  >,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postV1VisaRequirements>>,
+    TError,
+    { data: BodyType<VisaRequirementRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof postV1VisaRequirements>>,
+  TError,
+  { data: BodyType<VisaRequirementRequest> },
+  TContext
+> => {
+  const mutationKey = ["postV1VisaRequirements"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof postV1VisaRequirements>>,
+    { data: BodyType<VisaRequirementRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return postV1VisaRequirements(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PostV1VisaRequirementsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof postV1VisaRequirements>>
+>;
+export type PostV1VisaRequirementsMutationBody =
+  BodyType<VisaRequirementRequest>;
+export type PostV1VisaRequirementsMutationError = ErrorType<
+  | BadRequestResponse
+  | UnauthorizedResponse
+  | InsufficientBalanceResponse
+  | RateLimitedResponse
+  | InternalErrorResponse
+>;
+
+/**
+ * @summary Visa Requirement API
+ */
+export const usePostV1VisaRequirements = <
+  TError = ErrorType<
+    | BadRequestResponse
+    | UnauthorizedResponse
+    | InsufficientBalanceResponse
+    | RateLimitedResponse
+    | InternalErrorResponse
+  >,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof postV1VisaRequirements>>,
+    TError,
+    { data: BodyType<VisaRequirementRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof postV1VisaRequirements>>,
+  TError,
+  { data: BodyType<VisaRequirementRequest> },
+  TContext
+> => {
+  return useMutation(getPostV1VisaRequirementsMutationOptions(options));
+};
