@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -250,25 +250,122 @@ function KeysView({ tenantId }: { tenantId: string }) {
   );
 }
 
+// Cashfree drop-in SDK loader (shared shape with deep-check-payment.tsx).
+declare global {
+  interface Window {
+    Cashfree?: (options: { mode: "sandbox" | "production" }) => {
+      checkout: (options: { paymentSessionId: string; redirectTarget: "_self" | "_blank" | "_modal" }) => Promise<unknown>;
+    };
+  }
+}
+function loadCashfreeSdk(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (window.Cashfree) return resolve();
+    const existing = document.querySelector<HTMLScriptElement>('script[src="https://sdk.cashfree.com/js/v3/cashfree.js"]');
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", () => reject(new Error("Could not load Cashfree checkout")), { once: true });
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://sdk.cashfree.com/js/v3/cashfree.js";
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Could not load Cashfree checkout"));
+    document.body.appendChild(script);
+  });
+}
+
 // ── Usage ────────────────────────────────────────────────────────────────
 function UsageView({ tenantId }: { tenantId: string }) {
+  const toast = useToast();
   const { data } = useQuery<{ usage: any[]; kpis: any }>({ queryKey: [`/api/agency/${tenantId}/api/usage`] });
   const { data: wallet } = useQuery<{ wallet: { balanceCents: number; currency: string }; ledger: any[] }>({
     queryKey: [`/api/agency/${tenantId}/api/wallet`],
   });
   const usage = data?.usage ?? [];
   const ledger = wallet?.ledger ?? [];
+
+  // Self-serve Cashfree top-up. Two-step flow:
+  //   1. /initiate-topup → opens Cashfree drop-in with paymentSessionId
+  //   2. on return (?topup_order=…) → /confirm-topup credits the wallet
+  //      ONCE (idempotent). Then we invalidate the queries so the new
+  //      balance + ledger row appear instantly.
+  const [topupOpen, setTopupOpen] = useState(false);
+  const [topupAmount, setTopupAmount] = useState("25");
+  const [busy, setBusy] = useState(false);
+
+  // Auto-confirm on return from Cashfree.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const orderId = url.searchParams.get("topup_order");
+    if (!orderId) return;
+    (async () => {
+      try {
+        await apiRequest("POST", `/api/agency/${tenantId}/api/wallet/confirm-topup`, { orderId });
+        toast.toast({ title: "Wallet topped up" });
+        queryClient.invalidateQueries({ queryKey: [`/api/agency/${tenantId}/api/wallet`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/agency/${tenantId}/api/usage`] });
+      } catch (e: any) {
+        toast.toast({ title: "Could not confirm top-up", description: e?.message, variant: "destructive" });
+      } finally {
+        url.searchParams.delete("topup_order");
+        window.history.replaceState({}, "", url.pathname + (url.search || ""));
+      }
+    })();
+  }, [tenantId, toast]);
+
+  async function startTopup() {
+    setBusy(true);
+    try {
+      const cents = Math.round(parseFloat(topupAmount || "0") * 100);
+      if (!Number.isFinite(cents) || cents <= 0) throw new Error("Enter an amount in USD greater than 0");
+      const res = await apiRequest("POST", `/api/agency/${tenantId}/api/wallet/initiate-topup`, { amountCents: cents });
+      const init = await res.json();
+      if (!init?.paymentSessionId) throw new Error("Cashfree did not return a payment session");
+      await loadCashfreeSdk();
+      const cashfree = window.Cashfree?.({ mode: init.mode === "live" ? "production" : "sandbox" });
+      if (!cashfree) throw new Error("Cashfree checkout unavailable");
+      setTopupOpen(false);
+      await cashfree.checkout({ paymentSessionId: init.paymentSessionId, redirectTarget: "_self" });
+    } catch (e: any) {
+      toast.toast({ title: "Top-up failed", description: e?.message, variant: "destructive" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader><CardTitle>Wallet</CardTitle><CardDescription>Per-call charges debit this balance.</CardDescription></CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="text-3xl font-bold">{fmt(wallet?.wallet?.balanceCents ?? 0)}</div>
-            <div className="text-sm text-muted-foreground">Need a top-up? Contact support to recharge via Cashfree.</div>
+            <Button onClick={() => setTopupOpen(true)} style={{ backgroundImage: BRAND_GRADIENT }} className="text-white border-0">
+              <Wallet className="w-4 h-4 mr-2" /> Top up via Cashfree
+            </Button>
           </div>
         </CardContent>
       </Card>
+      <Dialog open={topupOpen} onOpenChange={setTopupOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Top up your API wallet</DialogTitle>
+            <DialogDescription>You'll be redirected to Cashfree to complete the payment.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Amount (USD)</Label>
+            <Input type="number" step="0.01" min="1" value={topupAmount} onChange={(e) => setTopupAmount(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setTopupOpen(false)}>Cancel</Button>
+            <Button disabled={busy} onClick={startTopup} style={{ backgroundImage: BRAND_GRADIENT }} className="text-white border-0">
+              {busy ? "Starting…" : "Continue to Cashfree"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Card>
         <CardHeader><CardTitle>Recent calls</CardTitle></CardHeader>
         <CardContent>

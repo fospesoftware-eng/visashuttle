@@ -21,6 +21,27 @@ import { eq, and, desc, sql as dsql } from "drizzle-orm";
 import { randomBytes, randomUUID, createHash, timingSafeEqual } from "crypto";
 import { z } from "zod";
 
+// Drizzle's transaction handle has heavily overloaded generics that don't
+// extract cleanly via `Parameters<>`, so we use a narrow alias here that
+// scopes the `any` to a single name instead of leaking it inline. The tx
+// methods we use (`update`, `insert`) are still type-checked by their args.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type DbTx = any;
+
+type ApiKeyRow = typeof apiKeys.$inferSelect;
+type LedgerRow = typeof tenantWalletLedger.$inferSelect;
+type PricingRow = typeof apiPricing.$inferSelect;
+
+// The Express session type isn't augmented with our custom userEmail /
+// userName fields in this package, but they're populated by the auth
+// middleware. This narrow accessor returns a string when the field is
+// present and a string, otherwise undefined — without leaking `any`.
+function getSessionField(req: Request, key: "userEmail" | "userName"): string | undefined {
+  const session = req.session as unknown as Record<string, unknown> | undefined;
+  const v = session?.[key];
+  return typeof v === "string" ? v : undefined;
+}
+
 // Default per-call prices (cents, USD) — seeded if the row is missing.
 const DEFAULT_PRICES: Record<ApiEndpointSlug, { priceCents: number; description: string }> = {
   "deep-check": {
@@ -120,7 +141,7 @@ async function settleSuccessAtomic(opts: {
   latencyMs: number;
   ip?: string | null;
 }): Promise<{ balanceAfter: number; usageId: string } | null> {
-  return await db.transaction(async (tx: any) => {
+  return await db.transaction(async (tx: DbTx) => {
     const updated = await tx
       .update(tenantWallet)
       .set({
@@ -135,7 +156,7 @@ async function settleSuccessAtomic(opts: {
       tenantId: opts.tenantId, apiKeyId: opts.apiKeyId, endpoint: opts.endpoint,
       status: 200, costCents: opts.priceCents, latencyMs: opts.latencyMs, ip: opts.ip ?? null,
     }).returning({ id: apiUsage.id });
-    const usageId = usage[0].id as string;
+    const usageId = usage[0].id;
     await tx.insert(tenantWalletLedger).values({
       tenantId: opts.tenantId, amountCents: -opts.priceCents, balanceAfterCents: balanceAfter,
       type: "api_debit", reference: `usage:${usageId}`, notes: `${opts.endpoint} API call`,
@@ -159,7 +180,7 @@ async function logRejectedCall(opts: {
 
 async function creditWallet(tenantId: string, amountCents: number, refType: string, reference: string, notes?: string): Promise<number> {
   await getOrCreateWallet(tenantId);
-  return await db.transaction(async (tx: any) => {
+  return await db.transaction(async (tx: DbTx) => {
     const updated = await tx
       .update(tenantWallet)
       .set({ balanceCents: dsql`${tenantWallet.balanceCents} + ${amountCents}`, updatedAt: new Date() })
@@ -269,7 +290,7 @@ export async function registerApiPlatformRoutes(
     let prices: { endpoint: string; priceCents: number; description: string | null }[] = [];
     try {
       const rows = await db.select().from(apiPricing).where(eq(apiPricing.active, true)).orderBy(apiPricing.endpoint);
-      prices = rows.map((r: any) => ({ endpoint: r.endpoint, priceCents: r.priceCents, description: r.description }));
+      prices = rows.map((r: PricingRow) => ({ endpoint: r.endpoint as ApiEndpointSlug, priceCents: r.priceCents, description: r.description }));
     } catch { /* fall through with empty list */ }
     const cards = prices.map((p) => `
       <div class="card">
@@ -333,7 +354,7 @@ export async function registerApiPlatformRoutes(
     const rows = await db.select().from(apiPricing).where(eq(apiPricing.active, true)).orderBy(apiPricing.endpoint);
     res.json({
       currency: "USD",
-      endpoints: rows.map((r: any) => ({
+      endpoints: rows.map((r: PricingRow) => ({
         endpoint: r.endpoint, priceCents: r.priceCents, currency: r.currency, description: r.description,
       })),
     });
@@ -373,9 +394,10 @@ export async function registerApiPlatformRoutes(
       const aiConfig = await storage.getPlatformAiConfig();
       const deep = await runDeepCheck(formData, aiConfig);
       result = deep.result;
-    } catch (err: any) {
+    } catch (err: unknown) {
       await logRejectedCall({ tenantId: ak.tenantId, apiKeyId: ak.id, endpoint: "deep-check", status: 502, latencyMs: Date.now() - startedAt, errorCode: "upstream_error", ip: req.ip });
-      const code = /Anthropic API key not configured/i.test(String(err?.message)) ? "ai_not_configured" : "upstream_error";
+      const message = err instanceof Error ? err.message : String(err);
+      const code = /Anthropic API key not configured/i.test(message) ? "ai_not_configured" : "upstream_error";
       res.status(code === "ai_not_configured" ? 503 : 502).json({ error: { code, message: code === "ai_not_configured" ? "Deep Check is temporarily unavailable." : "Deep Check failed to complete. Please retry." } });
       return;
     }
@@ -447,11 +469,13 @@ export async function registerApiPlatformRoutes(
         entryRequirement: entry, allowedVisaTypes: allowedTypes,
         template: matched ? {
           visaType: matched.visaType,
-          processingTime: (matched as any).processingTime ?? null,
-          validity: (matched as any).validity ?? null,
-          fee: (matched as any).fee ?? null,
-          requiredDocuments: (matched as any).requiredDocuments ?? [],
-          notes: (matched as any).notes ?? null,
+          processingTime: matched.processingTime ?? null,
+          fee: matched.fees ?? null,
+          requiredDocuments:
+            (matched.requirements && typeof matched.requirements === "object" && "documents" in matched.requirements
+              ? (matched.requirements as { documents?: string[] }).documents
+              : null) ?? [],
+          notes: matched.notes ?? null,
         } : null,
       };
     } catch {
@@ -491,7 +515,7 @@ export async function registerApiPlatformRoutes(
   app.get("/api/agency/:tenantId/api/keys", async (req, res) => {
     if (!helpers.requireTenantAccess(req, res, req.params.tenantId)) return;
     const rows = await db.select().from(apiKeys).where(eq(apiKeys.tenantId, req.params.tenantId)).orderBy(desc(apiKeys.createdAt));
-    res.json(rows.map((r: any) => ({ ...r, hashedSecret: undefined })));
+    res.json(rows.map((r: ApiKeyRow) => ({ ...r, hashedSecret: undefined })));
   });
 
   // Create key — full secret returned exactly once.
@@ -570,8 +594,8 @@ export async function registerApiPlatformRoutes(
       order_note: `VisaShuttle API wallet top-up`,
       customer_details: {
         customer_id: req.params.tenantId.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 45),
-        customer_email: (req.session as any)?.userEmail || "noreply@visashuttle.app",
-        customer_name: (req.session as any)?.userName || "Agency",
+        customer_email: getSessionField(req, "userEmail") || "noreply@visashuttle.app",
+        customer_name: getSessionField(req, "userName") || "Agency",
         customer_phone: "9999999999",
       },
       order_meta: {
@@ -713,7 +737,10 @@ export async function registerApiPlatformRoutes(
         eq(tenantWalletLedger.tenantId, req.params.tenantId),
         eq(tenantWalletLedger.type, "reseller_commission"),
       ));
-    const totalCommissionCents = earningsRows.reduce((s: number, r: any) => s + (r.amountCents ?? 0), 0);
+    const totalCommissionCents = earningsRows.reduce(
+      (s: number, r: Pick<LedgerRow, "amountCents" | "notes" | "createdAt">) => s + (r.amountCents ?? 0),
+      0,
+    );
     res.json({ links: rows, totalCommissionCents });
   });
 
