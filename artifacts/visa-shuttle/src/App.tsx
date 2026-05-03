@@ -47,6 +47,7 @@ import AgencySettingsPage from "@/pages/agency/settings";
 import ApiPlatformPage from "@/pages/agency/api-platform";
 import ApiPricingPublicPage from "@/pages/public/api-pricing";
 import ApiDocsPublicPage from "@/pages/public/api-docs";
+import TutorialPage from "@/pages/tutorial";
 
 import CustomerDashboard from "@/pages/customer/dashboard";
 import CustomerCasePage from "@/pages/customer/case";
@@ -132,6 +133,7 @@ function Router() {
           (/api-pricing) is a frontend mirror only used for in-app links. */}
       <Route path="/docs/api" component={ApiDocsPublicPage} />
       <Route path="/api-pricing" component={ApiPricingPublicPage} />
+      <Route path="/tutorial" component={TutorialPage} />
 
       <Route path="/app" component={AgencyDashboard} />
       <Route path="/app/leads" component={LeadsPage} />

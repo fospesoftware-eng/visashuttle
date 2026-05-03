@@ -17,6 +17,7 @@ export function SiteHeader() {
           <Link href="/visa-check" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Visa Check</Link>
           <Link href="/pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Pricing</Link>
           <Link href="/business" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">For Business</Link>
+          <Link href="/tutorial" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Tutorial</Link>
           <a href="/#contact" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Contact</a>
         </nav>
         <div className="flex items-center gap-2 sm:gap-3">
