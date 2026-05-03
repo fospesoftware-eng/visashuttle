@@ -895,3 +895,34 @@ intact for historical data and as a fallback.
   posts via `apiRequest` and invalidates both the detail and list query
   keys. Application cards keep showing their legacy passport snapshot with
   an explanatory note that future applications draw from the library.
+
+### Case detail tabs mirror the new-application wizard (May 2026)
+- **Sidebar** (`client/src/components/layouts/dashboard-layout.tsx`):
+  the agency `Applications` nav item is now a single link to `/app/cases`.
+  The `Processing` / `Completed` children were removed; deep-link routes
+  `/app/cases/processing` and `/app/cases/completed` still exist in
+  `App.tsx` for back-compat but are no longer surfaced in the sidebar.
+- **Case detail tabs** (`client/src/pages/agency/case-detail.tsx`): the
+  4-tab layout (Documents / Appointments / Messages / Activity) was
+  replaced with 10 tabs that mirror the wizard's 8 steps plus the two
+  comms tabs: `Destination`, `Applicant`, `Travel`, `Co-Travellers`,
+  `Appointments`, `Documents`, `Fees`, `Review`, `Messages`, `Activity`.
+  TabsList is wrapped in `overflow-x-auto` for narrow viewports.
+- **Data sources** (all endpoints already existed):
+  - Co-Travellers: `GET /api/cases/:id/co-travellers` (read-only summary
+    cards; the editable CoTravellersCard remains in the left sidebar).
+  - Appointments: `GET /api/cases/:id/appointments` for the tab badge
+    count; the tab content embeds `AppointmentsPanel` (interactive — same
+    as wizard step 5, which adds/edits appointments).
+  - Fees: `GET /api/cases/:id/invoices` + `GET /api/tenants/:tid/invoice-settings`
+    for currency. Tab shows billed / paid / outstanding totals plus a list
+    of invoice rows linking to `/app/accounting/invoices/:id`. A
+    "Manage Invoices" button deep-links to the invoices page filtered by
+    case.
+  - Destination / Applicant / Travel / Review tabs are read-only `<dl>`
+    grids derived from `caseData` (covers passport block, customer
+    contact, travel dates/purpose/itinerary, submission method, status,
+    counts, timestamps).
+- **Local helper** `formatMoney(cents, currency)` added at the top of
+  case-detail.tsx (Intl.NumberFormat with `currency` style + a plain-text
+  fallback). No shared money util existed.

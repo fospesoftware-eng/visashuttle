@@ -6,7 +6,8 @@ import {
   CheckCircle, AlertCircle, Clock, Send, Paperclip, Download,
   Brain, Lightbulb, RefreshCw, Copy, Check, ExternalLink, Share2,
   Loader2, MessageSquare, Flag, Users, Plus, Trash2, Pencil, Mail, FileDown,
-  Phone, MapPin, Globe, BookOpen, Hash, StickyNote, Plane
+  Phone, MapPin, Globe, BookOpen, Hash, StickyNote, Plane,
+  DollarSign, ClipboardCheck, ListChecks, Receipt
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,7 +25,7 @@ import { AppointmentsPanel } from "@/components/appointments-panel";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import type { Case, Document, Message, ActivityLog, CaseCoTraveller, CoTravellerRelationship } from "@shared/schema";
+import type { Case, Document, Message, ActivityLog, CaseCoTraveller, CoTravellerRelationship, Appointment, Invoice, InvoiceSettings } from "@shared/schema";
 import { CO_TRAVELLER_RELATIONSHIPS } from "@shared/schema";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
@@ -40,6 +41,18 @@ const RELATIONSHIP_LABELS: Record<CoTravellerRelationship, string> = {
   grandparent: "Grandparent", in_law: "In-law", partner: "Partner",
   friend: "Friend", colleague: "Colleague", relative: "Other relative", other: "Other",
 };
+
+function formatMoney(cents: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat("en", {
+      style: "currency",
+      currency: currency || "USD",
+      maximumFractionDigits: 2,
+    }).format((cents || 0) / 100);
+  } catch {
+    return `${currency || "USD"} ${((cents || 0) / 100).toFixed(2)}`;
+  }
+}
 
 function todayISO(): string {
   const d = new Date();
@@ -548,6 +561,48 @@ export default function CaseDetailPage() {
       if (!caseData?.tenantId) return [];
       const res = await fetch(`/api/tenants/${caseData.tenantId}/activity-logs`, { credentials: "include" });
       if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!caseData?.tenantId,
+  });
+
+  // Wizard-step tab data: co-travellers, appointments, invoices, invoice settings (for currency)
+  const { data: coTravellers = [] } = useQuery<CaseCoTraveller[]>({
+    queryKey: ["/api/cases", id, "co-travellers"],
+    queryFn: async () => {
+      const res = await fetch(`/api/cases/${id}/co-travellers`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!id,
+  });
+
+  const { data: caseAppointments = [] } = useQuery<Appointment[]>({
+    queryKey: ["/api/cases", id, "appointments"],
+    queryFn: async () => {
+      const res = await fetch(`/api/cases/${id}/appointments`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!id,
+  });
+
+  const { data: caseInvoices = [] } = useQuery<Invoice[]>({
+    queryKey: ["/api/cases", id, "invoices"],
+    queryFn: async () => {
+      const res = await fetch(`/api/cases/${id}/invoices`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!id,
+  });
+
+  const { data: invoiceSettings } = useQuery<InvoiceSettings>({
+    queryKey: ["/api/tenants", caseData?.tenantId, "invoice-settings"],
+    queryFn: async () => {
+      if (!caseData?.tenantId) return null as any;
+      const res = await fetch(`/api/tenants/${caseData.tenantId}/invoice-settings`, { credentials: "include" });
+      if (!res.ok) return null as any;
       return res.json();
     },
     enabled: !!caseData?.tenantId,
@@ -1155,25 +1210,291 @@ export default function CaseDetailPage() {
             {caseData.visaStage === "approved" && (
               <VisaCopyCard caseId={id!} caseData={caseData} />
             )}
-            <Tabs defaultValue="documents" className="space-y-4">
-              <TabsList>
-                <TabsTrigger value="documents" data-testid="tab-documents">
-                  Documents
-                  {documents.length > 0 && (
-                    <span className="ml-1.5 text-xs bg-muted rounded-full px-1.5">{documents.length}</span>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="appointments" data-testid="tab-appointments">
-                  Appointments
-                </TabsTrigger>
-                <TabsTrigger value="messages" data-testid="tab-messages">
-                  Messages
-                  {messages.length > 0 && (
-                    <span className="ml-1.5 text-xs bg-muted rounded-full px-1.5">{messages.length}</span>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="activity" data-testid="tab-activity">Activity</TabsTrigger>
-              </TabsList>
+            <Tabs defaultValue="destination" className="space-y-4">
+              <div className="overflow-x-auto -mx-1 px-1">
+                <TabsList className="w-max">
+                  <TabsTrigger value="destination" data-testid="tab-destination">
+                    <MapPin className="w-3.5 h-3.5 mr-1.5" /> Destination
+                  </TabsTrigger>
+                  <TabsTrigger value="applicant-tab" data-testid="tab-applicant">
+                    <User className="w-3.5 h-3.5 mr-1.5" /> Applicant
+                  </TabsTrigger>
+                  <TabsTrigger value="travel" data-testid="tab-travel">
+                    <Plane className="w-3.5 h-3.5 mr-1.5" /> Travel
+                  </TabsTrigger>
+                  <TabsTrigger value="co-travellers" data-testid="tab-co-travellers">
+                    <Users className="w-3.5 h-3.5 mr-1.5" /> Co-Travellers
+                    {coTravellers.length > 0 && (
+                      <span className="ml-1.5 text-xs bg-muted rounded-full px-1.5">{coTravellers.length}</span>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="appointments" data-testid="tab-appointments">
+                    <Calendar className="w-3.5 h-3.5 mr-1.5" /> Appointments
+                    {caseAppointments.length > 0 && (
+                      <span className="ml-1.5 text-xs bg-muted rounded-full px-1.5">{caseAppointments.length}</span>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="documents" data-testid="tab-documents">
+                    <ListChecks className="w-3.5 h-3.5 mr-1.5" /> Documents
+                    {documents.length > 0 && (
+                      <span className="ml-1.5 text-xs bg-muted rounded-full px-1.5">{documents.length}</span>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="fees" data-testid="tab-fees">
+                    <DollarSign className="w-3.5 h-3.5 mr-1.5" /> Fees
+                    {caseInvoices.length > 0 && (
+                      <span className="ml-1.5 text-xs bg-muted rounded-full px-1.5">{caseInvoices.length}</span>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="review" data-testid="tab-review">
+                    <ClipboardCheck className="w-3.5 h-3.5 mr-1.5" /> Review
+                  </TabsTrigger>
+                  <TabsTrigger value="messages" data-testid="tab-messages">
+                    <MessageSquare className="w-3.5 h-3.5 mr-1.5" /> Messages
+                    {messages.length > 0 && (
+                      <span className="ml-1.5 text-xs bg-muted rounded-full px-1.5">{messages.length}</span>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger value="activity" data-testid="tab-activity">
+                    <Clock className="w-3.5 h-3.5 mr-1.5" /> Activity
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+
+              {/* === Destination & Visa (wizard step 1) === */}
+              <TabsContent value="destination" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <MapPin className="w-4 h-4" /> Destination &amp; Visa
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                      <div>
+                        <dt className="text-xs uppercase tracking-wide text-muted-foreground">Destination Country</dt>
+                        <dd className="font-medium" data-testid="field-destination-country">
+                          {caseData.destinationCountry || <span className="text-muted-foreground">—</span>}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs uppercase tracking-wide text-muted-foreground">Visa Type</dt>
+                        <dd className="font-medium" data-testid="field-visa-type">
+                          {caseData.visaType || <span className="text-muted-foreground">—</span>}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs uppercase tracking-wide text-muted-foreground">Priority</dt>
+                        <dd className="font-medium capitalize" data-testid="field-priority">
+                          {caseData.priority || "normal"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs uppercase tracking-wide text-muted-foreground">Reference ID</dt>
+                        <dd className="font-mono text-xs" data-testid="field-reference">
+                          {caseData.referenceId || <span className="text-muted-foreground">—</span>}
+                        </dd>
+                      </div>
+                    </dl>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* === Applicant (wizard step 2) === */}
+              <TabsContent value="applicant-tab" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <User className="w-4 h-4" /> Applicant Details
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                      <div>
+                        <dt className="text-xs uppercase tracking-wide text-muted-foreground">Full Name</dt>
+                        <dd className="font-medium">{caseData.applicantName || <span className="text-muted-foreground">—</span>}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs uppercase tracking-wide text-muted-foreground">Date of Birth</dt>
+                        <dd className="font-medium">{caseData.applicantDob || <span className="text-muted-foreground">—</span>}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs uppercase tracking-wide text-muted-foreground">Email</dt>
+                        <dd className="font-medium break-all">{(caseData as any).customerEmail || <span className="text-muted-foreground">—</span>}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs uppercase tracking-wide text-muted-foreground">Phone</dt>
+                        <dd className="font-medium">{(caseData as any).customerPhone || <span className="text-muted-foreground">—</span>}</dd>
+                      </div>
+                    </dl>
+                  </CardContent>
+                </Card>
+
+                {(caseData.passportNumber || caseData.passportSurname || caseData.passportGivenName
+                  || caseData.passportNationality || caseData.passportFileUrl) && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <BookOpen className="w-4 h-4" /> Passport
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                        <div>
+                          <dt className="text-xs uppercase tracking-wide text-muted-foreground">Passport Number</dt>
+                          <dd className="font-mono">{caseData.passportNumber || <span className="text-muted-foreground">—</span>}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs uppercase tracking-wide text-muted-foreground">Nationality</dt>
+                          <dd className="font-medium">{caseData.passportNationality || <span className="text-muted-foreground">—</span>}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs uppercase tracking-wide text-muted-foreground">Surname</dt>
+                          <dd className="font-medium">{caseData.passportSurname || <span className="text-muted-foreground">—</span>}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs uppercase tracking-wide text-muted-foreground">Given Name</dt>
+                          <dd className="font-medium">{caseData.passportGivenName || <span className="text-muted-foreground">—</span>}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs uppercase tracking-wide text-muted-foreground">Gender</dt>
+                          <dd className="font-medium">{caseData.passportGender || <span className="text-muted-foreground">—</span>}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs uppercase tracking-wide text-muted-foreground">Place of Birth</dt>
+                          <dd className="font-medium">{caseData.passportPlaceOfBirth || <span className="text-muted-foreground">—</span>}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs uppercase tracking-wide text-muted-foreground">Date of Issue</dt>
+                          <dd className="font-medium">{caseData.passportDateOfIssue || <span className="text-muted-foreground">—</span>}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs uppercase tracking-wide text-muted-foreground">Date of Expiry</dt>
+                          <dd className="font-medium">{caseData.passportDateOfExpiry || <span className="text-muted-foreground">—</span>}</dd>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <dt className="text-xs uppercase tracking-wide text-muted-foreground">Place of Issue</dt>
+                          <dd className="font-medium">{caseData.passportPlaceOfIssue || <span className="text-muted-foreground">—</span>}</dd>
+                        </div>
+                        {caseData.passportFileUrl && (
+                          <div className="sm:col-span-2 pt-2">
+                            <a
+                              href={caseData.passportFileUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+                              data-testid="link-passport-file-tab"
+                            >
+                              <Paperclip className="w-3.5 h-3.5" /> View passport upload
+                            </a>
+                          </div>
+                        )}
+                      </dl>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+
+              {/* === Travel (wizard step 3) === */}
+              <TabsContent value="travel" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Plane className="w-4 h-4" /> Travel Details
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                      <div>
+                        <dt className="text-xs uppercase tracking-wide text-muted-foreground">Travel Date</dt>
+                        <dd className="font-medium">
+                          {caseData.travelDate
+                            ? new Date(caseData.travelDate as any).toLocaleDateString()
+                            : <span className="text-muted-foreground">—</span>}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs uppercase tracking-wide text-muted-foreground">Return Date</dt>
+                        <dd className="font-medium">
+                          {(caseData as any).returnDate
+                            ? new Date((caseData as any).returnDate).toLocaleDateString()
+                            : <span className="text-muted-foreground">—</span>}
+                        </dd>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <dt className="text-xs uppercase tracking-wide text-muted-foreground">Purpose of Travel</dt>
+                        <dd className="font-medium">
+                          {(caseData as any).travelPurpose || <span className="text-muted-foreground">—</span>}
+                        </dd>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <dt className="text-xs uppercase tracking-wide text-muted-foreground">Itinerary / Notes</dt>
+                        <dd className="whitespace-pre-wrap text-sm">
+                          {(caseData as any).itinerary || caseData.notes
+                            || <span className="text-muted-foreground">No travel notes recorded.</span>}
+                        </dd>
+                      </div>
+                    </dl>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* === Co-Travellers (wizard step 4) === */}
+              <TabsContent value="co-travellers" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Users className="w-4 h-4" /> Co-Travellers
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {coTravellers.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Users className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                        <p className="text-sm">No co-travellers on this application.</p>
+                        <p className="text-xs mt-1">You can add them from the sidebar Co-Travellers card.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {coTravellers.map((ct) => (
+                          <div
+                            key={ct.id}
+                            className="rounded-lg border p-3 bg-muted/20"
+                            data-testid={`co-traveller-${ct.id}`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold">{ct.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {ct.relationship ? RELATIONSHIP_LABELS[ct.relationship as CoTravellerRelationship] : "Relative"}
+                                  {ct.dob ? ` · DOB ${ct.dob}` : ""}
+                                  {ct.nationality ? ` · ${ct.nationality}` : ""}
+                                </p>
+                                {ct.passportNumber && (
+                                  <p className="text-xs font-mono text-muted-foreground mt-1">
+                                    Passport: {ct.passportNumber}
+                                  </p>
+                                )}
+                                {ct.notes && (
+                                  <p className="text-xs mt-1 whitespace-pre-wrap">{ct.notes}</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* === Appointments (wizard step 5) === */}
+              <TabsContent value="appointments" className="space-y-4">
+                <AppointmentsPanel
+                  caseId={caseData.id}
+                  destinationCountry={caseData.destinationCountry}
+                />
+              </TabsContent>
 
               {/* Documents tab */}
               <TabsContent value="documents" className="space-y-4">
@@ -1315,12 +1636,142 @@ export default function CaseDetailPage() {
                 </Card>
               </TabsContent>
 
-              {/* Appointments tab */}
-              <TabsContent value="appointments" className="space-y-4">
-                <AppointmentsPanel
-                  caseId={caseData.id}
-                  destinationCountry={caseData.destinationCountry}
-                />
+              {/* === Fees (wizard step 7) === */}
+              <TabsContent value="fees" className="space-y-4">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between gap-4">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <DollarSign className="w-4 h-4" /> Fees &amp; Invoices
+                    </CardTitle>
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      data-testid="button-create-invoice"
+                    >
+                      <Link href={`/app/accounting/invoices?caseId=${caseData.id}`}>
+                        <Receipt className="w-3.5 h-3.5 mr-1.5" /> Manage Invoices
+                      </Link>
+                    </Button>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {caseInvoices.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Receipt className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                        <p className="text-sm">No invoices yet for this application.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {(() => {
+                          const totalBilled = caseInvoices.reduce((s, i) => s + (i.total || 0), 0);
+                          const totalPaid = caseInvoices.reduce((s, i) => s + (i.paidAmount || 0), 0);
+                          const outstanding = Math.max(0, totalBilled - totalPaid);
+                          const cur = invoiceSettings?.currency || "USD";
+                          return (
+                            <div className="grid grid-cols-3 gap-3 text-center">
+                              <div className="rounded-lg border p-3">
+                                <p className="text-xs text-muted-foreground">Billed</p>
+                                <p className="font-semibold tabular-nums" data-testid="text-fees-billed">{formatMoney(totalBilled, cur)}</p>
+                              </div>
+                              <div className="rounded-lg border p-3">
+                                <p className="text-xs text-muted-foreground">Paid</p>
+                                <p className="font-semibold tabular-nums text-emerald-600" data-testid="text-fees-paid">{formatMoney(totalPaid, cur)}</p>
+                              </div>
+                              <div className="rounded-lg border p-3">
+                                <p className="text-xs text-muted-foreground">Outstanding</p>
+                                <p className="font-semibold tabular-nums text-amber-600" data-testid="text-fees-outstanding">{formatMoney(outstanding, cur)}</p>
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        <div className="space-y-2">
+                          {caseInvoices.map((inv) => (
+                            <Link key={inv.id} href={`/app/accounting/invoices/${inv.id}`} asChild>
+                              <a
+                                className="flex items-center justify-between gap-3 rounded-lg border p-3 hover-elevate no-underline text-foreground"
+                                data-testid={`invoice-row-${inv.id}`}
+                              >
+                                <div className="min-w-0">
+                                  <p className="font-mono text-sm font-semibold">{inv.invoiceNumber}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {inv.issuedAt ? new Date(inv.issuedAt as any).toLocaleDateString() : "—"}
+                                    {inv.dueDate ? ` · due ${new Date(inv.dueDate as any).toLocaleDateString()}` : ""}
+                                  </p>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <p className="font-semibold tabular-nums">
+                                    {formatMoney(inv.total || 0, invoiceSettings?.currency || "USD")}
+                                  </p>
+                                  <Badge variant="outline" className="text-[10px] capitalize">{inv.status}</Badge>
+                                </div>
+                              </a>
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* === Review (wizard step 8) === */}
+              <TabsContent value="review" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <ClipboardCheck className="w-4 h-4" /> Application Review
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="rounded-lg border p-3 text-center">
+                        <p className="text-xs text-muted-foreground">Status</p>
+                        <div className="mt-1"><StatusBadge status={caseData.status} /></div>
+                      </div>
+                      <div className="rounded-lg border p-3 text-center">
+                        <p className="text-xs text-muted-foreground">Co-Travellers</p>
+                        <p className="font-semibold tabular-nums" data-testid="review-cotravellers-count">{coTravellers.length}</p>
+                      </div>
+                      <div className="rounded-lg border p-3 text-center">
+                        <p className="text-xs text-muted-foreground">Appointments</p>
+                        <p className="font-semibold tabular-nums" data-testid="review-appointments-count">{caseAppointments.length}</p>
+                      </div>
+                      <div className="rounded-lg border p-3 text-center">
+                        <p className="text-xs text-muted-foreground">Documents</p>
+                        <p className="font-semibold tabular-nums">
+                          <span className="text-emerald-600">{documents.filter(d => d.status === "approved").length}</span>
+                          <span className="text-muted-foreground"> / {documents.length}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm pt-2 border-t">
+                      <div>
+                        <dt className="text-xs uppercase tracking-wide text-muted-foreground">Submission Method</dt>
+                        <dd className="font-medium uppercase">{caseData.submissionMethod || <span className="text-muted-foreground normal-case">—</span>}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs uppercase tracking-wide text-muted-foreground">Priority</dt>
+                        <dd className="font-medium capitalize">{caseData.priority || "normal"}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs uppercase tracking-wide text-muted-foreground">Created</dt>
+                        <dd className="font-medium">{caseData.createdAt ? new Date(caseData.createdAt).toLocaleString() : "—"}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs uppercase tracking-wide text-muted-foreground">Last Updated</dt>
+                        <dd className="font-medium">{caseData.updatedAt ? new Date(caseData.updatedAt).toLocaleString() : "—"}</dd>
+                      </div>
+                      {caseData.notes && (
+                        <div className="sm:col-span-2">
+                          <dt className="text-xs uppercase tracking-wide text-muted-foreground">Internal Notes</dt>
+                          <dd className="text-sm whitespace-pre-wrap">{caseData.notes}</dd>
+                        </div>
+                      )}
+                    </dl>
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               {/* Messages tab */}

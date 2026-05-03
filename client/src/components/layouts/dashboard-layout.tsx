@@ -55,13 +55,7 @@ const agencyNavItems: NavItem[] = [
   { icon: Users, label: "Leads", href: "/app/leads" },
   { icon: UserSquare2, label: "Customers", href: "/app/customers" },
   { icon: Send, label: "Proposals", href: "/app/proposals" },
-  {
-    icon: Briefcase, label: "Applications", href: "/app/cases",
-    children: [
-      { icon: ClipboardList, label: "Processing", href: "/app/cases/processing" },
-      { icon: CheckCircle, label: "Completed", href: "/app/cases/completed" },
-    ],
-  },
+  { icon: Briefcase, label: "Applications", href: "/app/cases" },
   {
     // Post-submission visa workflow — once an application is lodged with
     // the embassy / VFS / eVisa portal it surfaces here with a granular
