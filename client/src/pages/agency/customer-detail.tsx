@@ -3,7 +3,9 @@ import { Link, useParams } from "wouter";
 import {
   ArrowLeft, Mail, Phone, BadgeCheck, FileText, Calendar, MapPin,
   Briefcase, ChevronRight, User as UserIcon, Globe2,
+  AlertTriangle, Clock, Download, ExternalLink,
 } from "lucide-react";
+import { getPassportExpiryStatus, fmtPassportExpiry } from "@/pages/agency/customers";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -40,12 +42,106 @@ const STATUS_COLORS: Record<string, string> = {
   rejected: "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300",
 };
 
+function ExpiryBadge({ expiry }: { expiry: string | null | undefined }) {
+  const status = getPassportExpiryStatus(expiry);
+  if (!status) return null;
+  if (status === "expired") {
+    return (
+      <div
+        className="flex items-center gap-2 px-3 py-2 rounded-md bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 text-xs font-medium"
+        data-testid="alert-passport-expired"
+      >
+        <AlertTriangle className="h-4 w-4 shrink-0" />
+        <span>
+          Passport expired on {fmtPassportExpiry(expiry)}. Customer must renew
+          before any new application can be lodged.
+        </span>
+      </div>
+    );
+  }
+  return (
+    <div
+      className="flex items-center gap-2 px-3 py-2 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 text-amber-700 dark:text-amber-300 text-xs font-medium"
+      data-testid="alert-passport-expiring"
+    >
+      <Clock className="h-4 w-4 shrink-0" />
+      <span>
+        Passport expires {fmtPassportExpiry(expiry)} — most embassies require
+        at least 6 months of remaining validity.
+      </span>
+    </div>
+  );
+}
+
+// Allow only the two URL shapes we trust to render in <a href> / <img src>:
+//   - http(s)://… (real network URLs)
+//   - data:image/<png|jpeg|jpg|webp|gif>;base64,…  (inline scans)
+// Anything else (`javascript:`, `data:text/html`, `file:`, blob:, etc.) is
+// rejected so a malicious value in passportFileUrl can never run script in
+// an agency staff session.
+function sanitizePassportUrl(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const url = raw.trim();
+  if (/^https?:\/\//i.test(url)) return url;
+  if (/^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/i.test(url)) return url;
+  return null;
+}
+
+function PassportFileLink({ c }: { c: Case }) {
+  const url = sanitizePassportUrl(c.passportFileUrl);
+  if (!url) {
+    if (c.passportFileUrl) {
+      // We have a value but it failed the safety check — surface a hint
+      // rather than silently dropping it, so staff aren't confused.
+      return (
+        <div className="text-[11px] text-muted-foreground italic" data-testid="text-passport-file-blocked">
+          Passport file is attached but could not be displayed (unsupported URL type).
+        </div>
+      );
+    }
+    return null;
+  }
+  // Render an inline image preview for image MIME types, otherwise an
+  // open / download pair so PDFs and other formats still work.
+  const isImage = /^data:image\//i.test(url) || /\.(png|jpe?g|webp|gif)(\?|$)/i.test(url);
+  return (
+    <div className="space-y-2">
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground/80">
+        Passport file
+      </div>
+      {isImage ? (
+        <a href={url} target="_blank" rel="noopener noreferrer" data-testid="link-passport-file">
+          <img
+            src={url}
+            alt="Passport scan"
+            className="max-h-48 rounded-md border border-border object-contain bg-muted/30"
+          />
+        </a>
+      ) : (
+        <div className="flex items-center gap-2">
+          <a href={url} target="_blank" rel="noopener noreferrer">
+            <Button variant="outline" size="sm" data-testid="button-passport-open">
+              <ExternalLink className="h-3 w-3 mr-1" /> Open file
+            </Button>
+          </a>
+          <a href={url} download>
+            <Button variant="outline" size="sm" data-testid="button-passport-download">
+              <Download className="h-3 w-3 mr-1" /> Download
+            </Button>
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PassportBlock({ c }: { c: Case }) {
   // Only render if at least one passport field is set on this case.
   const hasAny = !!(
     c.passportNumber || c.passportSurname || c.passportGivenName ||
     c.passportNationality || c.passportDateOfExpiry || c.passportDateOfIssue ||
-    c.passportPlaceOfIssue || c.passportPlaceOfBirth || c.passportGender
+    c.passportPlaceOfIssue || c.passportPlaceOfBirth || c.passportGender ||
+    c.passportFileUrl
   );
   if (!hasAny) {
     return (
@@ -57,18 +153,22 @@ function PassportBlock({ c }: { c: Case }) {
   const fullName = [c.passportSurname, c.passportGivenName, c.passportMiddleName]
     .filter(Boolean).join(" ");
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 text-xs">
-      {fullName && (
-        <Field label="Name on passport" value={fullName} />
-      )}
-      <Field label="Passport #" value={c.passportNumber} mono />
-      <Field label="Nationality" value={c.passportNationality} />
-      <Field label="Gender" value={c.passportGender} />
-      <Field label="Date of birth" value={c.applicantDob} />
-      <Field label="Place of birth" value={c.passportPlaceOfBirth} />
-      <Field label="Date of issue" value={c.passportDateOfIssue} />
-      <Field label="Date of expiry" value={c.passportDateOfExpiry} />
-      <Field label="Place of issue" value={c.passportPlaceOfIssue} />
+    <div className="space-y-3">
+      <ExpiryBadge expiry={c.passportDateOfExpiry} />
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 text-xs">
+        {fullName && (
+          <Field label="Name on passport" value={fullName} />
+        )}
+        <Field label="Passport #" value={c.passportNumber} mono />
+        <Field label="Nationality" value={c.passportNationality} />
+        <Field label="Gender" value={c.passportGender} />
+        <Field label="Date of birth" value={c.applicantDob} />
+        <Field label="Place of birth" value={c.passportPlaceOfBirth} />
+        <Field label="Date of issue" value={c.passportDateOfIssue} />
+        <Field label="Date of expiry" value={c.passportDateOfExpiry} />
+        <Field label="Place of issue" value={c.passportPlaceOfIssue} />
+      </div>
+      <PassportFileLink c={c} />
     </div>
   );
 }

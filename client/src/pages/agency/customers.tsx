@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import {
   Search, Mail, Phone, Briefcase, ChevronRight, BadgeCheck, FileText, Globe2,
+  AlertTriangle, Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +21,64 @@ type CustomerListRow = CustomerAccount & {
   latestActivityAt: string | null;
   latestPassportNumber: string | null;
   latestPassportNationality: string | null;
+  earliestPassportExpiry: string | null;
 };
+
+// Parse a `YYYY-MM-DD` (optionally with a time suffix) into a *local* calendar
+// date at midnight, so date comparisons are timezone-stable. We strictly
+// validate month (1-12) and day (1-31, plus per-month ranges including leap
+// years) and reject anything that would silently roll over via JS Date
+// normalization (e.g. "2026-13-40").
+function parseLocalDate(s: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$/.exec(s);
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  const isLeap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+  const daysInMonth = [31, isLeap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (d > daysInMonth[mo - 1]) return null;
+  return new Date(y, mo - 1, d);
+}
+
+// Calendar-safe "add N months". Avoids the JS `setMonth` rollover bug where,
+// e.g., (Aug 31) + 6 months becomes Mar 3 (Feb has no day 31), by clamping
+// to the last valid day of the target month.
+function addMonths(date: Date, months: number): Date {
+  const y = date.getFullYear();
+  const m = date.getMonth() + months;
+  const targetYear = y + Math.floor(m / 12);
+  const targetMonth = ((m % 12) + 12) % 12;
+  const isLeap = (targetYear % 4 === 0 && targetYear % 100 !== 0) || targetYear % 400 === 0;
+  const daysInMonth = [31, isLeap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  const day = Math.min(date.getDate(), daysInMonth[targetMonth]);
+  return new Date(targetYear, targetMonth, day);
+}
+
+// Returns "expired" if the passport is past its expiry date (today inclusive
+// is still valid), "expiring" if it expires within 6 calendar months (most
+// embassies require ≥6 months of validity), or null otherwise.
+export function getPassportExpiryStatus(
+  expiry: string | null | undefined,
+): "expired" | "expiring" | null {
+  if (!expiry) return null;
+  const exp = parseLocalDate(expiry);
+  if (!exp) return null;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (exp.getTime() < today.getTime()) return "expired";
+  const sixMonths = addMonths(today, 6);
+  if (exp.getTime() < sixMonths.getTime()) return "expiring";
+  return null;
+}
+
+export function fmtPassportExpiry(expiry: string | null | undefined): string {
+  if (!expiry) return "—";
+  const d = parseLocalDate(expiry);
+  if (!d) return expiry;
+  return d.toLocaleDateString();
+}
 
 function initials(name?: string | null, email?: string | null) {
   const src = (name || email || "?").trim();
@@ -146,6 +204,32 @@ export default function CustomersPage() {
                             )}
                           </span>
                         )}
+                        {(() => {
+                          const status = getPassportExpiryStatus(c.earliestPassportExpiry);
+                          if (status === "expired") {
+                            return (
+                              <span
+                                className="inline-flex items-center gap-1 text-red-600 dark:text-red-400 font-medium"
+                                data-testid={`status-expired-${c.id}`}
+                              >
+                                <AlertTriangle className="h-3 w-3" />
+                                Passport expired ({fmtPassportExpiry(c.earliestPassportExpiry)})
+                              </span>
+                            );
+                          }
+                          if (status === "expiring") {
+                            return (
+                              <span
+                                className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium"
+                                data-testid={`status-expiring-${c.id}`}
+                              >
+                                <Clock className="h-3 w-3" />
+                                Expires {fmtPassportExpiry(c.earliestPassportExpiry)}
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
                       </div>
                     </div>
                     <div className="hidden sm:flex flex-col items-end gap-1 text-xs text-muted-foreground">

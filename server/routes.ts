@@ -2820,6 +2820,13 @@ export async function registerRoutes(
         latestActivityAt: latest,
         latestPassportNumber: withPassport?.passportNumber ?? null,
         latestPassportNationality: withPassport?.passportNationality ?? null,
+        // Earliest expiry across all of this customer's passports — used by
+        // the list page to flag expired / expiring-soon customers without
+        // having to open the detail view.
+        earliestPassportExpiry: cs
+          .map(c => c.passportDateOfExpiry)
+          .filter((d): d is string => !!d)
+          .sort()[0] ?? null,
       };
     });
     // Most recent activity first.

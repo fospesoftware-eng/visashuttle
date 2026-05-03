@@ -777,6 +777,31 @@ migration was needed.
   - Wired `/app/customers` and `/app/customers/:id` in `App.tsx`.
   - "Customers" nav item added to `agencyNavItems` between Leads and
     Proposals (`UserSquare2` icon).
+- **Passport file & expiry warnings** (May 2026 follow-up):
+  - List endpoint also returns `earliestPassportExpiry` per customer
+    (sorted ISO date) so the list page can flag expired/expiring
+    customers without a per-row detail fetch.
+  - Shared helpers `getPassportExpiryStatus` / `fmtPassportExpiry`
+    exported from `customers.tsx` and reused by `customer-detail.tsx`.
+    Status is `expired` (past today, local-midnight) /
+    `expiring` (within 6 calendar months, embassy industry standard) /
+    null. Date logic is timezone-stable via a custom `parseLocalDate`
+    (strict YYYY-MM-DD with leap-year + day-of-month validation, no JS
+    Date rollover) and a calendar-safe `addMonths` (clamps to last
+    valid day of target month so Aug-31 + 6mo = Feb-28, not Mar-3).
+  - List shows inline red "Passport expired" / amber "Expires (date)"
+    next to contact fields. Detail shows a full red/amber banner at
+    the top of each per-case passport block.
+  - `passportFileUrl` is rendered as an inline image preview when it
+    looks like an image (data:image/* or http(s) with image extension)
+    or as Open + Download buttons otherwise. URLs go through
+    `sanitizePassportUrl` which only allows `https?://` and
+    `data:image/(png|jpe?g|webp|gif);base64,…` — `javascript:`,
+    `data:text/html`, `file:`, `blob:`, protocol-relative `//evil.com`,
+    etc. are blocked. Blocked values surface a "Passport file is
+    attached but could not be displayed" hint instead of silently
+    dropping.
+
 - **Deliberate scope choices** (flagged by review, deferred):
   - Co-traveller passports (`case_co_travellers`) are not surfaced on
     the customer detail page — they belong to the case, not the
