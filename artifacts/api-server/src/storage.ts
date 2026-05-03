@@ -1890,9 +1890,15 @@ export class MemStorage implements IStorage {
       liveClientId: data.liveClientId !== undefined ? data.liveClientId : existing?.liveClientId ?? null,
       liveClientSecret: data.liveClientSecret !== undefined ? data.liveClientSecret : existing?.liveClientSecret ?? null,
       webhookSecret: data.webhookSecret !== undefined ? data.webhookSecret : existing?.webhookSecret ?? null,
+      stripeMode: data.stripeMode !== undefined ? data.stripeMode : existing?.stripeMode ?? "test",
+      stripeTestPublishableKey: data.stripeTestPublishableKey !== undefined ? data.stripeTestPublishableKey : existing?.stripeTestPublishableKey ?? null,
+      stripeTestSecretKey: data.stripeTestSecretKey !== undefined ? data.stripeTestSecretKey : existing?.stripeTestSecretKey ?? null,
+      stripeLivePublishableKey: data.stripeLivePublishableKey !== undefined ? data.stripeLivePublishableKey : existing?.stripeLivePublishableKey ?? null,
+      stripeLiveSecretKey: data.stripeLiveSecretKey !== undefined ? data.stripeLiveSecretKey : existing?.stripeLiveSecretKey ?? null,
+      stripeWebhookSecret: data.stripeWebhookSecret !== undefined ? data.stripeWebhookSecret : existing?.stripeWebhookSecret ?? null,
       updatedAt: new Date(),
     };
-    return this.paymentGatewayConfigRecord;
+    return this.paymentGatewayConfigRecord!;
   }
 }
 

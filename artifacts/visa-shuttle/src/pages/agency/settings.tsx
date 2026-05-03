@@ -1737,10 +1737,12 @@ export default function AgencySettingsPage() {
 // Lets the agency see their current Visa Shuttle subscription (set by the
 // platform admin) and pay the upcoming month's invoice via Cashfree.
 //
-// Cashfree return-url flow:
-//   1. POST /initiate-payment → we get a paymentSessionId + orderId.
-//   2. We open Cashfree's hosted checkout in a new tab.
-//   3. Cashfree redirects the user back to /app/settings?tab=subscription&order_id=...
+// Gateway return-url flow (works for both Cashfree and Stripe):
+//   1. POST /initiate-payment → backend tells us which provider is active and
+//      returns either a Cashfree paymentSessionId or a Stripe checkoutUrl.
+//   2. We open the provider's hosted checkout in a new tab.
+//   3. The provider redirects the user back to /app/settings?tab=subscription
+//      &order_id=SUB_... (Stripe also adds &session_id=...).
 //   4. On mount we detect order_id in the URL and call /confirm.
 function SubscriptionTab({ tenantId }: { tenantId?: string }) {
   const [confirming, setConfirming] = useState(false);
@@ -1774,10 +1776,18 @@ function SubscriptionTab({ tenantId }: { tenantId?: string }) {
     mutationFn: () => apiRequest("POST", `/api/agency/${tenantId}/subscription/initiate-payment`, {}),
     onSuccess: async (res: any) => {
       const data = await (res?.json?.() ?? res);
-      // Open Cashfree checkout. We use the simple hosted-redirect approach via
-      // payment_session_id; Cashfree's drop-in JS lib isn't loaded here.
+      // Branch on the provider returned by the backend.
+      if (data?.provider === "stripe") {
+        if (data?.checkoutUrl) {
+          window.open(data.checkoutUrl, "_blank");
+        } else {
+          toast({ title: "Could not start payment", description: "No Stripe checkout URL returned", variant: "destructive" });
+        }
+        return;
+      }
+      // Cashfree (default). Use the hosted-redirect approach via payment_session_id.
       if (data?.paymentSessionId) {
-        const url = data.mode === "production"
+        const url = data.mode === "production" || data.mode === "live"
           ? `https://payments.cashfree.com/order/#${data.paymentSessionId}`
           : `https://payments-test.cashfree.com/order/#${data.paymentSessionId}`;
         window.open(url, "_blank");
@@ -1788,12 +1798,24 @@ function SubscriptionTab({ tenantId }: { tenantId?: string }) {
     onError: (e: any) => toast({ title: "Payment failed", description: e?.message ?? "Try again", variant: "destructive" }),
   });
 
-  // Auto-confirm if we returned from Cashfree with ?order_id=...
+  // Auto-confirm if we returned from the gateway with ?order_id=... (works for
+  // both Cashfree and Stripe; backend looks up the invoice's stored provider).
   useEffect(() => {
     if (!tenantId) return;
     const params = new URLSearchParams(window.location.search);
     const orderId = params.get("order_id");
+    const canceled = params.get("canceled");
     if (!orderId || !orderId.startsWith("SUB_")) return;
+    if (canceled === "1") {
+      toast({ title: "Payment canceled", description: "You can retry whenever you're ready.", variant: "destructive" });
+      const url = new URL(window.location.href);
+      url.searchParams.delete("order_id");
+      url.searchParams.delete("canceled");
+      url.searchParams.delete("provider");
+      url.searchParams.delete("session_id");
+      window.history.replaceState({}, "", url.toString());
+      return;
+    }
     setConfirming(true);
     apiRequest("POST", `/api/agency/${tenantId}/subscription/confirm`, { orderId })
       .then(async (r: any) => {
@@ -1807,6 +1829,8 @@ function SubscriptionTab({ tenantId }: { tenantId?: string }) {
         // Strip the order_id from the URL so a refresh doesn't retry.
         const url = new URL(window.location.href);
         url.searchParams.delete("order_id");
+        url.searchParams.delete("provider");
+        url.searchParams.delete("session_id");
         window.history.replaceState({}, "", url.toString());
       })
       .catch((e: any) => toast({ title: "Could not confirm payment", description: e?.message, variant: "destructive" }))

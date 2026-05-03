@@ -46,7 +46,7 @@ interface AiConfigResponse {
 }
 
 interface PaymentGatewayConfigResponse {
-  provider: string;
+  provider: "cashfree" | "stripe";
   mode: "test" | "live";
   apiVersion: string;
   testClientId: string;
@@ -61,6 +61,18 @@ interface PaymentGatewayConfigResponse {
   hasLiveCredentials: boolean;
   hasWebhookSecret: boolean;
   activeReady: boolean;
+  stripe: {
+    mode: "test" | "live";
+    testPublishableKey: string;
+    testSecretKey: string;
+    livePublishableKey: string;
+    liveSecretKey: string;
+    webhookSecret: string;
+    hasTestCredentials: boolean;
+    hasLiveCredentials: boolean;
+    hasWebhookSecret: boolean;
+    activeReady: boolean;
+  };
 }
 
 function AiProviderCard() {
@@ -208,7 +220,11 @@ function PaymentGatewayCard() {
   const [showTestSecret, setShowTestSecret] = useState(false);
   const [showLiveSecret, setShowLiveSecret] = useState(false);
   const [showWebhookSecret, setShowWebhookSecret] = useState(false);
+  const [showStripeTestSecret, setShowStripeTestSecret] = useState(false);
+  const [showStripeLiveSecret, setShowStripeLiveSecret] = useState(false);
+  const [showStripeWebhookSecret, setShowStripeWebhookSecret] = useState(false);
   const [form, setForm] = useState({
+    provider: "cashfree" as "cashfree" | "stripe",
     mode: "test" as "test" | "live",
     apiVersion: "2023-08-01",
     testClientId: "",
@@ -216,6 +232,14 @@ function PaymentGatewayCard() {
     liveClientId: "",
     liveClientSecret: "",
     webhookSecret: "",
+    stripe: {
+      mode: "test" as "test" | "live",
+      testPublishableKey: "",
+      testSecretKey: "",
+      livePublishableKey: "",
+      liveSecretKey: "",
+      webhookSecret: "",
+    },
   });
 
   const { data: cfg, isLoading } = useQuery<PaymentGatewayConfigResponse>({
@@ -225,6 +249,7 @@ function PaymentGatewayCard() {
   useEffect(() => {
     if (cfg) {
       setForm({
+        provider: cfg.provider === "stripe" ? "stripe" : "cashfree",
         mode: cfg.mode || "test",
         apiVersion: cfg.apiVersion || "2023-08-01",
         testClientId: cfg.testClientId || "",
@@ -232,6 +257,14 @@ function PaymentGatewayCard() {
         liveClientId: cfg.liveClientId || "",
         liveClientSecret: cfg.liveClientSecret || "",
         webhookSecret: cfg.webhookSecret || "",
+        stripe: {
+          mode: cfg.stripe?.mode || "test",
+          testPublishableKey: cfg.stripe?.testPublishableKey || "",
+          testSecretKey: cfg.stripe?.testSecretKey || "",
+          livePublishableKey: cfg.stripe?.livePublishableKey || "",
+          liveSecretKey: cfg.stripe?.liveSecretKey || "",
+          webhookSecret: cfg.stripe?.webhookSecret || "",
+        },
       });
     }
   }, [cfg]);
@@ -240,14 +273,15 @@ function PaymentGatewayCard() {
     mutationFn: (data: typeof form) => apiRequest("POST", "/api/admin/payment-gateway-config", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-gateway-config"] });
-      toast({ title: "Payment gateway saved", description: "Cashfree settings have been updated." });
+      toast({ title: "Payment gateway saved", description: "Settings have been updated." });
     },
     onError: (err: any) => {
-      toast({ title: "Save failed", description: err.message || "Could not save Cashfree settings", variant: "destructive" });
+      toast({ title: "Save failed", description: err.message || "Could not save settings", variant: "destructive" });
     },
   });
 
   const activeBaseUrl = form.mode === "live" ? "https://api.cashfree.com/pg" : "https://sandbox.cashfree.com/pg";
+  const activeProviderReady = form.provider === "stripe" ? cfg?.stripe?.activeReady : cfg?.activeReady;
 
   return (
     <Card>
@@ -256,23 +290,52 @@ function PaymentGatewayCard() {
           <div>
             <CardTitle className="text-base flex items-center gap-2">
               <CreditCard className="w-4 h-4" />
-              Cashfree Payment Gateway
+              Payment Gateways
             </CardTitle>
-            <CardDescription>Configure Cashfree Payments credentials for test and live checkout</CardDescription>
+            <CardDescription>Configure Cashfree and Stripe credentials. The selected provider is used for tenant subscription billing.</CardDescription>
           </div>
           {isLoading ? (
             <div className="w-5 h-5 border-2 border-muted border-t-foreground rounded-full animate-spin" />
           ) : (
             <Badge
-              variant={cfg?.activeReady ? "default" : "secondary"}
-              className={cfg?.activeReady ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : ""}
+              variant={activeProviderReady ? "default" : "secondary"}
+              className={activeProviderReady ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : ""}
             >
-              {form.mode === "live" ? "Live" : "Test"} {cfg?.activeReady ? "Ready" : "Not Configured"}
+              {form.provider === "stripe"
+                ? `${form.stripe.mode === "live" ? "Live" : "Test"} ${activeProviderReady ? "Ready" : "Not Configured"}`
+                : `${form.mode === "live" ? "Live" : "Test"} ${activeProviderReady ? "Ready" : "Not Configured"}`}
             </Badge>
           )}
         </div>
       </CardHeader>
+      <CardContent className="pb-0">
+        <div className="rounded-xl border bg-muted/30 p-4 mb-5">
+          <Label className="text-sm font-semibold">Active Provider for Subscription Billing</Label>
+          <p className="text-xs text-muted-foreground mt-1 mb-3">
+            Tenant subscription payments will be processed through the provider you select here.
+          </p>
+          <Select
+            value={form.provider}
+            onValueChange={(provider: "cashfree" | "stripe") => setForm(f => ({ ...f, provider }))}
+          >
+            <SelectTrigger data-testid="select-active-provider" className="max-w-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="cashfree">Cashfree (India)</SelectItem>
+              <SelectItem value="stripe">Stripe (Global)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </CardContent>
       <CardContent className="space-y-5">
+        <div className="flex items-center gap-2 pt-1">
+          <CreditCard className="w-4 h-4 text-muted-foreground" />
+          <h3 className="text-sm font-semibold">Cashfree Credentials</h3>
+          {form.provider === "cashfree" && (
+            <Badge variant="outline" className="text-[10px] uppercase tracking-wide">Active</Badge>
+          )}
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label>Environment</Label>
@@ -425,25 +488,183 @@ function PaymentGatewayCard() {
           <p className="text-xs text-muted-foreground">Cashfree merchant APIs use `x-client-id`, `x-client-secret`, and `x-api-version` headers. Keep secrets server-side only.</p>
         </div>
 
+        <Separator className="my-2" />
+
+        {/* ── Stripe Credentials ─────────────────────────────────────────── */}
+        <div className="flex items-center gap-2 pt-1">
+          <CreditCard className="w-4 h-4 text-muted-foreground" />
+          <h3 className="text-sm font-semibold">Stripe Credentials</h3>
+          {form.provider === "stripe" && (
+            <Badge variant="outline" className="text-[10px] uppercase tracking-wide">Active</Badge>
+          )}
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label>Environment</Label>
+            <Select
+              value={form.stripe.mode}
+              onValueChange={(mode: "test" | "live") =>
+                setForm(f => ({ ...f, stripe: { ...f.stripe, mode } }))
+              }
+            >
+              <SelectTrigger data-testid="select-stripe-mode">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="test">Test</SelectItem>
+                <SelectItem value="live">Live / Production</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">Stripe test keys start with <span className="font-mono">sk_test_</span>; live with <span className="font-mono">sk_live_</span>.</p>
+          </div>
+          <div className="space-y-2">
+            <Label>Active environment</Label>
+            <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+              <span className="font-mono text-foreground">
+                {form.stripe.mode === "live" ? "Stripe Live" : "Stripe Test"}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">All Stripe API requests use <span className="font-mono">api.stripe.com</span> — the secret key determines test vs live.</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold">Test Credentials</p>
+              <p className="text-xs text-muted-foreground">Stripe sandbox keys for testing checkout flows</p>
+            </div>
+            {cfg?.stripe?.hasTestCredentials
+              ? <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+              : <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="stripeTestPublishableKey">Test Publishable Key</Label>
+              <Input
+                id="stripeTestPublishableKey"
+                value={form.stripe.testPublishableKey}
+                onChange={e => setForm(f => ({ ...f, stripe: { ...f.stripe, testPublishableKey: e.target.value } }))}
+                placeholder="pk_test_..."
+                className="font-mono text-sm"
+                data-testid="input-stripe-test-publishable-key"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="stripeTestSecretKey">Test Secret Key</Label>
+              <div className="relative">
+                <Input
+                  id="stripeTestSecretKey"
+                  type={showStripeTestSecret ? "text" : "password"}
+                  value={form.stripe.testSecretKey}
+                  onChange={e => setForm(f => ({ ...f, stripe: { ...f.stripe, testSecretKey: e.target.value } }))}
+                  placeholder={cfg?.stripe?.hasTestCredentials ? "Saved — enter new value to update" : "sk_test_..."}
+                  className="pr-10 font-mono text-sm"
+                  data-testid="input-stripe-test-secret-key"
+                />
+                <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowStripeTestSecret(s => !s)}>
+                  {showStripeTestSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold">Live Credentials</p>
+              <p className="text-xs text-muted-foreground">Stripe production keys — only used after switching environment to live</p>
+            </div>
+            {cfg?.stripe?.hasLiveCredentials
+              ? <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+              : <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="stripeLivePublishableKey">Live Publishable Key</Label>
+              <Input
+                id="stripeLivePublishableKey"
+                value={form.stripe.livePublishableKey}
+                onChange={e => setForm(f => ({ ...f, stripe: { ...f.stripe, livePublishableKey: e.target.value } }))}
+                placeholder="pk_live_..."
+                className="font-mono text-sm"
+                data-testid="input-stripe-live-publishable-key"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="stripeLiveSecretKey">Live Secret Key</Label>
+              <div className="relative">
+                <Input
+                  id="stripeLiveSecretKey"
+                  type={showStripeLiveSecret ? "text" : "password"}
+                  value={form.stripe.liveSecretKey}
+                  onChange={e => setForm(f => ({ ...f, stripe: { ...f.stripe, liveSecretKey: e.target.value } }))}
+                  placeholder={cfg?.stripe?.hasLiveCredentials ? "Saved — enter new value to update" : "sk_live_..."}
+                  className="pr-10 font-mono text-sm"
+                  data-testid="input-stripe-live-secret-key"
+                />
+                <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowStripeLiveSecret(s => !s)}>
+                  {showStripeLiveSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
+        <div className="space-y-1.5">
+          <Label htmlFor="stripeWebhookSecret">Webhook Signing Secret <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+          <div className="relative">
+            <Input
+              id="stripeWebhookSecret"
+              type={showStripeWebhookSecret ? "text" : "password"}
+              value={form.stripe.webhookSecret}
+              onChange={e => setForm(f => ({ ...f, stripe: { ...f.stripe, webhookSecret: e.target.value } }))}
+              placeholder={cfg?.stripe?.hasWebhookSecret ? "Saved — enter new value to update" : "whsec_..."}
+              className="pr-10 font-mono text-sm"
+              data-testid="input-stripe-webhook-secret"
+            />
+            <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowStripeWebhookSecret(s => !s)}>
+              {showStripeWebhookSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground">Used to verify Stripe webhook signatures. Find it in Stripe Dashboard → Developers → Webhooks.</p>
+        </div>
+
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <a
-            href="https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/overview"
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline"
-          >
-            Cashfree v2023-08-01 docs <ExternalLink className="w-3 h-3" />
-          </a>
+          <div className="flex items-center gap-4">
+            <a
+              href="https://www.cashfree.com/docs/api-reference/payments/previous/v2023-08-01/overview"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline"
+            >
+              Cashfree docs <ExternalLink className="w-3 h-3" />
+            </a>
+            <a
+              href="https://stripe.com/docs/api/checkout/sessions"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline"
+            >
+              Stripe docs <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
           <Button
             onClick={() => saveMutation.mutate(form)}
             disabled={saveMutation.isPending}
             className="gap-2"
-            data-testid="button-save-cashfree-config"
+            data-testid="button-save-payment-gateway-config"
           >
             {saveMutation.isPending
               ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               : <Save className="w-4 h-4" />}
-            Save Cashfree Settings
+            Save Payment Settings
           </Button>
         </div>
       </CardContent>

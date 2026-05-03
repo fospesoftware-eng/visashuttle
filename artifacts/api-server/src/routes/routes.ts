@@ -302,6 +302,31 @@ function getCashfreeCredentials(cfg: CashfreeConfigShape | undefined): {
   };
 }
 
+// Stripe credentials are split test/live just like Cashfree but with a
+// different naming convention (publishable + secret keys).
+type StripeConfigShape = {
+  stripeMode?: string | null;
+  stripeTestPublishableKey?: string | null;
+  stripeTestSecretKey?: string | null;
+  stripeLivePublishableKey?: string | null;
+  stripeLiveSecretKey?: string | null;
+};
+function getStripeCredentials(cfg: StripeConfigShape | undefined): {
+  mode: "live" | "test";
+  publishableKey?: string;
+  secretKey?: string;
+} {
+  const mode: "live" | "test" =
+    cfg?.stripeMode === "live" || process.env.STRIPE_MODE === "live" ? "live" : "test";
+  const publishableKey = mode === "live"
+    ? cfg?.stripeLivePublishableKey || process.env.STRIPE_LIVE_PUBLISHABLE_KEY
+    : cfg?.stripeTestPublishableKey || process.env.STRIPE_TEST_PUBLISHABLE_KEY;
+  const secretKey = mode === "live"
+    ? cfg?.stripeLiveSecretKey || process.env.STRIPE_LIVE_SECRET_KEY
+    : cfg?.stripeTestSecretKey || process.env.STRIPE_TEST_SECRET_KEY;
+  return { mode, publishableKey: publishableKey?.trim(), secretKey: secretKey?.trim() };
+}
+
 function validateCashfreeMode(mode: "live" | "test", clientId?: string, clientSecret?: string): string | null {
   const id = clientId || "";
   const secret = clientSecret || "";
@@ -3964,6 +3989,11 @@ export async function registerRoutes(
     const mode = cfg?.mode === "live" || process.env.CASHFREE_MODE === "live" ? "live" : "test";
     const testReady = !!((cfg?.testClientId || process.env.CASHFREE_TEST_CLIENT_ID) && (cfg?.testClientSecret || process.env.CASHFREE_TEST_CLIENT_SECRET));
     const liveReady = !!((cfg?.liveClientId || process.env.CASHFREE_LIVE_CLIENT_ID) && (cfg?.liveClientSecret || process.env.CASHFREE_LIVE_CLIENT_SECRET));
+    // Stripe-side flags
+    const stripeMode: "live" | "test" =
+      cfg?.stripeMode === "live" || process.env.STRIPE_MODE === "live" ? "live" : "test";
+    const stripeTestReady = !!((cfg?.stripeTestPublishableKey || process.env.STRIPE_TEST_PUBLISHABLE_KEY) && (cfg?.stripeTestSecretKey || process.env.STRIPE_TEST_SECRET_KEY));
+    const stripeLiveReady = !!((cfg?.stripeLivePublishableKey || process.env.STRIPE_LIVE_PUBLISHABLE_KEY) && (cfg?.stripeLiveSecretKey || process.env.STRIPE_LIVE_SECRET_KEY));
     res.json({
       provider: cfg?.provider || "cashfree",
       mode,
@@ -3982,11 +4012,26 @@ export async function registerRoutes(
       usingEnvTestCredentials: !cfg?.testClientId && !!process.env.CASHFREE_TEST_CLIENT_ID,
       usingEnvLiveCredentials: !cfg?.liveClientId && !!process.env.CASHFREE_LIVE_CLIENT_ID,
       activeReady: mode === "live" ? liveReady : testReady,
+      // Stripe block. Only the publishable key is returned in clear text
+      // (it's safe to expose to clients). Secret key is masked.
+      stripe: {
+        mode: stripeMode,
+        testPublishableKey: cfg?.stripeTestPublishableKey || "",
+        testSecretKey: cfg?.stripeTestSecretKey ? maskKey(cfg.stripeTestSecretKey) : "",
+        livePublishableKey: cfg?.stripeLivePublishableKey || "",
+        liveSecretKey: cfg?.stripeLiveSecretKey ? maskKey(cfg.stripeLiveSecretKey) : "",
+        webhookSecret: cfg?.stripeWebhookSecret ? maskKey(cfg.stripeWebhookSecret) : "",
+        hasTestCredentials: stripeTestReady,
+        hasLiveCredentials: stripeLiveReady,
+        hasWebhookSecret: !!cfg?.stripeWebhookSecret,
+        activeReady: stripeMode === "live" ? stripeLiveReady : stripeTestReady,
+      },
     });
   });
 
   app.post("/api/admin/payment-gateway-config", requireAdminAuth, async (req, res) => {
     const {
+      provider,
       mode,
       apiVersion,
       testClientId,
@@ -3994,8 +4039,11 @@ export async function registerRoutes(
       liveClientId,
       liveClientSecret,
       webhookSecret,
+      stripe,
     } = req.body;
-    const patch: Record<string, any> = { provider: "cashfree" };
+    const patch: Record<string, any> = {};
+    // Active provider for platform subscription billing.
+    if (provider === "cashfree" || provider === "stripe") patch.provider = provider;
     if (mode !== undefined) patch.mode = mode === "live" ? "live" : "test";
     if (apiVersion !== undefined) patch.apiVersion = apiVersion || "2023-08-01";
     if (testClientId !== undefined && !String(testClientId).includes("•")) patch.testClientId = testClientId || null;
@@ -4003,9 +4051,31 @@ export async function registerRoutes(
     if (liveClientId !== undefined && !String(liveClientId).includes("•")) patch.liveClientId = liveClientId || null;
     if (liveClientSecret !== undefined && !String(liveClientSecret).includes("•")) patch.liveClientSecret = liveClientSecret || null;
     if (webhookSecret !== undefined && !String(webhookSecret).includes("•")) patch.webhookSecret = webhookSecret || null;
+    // Stripe fields are nested under `stripe`. Mask checks ensure we don't
+    // accidentally overwrite a real saved key with the masked placeholder
+    // displayed in the UI.
+    if (stripe && typeof stripe === "object") {
+      if (stripe.mode !== undefined) patch.stripeMode = stripe.mode === "live" ? "live" : "test";
+      if (stripe.testPublishableKey !== undefined && !String(stripe.testPublishableKey).includes("•")) {
+        patch.stripeTestPublishableKey = stripe.testPublishableKey || null;
+      }
+      if (stripe.testSecretKey !== undefined && !String(stripe.testSecretKey).includes("•")) {
+        patch.stripeTestSecretKey = stripe.testSecretKey || null;
+      }
+      if (stripe.livePublishableKey !== undefined && !String(stripe.livePublishableKey).includes("•")) {
+        patch.stripeLivePublishableKey = stripe.livePublishableKey || null;
+      }
+      if (stripe.liveSecretKey !== undefined && !String(stripe.liveSecretKey).includes("•")) {
+        patch.stripeLiveSecretKey = stripe.liveSecretKey || null;
+      }
+      if (stripe.webhookSecret !== undefined && !String(stripe.webhookSecret).includes("•")) {
+        patch.stripeWebhookSecret = stripe.webhookSecret || null;
+      }
+    }
 
     const updated = await storage.upsertPaymentGatewayConfig(patch);
     const activeMode = updated.mode === "live" ? "live" : "test";
+    const stripeActiveMode = updated.stripeMode === "live" ? "live" : "test";
     res.json({
       success: true,
       provider: updated.provider || "cashfree",
@@ -4015,6 +4085,12 @@ export async function registerRoutes(
       hasLiveCredentials: !!(updated.liveClientId && updated.liveClientSecret),
       hasWebhookSecret: !!updated.webhookSecret,
       activeBaseUrl: activeMode === "live" ? "https://api.cashfree.com/pg" : "https://sandbox.cashfree.com/pg",
+      stripe: {
+        mode: stripeActiveMode,
+        hasTestCredentials: !!(updated.stripeTestPublishableKey && updated.stripeTestSecretKey),
+        hasLiveCredentials: !!(updated.stripeLivePublishableKey && updated.stripeLiveSecretKey),
+        hasWebhookSecret: !!updated.stripeWebhookSecret,
+      },
     });
   });
 
@@ -5874,9 +5950,14 @@ export async function registerRoutes(
   // subscription billing. The agency pays the platform via Cashfree using
   // PLATFORM creds (not tenant-scoped) — different from the invoice flow.
   registerPlatformExtensions(app, {
-    getPlatformCashfreeCreds: async () => {
+    getPlatformGateway: async () => {
       const cfg = await storage.getPaymentGatewayConfig();
-      return getCashfreeCredentials(cfg);
+      const provider = (cfg?.provider === "stripe" ? "stripe" : "cashfree") as "cashfree" | "stripe";
+      return {
+        provider,
+        cashfree: getCashfreeCredentials(cfg),
+        stripe: getStripeCredentials(cfg),
+      };
     },
     getRequestOrigin,
     readCashfreeBody,

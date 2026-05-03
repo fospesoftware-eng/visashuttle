@@ -38,13 +38,28 @@ type CashfreeCreds = {
   mode: string;
 };
 
+type StripeCreds = {
+  mode: "live" | "test";
+  publishableKey?: string;
+  secretKey?: string;
+};
+
+// The platform's active gateway selection + the credentials for whichever
+// provider is currently configured. `provider` decides which subscription
+// payment path runs at checkout time.
+type PlatformGatewaySelection = {
+  provider: "cashfree" | "stripe";
+  cashfree: CashfreeCreds;
+  stripe: StripeCreds;
+};
+
 type ExtensionsHelpers = {
   /**
-   * Load the platform's Cashfree credentials. We use PLATFORM creds (not
-   * tenant-scoped), since the agency is paying the platform — not their
-   * own customer.
+   * Load the platform's payment gateway selection + credentials. We use
+   * PLATFORM creds (not tenant-scoped), since the agency is paying the
+   * platform — not their own customer.
    */
-  getPlatformCashfreeCreds: () => Promise<CashfreeCreds>;
+  getPlatformGateway: () => Promise<PlatformGatewaySelection>;
   getRequestOrigin: (req: Request) => string;
   readCashfreeBody: (res: any) => Promise<any>;
 };
@@ -124,7 +139,7 @@ const adminSubscriptionPatchSchema = z.object({
 
 // ─── Registration ─────────────────────────────────────────────────────────────
 export function registerPlatformExtensions(app: Express, helpers: ExtensionsHelpers) {
-  const { getPlatformCashfreeCreds, getRequestOrigin, readCashfreeBody } = helpers;
+  const { getPlatformGateway, getRequestOrigin, readCashfreeBody } = helpers;
 
   // Roles allowed to read admin endpoints (everyone except agency users).
   const adminReadRoles = ["saas_admin", "platform_readonly", "platform_finance", "platform_support"];
@@ -486,8 +501,8 @@ export function registerPlatformExtensions(app: Express, helpers: ExtensionsHelp
   });
 
   // POST /api/agency/:tenantId/subscription/initiate-payment — creates a
-  // pending subscription invoice + Cashfree order. The agency is charged
-  // their `monthlyPriceCents` for the upcoming period.
+  // pending subscription invoice and a gateway order/session for the active
+  // platform-selected provider (Cashfree or Stripe).
   app.post("/api/agency/:tenantId/subscription/initiate-payment", async (req, res) => {
     try {
       if (!callerIsTenantMember(req, String(req.params.tenantId))) {
@@ -497,12 +512,9 @@ export function registerPlatformExtensions(app: Express, helpers: ExtensionsHelp
       if (sub.monthlyPriceCents <= 0) {
         res.status(400).json({ error: "No price configured. Please contact support." }); return;
       }
-      let cashfree: CashfreeCreds;
-      try { cashfree = await getPlatformCashfreeCreds(); }
+      let gw: PlatformGatewaySelection;
+      try { gw = await getPlatformGateway(); }
       catch { res.status(503).json({ error: "Online payment isn't configured yet. Please contact support." }); return; }
-      if (!cashfree.clientId || !cashfree.clientSecret) {
-        res.status(503).json({ error: "Online payment isn't configured yet. Please contact support." }); return;
-      }
 
       // Compute the upcoming period: starts when the current one ends, or
       // today if there's no current period.
@@ -517,14 +529,83 @@ export function registerPlatformExtensions(app: Express, helpers: ExtensionsHelp
         amountCents: sub.monthlyPriceCents,
         currency: sub.currency,
         status: "pending",
+        provider: gw.provider,
         periodStart, periodEnd,
       } as any).returning();
 
       const orderId = `SUB_${invoice.id.slice(0, 8)}_${Date.now()}`;
-      const requestId = randomUUID();
       const origin = getRequestOrigin(req);
       const tenantUser = await storage.getUser(req.session!.userId!);
 
+      // ── Stripe branch ────────────────────────────────────────────────────
+      if (gw.provider === "stripe") {
+        const stripe = gw.stripe;
+        if (!stripe.secretKey) {
+          res.status(503).json({ error: "Stripe isn't configured yet. Please contact support." }); return;
+        }
+        // Stripe expects amounts in the smallest currency unit. We already
+        // store `amountCents` so just pass it through.
+        const successUrl = `${origin}/app/settings?tab=subscription&order_id=${orderId}&provider=stripe&session_id={CHECKOUT_SESSION_ID}`;
+        const cancelUrl = `${origin}/app/settings?tab=subscription&order_id=${orderId}&provider=stripe&canceled=1`;
+        const params = new URLSearchParams();
+        params.append("mode", "payment");
+        params.append("success_url", successUrl);
+        params.append("cancel_url", cancelUrl);
+        params.append("client_reference_id", orderId);
+        if (tenantUser?.email) params.append("customer_email", tenantUser.email);
+        params.append("line_items[0][price_data][currency]", String(sub.currency).toLowerCase());
+        params.append("line_items[0][price_data][unit_amount]", String(sub.monthlyPriceCents));
+        params.append("line_items[0][price_data][product_data][name]", `Visa Shuttle subscription — ${sub.plan}`);
+        params.append("line_items[0][quantity]", "1");
+        params.append("metadata[invoice_id]", invoice.id);
+        params.append("metadata[tenant_id]", sub.tenantId);
+        params.append("metadata[order_id]", orderId);
+
+        let stripeRes;
+        try {
+          stripeRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${stripe.secretKey}`,
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: params.toString(),
+            signal: AbortSignal.timeout(20000),
+          });
+        } catch {
+          res.status(503).json({ error: "Payment gateway temporarily unreachable" }); return;
+        }
+        const sdata: any = await stripeRes.json().catch(() => ({}));
+        if (!stripeRes.ok) {
+          res.status(stripeRes.status >= 500 ? 503 : stripeRes.status).json({
+            error: sdata?.error?.message || "Unable to create Stripe checkout session",
+          });
+          return;
+        }
+        await db.update(tenantSubscriptionInvoices).set({
+          stripeSessionId: sdata.id,
+          cashfreeOrderId: orderId, // keep our own order id stored for /confirm lookup
+        }).where(eq(tenantSubscriptionInvoices.id, invoice.id));
+
+        res.json({
+          provider: "stripe",
+          invoiceId: invoice.id,
+          orderId,
+          sessionId: sdata.id,
+          checkoutUrl: sdata.url,
+          mode: stripe.mode,
+          amount: sub.monthlyPriceCents,
+          currency: sub.currency,
+        });
+        return;
+      }
+
+      // ── Cashfree branch (default) ────────────────────────────────────────
+      const cashfree = gw.cashfree;
+      if (!cashfree.clientId || !cashfree.clientSecret) {
+        res.status(503).json({ error: "Online payment isn't configured yet. Please contact support." }); return;
+      }
+      const requestId = randomUUID();
       const payload = {
         order_id: orderId,
         order_amount: sub.monthlyPriceCents / 100,
@@ -572,6 +653,7 @@ export function registerPlatformExtensions(app: Express, helpers: ExtensionsHelp
         .where(eq(tenantSubscriptionInvoices.id, invoice.id));
 
       res.json({
+        provider: "cashfree",
         invoiceId: invoice.id,
         orderId: data.order_id || orderId,
         paymentSessionId: data.payment_session_id,
@@ -584,8 +666,9 @@ export function registerPlatformExtensions(app: Express, helpers: ExtensionsHelp
     }
   });
 
-  // POST /api/agency/:tenantId/subscription/confirm — verify Cashfree order
-  // and, if PAID, mark the invoice + advance the subscription period.
+  // POST /api/agency/:tenantId/subscription/confirm — verify the gateway
+  // order/session and, if PAID, mark the invoice + advance the subscription
+  // period. Branches on the invoice's stored `provider`.
   app.post("/api/agency/:tenantId/subscription/confirm", async (req, res) => {
     try {
       if (!callerIsTenantMember(req, String(req.params.tenantId))) {
@@ -603,10 +686,71 @@ export function registerPlatformExtensions(app: Express, helpers: ExtensionsHelp
       if (invoice.status === "paid") {
         res.json({ paid: true, invoice, alreadyRecorded: true }); return;
       }
-      let cashfree: CashfreeCreds;
-      try { cashfree = await getPlatformCashfreeCreds(); }
+      let gw: PlatformGatewaySelection;
+      try { gw = await getPlatformGateway(); }
       catch { res.status(503).json({ error: "Gateway not configured" }); return; }
 
+      const provider = invoice.provider || "cashfree";
+
+      // ── Stripe verification ──────────────────────────────────────────────
+      if (provider === "stripe") {
+        const stripe = gw.stripe;
+        if (!stripe.secretKey) {
+          res.status(503).json({ error: "Stripe not configured" }); return;
+        }
+        if (!invoice.stripeSessionId) {
+          res.status(400).json({ error: "No Stripe session for this invoice" }); return;
+        }
+        let stripeRes;
+        try {
+          stripeRes = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(invoice.stripeSessionId)}`, {
+            headers: { "Authorization": `Bearer ${stripe.secretKey}` },
+            signal: AbortSignal.timeout(20000),
+          });
+        } catch {
+          res.status(503).json({ error: "Gateway temporarily unreachable" }); return;
+        }
+        const sdata: any = await stripeRes.json().catch(() => ({}));
+        if (!stripeRes.ok) {
+          res.status(stripeRes.status >= 500 ? 503 : stripeRes.status).json({
+            error: sdata?.error?.message || "Unable to verify payment",
+          });
+          return;
+        }
+        // Defence-in-depth: confirm the session belongs to this invoice.
+        const sessionInvoiceId = sdata?.metadata?.invoice_id;
+        if (sessionInvoiceId && sessionInvoiceId !== invoice.id) {
+          res.status(400).json({ error: "Session does not match invoice" }); return;
+        }
+        const isPaid = sdata.payment_status === "paid";
+        if (!isPaid) { res.json({ paid: false, status: sdata.payment_status || sdata.status }); return; }
+
+        const now = new Date();
+        const [updatedInvoice] = await db.update(tenantSubscriptionInvoices).set({
+          status: "paid",
+          paidAt: now,
+          stripePaymentIntentId: typeof sdata.payment_intent === "string" ? sdata.payment_intent : null,
+        }).where(eq(tenantSubscriptionInvoices.id, invoice.id)).returning();
+
+        await db.update(tenantSubscriptions).set({
+          status: "active",
+          currentPeriodStart: invoice.periodStart ?? now,
+          currentPeriodEnd: invoice.periodEnd ?? null,
+          updatedAt: now,
+        }).where(eq(tenantSubscriptions.id, invoice.subscriptionId));
+
+        res.json({ paid: true, invoice: updatedInvoice });
+        return;
+      }
+
+      // ── Cashfree verification (default) ──────────────────────────────────
+      const cashfree = gw.cashfree;
+      // Preflight: refuse early with a clear error if creds aren't configured
+      // for this mode. Mirrors the guard in initiate-payment / deep-check.
+      if (!cashfree.clientId || !cashfree.clientSecret) {
+        res.status(503).json({ error: "Cashfree gateway is not configured for this environment" });
+        return;
+      }
       let gatewayRes;
       try {
         gatewayRes = await fetch(`${cashfree.baseUrl}/orders/${encodeURIComponent(orderId)}`, {

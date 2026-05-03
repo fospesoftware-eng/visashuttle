@@ -71,10 +71,15 @@ routes for support tickets and tenant subscription billing. Wired from
   on non-GET. Use `requirePlatformRole([...])` for finer admin gates.
 - Agency-write endpoints use `callerIsTenantMember` (strict — platform staff
   must use admin endpoints to act on a tenant's behalf).
-- Tenant subscription billing uses PLATFORM Cashfree credentials
-  (`storage.getPaymentGatewayConfig()`), order id prefix `SUB_`, return URL
-  `/app/settings?tab=subscription&order_id=…`. Mirrors invoice flow at
-  routes.ts ~2566-2703.
+- Tenant subscription billing uses PLATFORM payment gateway selected in
+  `payment_gateway_config.provider` (`cashfree` | `stripe`).
+  `storage.getPaymentGatewayConfig()` exposes both credential blocks; the
+  super-admin Settings → Payment Gateway card edits both. Initiate-payment
+  branches by `gw.provider` and writes `tenant_subscription_invoices.provider`
+  so confirm verifies via the matching gateway (legacy rows default to
+  `cashfree`). Order id prefix `SUB_`, return URL
+  `/app/settings?tab=subscription&order_id=…` (Stripe also appends
+  `&session_id=…`; cancel URL adds `&canceled=1`).
 - Internal admin notes (`support_ticket_messages.internal_note=true`) are
   filtered out for non-platform readers in
   `GET /api/agency/:tenantId/tickets/:id`.

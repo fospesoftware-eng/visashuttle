@@ -590,9 +590,12 @@ export type InsertPlatformAiConfig = z.infer<typeof insertPlatformAiConfigSchema
 export type PlatformAiConfig = typeof platformAiConfig.$inferSelect;
 
 // ── Payment Gateway Config ───────────────────────────────────────────────────
+// `provider` selects which gateway is used for PLATFORM-level subscription
+// billing. Tenants/invoices keep using Cashfree fields. Adding Stripe means
+// extra columns rather than a parallel table to keep the admin UI simple.
 export const paymentGatewayConfig = pgTable("payment_gateway_config", {
   id: serial("id").primaryKey(),
-  provider: text("provider").notNull().default("cashfree"),
+  provider: text("provider").notNull().default("cashfree"), // "cashfree" | "stripe"
   mode: text("mode").notNull().default("test"),
   apiVersion: text("api_version").notNull().default("2023-08-01"),
   testClientId: text("test_client_id"),
@@ -600,6 +603,14 @@ export const paymentGatewayConfig = pgTable("payment_gateway_config", {
   liveClientId: text("live_client_id"),
   liveClientSecret: text("live_client_secret"),
   webhookSecret: text("webhook_secret"),
+  // Stripe credentials (separate from Cashfree so an admin can have both
+  // configured and switch the active provider without re-entering keys).
+  stripeMode: text("stripe_mode").notNull().default("test"),
+  stripeTestPublishableKey: text("stripe_test_publishable_key"),
+  stripeTestSecretKey: text("stripe_test_secret_key"),
+  stripeLivePublishableKey: text("stripe_live_publishable_key"),
+  stripeLiveSecretKey: text("stripe_live_secret_key"),
+  stripeWebhookSecret: text("stripe_webhook_secret"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
@@ -1015,8 +1026,13 @@ export const tenantSubscriptionInvoices = pgTable("tenant_subscription_invoices"
   status: text("status").notNull().default("pending"), // pending | paid | failed | void
   periodStart: timestamp("period_start"),
   periodEnd: timestamp("period_end"),
+  // `provider` records which gateway processed this invoice so confirm can
+  // branch correctly even if the admin switches the active provider later.
+  provider: text("provider").notNull().default("cashfree"), // "cashfree" | "stripe"
   cashfreeOrderId: text("cashfree_order_id"),
   cashfreePaymentId: text("cashfree_payment_id"),
+  stripeSessionId: text("stripe_session_id"),
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
   paidAt: timestamp("paid_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
