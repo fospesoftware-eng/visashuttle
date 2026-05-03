@@ -8,7 +8,13 @@ import { Card, Field, Picker, PrimaryButton } from "@/components/UI";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { apiPost } from "@/lib/api";
 import { COUNTRIES, PURPOSES, TRIP_DURATIONS, VISA_TYPES, EMPLOYMENT_STATUSES, INCOME_RANGES } from "@/lib/data";
+import type { CheckSubmitResponse, VisaCheckResult } from "@/lib/types";
 import { useColors } from "@/hooks/useColors";
+
+type BasicResultState =
+  | { ok: true; result: VisaCheckResult }
+  | { ok: false; error: string }
+  | null;
 
 interface BasicForm {
   nationality: string;
@@ -43,7 +49,7 @@ export default function BasicCheck() {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<BasicForm>(EMPTY);
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<any | null>(null);
+  const [result, setResult] = useState<BasicResultState>(null);
 
   const set = <K extends keyof BasicForm>(k: K) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -57,20 +63,21 @@ export default function BasicCheck() {
   async function submit() {
     setSubmitting(true);
     try {
-      const res = await apiPost<{ check: any; result: any }>("/api/b2c/check", {
+      const res = await apiPost<CheckSubmitResponse>("/api/b2c/check", {
         checkType: "basic",
         formData: form,
       });
-      setResult(res);
-    } catch (e: any) {
-      setResult({ error: e?.message || "Check failed" });
+      setResult({ ok: true, result: res.result ?? {} });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Check failed";
+      setResult({ ok: false, error: msg });
     } finally {
       setSubmitting(false);
     }
   }
 
-  if (result && !result.error) {
-    const r = result.result || {};
+  if (result && result.ok) {
+    const r = result.result;
     const score = r.approvalChance ?? 0;
     return (
       <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={{ padding: 20 }}>
@@ -144,7 +151,7 @@ export default function BasicCheck() {
     );
   }
 
-  if (result?.error) {
+  if (result && !result.ok) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24, backgroundColor: colors.background }}>
         <Feather name="alert-triangle" size={36} color={colors.destructive} />

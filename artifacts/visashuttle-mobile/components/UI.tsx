@@ -4,6 +4,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  StyleProp,
   StyleSheet,
   Text,
   TextInput,
@@ -18,7 +19,13 @@ import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { useColors } from "@/hooks/useColors";
 
-export function Card({ children, style }: { children: React.ReactNode; style?: ViewStyle | ViewStyle[] }) {
+export function Card({
+  children,
+  style,
+}: {
+  children: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+}) {
   const colors = useColors();
   return (
     <View
@@ -30,7 +37,7 @@ export function Card({ children, style }: { children: React.ReactNode; style?: V
           borderColor: colors.border,
           padding: 18,
         },
-        style as any,
+        style,
       ]}
     >
       {children}

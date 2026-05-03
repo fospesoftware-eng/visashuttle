@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useColors } from "@/hooks/useColors";
 
@@ -39,7 +39,7 @@ export function BrandGradient({
   style,
 }: {
   children?: React.ReactNode;
-  style?: any;
+  style?: StyleProp<ViewStyle>;
 }) {
   const colors = useColors();
   return (

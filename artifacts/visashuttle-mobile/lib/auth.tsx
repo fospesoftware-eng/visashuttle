@@ -20,15 +20,35 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function isObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null;
+}
+
+function extractUser(payload: unknown): B2cUser | null {
+  if (!isObject(payload)) return null;
+  const candidate = "user" in payload && isObject(payload.user) ? payload.user : payload;
+  if (!isObject(candidate)) return null;
+  if (typeof candidate.id !== "string" || typeof candidate.email !== "string") return null;
+  return {
+    id: candidate.id,
+    email: candidate.email,
+    fullName: typeof candidate.fullName === "string" ? candidate.fullName : null,
+    phone: typeof candidate.phone === "string" ? candidate.phone : null,
+    freeChecksRemaining:
+      typeof candidate.freeChecksRemaining === "number" ? candidate.freeChecksRemaining : null,
+    deepCheckAccess:
+      typeof candidate.deepCheckAccess === "boolean" ? candidate.deepCheckAccess : false,
+  };
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<B2cUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     try {
-      const me = await apiGet<{ user: B2cUser } | B2cUser | null>("/api/b2c/auth/me");
-      const u = me && typeof me === "object" && "user" in (me as any) ? (me as any).user : me;
-      setUser((u as B2cUser) ?? null);
+      const me = await apiGet<unknown>("/api/b2c/auth/me");
+      setUser(extractUser(me));
     } catch {
       setUser(null);
     }

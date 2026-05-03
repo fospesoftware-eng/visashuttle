@@ -6,17 +6,8 @@ import { Feather } from "@expo/vector-icons";
 
 import { Card, PrimaryButton } from "@/components/UI";
 import { apiGet } from "@/lib/api";
+import { actionPlanToStrings, type VisaCheck } from "@/lib/types";
 import { useColors } from "@/hooks/useColors";
-
-interface VisaCheck {
-  id: string;
-  checkType: string;
-  formData: Record<string, string>;
-  approvalChance: number | null;
-  statusLabel: string | null;
-  aiResponse: any;
-  createdAt: string;
-}
 
 export default function HistoryDetail() {
   const colors = useColors();
@@ -48,11 +39,12 @@ export default function HistoryDetail() {
   }
 
   const score = data.approvalChance ?? 0;
-  const fd = data.formData || {};
-  const r = data.aiResponse || {};
-  const strengths: string[] = r.strengths || [];
-  const weaknesses: string[] = r.weaknesses || r.risks || [];
-  const recommendations: string[] = r.recommendations || (r.actionPlan ? r.actionPlan.map((a: any) => a.title || a) : []);
+  const fd = data.formData ?? {};
+  const r = data.aiResponse ?? {};
+  const strengths: string[] = r.strengths ?? [];
+  const weaknesses: string[] = r.weaknesses ?? r.riskFactors ?? [];
+  const recommendations: string[] =
+    r.recommendations ?? r.nextSteps ?? actionPlanToStrings(r.actionPlan);
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={{ padding: 20 }}>

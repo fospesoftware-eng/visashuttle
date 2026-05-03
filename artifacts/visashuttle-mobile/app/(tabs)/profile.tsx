@@ -52,7 +52,8 @@ export default function Profile() {
       qc.invalidateQueries({ queryKey: ["b2c", "profile"] });
       Alert.alert("Profile saved", "Your saved details will pre-fill future checks.");
     },
-    onError: (e: any) => Alert.alert("Save failed", e?.message || "Please try again"),
+    onError: (e: unknown) =>
+      Alert.alert("Save failed", e instanceof Error ? e.message : "Please try again"),
   });
 
   const set = <K extends keyof SavedProfile>(k: K, v: SavedProfile[K]) => setForm((f) => ({ ...f, [k]: v }));

@@ -27,6 +27,27 @@ export interface SavedProfile {
   passportNumber?: string | null;
 }
 
+/** A single step in the AI-generated action plan. */
+export interface ActionPlanItem {
+  title?: string;
+  action?: string;
+  description?: string;
+}
+
+/** The structured AI assessment returned by /api/b2c/check and /api/b2c/deep-check. */
+export interface VisaCheckResult {
+  approvalChance?: number;
+  grade?: string;
+  statusLabel?: string;
+  summary?: string;
+  strengths?: string[];
+  riskFactors?: string[];
+  weaknesses?: string[];
+  nextSteps?: string[];
+  recommendations?: string[];
+  actionPlan?: ActionPlanItem[];
+}
+
 export interface VisaCheck {
   id: string;
   checkType: string;
@@ -34,6 +55,20 @@ export interface VisaCheck {
   aiProvider: string;
   approvalChance: number | null;
   statusLabel: string | null;
-  aiResponse: any;
+  aiResponse: VisaCheckResult | null;
   createdAt: string;
+}
+
+export interface CheckSubmitResponse {
+  check: VisaCheck;
+  result: VisaCheckResult;
+}
+
+/** Normalize possibly-mixed action-plan entries (objects or strings) into plain text. */
+export function actionPlanToStrings(plan: ActionPlanItem[] | string[] | undefined): string[] {
+  if (!plan) return [];
+  return plan.map((entry) => {
+    if (typeof entry === "string") return entry;
+    return entry.title ?? entry.action ?? entry.description ?? "";
+  }).filter(Boolean);
 }

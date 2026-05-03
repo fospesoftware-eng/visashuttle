@@ -25,12 +25,26 @@ const storage = {
   },
 };
 
+/**
+ * Resolve the API base URL for the current runtime.
+ *
+ * Priority:
+ *  1. EXPO_PUBLIC_API_URL — explicit override (e.g. https://api.example.com)
+ *  2. EXPO_PUBLIC_DOMAIN  — Replit dev/preview domain provided by the workflow
+ *  3. Web — relative URLs ("") so the browser uses the current origin (the
+ *     proxy in front of the artifact already routes /api/* to the API server)
+ *  4. Native dev fallback — http://localhost:8080 (the API server's local
+ *     dev port). This keeps simulators/emulators working when neither env
+ *     var is set, and surfaces a sensible default instead of silently
+ *     hitting the wrong host.
+ */
 function resolveBaseUrl(): string {
   const explicit = process.env.EXPO_PUBLIC_API_URL;
   if (explicit) return explicit.replace(/\/$/, "");
   const domain = process.env.EXPO_PUBLIC_DOMAIN;
   if (domain) return `https://${domain}`;
-  return "";
+  if (Platform.OS === "web") return "";
+  return "http://localhost:8080";
 }
 
 export const API_BASE = resolveBaseUrl();
@@ -113,14 +127,7 @@ export async function api<T = unknown>(
   }
 
   if (!res.ok) {
-    const message =
-      data && typeof data === "object" && data !== null && "error" in data &&
-      typeof (data as { error: unknown }).error === "string"
-        ? (data as { error: string }).error
-        : data && typeof data === "object" && data !== null && "message" in data &&
-          typeof (data as { message: unknown }).message === "string"
-        ? (data as { message: string }).message
-        : `Request failed with ${res.status}`;
+    const message = pickErrorMessage(data) ?? `Request failed with ${res.status}`;
     const err = new Error(message) as ApiError;
     err.status = res.status;
     err.payload = data;
@@ -128,6 +135,14 @@ export async function api<T = unknown>(
   }
 
   return data as T;
+}
+
+function pickErrorMessage(data: unknown): string | null {
+  if (!data || typeof data !== "object") return null;
+  const obj = data as Record<string, unknown>;
+  if (typeof obj.error === "string") return obj.error;
+  if (typeof obj.message === "string") return obj.message;
+  return null;
 }
 
 export const apiGet = <T = unknown>(path: string) => api<T>("GET", path);

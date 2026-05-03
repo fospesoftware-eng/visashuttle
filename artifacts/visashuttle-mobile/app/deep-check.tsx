@@ -11,8 +11,14 @@ import {
   COUNTRIES, PURPOSES, TRIP_DURATIONS, VISA_TYPES,
   EMPLOYMENT_STATUSES, INCOME_RANGES, BANK_BALANCE_RANGES, GENDERS,
 } from "@/lib/data";
+import { actionPlanToStrings, type CheckSubmitResponse, type VisaCheckResult } from "@/lib/types";
 import { useAuth } from "@/lib/auth";
 import { useColors } from "@/hooks/useColors";
+
+type DeepResultState =
+  | { ok: true; result: VisaCheckResult }
+  | { ok: false; error: string }
+  | null;
 
 const YES_NO = ["Yes", "No"];
 const YES_NO_MAYBE = ["Yes", "No", "Planning to get"];
@@ -48,7 +54,7 @@ export default function DeepCheck() {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<DeepForm>(EMPTY);
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<any | null>(null);
+  const [result, setResult] = useState<DeepResultState>(null);
 
   const set = <K extends keyof DeepForm>(k: K) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -86,7 +92,7 @@ export default function DeepCheck() {
             { icon: "refresh-ccw", text: "Unlimited re-runs" },
           ].map((b) => (
             <View key={b.text} style={styles.bulletRow}>
-              <Feather name={b.icon as any} size={18} color={colors.primary} />
+              <Feather name={b.icon as keyof typeof Feather.glyphMap} size={18} color={colors.primary} />
               <Text style={[styles.bulletText, { color: colors.foreground }]}>{b.text}</Text>
             </View>
           ))}
@@ -112,25 +118,27 @@ export default function DeepCheck() {
   async function submit() {
     setSubmitting(true);
     try {
-      const res = await apiPost<{ check: any; result: any }>("/api/b2c/deep-check", {
+      const res = await apiPost<CheckSubmitResponse>("/api/b2c/deep-check", {
         checkType: "deep",
         formData: form,
       });
-      setResult(res);
-    } catch (e: any) {
-      setResult({ error: e?.message || "Check failed" });
+      setResult({ ok: true, result: res.result ?? {} });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Check failed";
+      setResult({ ok: false, error: msg });
     } finally {
       setSubmitting(false);
     }
   }
 
-  if (result && !result.error) {
-    const r = result.result || {};
+  if (result && result.ok) {
+    const r = result.result;
     const score = r.approvalChance ?? 0;
-    const grade = r.grade || (score >= 80 ? "A" : score >= 60 ? "B" : score >= 40 ? "C" : "D");
-    const items: string[] = (r.actionPlan && Array.isArray(r.actionPlan))
-      ? r.actionPlan.map((a: any) => a.title || a.action || a)
-      : (r.nextSteps || r.recommendations || []);
+    const grade = r.grade ?? (score >= 80 ? "A" : score >= 60 ? "B" : score >= 40 ? "C" : "D");
+    const planItems = actionPlanToStrings(r.actionPlan);
+    const items: string[] = planItems.length > 0
+      ? planItems
+      : (r.nextSteps ?? r.recommendations ?? []);
     return (
       <ScrollView style={{ flex: 1, backgroundColor: colors.background }} contentContainerStyle={{ padding: 20 }}>
         <LinearGradient
@@ -179,7 +187,7 @@ export default function DeepCheck() {
     );
   }
 
-  if (result?.error) {
+  if (result && !result.ok) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24, backgroundColor: colors.background }}>
         <Feather name="alert-triangle" size={36} color={colors.destructive} />
