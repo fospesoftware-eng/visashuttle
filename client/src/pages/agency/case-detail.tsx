@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
@@ -7,7 +7,7 @@ import {
   Brain, Lightbulb, RefreshCw, Copy, Check, ExternalLink, Share2,
   Loader2, MessageSquare, Flag, Users, Plus, Trash2, Pencil, Mail, FileDown,
   Phone, MapPin, Globe, BookOpen, Hash, StickyNote, Plane,
-  DollarSign, ClipboardCheck, ListChecks, Receipt
+  DollarSign, ClipboardCheck, ListChecks, Receipt, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,6 +41,95 @@ const RELATIONSHIP_LABELS: Record<CoTravellerRelationship, string> = {
   grandparent: "Grandparent", in_law: "In-law", partner: "Partner",
   friend: "Friend", colleague: "Colleague", relative: "Other relative", other: "Other",
 };
+
+/**
+ * Wraps a long, horizontally-overflowing tab strip and adds smooth
+ * left/right chevron buttons + edge fade. The arrows auto-hide when the
+ * strip is fully scrolled in that direction or fits without overflow.
+ * Also auto-scrolls the active tab into view when it changes.
+ */
+function ScrollableTabBar({ children, activeValue }: { children: React.ReactNode; activeValue: string }) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [canLeft, setCanLeft] = useState(false);
+  const [canRight, setCanRight] = useState(false);
+
+  const update = useCallback(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    setCanLeft(el.scrollLeft > 4);
+    setCanRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", update);
+      ro.disconnect();
+    };
+  }, [update]);
+
+  // Bring the active tab into view smoothly when it changes.
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const active = el.querySelector<HTMLElement>('[data-state="active"]');
+    if (active) active.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }, [activeValue]);
+
+  const scrollBy = (delta: number) => {
+    scrollerRef.current?.scrollBy({ left: delta, behavior: "smooth" });
+  };
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => scrollBy(-220)}
+        aria-label="Scroll tabs left"
+        data-testid="button-tabs-scroll-left"
+        className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 h-8 w-8 rounded-full border bg-background/95 shadow-sm flex items-center justify-center transition-opacity ${
+          canLeft ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+      >
+        <ChevronLeft className="w-4 h-4" />
+      </button>
+      <button
+        type="button"
+        onClick={() => scrollBy(220)}
+        aria-label="Scroll tabs right"
+        data-testid="button-tabs-scroll-right"
+        className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 h-8 w-8 rounded-full border bg-background/95 shadow-sm flex items-center justify-center transition-opacity ${
+          canRight ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+      >
+        <ChevronRight className="w-4 h-4" />
+      </button>
+      {/* Edge fade gradients to hint at overflow */}
+      <div
+        className={`pointer-events-none absolute left-0 top-0 h-full w-10 bg-gradient-to-r from-background to-transparent transition-opacity ${
+          canLeft ? "opacity-100" : "opacity-0"
+        }`}
+      />
+      <div
+        className={`pointer-events-none absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-background to-transparent transition-opacity ${
+          canRight ? "opacity-100" : "opacity-0"
+        }`}
+      />
+      <div
+        ref={scrollerRef}
+        className="overflow-x-auto scroll-smooth no-scrollbar px-9"
+        style={{ scrollbarWidth: "none" }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
 
 function formatMoney(cents: number, currency: string): string {
   try {
@@ -512,6 +601,7 @@ export default function CaseDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [location, setLocation] = useLocation();
   const [message, setMessage] = useState("");
+  const [activeTab, setActiveTab] = useState("destination");
   const [linkCopied, setLinkCopied] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -1210,8 +1300,13 @@ export default function CaseDetailPage() {
             {caseData.visaStage === "approved" && (
               <VisaCopyCard caseId={id!} caseData={caseData} />
             )}
-            <Tabs defaultValue="destination" className="space-y-4">
-              <div className="overflow-x-auto -mx-1 px-1">
+            <Tabs
+              defaultValue="destination"
+              value={activeTab}
+              onValueChange={setActiveTab}
+              className="space-y-4"
+            >
+              <ScrollableTabBar activeValue={activeTab}>
                 <TabsList className="w-max">
                   <TabsTrigger value="destination" data-testid="tab-destination">
                     <MapPin className="w-3.5 h-3.5 mr-1.5" /> Destination
@@ -1259,7 +1354,7 @@ export default function CaseDetailPage() {
                     <Clock className="w-3.5 h-3.5 mr-1.5" /> Activity
                   </TabsTrigger>
                 </TabsList>
-              </div>
+              </ScrollableTabBar>
 
               {/* === Destination & Visa (wizard step 1) === */}
               <TabsContent value="destination" className="space-y-4">
