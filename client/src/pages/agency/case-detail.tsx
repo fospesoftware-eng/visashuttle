@@ -87,12 +87,24 @@ function ScrollableTabBar({ children, activeValue }: { children: React.ReactNode
 
   return (
     <div className="relative">
+      {/* Edge fade gradients to hint at overflow (rendered BEFORE the
+          chevron buttons so the buttons stack above them visually). */}
+      <div
+        className={`pointer-events-none absolute left-0 top-0 h-full w-10 z-10 bg-gradient-to-r from-background to-transparent transition-opacity ${
+          canLeft ? "opacity-100" : "opacity-0"
+        }`}
+      />
+      <div
+        className={`pointer-events-none absolute right-0 top-0 h-full w-10 z-10 bg-gradient-to-l from-background to-transparent transition-opacity ${
+          canRight ? "opacity-100" : "opacity-0"
+        }`}
+      />
       <button
         type="button"
         onClick={() => scrollBy(-220)}
         aria-label="Scroll tabs left"
         data-testid="button-tabs-scroll-left"
-        className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 h-8 w-8 rounded-full border bg-background/95 shadow-sm flex items-center justify-center transition-opacity ${
+        className={`absolute left-0 top-1/2 -translate-y-1/2 z-20 h-8 w-8 rounded-full border bg-background shadow-sm flex items-center justify-center transition-opacity hover:bg-accent ${
           canLeft ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       >
@@ -103,23 +115,12 @@ function ScrollableTabBar({ children, activeValue }: { children: React.ReactNode
         onClick={() => scrollBy(220)}
         aria-label="Scroll tabs right"
         data-testid="button-tabs-scroll-right"
-        className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 h-8 w-8 rounded-full border bg-background/95 shadow-sm flex items-center justify-center transition-opacity ${
+        className={`absolute right-0 top-1/2 -translate-y-1/2 z-20 h-8 w-8 rounded-full border bg-background shadow-sm flex items-center justify-center transition-opacity hover:bg-accent ${
           canRight ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       >
         <ChevronRight className="w-4 h-4" />
       </button>
-      {/* Edge fade gradients to hint at overflow */}
-      <div
-        className={`pointer-events-none absolute left-0 top-0 h-full w-10 bg-gradient-to-r from-background to-transparent transition-opacity ${
-          canLeft ? "opacity-100" : "opacity-0"
-        }`}
-      />
-      <div
-        className={`pointer-events-none absolute right-0 top-0 h-full w-10 bg-gradient-to-l from-background to-transparent transition-opacity ${
-          canRight ? "opacity-100" : "opacity-0"
-        }`}
-      />
       <div
         ref={scrollerRef}
         className="overflow-x-auto scroll-smooth no-scrollbar px-9"
