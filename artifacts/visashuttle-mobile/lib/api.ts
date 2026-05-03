@@ -1,6 +1,7 @@
 import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
 
 const COOKIE_KEY = "visashuttle.cookie";
 
@@ -28,21 +29,33 @@ const storage = {
 /**
  * Resolve the API base URL for the current runtime.
  *
+ * The Express backend (`@workspace/api-server`) is exposed by the Replit
+ * artifact router under `/api` on the main repl domain (`REPLIT_DOMAINS`).
+ * Expo runs on a *different* subdomain (`REPLIT_EXPO_DEV_DOMAIN`) that does
+ * NOT go through the artifact router, so we must always use an absolute URL
+ * pointing at the main domain — both on web and native — to share the same
+ * users database and sessions as the web app.
+ *
  * Priority:
- *  1. EXPO_PUBLIC_API_URL — explicit override (e.g. https://api.example.com)
- *  2. EXPO_PUBLIC_DOMAIN  — Replit dev/preview domain provided by the workflow
- *  3. Web — relative URLs ("") so the browser uses the current origin (the
- *     proxy in front of the artifact already routes /api/* to the API server)
- *  4. Native dev fallback — http://localhost:8080 (the API server's local
- *     dev port). This keeps simulators/emulators working when neither env
- *     var is set, and surfaces a sensible default instead of silently
- *     hitting the wrong host.
+ *  1. EXPO_PUBLIC_API_URL — explicit override or the value injected by
+ *     `app.config.ts` from `REPLIT_DOMAINS` at bundle time.
+ *  2. `expo-constants` extra.apiUrl — same value, exposed via the manifest
+ *     for runtimes where `process.env` inlining is not available.
+ *  3. EXPO_PUBLIC_DOMAIN — legacy fallback name (treated as a hostname).
+ *  4. Web — relative URLs ("") so the browser uses the current origin (only
+ *     useful when the app is served from the same domain as the API).
+ *  5. Native dev fallback — http://localhost:8080 (simulator only).
  */
 function resolveBaseUrl(): string {
   const explicit = process.env.EXPO_PUBLIC_API_URL;
   if (explicit) return explicit.replace(/\/$/, "");
+
+  const extra = (Constants.expoConfig?.extra ?? {}) as { apiUrl?: string };
+  if (extra.apiUrl) return extra.apiUrl.replace(/\/$/, "");
+
   const domain = process.env.EXPO_PUBLIC_DOMAIN;
   if (domain) return `https://${domain}`;
+
   if (Platform.OS === "web") return "";
   return "http://localhost:8080";
 }

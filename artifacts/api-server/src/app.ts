@@ -8,10 +8,10 @@ import { logger } from "./lib/logger";
 
 const app: Express = express();
 
-// Trust proxy for production (required for secure cookies behind reverse proxy)
-if (process.env.NODE_ENV === "production") {
-  app.set("trust proxy", 1);
-}
+// Trust the Replit reverse proxy on every environment so `req.secure` and the
+// remote IP reflect the real client. Required for cross-site cookies issued
+// over HTTPS (the dev preview is also served via HTTPS through the proxy).
+app.set("trust proxy", 1);
 
 app.use(
   pinoHttp({
@@ -33,7 +33,18 @@ app.use(
   }),
 );
 
-app.use(cors());
+// The mobile artifact (Expo) is served from a *different* subdomain than the
+// API (it bypasses the artifact router), so cross-origin requests from the
+// mobile app must be allowed and must carry the session cookie. Reflecting
+// the request origin (instead of `*`) keeps `Access-Control-Allow-Credentials`
+// valid. Requests with no Origin header (native fetch, server-to-server) are
+// also allowed.
+app.use(
+  cors({
+    origin: (origin, cb) => cb(null, origin ?? true),
+    credentials: true,
+  }),
+);
 
 // Passport scan endpoint accepts large base64 images
 app.use(
@@ -68,10 +79,15 @@ const sessionOptions: session.SessionOptions = {
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === "production",
+    // Replit always serves the public domain over HTTPS (even in dev), and
+    // we trust the proxy above, so secure cookies work in every environment.
+    // The mobile app talks to the API cross-origin from the Expo subdomain,
+    // which requires `SameSite=None; Secure` for the session cookie to be
+    // accepted by the browser.
+    secure: true,
     httpOnly: true,
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    sameSite: "lax",
+    sameSite: "none",
   },
 };
 
