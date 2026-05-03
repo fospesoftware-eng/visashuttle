@@ -926,3 +926,22 @@ intact for historical data and as a fallback.
 - **Local helper** `formatMoney(cents, currency)` added at the top of
   case-detail.tsx (Intl.NumberFormat with `currency` style + a plain-text
   fallback). No shared money util existed.
+
+## Database Provisioning (May 3, 2026)
+
+- Replit Postgres provisioned; `DATABASE_URL` now set in env.
+- Schema applied via `drizzle-kit generate` + SQL applied to the new
+  database (28 tables created from `migrations/0000_init.sql`).
+- Server now uses `HybridStorage` (DB-backed) instead of `MemStorage`.
+  Data created in the app now survives workflow restarts.
+- Note: the previous in-memory data (any cases created before the DB
+  was provisioned) was lost on restart. The seed data (demo cases for
+  John Smith) is reseeded on startup if missing.
+
+## Tab Strip Navigation Polish
+
+- `ScrollableTabBar` (in `client/src/pages/agency/case-detail.tsx`)
+  replaces the raw `overflow-x-auto` with chevron buttons + edge-fade
+  gradients. Buttons sit at `z-20`, gradients at `z-10`, so the left
+  chevron is always visible (previously the gradient covered it at the
+  rightmost scroll position).
