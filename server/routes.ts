@@ -2838,6 +2838,19 @@ export async function registerRoutes(
         ...ps.map(p => p.passportDateOfExpiry),
         ...cs.map(c => c.passportDateOfExpiry),
       ].filter((d): d is string => !!d).sort();
+      // Every passport number associated with this customer (library +
+      // legacy case snapshots), de-duplicated. Used by the agency search
+      // box so staff can find a customer by *any* of their passports —
+      // including co-travellers' — not just the primary.
+      const passportNumbers = Array.from(new Set([
+        ...ps.map(p => p.passportNumber),
+        ...cs.map(c => c.passportNumber),
+      ].filter((n): n is string => !!n && n.trim().length > 0)));
+      // Holder names from the library too, so search like "jane smith" still
+      // finds the customer when Jane is only listed as a co-traveller.
+      const passportHolderNames = Array.from(new Set(
+        ps.map(p => p.holderName).filter((n): n is string => !!n && n.trim().length > 0)
+      ));
       return {
         ...cust,
         caseCount: cs.length,
@@ -2847,6 +2860,8 @@ export async function registerRoutes(
         latestPassportNumber: passportSrc?.passportNumber ?? null,
         latestPassportNationality: passportSrc?.passportNationality ?? null,
         earliestPassportExpiry: allExpiries[0] ?? null,
+        passportNumbers,
+        passportHolderNames,
       };
     });
     // Most recent activity first.

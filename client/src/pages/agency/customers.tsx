@@ -19,9 +19,15 @@ type CustomerListRow = CustomerAccount & {
   caseCount: number;
   activeCaseCount: number;
   latestActivityAt: string | null;
+  passportCount: number;
   latestPassportNumber: string | null;
   latestPassportNationality: string | null;
   earliestPassportExpiry: string | null;
+  // Every passport number on this customer's record (library + legacy
+  // snapshots), de-duplicated, used for free-text search.
+  passportNumbers: string[];
+  // Holder names from the library (covers co-travellers).
+  passportHolderNames: string[];
 };
 
 // Parse a `YYYY-MM-DD` (optionally with a time suffix) into a *local* calendar
@@ -108,13 +114,28 @@ export default function CustomersPage() {
     if (!customers) return [];
     const q = search.trim().toLowerCase();
     if (!q) return customers;
+    // Strip non-alphanumerics from the query so "P 11 11 111" / "p-1111111"
+    // both match a stored passport number of "P1111111".
+    const qPassport = q.replace(/[^a-z0-9]/g, "");
     return customers.filter((c) => {
-      return (
+      if (
         c.name?.toLowerCase().includes(q) ||
         c.email.toLowerCase().includes(q) ||
-        c.phone?.toLowerCase().includes(q) ||
-        c.latestPassportNumber?.toLowerCase().includes(q)
+        c.phone?.toLowerCase().includes(q)
+      ) return true;
+      // Match against ANY passport on file (the customer's own + every
+      // co-traveller's), not just the primary one.
+      const passportMatch = (c.passportNumbers ?? []).some(n => {
+        const v = n.toLowerCase();
+        if (v.includes(q)) return true;
+        if (qPassport && v.replace(/[^a-z0-9]/g, "").includes(qPassport)) return true;
+        return false;
+      });
+      if (passportMatch) return true;
+      const holderMatch = (c.passportHolderNames ?? []).some(h =>
+        h.toLowerCase().includes(q)
       );
+      return holderMatch;
     });
   }, [customers, search]);
 
