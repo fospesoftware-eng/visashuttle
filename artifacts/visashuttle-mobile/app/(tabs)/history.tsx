@@ -17,7 +17,15 @@ interface VisaCheck {
   createdAt: string;
 }
 
-function scoreColor(score: number | null, palette: any) {
+interface ColorPalette {
+  mutedForeground: string;
+  success: string;
+  primary: string;
+  warning: string;
+  destructive: string;
+}
+
+function scoreColor(score: number | null, palette: ColorPalette) {
   if (score === null) return palette.mutedForeground;
   if (score >= 80) return palette.success;
   if (score >= 60) return palette.primary;

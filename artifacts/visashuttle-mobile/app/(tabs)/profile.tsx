@@ -57,6 +57,13 @@ export default function Profile() {
 
   const set = <K extends keyof SavedProfile>(k: K, v: SavedProfile[K]) => setForm((f) => ({ ...f, [k]: v }));
 
+  const docToggles: { k: keyof SavedProfile; label: string }[] = [
+    { k: "hasPassport", label: "Valid passport (6+ months)" },
+    { k: "hasBankStatement", label: "Recent bank statements (6 months)" },
+    { k: "hasIncomeProof", label: "Income proof / payslips" },
+    { k: "hasTaxReturn", label: "Tax returns" },
+  ];
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <ScrollView
@@ -90,17 +97,12 @@ export default function Profile() {
 
         <Card>
           <Text style={[styles.section, { color: colors.foreground }]}>Documents on hand</Text>
-          {[
-            { k: "hasPassport", label: "Valid passport (6+ months)" },
-            { k: "hasBankStatement", label: "Recent bank statements (6 months)" },
-            { k: "hasIncomeProof", label: "Income proof / payslips" },
-            { k: "hasTaxReturn", label: "Tax returns" },
-          ].map((row) => (
+          {docToggles.map((row) => (
             <View key={row.k} style={styles.toggleRow}>
               <Text style={{ flex: 1, fontFamily: "Inter_500Medium", color: colors.foreground }}>{row.label}</Text>
               <Switch
-                value={!!(form as any)[row.k]}
-                onValueChange={(v) => set(row.k as any, v as any)}
+                value={!!form[row.k]}
+                onValueChange={(v) => set(row.k, v as SavedProfile[typeof row.k])}
                 trackColor={{ true: colors.primary, false: colors.border }}
                 thumbColor="#fff"
               />

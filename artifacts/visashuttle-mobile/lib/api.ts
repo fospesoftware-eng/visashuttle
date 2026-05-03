@@ -1,6 +1,29 @@
+import { Platform } from "react-native";
+import * as SecureStore from "expo-secure-store";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const COOKIE_KEY = "visashuttle.cookie";
+
+const storage = {
+  async get(key: string): Promise<string | null> {
+    if (Platform.OS === "web") return AsyncStorage.getItem(key);
+    return (await SecureStore.getItemAsync(key)) ?? null;
+  },
+  async set(key: string, value: string): Promise<void> {
+    if (Platform.OS === "web") {
+      await AsyncStorage.setItem(key, value);
+      return;
+    }
+    await SecureStore.setItemAsync(key, value);
+  },
+  async remove(key: string): Promise<void> {
+    if (Platform.OS === "web") {
+      await AsyncStorage.removeItem(key);
+      return;
+    }
+    await SecureStore.deleteItemAsync(key);
+  },
+};
 
 function resolveBaseUrl(): string {
   const explicit = process.env.EXPO_PUBLIC_API_URL;
@@ -13,26 +36,34 @@ function resolveBaseUrl(): string {
 export const API_BASE = resolveBaseUrl();
 
 let memoryCookie: string | null = null;
+let cookieLoaded = false;
 
 export async function loadCookie(): Promise<string | null> {
-  if (memoryCookie !== null) return memoryCookie;
-  const v = await AsyncStorage.getItem(COOKIE_KEY);
-  memoryCookie = v;
-  return v;
+  if (cookieLoaded) return memoryCookie;
+  try {
+    memoryCookie = await storage.get(COOKIE_KEY);
+  } catch {
+    memoryCookie = null;
+  }
+  cookieLoaded = true;
+  return memoryCookie;
 }
 
 export async function saveCookie(cookie: string | null): Promise<void> {
   memoryCookie = cookie;
-  if (cookie) {
-    await AsyncStorage.setItem(COOKIE_KEY, cookie);
-  } else {
-    await AsyncStorage.removeItem(COOKIE_KEY);
+  cookieLoaded = true;
+  try {
+    if (cookie) await storage.set(COOKIE_KEY, cookie);
+    else await storage.remove(COOKIE_KEY);
+  } catch {
+    /* ignore persistence errors */
   }
 }
 
 function parseSetCookie(setCookieHeader: string | null): string | null {
   if (!setCookieHeader) return null;
-  const first = setCookieHeader.split(",").find((p) => p.includes("connect.sid=")) ?? setCookieHeader;
+  const first =
+    setCookieHeader.split(",").find((p) => p.includes("connect.sid=")) ?? setCookieHeader;
   const pair = first.split(";")[0]?.trim();
   return pair || null;
 }
@@ -42,28 +73,34 @@ export interface ApiError extends Error {
   payload?: unknown;
 }
 
+const isWeb = Platform.OS === "web";
+
 export async function api<T = unknown>(
   method: string,
   path: string,
   body?: unknown,
 ): Promise<T> {
-  const cookie = await loadCookie();
-  const headers: Record<string, string> = {
-    Accept: "application/json",
-  };
+  const headers: Record<string, string> = { Accept: "application/json" };
   if (body !== undefined) headers["Content-Type"] = "application/json";
-  if (cookie) headers["Cookie"] = cookie;
+
+  if (!isWeb) {
+    const cookie = await loadCookie();
+    if (cookie) headers["Cookie"] = cookie;
+  }
 
   const url = `${API_BASE}${path}`;
   const res = await fetch(url, {
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
+    ...(isWeb ? { credentials: "include" as const } : {}),
   });
 
-  const setCookie = res.headers.get("set-cookie");
-  const newCookie = parseSetCookie(setCookie);
-  if (newCookie) await saveCookie(newCookie);
+  if (!isWeb) {
+    const setCookie = res.headers.get("set-cookie");
+    const newCookie = parseSetCookie(setCookie);
+    if (newCookie) await saveCookie(newCookie);
+  }
 
   const text = await res.text();
   let data: unknown = null;
@@ -76,11 +113,15 @@ export async function api<T = unknown>(
   }
 
   if (!res.ok) {
-    const err = new Error(
-      (data && typeof data === "object" && "message" in data && typeof (data as any).message === "string"
-        ? (data as any).message
-        : `Request failed with ${res.status}`),
-    ) as ApiError;
+    const message =
+      data && typeof data === "object" && data !== null && "error" in data &&
+      typeof (data as { error: unknown }).error === "string"
+        ? (data as { error: string }).error
+        : data && typeof data === "object" && data !== null && "message" in data &&
+          typeof (data as { message: unknown }).message === "string"
+        ? (data as { message: string }).message
+        : `Request failed with ${res.status}`;
+    const err = new Error(message) as ApiError;
     err.status = res.status;
     err.payload = data;
     throw err;
