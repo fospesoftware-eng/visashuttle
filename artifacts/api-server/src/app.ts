@@ -66,18 +66,59 @@ for (const o of (process.env.CORS_ALLOWED_ORIGINS ?? "").split(",")) {
 }
 const localhostOrigin = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i;
 
+function isAllowedOrigin(origin: string): boolean {
+  return allowedOriginSet.has(origin) || localhostOrigin.test(origin);
+}
+
 app.use(
   cors({
+    // Reflect the request origin for allowed origins; for unknown origins we
+    // simply omit the `Access-Control-Allow-Origin` header (returning `false`
+    // here). The browser will refuse to read the response, which is the
+    // correct outcome — and we don't surface a 500. The CSRF middleware
+    // below independently blocks state-changing requests from unknown
+    // origins so the server never executes them either.
     origin(origin, cb) {
       if (!origin) return cb(null, true);
-      if (allowedOriginSet.has(origin) || localhostOrigin.test(origin)) {
-        return cb(null, true);
-      }
-      return cb(new Error(`Origin ${origin} is not allowed by CORS`));
+      return cb(null, isAllowedOrigin(origin));
     },
     credentials: true,
   }),
 );
+
+// CSRF defense: because we set `SameSite=None` on the shared session cookie
+// (required for the cross-origin Expo mobile client), browsers would
+// otherwise attach the session cookie on simple cross-site form posts. The
+// CORS allowlist alone does NOT prevent that — CORS only restricts response
+// readability, not whether the request is sent. We therefore reject any
+// state-changing request whose `Origin` (or, for clients that omit Origin,
+// `Referer`) is not in the allowlist. Requests without Origin AND without
+// Referer are allowed: those are native-mobile fetches, curl, and
+// server-to-server calls, which cannot be forged by a browser.
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (SAFE_METHODS.has(req.method)) return next();
+
+  const origin = req.get("origin");
+  if (origin) {
+    if (isAllowedOrigin(origin)) return next();
+    return res.status(403).json({ error: "Cross-site request blocked" });
+  }
+
+  const referer = req.get("referer");
+  if (referer) {
+    try {
+      const refOrigin = new URL(referer).origin;
+      if (isAllowedOrigin(refOrigin)) return next();
+      return res.status(403).json({ error: "Cross-site request blocked" });
+    } catch {
+      return res.status(403).json({ error: "Invalid referer" });
+    }
+  }
+
+  // No Origin and no Referer: not a browser-driven cross-site request.
+  return next();
+});
 
 // Passport scan endpoint accepts large base64 images
 app.use(
