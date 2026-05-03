@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "../storage";
 import { runVisaCheck, runDeepCheck, scanPassportImage, isPassportScanConfigured } from "../ai";
 import { registerApiPlatformRoutes } from "./api-platform";
+import { registerPlatformExtensions } from "./platform-extensions";
 import express from "express";
 import { sendOtp, verifyOtp, getSmsProviderStatus } from "../sms";
 import { getEntryRequirement } from "../shared/visa-free";
@@ -362,10 +363,24 @@ function requireAgencyAuth(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
-// Middleware to require SaaS admin role
+// Roles that may use the platform admin console. `saas_admin` is the super
+// role; the others are granular sub-roles introduced for the admin team.
+const PLATFORM_ROLES_SET = new Set([
+  "saas_admin", "platform_readonly", "platform_finance", "platform_support",
+]);
+
+// Middleware to require an admin role. GETs are accessible to ALL platform
+// roles (including read-only). Writes (POST/PATCH/DELETE) are still gated to
+// the super role `saas_admin` for endpoints that haven't been granularized
+// yet — finance/support endpoints opt-in via `requirePlatformRole` in
+// platform-extensions.ts.
 function requireAdminAuth(req: Request, res: Response, next: NextFunction) {
-  if (!req.session?.userId || req.session?.userRole !== "saas_admin") {
+  const role = req.session?.userRole ?? "";
+  if (!req.session?.userId || !PLATFORM_ROLES_SET.has(role)) {
     return res.status(403).json({ error: "Admin access required" });
+  }
+  if (req.method !== "GET" && role !== "saas_admin") {
+    return res.status(403).json({ error: "Super-admin access required for this action" });
   }
   next();
 }
@@ -5853,6 +5868,18 @@ export async function registerRoutes(
       getRequestOrigin,
       readBody: readCashfreeBody,
     },
+  });
+
+  // ── Platform extensions: granular admin roles, support tickets, tenant
+  // subscription billing. The agency pays the platform via Cashfree using
+  // PLATFORM creds (not tenant-scoped) — different from the invoice flow.
+  registerPlatformExtensions(app, {
+    getPlatformCashfreeCreds: async () => {
+      const cfg = await storage.getPaymentGatewayConfig();
+      return getCashfreeCredentials(cfg);
+    },
+    getRequestOrigin,
+    readCashfreeBody,
   });
 
   return httpServer;

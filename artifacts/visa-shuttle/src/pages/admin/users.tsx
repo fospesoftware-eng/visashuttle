@@ -31,6 +31,9 @@ import { formatDistanceToNow } from "date-fns";
 
 const ROLE_COLORS: Record<string, string> = {
   saas_admin: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
+  platform_finance: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+  platform_support: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+  platform_readonly: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
   agency_owner: "bg-primary/10 text-primary",
   agency_staff: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
   customer: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
@@ -196,6 +199,9 @@ export default function AdminUsersPage() {
                 <SelectContent>
                   <SelectItem value="all">All Roles</SelectItem>
                   <SelectItem value="saas_admin">SaaS Admin</SelectItem>
+                  <SelectItem value="platform_finance">Platform · Finance</SelectItem>
+                  <SelectItem value="platform_support">Platform · Support</SelectItem>
+                  <SelectItem value="platform_readonly">Platform · Read-only</SelectItem>
                   <SelectItem value="agency_owner">Agency Owner</SelectItem>
                   <SelectItem value="agency_staff">Agency Staff</SelectItem>
                   <SelectItem value="customer">Customer</SelectItem>
@@ -425,7 +431,10 @@ export default function AdminUsersPage() {
                 <Select value={editUser.role} onValueChange={v => setEditUser({ ...editUser, role: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="saas_admin">SaaS Admin</SelectItem>
+                    <SelectItem value="saas_admin">SaaS Admin (super)</SelectItem>
+                    <SelectItem value="platform_finance">Platform · Finance</SelectItem>
+                    <SelectItem value="platform_support">Platform · Support</SelectItem>
+                    <SelectItem value="platform_readonly">Platform · Read-only</SelectItem>
                     <SelectItem value="agency_owner">Agency Owner</SelectItem>
                     <SelectItem value="agency_staff">Agency Staff</SelectItem>
                     <SelectItem value="customer">Customer</SelectItem>

@@ -8,6 +8,13 @@
       "when": 1777804821480,
       "tag": "0000_api_platform",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1782000000000,
+      "tag": "0001_platform_extensions",
+      "breakpoints": true
     }
   ]
 }

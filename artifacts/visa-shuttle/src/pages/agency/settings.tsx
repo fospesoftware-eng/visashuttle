@@ -1212,7 +1212,7 @@ export default function AgencySettingsPage() {
           <p className="text-muted-foreground">Manage your agency settings and preferences.</p>
         </div>
 
-        <Tabs defaultValue="branding" className="space-y-4">
+        <Tabs defaultValue={typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "subscription" ? "subscription" : "branding"} className="space-y-4">
           <TabsList>
             <TabsTrigger value="branding" data-testid="tab-branding">
               <Palette className="w-4 h-4 mr-2" />
@@ -1234,6 +1234,7 @@ export default function AgencySettingsPage() {
               SMS
             </TabsTrigger>
             <TabsTrigger value="billing" data-testid="tab-billing">Billing</TabsTrigger>
+            <TabsTrigger value="subscription" data-testid="tab-subscription">Subscription</TabsTrigger>
           </TabsList>
 
           <TabsContent value="branding" className="space-y-6">
@@ -1722,8 +1723,187 @@ export default function AgencySettingsPage() {
           <TabsContent value="billing" className="space-y-4">
             <BillingTab tenantId={tenant?.id} />
           </TabsContent>
+
+          <TabsContent value="subscription" className="space-y-4">
+            <SubscriptionTab tenantId={tenant?.id} />
+          </TabsContent>
         </Tabs>
       </div>
     </DashboardLayout>
+  );
+}
+
+// ─── Subscription Tab ─────────────────────────────────────────────────────────
+// Lets the agency see their current Visa Shuttle subscription (set by the
+// platform admin) and pay the upcoming month's invoice via Cashfree.
+//
+// Cashfree return-url flow:
+//   1. POST /initiate-payment → we get a paymentSessionId + orderId.
+//   2. We open Cashfree's hosted checkout in a new tab.
+//   3. Cashfree redirects the user back to /app/settings?tab=subscription&order_id=...
+//   4. On mount we detect order_id in the URL and call /confirm.
+function SubscriptionTab({ tenantId }: { tenantId?: string }) {
+  const [confirming, setConfirming] = useState(false);
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
+  const subQuery = useQuery<{
+    subscription: {
+      id: string; tenantId: string; plan: string; status: string;
+      monthlyPriceCents: number; currency: string;
+      trialEndsAt: string | null;
+      currentPeriodStart: string | null; currentPeriodEnd: string | null;
+      notes: string | null;
+    };
+    invoices: {
+      id: string; amountCents: number; currency: string; status: string;
+      periodStart: string | null; periodEnd: string | null;
+      paidAt: string | null; createdAt: string | null;
+    }[];
+  }>({
+    queryKey: ["/api/agency", tenantId, "subscription"],
+    queryFn: async () => {
+      const r = await fetch(`/api/agency/${tenantId}/subscription`, { credentials: "include" });
+      if (!r.ok) throw new Error("Failed to load subscription");
+      return r.json();
+    },
+    enabled: !!tenantId,
+  });
+
+  const initiateMut = useMutation({
+    mutationFn: () => apiRequest("POST", `/api/agency/${tenantId}/subscription/initiate-payment`, {}),
+    onSuccess: async (res: any) => {
+      const data = await (res?.json?.() ?? res);
+      // Open Cashfree checkout. We use the simple hosted-redirect approach via
+      // payment_session_id; Cashfree's drop-in JS lib isn't loaded here.
+      if (data?.paymentSessionId) {
+        const url = data.mode === "production"
+          ? `https://payments.cashfree.com/order/#${data.paymentSessionId}`
+          : `https://payments-test.cashfree.com/order/#${data.paymentSessionId}`;
+        window.open(url, "_blank");
+      } else {
+        toast({ title: "Could not start payment", description: "No session id returned", variant: "destructive" });
+      }
+    },
+    onError: (e: any) => toast({ title: "Payment failed", description: e?.message ?? "Try again", variant: "destructive" }),
+  });
+
+  // Auto-confirm if we returned from Cashfree with ?order_id=...
+  useEffect(() => {
+    if (!tenantId) return;
+    const params = new URLSearchParams(window.location.search);
+    const orderId = params.get("order_id");
+    if (!orderId || !orderId.startsWith("SUB_")) return;
+    setConfirming(true);
+    apiRequest("POST", `/api/agency/${tenantId}/subscription/confirm`, { orderId })
+      .then(async (r: any) => {
+        const data = await (r?.json?.() ?? r);
+        if (data?.paid) {
+          toast({ title: "Payment received", description: "Your subscription has been renewed." });
+          qc.invalidateQueries({ queryKey: ["/api/agency", tenantId, "subscription"] });
+        } else {
+          toast({ title: "Payment not completed", description: `Status: ${data?.status ?? "unknown"}`, variant: "destructive" });
+        }
+        // Strip the order_id from the URL so a refresh doesn't retry.
+        const url = new URL(window.location.href);
+        url.searchParams.delete("order_id");
+        window.history.replaceState({}, "", url.toString());
+      })
+      .catch((e: any) => toast({ title: "Could not confirm payment", description: e?.message, variant: "destructive" }))
+      .finally(() => setConfirming(false));
+  }, [tenantId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (subQuery.isLoading || !subQuery.data) {
+    return <Skeleton className="h-48" />;
+  }
+  const { subscription: sub, invoices } = subQuery.data;
+  const fmt = (cents: number, ccy: string) => {
+    const v = (cents / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return ccy === "INR" ? `₹${v}` : `${ccy} ${v}`;
+  };
+  const STATUS: Record<string, string> = {
+    trialing: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+    active: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+    past_due: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+    canceled: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+    paid: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+    pending: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+    failed: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <CreditCard className="w-4 h-4" /> Current subscription
+          </CardTitle>
+          <CardDescription>Your Visa Shuttle plan and billing.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div>
+              <p className="text-xs text-muted-foreground">Plan</p>
+              <p className="font-semibold capitalize">{sub.plan}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Status</p>
+              <Badge variant="secondary" className={STATUS[sub.status] ?? ""}>{sub.status}</Badge>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Monthly</p>
+              <p className="font-semibold">{fmt(sub.monthlyPriceCents, sub.currency)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Current period ends</p>
+              <p className="text-sm">{sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd).toLocaleDateString() : "—"}</p>
+            </div>
+            <div className="md:col-span-2 flex items-end justify-end">
+              {sub.monthlyPriceCents > 0 ? (
+                <Button onClick={() => initiateMut.mutate()} disabled={initiateMut.isPending || confirming} className="gap-2">
+                  {(initiateMut.isPending || confirming)
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : <CreditCard className="w-4 h-4" />}
+                  Pay {fmt(sub.monthlyPriceCents, sub.currency)}
+                </Button>
+              ) : (
+                <p className="text-sm text-muted-foreground">No price set yet — contact support.</p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Billing history</CardTitle>
+          <CardDescription>Past subscription invoices.</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          {invoices.length === 0 ? (
+            <p className="px-6 py-8 text-center text-sm text-muted-foreground">No invoices yet.</p>
+          ) : (
+            <div className="divide-y">
+              {invoices.map(inv => (
+                <div key={inv.id} className="px-6 py-3 flex items-center gap-3">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{fmt(inv.amountCents, inv.currency)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {inv.periodStart ? new Date(inv.periodStart).toLocaleDateString() : "—"}
+                      {" – "}
+                      {inv.periodEnd ? new Date(inv.periodEnd).toLocaleDateString() : "—"}
+                    </p>
+                  </div>
+                  <Badge variant="secondary" className={STATUS[inv.status] ?? ""}>{inv.status}</Badge>
+                  <span className="text-xs text-muted-foreground w-32 text-right">
+                    {inv.paidAt ? `Paid ${new Date(inv.paidAt).toLocaleDateString()}` : (inv.createdAt ? new Date(inv.createdAt).toLocaleDateString() : "")}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

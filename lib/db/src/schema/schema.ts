@@ -918,3 +918,110 @@ export const resellerLinks = pgTable("reseller_links", {
 export const insertResellerLinkSchema = createInsertSchema(resellerLinks).omit({ id: true, createdAt: true });
 export type InsertResellerLink = z.infer<typeof insertResellerLinkSchema>;
 export type ResellerLink = typeof resellerLinks.$inferSelect;
+
+// ─── Platform admin roles ──────────────────────────────────────────────────────
+// In addition to the existing `saas_admin` super-role, the platform supports
+// granular admin roles for the support / finance / read-only personas. These
+// are stored in users.role just like saas_admin and have NO tenantId.
+export const PLATFORM_ROLES = [
+  "saas_admin",         // full superuser
+  "platform_finance",   // finance ops: view + invoice/payment/wallet/subscription writes
+  "platform_support",   // support ops: tickets + read most things
+  "platform_readonly",  // audit / observers: read everything, no writes
+] as const;
+export type PlatformRole = typeof PLATFORM_ROLES[number];
+
+// ─── Support tickets ───────────────────────────────────────────────────────────
+// Agencies open tickets to the platform. Each ticket has a thread of messages
+// (author = agency user OR platform admin) and a status workflow:
+//   open → pending (admin replied, awaiting agency) → resolved → closed
+export const SUPPORT_TICKET_STATUSES = ["open", "pending", "resolved", "closed"] as const;
+export const SUPPORT_TICKET_PRIORITIES = ["low", "normal", "high", "urgent"] as const;
+export const SUPPORT_TICKET_CATEGORIES = ["billing", "technical", "account", "feature_request", "other"] as const;
+export type SupportTicketStatus = typeof SUPPORT_TICKET_STATUSES[number];
+export type SupportTicketPriority = typeof SUPPORT_TICKET_PRIORITIES[number];
+export type SupportTicketCategory = typeof SUPPORT_TICKET_CATEGORIES[number];
+
+export const supportTickets = pgTable("support_tickets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull(),
+  subject: text("subject").notNull(),
+  category: text("category").notNull().default("other"),
+  status: text("status").notNull().default("open"),
+  priority: text("priority").notNull().default("normal"),
+  createdByUserId: varchar("created_by_user_id").notNull(),
+  assignedToUserId: varchar("assigned_to_user_id"),
+  lastMessageAt: timestamp("last_message_at").defaultNow(),
+  lastMessageBy: text("last_message_by"), // "agency" | "admin"
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export const insertSupportTicketSchema = createInsertSchema(supportTickets).omit({
+  id: true, createdAt: true, updatedAt: true, lastMessageAt: true, lastMessageBy: true, assignedToUserId: true,
+});
+export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
+export type SupportTicket = typeof supportTickets.$inferSelect;
+
+export const supportTicketMessages = pgTable("support_ticket_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ticketId: varchar("ticket_id").notNull(),
+  authorUserId: varchar("author_user_id").notNull(),
+  authorRole: text("author_role").notNull(), // "agency" | "admin"
+  authorName: text("author_name"),
+  body: text("body").notNull(),
+  internalNote: boolean("internal_note").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export const insertSupportTicketMessageSchema = createInsertSchema(supportTicketMessages).omit({
+  id: true, createdAt: true,
+});
+export type InsertSupportTicketMessage = z.infer<typeof insertSupportTicketMessageSchema>;
+export type SupportTicketMessage = typeof supportTicketMessages.$inferSelect;
+
+// ─── Tenant subscription billing ───────────────────────────────────────────────
+// Tracks the agency's subscription to Visa Shuttle itself (separate from the
+// per-call API wallet). Admin sets the plan and monthly price; the agency pays
+// via Cashfree from their Settings → Subscription tab.
+export const SUBSCRIPTION_STATUSES = ["trialing", "active", "past_due", "canceled"] as const;
+export type SubscriptionStatus = typeof SUBSCRIPTION_STATUSES[number];
+
+export const tenantSubscriptions = pgTable("tenant_subscriptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().unique(),
+  plan: text("plan").notNull().default("starter"), // starter | professional | enterprise (mirrors tenants.plan)
+  status: text("status").notNull().default("trialing"),
+  monthlyPriceCents: integer("monthly_price_cents").notNull().default(0),
+  currency: text("currency").notNull().default("INR"),
+  trialEndsAt: timestamp("trial_ends_at"),
+  currentPeriodStart: timestamp("current_period_start"),
+  currentPeriodEnd: timestamp("current_period_end"),
+  canceledAt: timestamp("canceled_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export const insertTenantSubscriptionSchema = createInsertSchema(tenantSubscriptions).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export type InsertTenantSubscription = z.infer<typeof insertTenantSubscriptionSchema>;
+export type TenantSubscription = typeof tenantSubscriptions.$inferSelect;
+
+export const tenantSubscriptionInvoices = pgTable("tenant_subscription_invoices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull(),
+  subscriptionId: varchar("subscription_id").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  currency: text("currency").notNull().default("INR"),
+  status: text("status").notNull().default("pending"), // pending | paid | failed | void
+  periodStart: timestamp("period_start"),
+  periodEnd: timestamp("period_end"),
+  cashfreeOrderId: text("cashfree_order_id"),
+  cashfreePaymentId: text("cashfree_payment_id"),
+  paidAt: timestamp("paid_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export const insertTenantSubscriptionInvoiceSchema = createInsertSchema(tenantSubscriptionInvoices).omit({
+  id: true, createdAt: true,
+});
+export type InsertTenantSubscriptionInvoice = z.infer<typeof insertTenantSubscriptionInvoiceSchema>;
+export type TenantSubscriptionInvoice = typeof tenantSubscriptionInvoices.$inferSelect;

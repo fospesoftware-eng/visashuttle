@@ -57,3 +57,24 @@ Express 5 backend serving all API routes.
 - Tailwind v3 (not v4) — using postcss setup, not `@tailwindcss/vite` plugin.
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+
+## Platform extensions (super-admin features)
+
+`artifacts/api-server/src/routes/platform-extensions.ts` registers admin/agency
+routes for support tickets and tenant subscription billing. Wired from
+`routes.ts` via `registerPlatformExtensions(app, helpers)`.
+
+- `PLATFORM_ROLES` (in `lib/db/src/schema/schema.ts`): `saas_admin`,
+  `platform_finance`, `platform_support`, `platform_readonly`. Stored in
+  `users.role` exactly like the existing `saas_admin`.
+- `requireAdminAuth` (routes.ts) accepts all 4 roles on GET; only `saas_admin`
+  on non-GET. Use `requirePlatformRole([...])` for finer admin gates.
+- Agency-write endpoints use `callerIsTenantMember` (strict — platform staff
+  must use admin endpoints to act on a tenant's behalf).
+- Tenant subscription billing uses PLATFORM Cashfree credentials
+  (`storage.getPaymentGatewayConfig()`), order id prefix `SUB_`, return URL
+  `/app/settings?tab=subscription&order_id=…`. Mirrors invoice flow at
+  routes.ts ~2566-2703.
+- Internal admin notes (`support_ticket_messages.internal_note=true`) are
+  filtered out for non-platform readers in
+  `GET /api/agency/:tenantId/tickets/:id`.

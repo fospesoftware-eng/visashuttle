@@ -6,7 +6,8 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, LogOut, Bell, Search,
   Menu, X, Building2, ShieldCheck, Database, Activity, Globe, CreditCard,
   CheckCircle, AlertCircle, Inbox, Receipt, Banknote, ClipboardList,
-  Send, Stamp, Loader2, XCircle, UserSquare2, KeyRound, BookOpen, LayoutDashboard
+  Send, Stamp, Loader2, XCircle, UserSquare2, KeyRound, BookOpen, LayoutDashboard,
+  LifeBuoy, Wallet
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,8 @@ const adminNavItems: NavItem[] = [
   { icon: Users, label: "Users", href: "/admin/users" },
   { icon: ClipboardList, label: "Operations", href: "/admin/operations" },
   { icon: CreditCard, label: "Finance", href: "/admin/finance" },
+  { icon: Wallet, label: "Subscriptions", href: "/admin/subscriptions" },
+  { icon: LifeBuoy, label: "Support", href: "/admin/support" },
   { icon: Database, label: "Visa Knowledge", href: "/admin/vkb" },
   { icon: ShieldCheck, label: "AI Governance", href: "/admin/ai" },
   { icon: Activity, label: "Audit Logs", href: "/admin/audit" },
@@ -90,6 +93,7 @@ const agencyNavItems: NavItem[] = [
       { icon: Users,               label: "Resellers", href: "/app/business/api/resellers" },
     ],
   },
+  { icon: LifeBuoy, label: "Support", href: "/app/support" },
   { icon: Settings, label: "Settings", href: "/app/settings" },
 ];
 

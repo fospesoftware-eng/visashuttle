@@ -64,6 +64,9 @@ import AdminAuditPage from "@/pages/admin/audit";
 import AdminSettingsPage from "@/pages/admin/settings";
 import AdminOperationsPage from "@/pages/admin/operations";
 import AdminFinancePage from "@/pages/admin/finance";
+import AdminSupportPage from "@/pages/admin/support";
+import AdminSubscriptionsPage from "@/pages/admin/subscriptions";
+import AgencySupportPage from "@/pages/agency/support";
 
 import AgencyRegisterPage from "@/pages/agency-register";
 import PrivacyPolicyPage from "@/pages/privacy-policy";
@@ -203,6 +206,7 @@ function Router() {
       <Route path="/app/business/api/resellers" >{() => <ApiPlatformPage view="resellers" />}</Route>
       <Route path="/app/reports" component={ReportsPage} />
       <Route path="/app/settings" component={AgencySettingsPage} />
+      <Route path="/app/support" component={AgencySupportPage} />
       <Route path="/app/visa-check" component={VisaCheckPage} />
 
       <Route path="/customer" component={CustomerDashboard} />
@@ -218,6 +222,8 @@ function Router() {
       <Route path="/admin/users" component={AdminUsersPage} />
       <Route path="/admin/operations" component={AdminOperationsPage} />
       <Route path="/admin/finance" component={AdminFinancePage} />
+      <Route path="/admin/support" component={AdminSupportPage} />
+      <Route path="/admin/subscriptions" component={AdminSubscriptionsPage} />
       <Route path="/admin/audit" component={AdminAuditPage} />
       <Route path="/admin/settings" component={AdminSettingsPage} />
 
