@@ -1,22 +1,28 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Alert,
+  Dimensions,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 
-import { Logo } from "@/components/Logo";
+import { AnimatedOrbs } from "@/components/AnimatedOrbs";
 import { Field, PrimaryButton } from "@/components/UI";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { apiPost } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { useColors } from "@/hooks/useColors";
+
+const { width: SCREEN_W } = Dimensions.get("window");
 
 type Step = "info" | "otp";
 
@@ -73,8 +79,8 @@ export default function Join() {
       setResendIn(60);
       setTimeout(() => otpRefs.current[0]?.focus(), 200);
       Alert.alert("Demo code", "Use 1234 to verify (no SMS sent in demo).");
-    } catch (e: any) {
-      Alert.alert("Failed to send code", e?.message || "Please try again");
+    } catch (e) {
+      Alert.alert("Failed to send code", e instanceof Error ? e.message : "Please try again");
     } finally {
       setLoading(false);
     }
@@ -88,8 +94,8 @@ export default function Join() {
       setOtp(["", "", "", ""]);
       setResendIn(60);
       otpRefs.current[0]?.focus();
-    } catch (e: any) {
-      Alert.alert("Failed", e?.message || "Please try again");
+    } catch (e) {
+      Alert.alert("Failed", e instanceof Error ? e.message : "Please try again");
     } finally {
       setLoading(false);
     }
@@ -113,8 +119,8 @@ export default function Join() {
       });
       await refresh();
       router.replace("/(tabs)");
-    } catch (e: any) {
-      Alert.alert("Verification failed", e?.message || "Invalid or expired code");
+    } catch (e) {
+      Alert.alert("Verification failed", e instanceof Error ? e.message : "Invalid or expired code");
     } finally {
       setLoading(false);
     }
@@ -128,7 +134,7 @@ export default function Join() {
     if (digit && idx < 3) otpRefs.current[idx + 1]?.focus();
   }
 
-  function handleOtpKey(idx: number, e: any) {
+  function handleOtpKey(idx: number, e: { nativeEvent: { key: string } }) {
     if (e.nativeEvent.key === "Backspace" && !otp[idx] && idx > 0) {
       otpRefs.current[idx - 1]?.focus();
     }
@@ -136,25 +142,51 @@ export default function Join() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <View style={styles.header}>
+        <LinearGradient
+          colors={[colors.gradientStart, colors.gradientMid, colors.gradientEnd]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <AnimatedOrbs variant="header" />
+        <View style={[styles.headerInner, { paddingTop: insets.top + 12 }]}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn} hitSlop={8}>
+            <Feather name="x" size={20} color="#fff" />
+          </TouchableOpacity>
+
+          <Animated.View entering={FadeInDown.duration(500)} style={styles.brandRow}>
+            <View style={styles.logoChip}>
+              <Image
+                source={require("@/assets/brand/logo-white.png")}
+                style={{ width: 30, height: 30 }}
+                contentFit="contain"
+              />
+            </View>
+            <Text style={styles.brandText}>VisaShuttle</Text>
+          </Animated.View>
+
+          <Animated.Text entering={FadeInDown.duration(600).delay(100)} style={styles.headline}>
+            {step === "info" ? "Create your account" : "Verify your number"}
+          </Animated.Text>
+          <Animated.Text entering={FadeInDown.duration(600).delay(200)} style={styles.headlineSub}>
+            {step === "info"
+              ? "1 free AI visa check · no credit card required"
+              : "We sent a 4-digit code · demo code is 1234"}
+          </Animated.Text>
+        </View>
+      </View>
+
       <KeyboardAwareScrollViewCompat
-        contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 24, paddingBottom: 40 }}
+        contentContainerStyle={{ paddingHorizontal: 22, paddingBottom: 40, paddingTop: 22 }}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
-            <Feather name="x" size={22} color={colors.foreground} />
-          </TouchableOpacity>
-          <Logo size={28} showText />
-          <View style={{ width: 36 }} />
-        </View>
-
         {step === "info" ? (
           <>
-            <Text style={[styles.title, { color: colors.foreground }]}>Create your account</Text>
-            <Text style={[styles.sub, { color: colors.mutedForeground }]}>
-              1 free AI visa check — no credit card needed.
-            </Text>
-            <View style={{ marginTop: 24 }}>
+            <Animated.View
+              entering={FadeInUp.duration(600).delay(150)}
+              style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+            >
               <Field
                 label="Full name"
                 value={form.fullName}
@@ -188,24 +220,25 @@ export default function Join() {
                 error={errors.password}
               />
               <PrimaryButton title="Send verification code" onPress={sendOtp} loading={loading} icon="send" />
-            </View>
+            </Animated.View>
 
-            <View style={styles.footer}>
+            <Animated.View entering={FadeInUp.duration(600).delay(250)} style={styles.footerRow}>
               <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 14 }}>
                 Already have an account?{" "}
               </Text>
               <TouchableOpacity onPress={() => router.replace("/sign-in")}>
                 <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>Sign in</Text>
               </TouchableOpacity>
-            </View>
+            </Animated.View>
           </>
         ) : (
-          <>
-            <Text style={[styles.title, { color: colors.foreground }]}>Verify your number</Text>
-            <Text style={[styles.sub, { color: colors.mutedForeground }]}>
-              We sent a 4-digit code. Demo code is 1234.
+          <Animated.View
+            entering={FadeInUp.duration(600).delay(150)}
+            style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+          >
+            <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 13, marginBottom: 12 }}>
+              Sent to {fullPhone()}
             </Text>
-
             <View style={styles.otpRow}>
               {otp.map((d, i) => (
                 <TextInput
@@ -231,7 +264,7 @@ export default function Join() {
             </View>
 
             <PrimaryButton title="Verify & create account" onPress={verify} loading={loading} icon="check" />
-            <View style={{ height: 12 }} />
+            <View style={{ height: 10 }} />
             <PrimaryButton
               title={resendIn > 0 ? `Resend code in ${resendIn}s` : "Resend code"}
               onPress={resend}
@@ -239,10 +272,10 @@ export default function Join() {
               disabled={resendIn > 0}
               variant="ghost"
             />
-            <TouchableOpacity onPress={() => setStep("info")} style={{ marginTop: 16, alignItems: "center" }}>
+            <TouchableOpacity onPress={() => setStep("info")} style={{ marginTop: 14, alignItems: "center" }}>
               <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>← Edit details</Text>
             </TouchableOpacity>
-          </>
+          </Animated.View>
         )}
       </KeyboardAwareScrollViewCompat>
     </View>
@@ -250,11 +283,52 @@ export default function Join() {
 }
 
 const styles = StyleSheet.create({
-  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
-  iconBtn: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
-  title: { fontFamily: "Inter_700Bold", fontSize: 28, marginTop: 16 },
-  sub: { fontFamily: "Inter_400Regular", fontSize: 15, marginTop: 6 },
-  otpRow: { flexDirection: "row", justifyContent: "space-between", marginVertical: 28 },
+  header: {
+    height: 260,
+    width: SCREEN_W,
+    overflow: "hidden",
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+  },
+  headerInner: { flex: 1, paddingHorizontal: 22 },
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
+  },
+  brandRow: { flexDirection: "row", alignItems: "center", marginTop: 16 },
+  logoChip: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
+    marginRight: 12,
+  },
+  brandText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 18 },
+  headline: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 26, marginTop: 16, letterSpacing: -0.3 },
+  headlineSub: { color: "rgba(255,255,255,0.88)", fontFamily: "Inter_400Regular", fontSize: 14, marginTop: 6 },
+  card: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 18,
+    marginTop: -28,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 6,
+  },
+  footerRow: { flexDirection: "row", justifyContent: "center", marginTop: 22 },
+  otpRow: { flexDirection: "row", justifyContent: "space-between", marginVertical: 18 },
   otpInput: {
     width: 64,
     height: 64,
@@ -264,5 +338,4 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontFamily: "Inter_700Bold",
   },
-  footer: { flexDirection: "row", justifyContent: "center", marginTop: 24 },
 });
