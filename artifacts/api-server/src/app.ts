@@ -33,15 +33,48 @@ app.use(
   }),
 );
 
-// The mobile artifact (Expo) is served from a *different* subdomain than the
+// The mobile artifact (Expo) is served from a different subdomain than the
 // API (it bypasses the artifact router), so cross-origin requests from the
-// mobile app must be allowed and must carry the session cookie. Reflecting
-// the request origin (instead of `*`) keeps `Access-Control-Allow-Credentials`
-// valid. Requests with no Origin header (native fetch, server-to-server) are
-// also allowed.
+// mobile app need to be allowed *and* must carry the session cookie. We use
+// an explicit allowlist (built from Replit-provided env vars + localhost dev
+// hosts) — never reflect arbitrary origins — because we set
+// `credentials: true` and use cookie-based sessions, which would otherwise
+// expose authenticated endpoints to CSRF from any site.
+//
+// Allowed origins:
+//  • Each entry in REPLIT_DOMAINS (the main repl domain that serves the web
+//    artifact and the API via the artifact router).
+//  • REPLIT_EXPO_DEV_DOMAIN (the Expo dev subdomain that hosts the mobile
+//    web preview and Metro bundler).
+//  • CORS_ALLOWED_ORIGINS — comma-separated override for additional trusted
+//    origins (e.g. published custom domains).
+//  • Localhost on any port for local-machine development.
+//
+// Requests without an Origin header (native mobile fetch, curl, server-to-
+// server) are also allowed since they cannot be forged by a browser.
+const allowedOriginSet = new Set<string>();
+for (const d of (process.env.REPLIT_DOMAINS ?? "").split(",")) {
+  const host = d.trim();
+  if (host) allowedOriginSet.add(`https://${host}`);
+}
+if (process.env.REPLIT_EXPO_DEV_DOMAIN) {
+  allowedOriginSet.add(`https://${process.env.REPLIT_EXPO_DEV_DOMAIN}`);
+}
+for (const o of (process.env.CORS_ALLOWED_ORIGINS ?? "").split(",")) {
+  const trimmed = o.trim();
+  if (trimmed) allowedOriginSet.add(trimmed);
+}
+const localhostOrigin = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i;
+
 app.use(
   cors({
-    origin: (origin, cb) => cb(null, origin ?? true),
+    origin(origin, cb) {
+      if (!origin) return cb(null, true);
+      if (allowedOriginSet.has(origin) || localhostOrigin.test(origin)) {
+        return cb(null, true);
+      }
+      return cb(new Error(`Origin ${origin} is not allowed by CORS`));
+    },
     credentials: true,
   }),
 );
