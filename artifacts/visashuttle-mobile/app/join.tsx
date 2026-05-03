@@ -78,7 +78,9 @@ export default function Join() {
       setStep("otp");
       setResendIn(60);
       setTimeout(() => otpRefs.current[0]?.focus(), 200);
-      Alert.alert("Demo code", "Use 1234 to verify (no SMS sent in demo).");
+      if (__DEV__) {
+        Alert.alert("Demo code", "Use 1234 to verify (no SMS sent in demo).");
+      }
     } catch (e) {
       Alert.alert("Failed to send code", e instanceof Error ? e.message : "Please try again");
     } finally {
@@ -172,7 +174,9 @@ export default function Join() {
           <Animated.Text entering={FadeInDown.duration(600).delay(200)} style={styles.headlineSub}>
             {step === "info"
               ? "1 free AI visa check · no credit card required"
-              : "We sent a 4-digit code · demo code is 1234"}
+              : __DEV__
+                ? "We sent a 4-digit code · demo code is 1234"
+                : "We just sent you a 4-digit code"}
           </Animated.Text>
         </View>
       </View>

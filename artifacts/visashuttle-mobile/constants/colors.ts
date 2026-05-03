@@ -1,6 +1,8 @@
-// Brand tokens are direct HSL→hex conversions of the web tokens defined in
-// artifacts/visa-shuttle/src/index.css (`:root` and `.dark`). Keep in sync
-// with that file when the web theme changes.
+// Source of truth: the HSL CSS custom properties declared in
+// `artifacts/visa-shuttle/src/index.css` under `:root` (light) and `.dark`.
+// Each color below is the direct HSL→hex conversion of the matching token
+// from that file (the original HSL value is noted in a comment alongside it).
+// Keep this file in sync whenever the web theme tokens change.
 
 const brand = {
   // Brand gradient stops (Logo: Electric Blue → Purple → Hot Pink)
