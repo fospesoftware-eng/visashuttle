@@ -44,6 +44,9 @@ import DocumentsPage from "@/pages/agency/documents";
 import ReportsPage from "@/pages/agency/reports";
 import AccountingPage from "@/pages/agency/accounting";
 import AgencySettingsPage from "@/pages/agency/settings";
+import ApiPlatformPage from "@/pages/agency/api-platform";
+import ApiPricingPublicPage from "@/pages/public/api-pricing";
+import ApiDocsPublicPage from "@/pages/public/api-docs";
 
 import CustomerDashboard from "@/pages/customer/dashboard";
 import CustomerCasePage from "@/pages/customer/case";
@@ -123,6 +126,8 @@ function Router() {
       <Route path="/terms-and-conditions" component={TermsAndConditionsPage} />
       <Route path="/refund-policy" component={RefundPolicyPage} />
       <Route path="/schengen-slots" component={SchengenSlotsPage} />
+      <Route path="/api-pricing" component={ApiPricingPublicPage} />
+      <Route path="/api-docs" component={ApiDocsPublicPage} />
 
       <Route path="/app" component={AgencyDashboard} />
       <Route path="/app/leads" component={LeadsPage} />
@@ -184,6 +189,12 @@ function Router() {
       <Route path="/app/accounting/settings/invoice-template">
         <AccountingPage view="settings" defaultSettingsTab="invoice-template" />
       </Route>
+      <Route path="/app/business/api"           >{() => <ApiPlatformPage view="overview"  />}</Route>
+      <Route path="/app/business/api/keys"      >{() => <ApiPlatformPage view="keys"      />}</Route>
+      <Route path="/app/business/api/usage"     >{() => <ApiPlatformPage view="usage"     />}</Route>
+      <Route path="/app/business/api/pricing"   >{() => <ApiPlatformPage view="pricing"   />}</Route>
+      <Route path="/app/business/api/docs"      >{() => <ApiPlatformPage view="docs"      />}</Route>
+      <Route path="/app/business/api/resellers" >{() => <ApiPlatformPage view="resellers" />}</Route>
       <Route path="/app/reports" component={ReportsPage} />
       <Route path="/app/settings" component={AgencySettingsPage} />
       <Route path="/app/visa-check" component={VisaCheckPage} />

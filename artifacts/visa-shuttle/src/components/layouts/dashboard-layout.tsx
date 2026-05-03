@@ -6,7 +6,7 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, LogOut, Bell, Search,
   Menu, X, Building2, ShieldCheck, Database, Activity, Globe, CreditCard,
   CheckCircle, AlertCircle, Inbox, Receipt, Banknote, ClipboardList,
-  Send, Stamp, Loader2, XCircle, UserSquare2
+  Send, Stamp, Loader2, XCircle, UserSquare2, KeyRound, BookOpen, LayoutDashboard
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -78,6 +78,18 @@ const agencyNavItems: NavItem[] = [
   },
   { icon: BarChart3, label: "Reports", href: "/app/reports" },
   { icon: Globe, label: "Visa Check", href: "/app/visa-check" },
+  {
+    // Agency API Platform — paid pay-per-call public APIs the agency can resell.
+    icon: Briefcase, label: "Business", href: "/app/business/api",
+    children: [
+      { icon: LayoutDashboard,     label: "Overview",  href: "/app/business/api" },
+      { icon: KeyRound,            label: "API Keys",  href: "/app/business/api/keys" },
+      { icon: Activity,            label: "Usage",     href: "/app/business/api/usage" },
+      { icon: Receipt,             label: "Pricing",   href: "/app/business/api/pricing" },
+      { icon: BookOpen,            label: "Docs",      href: "/app/business/api/docs" },
+      { icon: Users,               label: "Resellers", href: "/app/business/api/resellers" },
+    ],
+  },
   { icon: Settings, label: "Settings", href: "/app/settings" },
 ];
 

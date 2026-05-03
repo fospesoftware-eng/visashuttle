@@ -33,6 +33,7 @@ Express 5 backend serving all API routes.
 - Shared utilities in `src/shared/` (visa-free.ts, destinations.ts, visa-catalog.ts)
 - AI features: `src/ai.ts` (visa check, deep check, passport scan)
 - SMS: `src/sms.ts` (OTP via Twilio)
+- Agency API Platform: `src/routes/api-platform.ts` — paid pay-per-call public APIs (`/api/v1/deep-check`, `/api/v1/visa-requirements`) gated by Bearer keys (`vs_<prefix>_<secret>`, sha256-hashed, one-time reveal). Per-call wallet debit with refund-on-error and reseller commission credit. Tables: `apiKeys`, `apiUsage`, `apiPricing`, `tenantWallet`, `tenantWalletLedger`, `resellerLinks`. UI under `/app/business/api/*` (Business sidebar group); public pages `/api-pricing`, `/api-docs`. Default prices: deep-check $1.99, visa-requirements $0.25.
 
 ## Key Commands
 

@@ -814,3 +814,107 @@ export const PAYMENT_METHODS = [
   { value: "other",         label: "Other" },
 ] as const;
 export type PaymentMethod = typeof PAYMENT_METHODS[number]["value"];
+
+// ===== Agency API Platform =====
+// Per-call paid public APIs (Deep Check, Visa Requirement) that agencies can
+// resell. All money fields are integer cents. The Anthropic call is masked
+// behind these endpoints; clients see only VisaShuttle-shaped JSON.
+
+// Two endpoint slugs we expose & price independently.
+export const API_ENDPOINTS = ["deep-check", "visa-requirements"] as const;
+export type ApiEndpointSlug = typeof API_ENDPOINTS[number];
+
+// Tenant-owned API keys. The plaintext secret is shown ONCE on creation;
+// we only persist its sha256 hash plus an indexed prefix used for lookup.
+// `parentTenantId` is set when the key is minted by a reseller for one of
+// its sub-tenants.
+export const apiKeys = pgTable("api_keys", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull(),
+  parentTenantId: varchar("parent_tenant_id"),
+  name: text("name").notNull(),
+  prefix: varchar("prefix", { length: 16 }).notNull().unique(),
+  hashedSecret: text("hashed_secret").notNull(),
+  scopes: text("scopes").array().notNull().default(sql`ARRAY[]::text[]`),
+  status: text("status").notNull().default("active"), // active | revoked
+  lastUsedAt: timestamp("last_used_at"),
+  revokedAt: timestamp("revoked_at"),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export const insertApiKeySchema = createInsertSchema(apiKeys).omit({ id: true, createdAt: true });
+export type InsertApiKey = z.infer<typeof insertApiKeySchema>;
+export type ApiKey = typeof apiKeys.$inferSelect;
+
+// Per-call audit log. One row per attempted API call (success or paid failure).
+export const apiUsage = pgTable("api_usage", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull(),
+  apiKeyId: varchar("api_key_id").notNull(),
+  endpoint: text("endpoint").notNull(),
+  status: integer("status").notNull(),
+  costCents: integer("cost_cents").notNull().default(0),
+  latencyMs: integer("latency_ms").notNull().default(0),
+  errorCode: text("error_code"),
+  ip: text("ip"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export const insertApiUsageSchema = createInsertSchema(apiUsage).omit({ id: true, createdAt: true });
+export type InsertApiUsage = z.infer<typeof insertApiUsageSchema>;
+export type ApiUsage = typeof apiUsage.$inferSelect;
+
+// Platform-wide (admin-controlled) per-call price for each endpoint, in cents.
+export const apiPricing = pgTable("api_pricing", {
+  id: serial("id").primaryKey(),
+  endpoint: text("endpoint").notNull().unique(),
+  priceCents: integer("price_cents").notNull(),
+  currency: text("currency").notNull().default("USD"),
+  description: text("description"),
+  active: boolean("active").notNull().default(true),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export const insertApiPricingSchema = createInsertSchema(apiPricing).omit({ id: true, updatedAt: true });
+export type InsertApiPricing = z.infer<typeof insertApiPricingSchema>;
+export type ApiPricing = typeof apiPricing.$inferSelect;
+
+// One wallet per tenant. `balanceCents` is the source of truth and is
+// updated transactionally alongside ledger inserts.
+export const tenantWallet = pgTable("tenant_wallet", {
+  tenantId: varchar("tenant_id").primaryKey(),
+  balanceCents: integer("balance_cents").notNull().default(0),
+  currency: text("currency").notNull().default("USD"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export const insertTenantWalletSchema = createInsertSchema(tenantWallet).omit({ updatedAt: true });
+export type InsertTenantWallet = z.infer<typeof insertTenantWalletSchema>;
+export type TenantWallet = typeof tenantWallet.$inferSelect;
+
+// Append-only ledger of every wallet movement: top-up, debit, refund,
+// reseller commission credit. `amountCents` is signed (+ credit, − debit).
+export const tenantWalletLedger = pgTable("tenant_wallet_ledger", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  balanceAfterCents: integer("balance_after_cents").notNull(),
+  type: text("type").notNull(), // topup | api_debit | api_refund | reseller_commission | adjustment
+  reference: text("reference"),  // e.g. orderId / apiUsageId
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export const insertTenantWalletLedgerSchema = createInsertSchema(tenantWalletLedger).omit({ id: true, createdAt: true });
+export type InsertTenantWalletLedger = z.infer<typeof insertTenantWalletLedgerSchema>;
+export type TenantWalletLedger = typeof tenantWalletLedger.$inferSelect;
+
+// Reseller link: parent (reseller) tenant earns a fixed per-call commission
+// for every paid call made under any apiKey owned by `childTenantId`.
+export const resellerLinks = pgTable("reseller_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  parentTenantId: varchar("parent_tenant_id").notNull(),
+  childTenantId: varchar("child_tenant_id").notNull().unique(),
+  commissionCents: integer("commission_cents").notNull().default(0),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export const insertResellerLinkSchema = createInsertSchema(resellerLinks).omit({ id: true, createdAt: true });
+export type InsertResellerLink = z.infer<typeof insertResellerLinkSchema>;
+export type ResellerLink = typeof resellerLinks.$inferSelect;

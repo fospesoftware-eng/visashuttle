@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "../storage";
 import { runVisaCheck, runDeepCheck, scanPassportImage, isPassportScanConfigured } from "../ai";
+import { registerApiPlatformRoutes } from "./api-platform";
 import express from "express";
 import { sendOtp, verifyOtp, getSmsProviderStatus } from "../sms";
 import { getEntryRequirement } from "../shared/visa-free";
@@ -5816,6 +5817,9 @@ export async function registerRoutes(
     schengenCache = { data, ts: now };
     res.json(data);
   });
+
+  // ── Agency API Platform (paid pay-per-call public APIs + dashboard CRUD)
+  await registerApiPlatformRoutes(app, { requireTenantAccess });
 
   return httpServer;
 }
