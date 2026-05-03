@@ -266,7 +266,18 @@ function getRequestOrigin(req: Request): string {
   return `${proto || req.protocol}://${req.get("host")}`;
 }
 
-function getCashfreeCredentials(cfg: Awaited<ReturnType<typeof storage.getPaymentGatewayConfig>>) {
+// Accepts either the global platform Cashfree config or a per-tenant config
+// — both share the same {mode, apiVersion, testClientId, testClientSecret,
+// liveClientId, liveClientSecret} surface, so we narrow on those fields only.
+type CashfreeConfigShape = {
+  mode?: string | null;
+  apiVersion?: string | null;
+  testClientId?: string | null;
+  testClientSecret?: string | null;
+  liveClientId?: string | null;
+  liveClientSecret?: string | null;
+};
+function getCashfreeCredentials(cfg: CashfreeConfigShape | undefined) {
   const mode = cfg?.mode === "live" || process.env.CASHFREE_MODE === "live" ? "live" : "test";
   const clientId = mode === "live"
     ? cfg?.liveClientId || process.env.CASHFREE_LIVE_CLIENT_ID
@@ -2552,7 +2563,7 @@ export async function registerRoutes(
       const balance = Math.max(0, invoice.total - invoice.paidAmount);
       if (balance <= 0) return res.status(400).json({ error: "This invoice is already fully paid." });
       const cfg = await storage.getTenantPaymentGatewayConfig(invoice.tenantId);
-      const cashfree = getCashfreeCredentials(cfg as any);
+      const cashfree = getCashfreeCredentials(cfg);
       if (!cashfree.clientId || !cashfree.clientSecret) {
         return res.status(503).json({ error: "Online payments are not configured for this agency. Please use the offline tab." });
       }
@@ -2631,7 +2642,7 @@ export async function registerRoutes(
       if (existing) return res.json({ paid: true, payment: existing, alreadyRecorded: true });
 
       const cfg = await storage.getTenantPaymentGatewayConfig(invoice.tenantId);
-      const cashfree = getCashfreeCredentials(cfg as any);
+      const cashfree = getCashfreeCredentials(cfg);
       if (!cashfree.clientId || !cashfree.clientSecret) {
         return res.status(503).json({ error: "Gateway not configured" });
       }
@@ -5830,7 +5841,7 @@ export async function registerRoutes(
         // Fall back to platform creds via the same helper signature.
         const cfg = (await storage.getTenantPaymentGatewayConfig(tenantId)) as any
           ?? (await storage.getPaymentGatewayConfig());
-        return getCashfreeCredentials(cfg as any);
+        return getCashfreeCredentials(cfg);
       },
       getRequestOrigin,
       readBody: readCashfreeBody,

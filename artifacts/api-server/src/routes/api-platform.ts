@@ -18,15 +18,16 @@ import {
   API_ENDPOINTS, type ApiEndpointSlug,
 } from "@workspace/db";
 import { eq, and, desc, sql as dsql } from "drizzle-orm";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import type * as dbSchema from "@workspace/db";
 import { randomBytes, randomUUID, createHash, timingSafeEqual } from "crypto";
 import { z } from "zod";
 
-// Drizzle's transaction handle has heavily overloaded generics that don't
-// extract cleanly via `Parameters<>`, so we use a narrow alias here that
-// scopes the `any` to a single name instead of leaking it inline. The tx
-// methods we use (`update`, `insert`) are still type-checked by their args.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type DbTx = any;
+// Drizzle transaction handle. `db` itself is typed `any` in this codebase
+// because of the conditional pool init in db.ts, so we reach into the
+// concrete drizzle node-postgres type to recover proper tx typing for
+// callbacks here without leaking `any`.
+type DbTx = Parameters<Parameters<NodePgDatabase<typeof dbSchema>["transaction"]>[0]>[0];
 
 type ApiKeyRow = typeof apiKeys.$inferSelect;
 type LedgerRow = typeof tenantWalletLedger.$inferSelect;
@@ -63,7 +64,7 @@ declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
-      apiKey?: { id: string; tenantId: string; parentTenantId: string | null };
+      apiKey?: { id: string; tenantId: string; parentTenantId: string | null; scopes: string[] };
     }
   }
 }
@@ -222,8 +223,28 @@ async function requireApiKey(req: Request, res: Response, next: NextFunction): P
   }
   // Best-effort lastUsedAt; do not block on failure.
   db.update(apiKeys).set({ lastUsedAt: new Date() }).where(eq(apiKeys.id, row.id)).catch(() => {});
-  req.apiKey = { id: row.id, tenantId: row.tenantId, parentTenantId: row.parentTenantId ?? null };
+  req.apiKey = {
+    id: row.id, tenantId: row.tenantId, parentTenantId: row.parentTenantId ?? null,
+    scopes: row.scopes ?? [],
+  };
   next();
+}
+
+// Per-endpoint scope guard. Apply AFTER requireApiKey. An empty scope list is
+// treated as "any endpoint" so legacy keys aren't broken; non-empty scopes
+// are enforced strictly. Returns 403 with `forbidden_scope` on mismatch.
+function requireScope(scope: ApiEndpointSlug) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const ak = req.apiKey;
+    if (!ak) { res.status(401).json({ error: { code: "unauthorized", message: "Missing API key" } }); return; }
+    if (ak.scopes.length > 0 && !ak.scopes.includes(scope)) {
+      res.status(403).json({
+        error: { code: "forbidden_scope", message: `This API key is not authorized for ${scope}.` },
+      });
+      return;
+    }
+    next();
+  };
 }
 
 function rateLimit(req: Request, res: Response, next: NextFunction): void {
@@ -361,7 +382,7 @@ export async function registerApiPlatformRoutes(
   });
 
   // ── POST /api/v1/deep-check ─────────────────────────────────────────────
-  app.post("/api/v1/deep-check", requireApiKey, rateLimit, async (req, res) => {
+  app.post("/api/v1/deep-check", requireApiKey, requireScope("deep-check"), rateLimit, async (req, res) => {
     const startedAt = Date.now();
     const ak = req.apiKey!;
     const parsed = deepCheckBodySchema.safeParse(req.body);
@@ -435,7 +456,7 @@ export async function registerApiPlatformRoutes(
   });
 
   // ── POST /api/v1/visa-requirements ──────────────────────────────────────
-  app.post("/api/v1/visa-requirements", requireApiKey, rateLimit, async (req, res) => {
+  app.post("/api/v1/visa-requirements", requireApiKey, requireScope("visa-requirements"), rateLimit, async (req, res) => {
     const startedAt = Date.now();
     const ak = req.apiKey!;
     const parsed = visaReqBodySchema.safeParse(req.body);
@@ -470,6 +491,13 @@ export async function registerApiPlatformRoutes(
         template: matched ? {
           visaType: matched.visaType,
           processingTime: matched.processingTime ?? null,
+          // Validity is not a schema column today; surface it in the response
+          // so consumers can begin parsing it once the template editor adds
+          // it. Pulled from the requirements blob if present, else null.
+          validity:
+            (matched.requirements && typeof matched.requirements === "object" && "validity" in matched.requirements
+              ? (matched.requirements as { validity?: string | null }).validity
+              : null) ?? null,
           fee: matched.fees ?? null,
           requiredDocuments:
             (matched.requirements && typeof matched.requirements === "object" && "documents" in matched.requirements
