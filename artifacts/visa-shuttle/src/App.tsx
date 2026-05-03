@@ -169,6 +169,9 @@ function Router() {
       <Route path="/app/accounting/invoices">
         <AccountingPage view="invoices" />
       </Route>
+      <Route path="/app/accounting/payments">
+        <AccountingPage view="payments" />
+      </Route>
       <Route path="/app/accounting/settings">
         <AccountingPage view="settings" defaultSettingsTab="overview" />
       </Route>

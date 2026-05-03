@@ -99,7 +99,7 @@ function fmtDate(d: string | Date | null | undefined) {
 //                Fee Templates, Invoice Template). This is what's reached from
 //                the sidebar's "Accounting → Settings" entry.
 interface AccountingPageProps {
-  view?: "invoices" | "settings";
+  view?: "invoices" | "payments" | "settings";
   defaultSettingsTab?: "overview" | "payments" | "templates" | "invoice-template";
 }
 
@@ -133,6 +133,25 @@ export default function AccountingPage({
             </p>
           </div>
           <InvoicesTab tenantId={tenantId} />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // Standalone Payments page — sidebar entry "Accounting → Payments". Lists
+  // every payment ever recorded against any invoice for this tenant, with
+  // a "Record Payment" action and per-row gateway payment-link sharing.
+  if (view === "payments") {
+    return (
+      <DashboardLayout type="agency">
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold" data-testid="text-page-title">Payments</h1>
+            <p className="text-muted-foreground">
+              Every payment recorded against your invoices, in one place. Record a payment manually or share a gateway payment link — confirmed gateway payments auto-credit the invoice.
+            </p>
+          </div>
+          <PaymentsTab tenantId={tenantId} showRecordAction />
         </div>
       </DashboardLayout>
     );
@@ -176,7 +195,10 @@ export default function AccountingPage({
 // ============================================================
 // Payments tab — tenant-wide payments list
 // ============================================================
-function PaymentsTab({ tenantId }: { tenantId: string }) {
+function PaymentsTab({
+  tenantId,
+  showRecordAction = false,
+}: { tenantId: string; showRecordAction?: boolean }) {
   const { toast } = useToast();
   const { data: payments = [], isLoading } = useQuery<Payment[]>({
     queryKey: ["/api/tenants", tenantId, "payments"],
@@ -232,14 +254,103 @@ function PaymentsTab({ tenantId }: { tenantId: string }) {
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  const methodLabel = (m: string) => ({
-    cash: "Cash", card: "Card", bank_transfer: "Bank Transfer", online: "Online", other: "Other",
-  } as Record<string, string>)[m] ?? m;
+  // ----- Record Payment dialog state (only used when showRecordAction) -----
+  // Lists of unpaid invoices the staff can pick from + manual record fields.
+  // The "Send Payment Link" mode lazily generates a public payment URL via
+  // /api/invoices/:id/share-link. The customer then pays via Cashfree on the
+  // public page, which auto-credits a payment row through
+  // /api/public/invoice/:token/confirm — so balances reconcile automatically.
+  const [recordOpen, setRecordOpen] = useState(false);
+  const [recordInvoiceId, setRecordInvoiceId] = useState<string>("");
+  const [recordMode, setRecordMode] = useState<"manual" | "link">("manual");
+  const [recordAmount, setRecordAmount] = useState<string>("");
+  const [recordMethod, setRecordMethod] = useState<string>("cash");
+  const [recordRef, setRecordRef] = useState<string>("");
+  const [recordNotes, setRecordNotes] = useState<string>("");
+  const [recordLinkUrl, setRecordLinkUrl] = useState<string>("");
+  const [recordLinkCopied, setRecordLinkCopied] = useState(false);
+
+  const unpaidInvoices = useMemo(() => {
+    return invoices
+      .filter((inv) => {
+        if (inv.status === "cancelled") return false;
+        const bal = Math.max(0, (inv.total ?? 0) - (inv.paidAmount ?? 0));
+        return bal > 0;
+      })
+      .sort((a, b) => {
+        const ta = a.issuedAt ? new Date(a.issuedAt).getTime() : 0;
+        const tb = b.issuedAt ? new Date(b.issuedAt).getTime() : 0;
+        return tb - ta;
+      });
+  }, [invoices]);
+
+  const recordSelectedInvoice = invoicesById.get(recordInvoiceId);
+  const recordSelectedBalance = recordSelectedInvoice
+    ? Math.max(0, (recordSelectedInvoice.total ?? 0) - (recordSelectedInvoice.paidAmount ?? 0))
+    : 0;
+
+  const resetRecordForm = () => {
+    setRecordInvoiceId("");
+    setRecordMode("manual");
+    setRecordAmount("");
+    setRecordMethod("cash");
+    setRecordRef("");
+    setRecordNotes("");
+    setRecordLinkUrl("");
+    setRecordLinkCopied(false);
+  };
+
+  const recordPaymentMutation = useMutation({
+    mutationFn: async () => {
+      if (!recordInvoiceId) throw new Error("Pick an invoice");
+      const cents = toCents(recordAmount);
+      if (cents <= 0) throw new Error("Enter an amount greater than zero");
+      const res = await apiRequest("POST", `/api/invoices/${recordInvoiceId}/payments`, {
+        amount: cents,
+        method: recordMethod,
+        reference: recordRef || null,
+        notes: recordNotes || null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "payments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "invoices", "stats"] });
+      toast({ title: "Payment recorded" });
+      setRecordOpen(false);
+      resetRecordForm();
+    },
+    onError: (e: Error) =>
+      toast({ title: "Could not record payment", description: e.message, variant: "destructive" }),
+  });
+
+  const generateLinkMutation = useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const res = await apiRequest("POST", `/api/invoices/${invoiceId}/share-link`, {});
+      return res.json() as Promise<{ token: string; url: string }>;
+    },
+    onSuccess: (data) => {
+      setRecordLinkUrl(data.url);
+      setRecordLinkCopied(false);
+    },
+    onError: (e: Error) =>
+      toast({ title: "Could not generate link", description: e.message, variant: "destructive" }),
+  });
+
+  // Pull labels from the shared PAYMENT_METHODS enum so every method
+  // (including auto-credited "gateway" rows from the public payment page,
+  // plus "upi") is first-class in this list. Keeps the agency UI in sync
+  // with whatever the backend whitelist allows.
+  const methodLabel = (m: string) =>
+    PAYMENT_METHODS.find((x) => x.value === m)?.label ?? m;
 
   const methodBadgeClass = (m: string) => ({
     cash:          "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
     card:          "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300",
     bank_transfer: "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300",
+    upi:           "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-950 dark:text-fuchsia-300",
+    gateway:       "bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300",
     online:        "bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300",
     other:         "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
   } as Record<string, string>)[m] ?? "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300";
@@ -304,13 +415,21 @@ function PaymentsTab({ tenantId }: { tenantId: string }) {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All methods</SelectItem>
-            <SelectItem value="cash">Cash</SelectItem>
-            <SelectItem value="card">Card</SelectItem>
-            <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-            <SelectItem value="online">Online</SelectItem>
-            <SelectItem value="other">Other</SelectItem>
+            {PAYMENT_METHODS.map((m) => (
+              <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
+        {showRecordAction && (
+          <Button
+            onClick={() => { resetRecordForm(); setRecordOpen(true); }}
+            className="text-white shrink-0"
+            style={{ background: "linear-gradient(90deg, #4055FF 0%, #9033F5 50%, #FF2060 100%)" }}
+            data-testid="button-open-record-payment"
+          >
+            <Plus className="w-4 h-4 mr-1.5" /> Record Payment
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -361,18 +480,31 @@ function PaymentsTab({ tenantId }: { tenantId: string }) {
                         {fmtMoney(p.amount, currency)}
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            if (confirm("Remove this payment? The invoice balance will be updated.")) {
-                              deleteMutation.mutate(p.id);
-                            }
-                          }}
-                          data-testid={`button-delete-payment-${p.id}`}
-                        >
-                          <Trash2 className="w-4 h-4 text-red-600" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          {inv && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Open invoice"
+                              onClick={() => { window.location.href = `/app/accounting/invoices?open=${inv.id}`; }}
+                              data-testid={`button-open-invoice-${p.id}`}
+                            >
+                              <FileText className="w-4 h-4 text-muted-foreground" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              if (confirm("Remove this payment? The invoice balance will be updated.")) {
+                                deleteMutation.mutate(p.id);
+                              }
+                            }}
+                            data-testid={`button-delete-payment-${p.id}`}
+                          >
+                            <Trash2 className="w-4 h-4 text-red-600" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -382,6 +514,218 @@ function PaymentsTab({ tenantId }: { tenantId: string }) {
           )}
         </CardContent>
       </Card>
+
+      {/* Record Payment dialog — manual entry OR generate a Cashfree payment
+          link the agency can share. The public payment page already
+          auto-credits a payment row on successful Cashfree confirmation. */}
+      <Dialog
+        open={recordOpen}
+        onOpenChange={(o) => {
+          setRecordOpen(o);
+          if (!o) resetRecordForm();
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Record a payment</DialogTitle>
+            <DialogDescription>
+              Pick an invoice with an outstanding balance, then either log a payment your agency already collected, or send the customer a payment link that auto-credits when paid.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Invoice</label>
+              <Select
+                value={recordInvoiceId}
+                onValueChange={(v) => {
+                  setRecordInvoiceId(v);
+                  setRecordLinkUrl("");
+                  const inv = invoicesById.get(v);
+                  if (inv) {
+                    const bal = Math.max(0, (inv.total ?? 0) - (inv.paidAmount ?? 0));
+                    setRecordAmount(fromCents(bal));
+                  }
+                }}
+              >
+                <SelectTrigger data-testid="select-record-invoice">
+                  <SelectValue placeholder={
+                    unpaidInvoices.length === 0
+                      ? "No invoices with an outstanding balance"
+                      : "Select an invoice…"
+                  } />
+                </SelectTrigger>
+                <SelectContent>
+                  {unpaidInvoices.map((inv) => {
+                    const bal = Math.max(0, (inv.total ?? 0) - (inv.paidAmount ?? 0));
+                    return (
+                      <SelectItem key={inv.id} value={inv.id}>
+                        {inv.invoiceNumber} · {inv.customerName} · {fmtMoney(bal, inv.currency || currency)} due
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              {recordSelectedInvoice && (
+                <p className="text-xs text-muted-foreground">
+                  Balance due: {fmtMoney(recordSelectedBalance, recordSelectedInvoice.currency || currency)}
+                </p>
+              )}
+            </div>
+
+            {recordInvoiceId && (
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant={recordMode === "manual" ? "default" : "outline"}
+                  onClick={() => setRecordMode("manual")}
+                  data-testid="button-mode-manual"
+                >
+                  <Banknote className="w-4 h-4 mr-1.5" /> Log manually
+                </Button>
+                <Button
+                  type="button"
+                  variant={recordMode === "link" ? "default" : "outline"}
+                  onClick={() => { setRecordMode("link"); setRecordLinkUrl(""); }}
+                  data-testid="button-mode-link"
+                >
+                  <Send className="w-4 h-4 mr-1.5" /> Send payment link
+                </Button>
+              </div>
+            )}
+
+            {recordInvoiceId && recordMode === "manual" && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground">Amount</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={recordAmount}
+                      onChange={(e) => setRecordAmount(e.target.value)}
+                      data-testid="input-record-amount"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs text-muted-foreground">Method</label>
+                    <Select value={recordMethod} onValueChange={setRecordMethod}>
+                      <SelectTrigger data-testid="select-record-method"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {PAYMENT_METHODS.map((m) => (
+                          <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs text-muted-foreground">
+                    {PAYMENT_REFERENCE_LABELS[recordMethod] ?? "Reference (optional)"}
+                  </label>
+                  <Input
+                    value={recordRef}
+                    onChange={(e) => setRecordRef(e.target.value)}
+                    data-testid="input-record-ref"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs text-muted-foreground">Notes (optional)</label>
+                  <Input
+                    value={recordNotes}
+                    onChange={(e) => setRecordNotes(e.target.value)}
+                    data-testid="input-record-notes"
+                  />
+                </div>
+              </div>
+            )}
+
+            {recordInvoiceId && recordMode === "link" && (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Generate a secure payment link the customer can open to pay online via card, UPI, or net-banking. The invoice will be auto-credited on successful payment.
+                </p>
+                {!recordLinkUrl ? (
+                  <Button
+                    type="button"
+                    onClick={() => generateLinkMutation.mutate(recordInvoiceId)}
+                    disabled={generateLinkMutation.isPending}
+                    data-testid="button-generate-link"
+                  >
+                    {generateLinkMutation.isPending ? "Generating…" : "Generate payment link"}
+                  </Button>
+                ) : (
+                  <>
+                    <div className="flex gap-1.5">
+                      <Input
+                        readOnly
+                        value={recordLinkUrl}
+                        className="text-xs font-mono"
+                        onFocus={(e) => e.currentTarget.select()}
+                        data-testid="input-record-link-url"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="shrink-0"
+                        onClick={async () => {
+                          try { await navigator.clipboard.writeText(recordLinkUrl); } catch { /* ignore */ }
+                          setRecordLinkCopied(true);
+                          window.setTimeout(() => setRecordLinkCopied(false), 1500);
+                        }}
+                        data-testid="button-copy-record-link"
+                      >
+                        {recordLinkCopied
+                          ? <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                          : <Copy className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <a
+                        href={`mailto:${recordSelectedInvoice?.customerEmail ?? ""}?subject=${encodeURIComponent(`Invoice ${recordSelectedInvoice?.invoiceNumber ?? ""}`)}&body=${encodeURIComponent(`Hi ${recordSelectedInvoice?.customerName ?? ""},\n\nYou can view and pay your invoice here:\n${recordLinkUrl}\n\nThanks!`)}`}
+                        className="text-xs rounded-md border px-2 py-1.5 text-center hover-elevate"
+                        data-testid="button-record-share-email"
+                      >Email</a>
+                      <a
+                        href={`https://wa.me/${(recordSelectedInvoice?.customerPhone ?? "").replace(/\D/g, "")}?text=${encodeURIComponent(`Invoice ${recordSelectedInvoice?.invoiceNumber ?? ""}: ${recordLinkUrl}`)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs rounded-md border px-2 py-1.5 text-center hover-elevate"
+                        data-testid="button-record-share-whatsapp"
+                      >WhatsApp</a>
+                      <a
+                        href={`sms:${recordSelectedInvoice?.customerPhone ?? ""}?body=${encodeURIComponent(`Invoice ${recordSelectedInvoice?.invoiceNumber ?? ""}: ${recordLinkUrl}`)}`}
+                        className="text-xs rounded-md border px-2 py-1.5 text-center hover-elevate"
+                        data-testid="button-record-share-sms"
+                      >SMS</a>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Once paid, the payment will appear in this list automatically.
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRecordOpen(false)} data-testid="button-cancel-record">
+              {recordMode === "link" && recordLinkUrl ? "Done" : "Cancel"}
+            </Button>
+            {recordMode === "manual" && (
+              <Button
+                onClick={() => recordPaymentMutation.mutate()}
+                disabled={!recordInvoiceId || recordPaymentMutation.isPending}
+                className="text-white"
+                style={{ background: "linear-gradient(90deg, #4055FF 0%, #9033F5 50%, #FF2060 100%)" }}
+                data-testid="button-submit-record-payment"
+              >
+                {recordPaymentMutation.isPending ? "Saving…" : "Record Payment"}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -599,6 +943,22 @@ function InvoicesTab({ tenantId }: { tenantId: string }) {
   const { toast } = useToast();
   const [composeOpen, setComposeOpen] = useState(false);
   const [viewInvoiceId, setViewInvoiceId] = useState<string | null>(null);
+
+  // Honor "?open=<invoiceId>" so deep-links from the Payments page (and
+  // anywhere else) auto-open the invoice detail dialog. We strip the query
+  // param after consuming it so a back/forward navigation doesn't reopen it.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const openId = params.get("open");
+    if (openId) {
+      setViewInvoiceId(openId);
+      params.delete("open");
+      const qs = params.toString();
+      const newUrl = window.location.pathname + (qs ? `?${qs}` : "") + window.location.hash;
+      window.history.replaceState({}, "", newUrl);
+    }
+  }, []);
 
   const { data: invoices = [], isLoading } = useQuery<Invoice[]>({
     queryKey: ["/api/tenants", tenantId, "invoices"],
