@@ -4190,6 +4190,7 @@ export async function registerRoutes(
     req.session.b2cUserId = user.id;
     req.session.save((err) => {
       if (err) {
+        req.log.error({ err }, "[b2c/auth/login] session.save failed");
         return res.status(500).json({ error: "Session error, please try again" });
       }
       const { password: _, ...safeUser } = user;

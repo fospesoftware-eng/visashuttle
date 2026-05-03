@@ -166,6 +166,26 @@ const sessionOptions: session.SessionOptions = {
 };
 
 if (pool) {
+  // Defensive bootstrap: ensure the `sessions` table exists before the store
+  // tries to read/write it. `connect-pg-simple`'s `createTableIfMissing` runs
+  // on first use and has been observed to silently leave the table missing in
+  // some environments — when that happens every `req.session.save()` fails
+  // with a confusing "Session error, please try again" response on login.
+  // Creating it explicitly at boot makes a fresh database always work.
+  void pool
+    .query(
+      `CREATE TABLE IF NOT EXISTS "sessions" (
+         "sid"    varchar       NOT NULL COLLATE "default",
+         "sess"   json          NOT NULL,
+         "expire" timestamp(6)  NOT NULL,
+         CONSTRAINT "sessions_pkey" PRIMARY KEY ("sid")
+       );
+       CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "sessions" ("expire");`,
+    )
+    .catch((err) => {
+      logger.error({ err }, "[Session] Failed to ensure sessions table exists");
+    });
+
   sessionOptions.store = new PgStore({
     pool,
     createTableIfMissing: true,
