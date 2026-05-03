@@ -5,7 +5,7 @@ import {
   ArrowLeft, Mail, Phone, BadgeCheck, FileText, Calendar,
   Briefcase, ChevronRight, User as UserIcon, Globe2,
   AlertTriangle, Clock, Download, ExternalLink,
-  Plus, Pencil, Trash2, Star, BookUser,
+  Plus, Pencil, Trash2, Star, BookUser, Upload, Loader2, Sparkles,
 } from "lucide-react";
 import { getPassportExpiryStatus, fmtPassportExpiry } from "@/pages/agency/customers";
 import { Button } from "@/components/ui/button";
@@ -268,17 +268,113 @@ function PassportFormDialog({
 }) {
   const { toast } = useToast();
   const [form, setForm] = useState<PassportFormState>(initial);
+  const [scanWarnings, setScanWarnings] = useState<string[]>([]);
 
   // Re-sync the form whenever the dialog is reopened for a different
   // passport (or freshly opened for "create"). useEffect rather than a
   // render-phase setState so we don't trigger extra renders or warnings.
   useEffect(() => {
-    if (open) setForm(initial);
+    if (open) {
+      setForm(initial);
+      setScanWarnings([]);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initial]);
 
   const set = (patch: Partial<PassportFormState>) =>
     setForm(prev => ({ ...prev, ...patch }));
+
+  // === Passport scanner (Claude vision) ===
+  // Reads the chosen image as a base64 data URI, POSTs the bytes to the
+  // shared /api/passport/scan endpoint, and merges any fields the OCR
+  // returned into the form. We only overwrite fields that came back
+  // non-null so a re-scan won't blow away values the user already typed.
+  const scanMutation = useMutation({
+    mutationFn: async (file: File) => {
+      // Hard cap mirrors the server's 8 MB limit; warn early so we don't
+      // spend time uploading something that will be rejected.
+      if (file.size > 8 * 1024 * 1024) {
+        throw new Error("Image is too large. Please upload a file under 8 MB.");
+      }
+      if (!file.type.startsWith("image/")) {
+        throw new Error("Please choose an image file (JPG, PNG, WebP, or GIF).");
+      }
+      const dataUri: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error("Couldn't read the file."));
+        reader.readAsDataURL(file);
+      });
+      const res = await apiRequest("POST", "/api/passport/scan", {
+        imageBase64: dataUri,
+        mimeType: file.type,
+      });
+      const json = await res.json();
+      return { json, dataUri };
+    },
+    onSuccess: ({ json, dataUri }) => {
+      const r = json as {
+        surname: string | null;
+        givenName: string | null;
+        middleName: string | null;
+        passportNumber: string | null;
+        nationality: string | null;
+        gender: string | null;
+        dateOfBirth: string | null;
+        dateOfIssue: string | null;
+        dateOfExpiry: string | null;
+        placeOfIssue: string | null;
+        placeOfBirth: string | null;
+        warnings: string[];
+      };
+      // Only fill fields that came back non-null (don't clobber existing
+      // user input on re-scan).
+      setForm(prev => ({
+        ...prev,
+        passportSurname: r.surname ?? prev.passportSurname,
+        passportGivenName: r.givenName ?? prev.passportGivenName,
+        passportMiddleName: r.middleName ?? prev.passportMiddleName,
+        passportNumber: r.passportNumber ?? prev.passportNumber,
+        passportNationality: r.nationality ?? prev.passportNationality,
+        passportGender: r.gender ?? prev.passportGender,
+        passportDateOfBirth: r.dateOfBirth ?? prev.passportDateOfBirth,
+        passportDateOfIssue: r.dateOfIssue ?? prev.passportDateOfIssue,
+        passportDateOfExpiry: r.dateOfExpiry ?? prev.passportDateOfExpiry,
+        passportPlaceOfIssue: r.placeOfIssue ?? prev.passportPlaceOfIssue,
+        passportPlaceOfBirth: r.placeOfBirth ?? prev.passportPlaceOfBirth,
+        // Auto-derive holderName from the OCR if the user hasn't set one.
+        holderName: prev.holderName || [r.givenName, r.surname].filter(Boolean).join(" "),
+        // Attach the scanned image as the passport file, but only if the
+        // user hasn't already pointed at a different URL.
+        passportFileUrl: prev.passportFileUrl || dataUri,
+      }));
+      setScanWarnings(Array.isArray(r.warnings) ? r.warnings : []);
+      const filledCount = [
+        r.surname, r.givenName, r.passportNumber, r.nationality,
+        r.dateOfBirth, r.dateOfIssue, r.dateOfExpiry,
+      ].filter(Boolean).length;
+      toast({
+        title: filledCount > 0 ? "Passport scanned" : "Scan finished",
+        description: filledCount > 0
+          ? `Filled ${filledCount} field${filledCount === 1 ? "" : "s"} from the image. Please double-check the values.`
+          : "Couldn't read any fields confidently — please fill the form manually.",
+      });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Scan failed",
+        description: err?.message ?? "Please try again, or fill the form manually.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onScanFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Reset the input so the same file can be chosen again after an error.
+    e.target.value = "";
+    if (file) scanMutation.mutate(file);
+  };
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -329,6 +425,57 @@ function PassportFormDialog({
             future applications and shared between co-travellers.
           </DialogDescription>
         </DialogHeader>
+
+        {/* Scanner: upload a passport bio-page image and let Claude
+            pre-fill the fields. Failure is non-fatal — the rest of the
+            form still works for manual entry. */}
+        <div className="rounded-md border border-dashed border-border bg-muted/30 p-3 mb-1">
+          <div className="flex items-start gap-3">
+            <div className="rounded-md bg-primary/10 text-primary p-2">
+              <Sparkles className="h-4 w-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium">Auto-fill from passport image</div>
+              <div className="text-xs text-muted-foreground mt-0.5">
+                Upload a clear photo of the bio page (JPG/PNG/WebP, ≤ 8 MB) and we'll
+                read the fields automatically. You can edit anything before saving.
+              </div>
+              {scanWarnings.length > 0 && (
+                <ul className="mt-2 text-[11px] text-amber-700 dark:text-amber-300 list-disc list-inside space-y-0.5">
+                  {scanWarnings.map((w, i) => (
+                    <li key={i} data-testid={`text-scan-warning-${i}`}>{w}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <label>
+              <input
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                onChange={onScanFile}
+                disabled={scanMutation.isPending}
+                data-testid="input-scan-passport"
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={scanMutation.isPending}
+                asChild
+              >
+                <span data-testid="button-scan-passport">
+                  {scanMutation.isPending ? (
+                    <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Scanning…</>
+                  ) : (
+                    <><Upload className="h-3 w-3 mr-1" /> Scan image</>
+                  )}
+                </span>
+              </Button>
+            </label>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
           <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="md:col-span-1">
