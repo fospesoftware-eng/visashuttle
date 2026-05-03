@@ -739,6 +739,53 @@ B2C portal mock data (feature work, not security),
 agency Knowledge / Messages / Customers pages that the audit identified
 as missing (feature work).
 
+### Customers module (May 2026)
+
+New agency-side directory of every portal customer linked to the tenant,
+with their applications and passport details. The schema already had
+the right shape — `customerAccounts` for the identity, `customerTenantLinks`
+for the multi-tenant join, passport fields on `cases` — so no schema
+migration was needed.
+
+- **Schema usage** (`shared/schema.ts`): a "customer" is a `customerAccount`
+  joined to a tenant via `customerTenantLinks`. Each case carries its
+  own passport snapshot (`passportSurname`, `passportGivenName`,
+  `passportNumber`, `passportNationality`, `passportDateOfIssue`,
+  `passportDateOfExpiry`, `passportPlaceOfIssue`, `passportPlaceOfBirth`,
+  `passportGender`, `passportMiddleName`) so a customer can have multiple
+  passports across multiple cases — that's a real-world need (renewal,
+  separate kid passports under one parent account, etc.).
+- **Storage** (`server/storage.ts`): added
+  `getCustomersByTenantId(tenantId)` which walks `customerTenantLinks`,
+  resolves accounts, and de-dupes.
+- **Backend** (`server/routes.ts`):
+  - `GET /api/tenants/:tenantId/customers` — list, enriched per row
+    with `caseCount`, `activeCaseCount`, `latestActivityAt`, and the
+    most-recent `latestPassportNumber` / `latestPassportNationality`
+    (sorted by case `updatedAt` so renewals show the new passport,
+    not the original).
+  - `GET /api/tenants/:tenantId/customers/:customerId` — full
+    `{ account, cases }` payload. Verifies `customerTenantLinks` first
+    so a customer that's not linked to this tenant returns 404 even
+    if the agency owner could otherwise satisfy `requireTenantAccess`.
+  - Both routes behind `requireTenantAccess`. Anon→401, cross-tenant→403.
+- **Frontend**:
+  - `client/src/pages/agency/customers.tsx` — searchable card list
+    (search hits name/email/phone/passport), sorted by latest activity.
+  - `client/src/pages/agency/customer-detail.tsx` — header card +
+    one passport block per case with link-through to `/app/cases/:id`.
+  - Wired `/app/customers` and `/app/customers/:id` in `App.tsx`.
+  - "Customers" nav item added to `agencyNavItems` between Leads and
+    Proposals (`UserSquare2` icon).
+- **Deliberate scope choices** (flagged by review, deferred):
+  - Co-traveller passports (`case_co_travellers`) are not surfaced on
+    the customer detail page — they belong to the case, not the
+    customer, so they're shown on the case-detail screen instead.
+  - List enrichment is in-process aggregation over all tenant cases.
+    Fine for the current MemStorage / small-tenant footprint; will
+    move to DB-side aggregation when we cut over to the real Postgres
+    storage.
+
 ### Proposal payment link (T007 — May 2026)
 
 Lets the agency attach an estimate amount to a proposal so the customer can

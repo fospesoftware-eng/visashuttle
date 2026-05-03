@@ -31,6 +31,8 @@ import VisaCheckPage from "@/pages/visa-check";
 import VisaCheckPublicPage from "@/pages/visa-check-public";
 import AgencyDashboard from "@/pages/agency/dashboard";
 import LeadsPage from "@/pages/agency/leads";
+import CustomersPage from "@/pages/agency/customers";
+import CustomerDetailPage from "@/pages/agency/customer-detail";
 import ProposalsPage from "@/pages/agency/proposals";
 import ProposalApplyPage from "@/pages/proposal-apply";
 import InvoicePayPage from "@/pages/public/invoice-pay";
@@ -124,6 +126,8 @@ function Router() {
 
       <Route path="/app" component={AgencyDashboard} />
       <Route path="/app/leads" component={LeadsPage} />
+      <Route path="/app/customers" component={CustomersPage} />
+      <Route path="/app/customers/:id" component={CustomerDetailPage} />
       <Route path="/app/proposals" component={ProposalsPage} />
 
       {/* Public, tokenized proposal apply page — no auth, token IS the

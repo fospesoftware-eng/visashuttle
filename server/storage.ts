@@ -139,6 +139,9 @@ export interface IStorage {
   getCustomerTenantLink(customerAccountId: string, tenantId: string): Promise<CustomerTenantLink | undefined>;
   createCustomerTenantLink(link: InsertCustomerTenantLink): Promise<CustomerTenantLink>;
   getCustomerTenantLinks(customerAccountId: string): Promise<CustomerTenantLink[]>;
+  // Returns every customerAccount linked to a given tenant (used by the
+  // agency-side Customers module).
+  getCustomersByTenantId(tenantId: string): Promise<CustomerAccount[]>;
 
   createOTPCode(otp: InsertOTPCode): Promise<OTPCode>;
   getActiveOTPCode(email: string, tenantId: string): Promise<OTPCode | undefined>;
@@ -1514,6 +1517,21 @@ export class MemStorage implements IStorage {
     return Array.from(this.customerTenantLinks.values()).filter(
       link => link.customerAccountId === customerAccountId
     );
+  }
+
+  async getCustomersByTenantId(tenantId: string): Promise<CustomerAccount[]> {
+    const linkedIds = Array.from(this.customerTenantLinks.values())
+      .filter(link => link.tenantId === tenantId)
+      .map(link => link.customerAccountId);
+    const seen = new Set<string>();
+    const out: CustomerAccount[] = [];
+    for (const id of linkedIds) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const acct = this.customerAccounts.get(id);
+      if (acct) out.push(acct);
+    }
+    return out;
   }
 
   async createOTPCode(insertOTP: InsertOTPCode): Promise<OTPCode> {

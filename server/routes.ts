@@ -2778,6 +2778,79 @@ export async function registerRoutes(
     res.json(cases);
   });
 
+  // === Customers (agency-side directory of portal customers) ===
+  // Lists every CustomerAccount linked to this tenant, with a small
+  // aggregate (case count, latest case date) computed off the cases table
+  // so the index page is single-fetch.
+  app.get("/api/tenants/:tenantId/customers", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
+    const tenantId = req.params.tenantId;
+    const [customers, allCases] = await Promise.all([
+      storage.getCustomersByTenantId(tenantId),
+      storage.getCasesByTenantId(tenantId),
+    ]);
+    const casesByCust = new Map<string, typeof allCases>();
+    for (const c of allCases) {
+      if (!c.customerAccountId) continue;
+      const arr = casesByCust.get(c.customerAccountId) ?? [];
+      arr.push(c);
+      casesByCust.set(c.customerAccountId, arr);
+    }
+    const enriched = customers.map(cust => {
+      const cs = casesByCust.get(cust.id) ?? [];
+      const latest = cs.reduce<Date | null>((acc, c) => {
+        const d = c.updatedAt ? new Date(c.updatedAt) : (c.createdAt ? new Date(c.createdAt) : null);
+        if (!d) return acc;
+        return !acc || d > acc ? d : acc;
+      }, null);
+      // Surface the MOST RECENT passport snapshot (not just the first one in
+      // array order) — pick the case with the latest updatedAt/createdAt that
+      // actually has a passport number on it.
+      const withPassport = cs
+        .filter(c => c.passportNumber)
+        .sort((a, b) => {
+          const ta = (a.updatedAt ?? a.createdAt) ? new Date(a.updatedAt ?? a.createdAt!).getTime() : 0;
+          const tb = (b.updatedAt ?? b.createdAt) ? new Date(b.updatedAt ?? b.createdAt!).getTime() : 0;
+          return tb - ta;
+        })[0];
+      return {
+        ...cust,
+        caseCount: cs.length,
+        activeCaseCount: cs.filter(c => !["approved", "rejected"].includes(c.status)).length,
+        latestActivityAt: latest,
+        latestPassportNumber: withPassport?.passportNumber ?? null,
+        latestPassportNationality: withPassport?.passportNationality ?? null,
+      };
+    });
+    // Most recent activity first.
+    enriched.sort((a, b) => {
+      const ta = a.latestActivityAt ? a.latestActivityAt.getTime() : 0;
+      const tb = b.latestActivityAt ? b.latestActivityAt.getTime() : 0;
+      return tb - ta;
+    });
+    res.json(enriched);
+  });
+
+  // Single customer with their cases (each case carries its own passport
+  // snapshot — multiple passports per customer are normal because the
+  // customer can have separate applications under different passports).
+  app.get("/api/tenants/:tenantId/customers/:customerId", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
+    const { tenantId, customerId } = req.params;
+    // Belt-and-braces: verify the customer is actually linked to this tenant
+    // before exposing their account record.
+    const link = await storage.getCustomerTenantLink(customerId, tenantId);
+    if (!link) {
+      return res.status(404).json({ error: "Customer not found in this agency" });
+    }
+    const account = await storage.getCustomerAccount(customerId);
+    if (!account) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+    const cases = await storage.getCasesByCustomerAccountId(customerId, tenantId);
+    res.json({ account, cases });
+  });
+
   app.post("/api/tenants/:tenantId/cases", async (req, res) => {
     if (!requireTenantAccess(req, res, req.params.tenantId)) return;
     // Validate dates: travel date can't be in the past, DOB can't be in the future

@@ -6,7 +6,7 @@ import {
   ChevronLeft, ChevronRight, ChevronDown, LogOut, Bell, Search,
   Menu, X, Building2, ShieldCheck, Database, Activity, Globe, CreditCard,
   CheckCircle, AlertCircle, Inbox, Receipt, Banknote, ClipboardList,
-  Send, Stamp, Loader2, XCircle
+  Send, Stamp, Loader2, XCircle, UserSquare2
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -53,6 +53,7 @@ const adminNavItems: NavItem[] = [
 const agencyNavItems: NavItem[] = [
   { icon: Home, label: "Dashboard", href: "/app" },
   { icon: Users, label: "Leads", href: "/app/leads" },
+  { icon: UserSquare2, label: "Customers", href: "/app/customers" },
   { icon: Send, label: "Proposals", href: "/app/proposals" },
   {
     icon: Briefcase, label: "Applications", href: "/app/cases",
