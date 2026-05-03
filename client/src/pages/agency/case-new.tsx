@@ -5,6 +5,7 @@ import {
   ArrowLeft, ArrowRight, Check, Loader2, Plus, Save, Send, Trash2, Users,
   MapPin, FileText, User as UserIcon, Plane, ClipboardCheck, ListChecks,
   Search, X, CircleDot, DollarSign, Upload, ScanLine, AlertTriangle, RotateCcw,
+  Calendar as CalendarIcon, Building2,
 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,7 @@ import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { CO_TRAVELLER_RELATIONSHIPS, type CoTravellerRelationship, type FeeTemplate, type InvoiceSettings, type Lead } from "@shared/schema";
+import { CO_TRAVELLER_RELATIONSHIPS, type CoTravellerRelationship, type FeeTemplate, type InvoiceSettings, type Lead, APPOINTMENT_TYPES, APPOINTMENT_STATUSES, type AppointmentType, type AppointmentStatus } from "@shared/schema";
 import { getDocumentChecklist, type DocumentRequirement } from "@/data/document-checklists";
 import { getCountryVisaConfig } from "@/data/country-visa-types";
 import { COUNTRIES, VISA_TYPES as GENERIC_VISA_TYPES } from "@shared/destinations";
@@ -93,6 +94,28 @@ async function scanPassportApi(base64: string, mimeType: string): Promise<ScanRe
   return (await res.json()) as ScanResult;
 }
 
+type AppointmentDraft = {
+  key: string;
+  appointmentType: AppointmentType | "";
+  provider: string;
+  location: string;
+  scheduledAt: string; // datetime-local string ("YYYY-MM-DDTHH:mm")
+  status: AppointmentStatus;
+  notes: string;
+};
+
+function emptyAppointment(): AppointmentDraft {
+  return {
+    key: Math.random().toString(36).slice(2),
+    appointmentType: "",
+    provider: "",
+    location: "",
+    scheduledAt: "",
+    status: "scheduled",
+    notes: "",
+  };
+}
+
 type CoTravellerDraft = {
   key: string;
   name: string;
@@ -160,9 +183,10 @@ const STEPS = [
   { id: 2, title: "Applicant", icon: UserIcon },
   { id: 3, title: "Travel Details", icon: Plane },
   { id: 4, title: "Co-Travellers", icon: Users },
-  { id: 5, title: "Documents", icon: ListChecks },
-  { id: 6, title: "Fees", icon: DollarSign },
-  { id: 7, title: "Review", icon: ClipboardCheck },
+  { id: 5, title: "Appointments", icon: CalendarIcon },
+  { id: 6, title: "Documents", icon: ListChecks },
+  { id: 7, title: "Fees", icon: DollarSign },
+  { id: 8, title: "Review", icon: ClipboardCheck },
 ] as const;
 
 const FEE_CATEGORIES = [
@@ -370,6 +394,16 @@ export default function NewCasePage() {
   }, [form.passportGivenName, form.passportSurname]);
 
   const [coTravellers, setCoTravellers] = useState<CoTravellerDraft[]>([]);
+
+  // === Appointments (Step 5) ===
+  // Bookings to be created alongside the case (embassy, VFS, BLS, etc).
+  // The appointments API needs a caseId, so we collect drafts here and POST
+  // each one *after* the case is created in createCaseAndCompanions().
+  const [appointmentDrafts, setAppointmentDrafts] = useState<AppointmentDraft[]>([]);
+  const updateAppointment = (key: string, patch: Partial<AppointmentDraft>) =>
+    setAppointmentDrafts((arr) => arr.map((a) => (a.key === key ? { ...a, ...patch } : a)));
+  const removeAppointment = (key: string) =>
+    setAppointmentDrafts((arr) => arr.filter((a) => a.key !== key));
 
   // Auto-derive each co-traveller's full name from their passport given-name +
   // surname — same rule as the applicant: skip rows the agent has manually
@@ -746,8 +780,27 @@ export default function NewCasePage() {
         }
       }
     }
-    // Step 5 (Documents) has no hard validation — agency may onboard with empty checklist
-    if (s === 6) {
+    // Step 5 (Appointments) — soft step. Allow zero appointments, but every
+    // row that's been started needs a type, provider and a future-ish date.
+    if (s === 5) {
+      const now = Date.now();
+      for (const a of appointmentDrafts) {
+        const started = !!(a.appointmentType || a.provider.trim() || a.scheduledAt);
+        if (!started) continue;
+        if (!a.appointmentType) return "Each appointment needs a type (Embassy, VFS, BLS, or Other).";
+        if (!a.provider.trim()) return "Each appointment needs a provider / centre name.";
+        if (!a.scheduledAt) return "Each appointment needs a date and time.";
+        const t = new Date(a.scheduledAt).getTime();
+        if (isNaN(t)) return "An appointment has an invalid date/time.";
+        // Allow up to 24h in the past so an agent can record a just-completed
+        // appointment without having to fight the clock.
+        if (t < now - 24 * 60 * 60 * 1000) {
+          return "Appointment date/time can't be in the past.";
+        }
+      }
+    }
+    // Step 6 (Documents) has no hard validation — agency may onboard with empty checklist
+    if (s === 7) {
       // Soft step — allow zero fees, but partially-filled rows must be valid
       for (const it of feeItems) {
         const hasDesc = it.description.trim().length > 0;
@@ -764,7 +817,7 @@ export default function NewCasePage() {
 
   // Submission requires every step to be valid
   const fullValidationError = (): string | null => {
-    for (const s of [1, 2, 3, 4, 5, 6] as StepId[]) {
+    for (const s of [1, 2, 3, 4, 5, 6, 7] as StepId[]) {
       const err = stepError(s);
       if (err) return err;
     }
@@ -1239,6 +1292,32 @@ export default function NewCasePage() {
       }
     }
 
+    // Persist appointments collected in Step 5. Each one is an independent
+    // POST so a single failure doesn't take down the others — we surface a
+    // toast per failure and keep going (the case is already created).
+    for (const a of appointmentDrafts) {
+      const started = !!(a.appointmentType || a.provider.trim() || a.scheduledAt);
+      if (!started) continue;
+      // Defensive: skip incomplete rows on draft saves where validation is soft.
+      if (!a.appointmentType || !a.provider.trim() || !a.scheduledAt) continue;
+      try {
+        await apiRequest("POST", `/api/cases/${created.id}/appointments`, {
+          appointmentType: a.appointmentType,
+          provider: a.provider.trim(),
+          location: a.location.trim() || null,
+          scheduledAt: new Date(a.scheduledAt).toISOString(),
+          status: a.status,
+          notes: a.notes.trim() || null,
+        });
+      } catch (err: any) {
+        toast({
+          title: "Could not save appointment",
+          description: `${a.provider || "Appointment"}: ${err?.message ?? "Unknown error"}`,
+          variant: "destructive",
+        });
+      }
+    }
+
     // Auto-create a draft invoice if any valid fee lines are present
     if (validFeeItems.length > 0) {
       try {
@@ -1398,7 +1477,7 @@ export default function NewCasePage() {
       return;
     }
     // Lighter validation for drafts: we still don't want bad dates persisted
-    for (const s of [2, 3, 4, 6] as StepId[]) {
+    for (const s of [2, 3, 4, 5, 7] as StepId[]) {
       const err = stepError(s);
       if (err && !err.includes("required")) {
         toast({ title: "Fix before saving draft", description: err, variant: "destructive" });
@@ -2594,6 +2673,139 @@ export default function NewCasePage() {
 
           {step === 5 && (
             <Card>
+              <CardHeader className="flex flex-row items-start justify-between gap-4">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <CalendarIcon className="w-4 h-4" /> Appointments
+                  </CardTitle>
+                  <CardDescription>
+                    Add embassy / VFS / BLS bookings tied to this case. You can skip
+                    this step and add them later from the case page.
+                  </CardDescription>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setAppointmentDrafts((arr) => [...arr, emptyAppointment()])}
+                  data-testid="button-add-appointment"
+                >
+                  <Plus className="w-4 h-4 mr-1.5" /> Add appointment
+                </Button>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {appointmentDrafts.length === 0 ? (
+                  <div className="border-2 border-dashed border-border rounded-lg p-6 text-center text-sm text-muted-foreground">
+                    <CalendarIcon className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                    <p>No appointments yet — click "Add appointment" if you've already booked one.</p>
+                  </div>
+                ) : (
+                  appointmentDrafts.map((a, idx) => (
+                    <div key={a.key} className="border rounded-lg p-4 space-y-3 bg-muted/10" data-testid={`card-appointment-${idx}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-medium text-sm flex items-center gap-2">
+                          <Building2 className="w-4 h-4 text-muted-foreground" />
+                          Appointment #{idx + 1}
+                        </p>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive"
+                          onClick={() => removeAppointment(a.key)}
+                          data-testid={`button-remove-appointment-${idx}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <Label>Type *</Label>
+                          <Select
+                            value={a.appointmentType || undefined}
+                            onValueChange={(v) => updateAppointment(a.key, { appointmentType: v as AppointmentType })}
+                          >
+                            <SelectTrigger data-testid={`select-appointment-type-${idx}`}>
+                              <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {APPOINTMENT_TYPES.map((t) => (
+                                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label>Status</Label>
+                          <Select
+                            value={a.status}
+                            onValueChange={(v) => updateAppointment(a.key, { status: v as AppointmentStatus })}
+                          >
+                            <SelectTrigger data-testid={`select-appointment-status-${idx}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {APPOINTMENT_STATUSES.map((s) => (
+                                <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="md:col-span-2">
+                          <Label>Provider / centre name *</Label>
+                          <Input
+                            value={a.provider}
+                            onChange={(e) => updateAppointment(a.key, { provider: e.target.value })}
+                            placeholder={
+                              a.appointmentType === "embassy_consulate"
+                                ? "e.g. French Embassy — New Delhi"
+                                : a.appointmentType === "vfs"
+                                ? "e.g. VFS Global — Mumbai"
+                                : a.appointmentType === "bls"
+                                ? "e.g. BLS International — Delhi"
+                                : "Centre / provider name"
+                            }
+                            data-testid={`input-appointment-provider-${idx}`}
+                          />
+                        </div>
+                        <div>
+                          <Label>Date & time *</Label>
+                          <Input
+                            type="datetime-local"
+                            value={a.scheduledAt}
+                            onChange={(e) => updateAppointment(a.key, { scheduledAt: e.target.value })}
+                            data-testid={`input-appointment-scheduled-${idx}`}
+                          />
+                        </div>
+                        <div>
+                          <Label>Location <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                          <Input
+                            value={a.location}
+                            onChange={(e) => updateAppointment(a.key, { location: e.target.value })}
+                            placeholder="City / address"
+                            data-testid={`input-appointment-location-${idx}`}
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <Label>Notes <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                          <Textarea
+                            value={a.notes}
+                            rows={2}
+                            onChange={(e) => updateAppointment(a.key, { notes: e.target.value })}
+                            placeholder="Reference number, instructions for the customer, etc."
+                            data-testid={`input-appointment-notes-${idx}`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {step === 6 && (
+            <Card>
               <CardHeader>
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -2665,7 +2877,7 @@ export default function NewCasePage() {
             </Card>
           )}
 
-          {step === 6 && (
+          {step === 7 && (
             <Card>
               <CardHeader>
                 <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -2815,7 +3027,7 @@ export default function NewCasePage() {
             </Card>
           )}
 
-          {step === 7 && (
+          {step === 8 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
@@ -2882,8 +3094,32 @@ export default function NewCasePage() {
                 </div>
                 <div className="border rounded-xl p-4 bg-muted/20">
                   <div className="flex items-center justify-between mb-2">
+                    <p className="font-medium">Appointments ({appointmentDrafts.length})</p>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setStep(5)} data-testid="button-edit-appointments">Edit</Button>
+                  </div>
+                  {appointmentDrafts.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">None added — you can schedule appointments later from the case page.</p>
+                  ) : (
+                    <ul className="space-y-1 text-sm">
+                      {appointmentDrafts.map((a, idx) => {
+                        const typeLabel = APPOINTMENT_TYPES.find((t) => t.value === a.appointmentType)?.label ?? "—";
+                        const when = a.scheduledAt ? new Date(a.scheduledAt).toLocaleString() : "—";
+                        return (
+                          <li key={a.key} className="text-muted-foreground" data-testid={`review-appointment-${idx}`}>
+                            <span className="font-medium text-foreground">{a.provider || `Appointment #${idx + 1}`}</span>
+                            {` · ${typeLabel}`}
+                            {` · ${when}`}
+                            {a.location ? ` · ${a.location}` : ""}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+                <div className="border rounded-xl p-4 bg-muted/20">
+                  <div className="flex items-center justify-between mb-2">
                     <p className="font-medium">Fees ({validFeeItems.length} {validFeeItems.length === 1 ? "line" : "lines"})</p>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => setStep(6)} data-testid="button-edit-fees">Edit</Button>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setStep(7)} data-testid="button-edit-fees">Edit</Button>
                   </div>
                   {validFeeItems.length === 0 ? (
                     <p className="text-muted-foreground text-sm">No fees added — no invoice will be created.</p>
@@ -2912,7 +3148,7 @@ export default function NewCasePage() {
                 <div className="border rounded-xl p-4 bg-muted/20">
                   <div className="flex items-center justify-between mb-2">
                     <p className="font-medium">Documents Checklist ({totalSelectedDocsCount} item{totalSelectedDocsCount === 1 ? "" : "s"})</p>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => setStep(5)} data-testid="button-edit-documents">Edit</Button>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setStep(6)} data-testid="button-edit-documents">Edit</Button>
                   </div>
                   {checklist.length === 0 ? (
                     <p className="text-muted-foreground text-sm">No checklist available for this destination + visa type.</p>
