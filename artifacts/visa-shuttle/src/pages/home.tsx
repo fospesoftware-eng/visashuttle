@@ -3,7 +3,10 @@ import { Link, useLocation } from "wouter";
 import {
   Sparkles, Brain, Zap, Shield, ArrowRight, CheckCircle,
   Globe, Star, TrendingUp, FileText, Lock,
-  Mail, MapPin, Send
+  Mail, MapPin, Send,
+  Flag, Map, Stamp, Compass, UserCheck, Wallet,
+  Plane, ShieldAlert, CalendarCheck, TicketCheck,
+  Hotel, CreditCard, FolderCheck, Bot,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -431,29 +434,60 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 14 Factors */}
-      <section className="py-14 md:py-20 px-4 bg-muted/30 border-y">
-        <div className="max-w-5xl mx-auto text-center">
+      {/* What the AI Looks At — 14 signals */}
+      <section className="relative py-16 md:py-24 px-4 bg-muted/30 border-y overflow-hidden">
+        {/* decorative blurs */}
+        <div aria-hidden className="pointer-events-none absolute -top-24 -left-24 w-72 h-72 rounded-full bg-[#4055FF]/20 blur-3xl animate-pulse" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-24 -right-24 w-72 h-72 rounded-full bg-[#FF2060]/20 blur-3xl animate-pulse [animation-delay:1.5s]" />
+
+        <div className="relative max-w-6xl mx-auto text-center">
           <Badge className="mb-5 bg-[#4055FF]/10 text-[#4055FF] dark:bg-[#4055FF]/20 dark:text-[#8899FF] border-[#4055FF]/20 hover:bg-[#4055FF]/10">
-            14 Key Factors Analyzed
+            <Sparkles className="w-3 h-3 mr-1.5" />
+            What the AI Looks At
           </Badge>
-          <h2 className="text-2xl md:text-3xl font-bold mb-3">What the AI Looks At</h2>
-          <p className="text-muted-foreground mb-10 max-w-xl mx-auto">The same factors immigration officers evaluate — now analyzed by AI in seconds.</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <h2 className="text-3xl md:text-4xl font-black tracking-tight mb-3 bg-clip-text text-transparent bg-gradient-to-r from-[#4055FF] via-[#9033F5] to-[#FF2060]">
+            The Signals Behind Every Decision
+          </h2>
+          <p className="text-muted-foreground mb-12 max-w-2xl mx-auto leading-relaxed">
+            The same factors immigration officers evaluate — now analyzed by AI in seconds.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
-              "Nationality", "Destination Country", "Visa Type", "Purpose of Travel",
-              "Age & Employment", "Monthly Income", "Bank Balance", "Travel History",
-              "Visa Refusals", "Trip Duration", "Return Ticket", "Accommodation Proof",
-              "Trip Funding", "Document Readiness",
-            ].map((factor, i) => (
-              <div
-                key={factor}
-                className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-background border text-sm text-left"
+              { icon: Flag,           title: "Nationality Strength Index",     desc: "How your passport ranks against global mobility data.",        grad: "from-[#4055FF] to-[#6B7CFF]" },
+              { icon: Map,            title: "Destination Risk Mapping",       desc: "Country-specific approval patterns and refusal trends.",       grad: "from-[#9033F5] to-[#C56BFF]" },
+              { icon: Stamp,          title: "Visa Type Complexity",           desc: "Tourist, business, study — each carries its own scrutiny.",    grad: "from-[#FF2060] to-[#FF6B8E]" },
+              { icon: Compass,        title: "Travel Intent Clarity",          desc: "How clearly your purpose of travel reads to an officer.",      grad: "from-[#10B981] to-[#34D399]" },
+              { icon: UserCheck,      title: "Profile Stability Score",        desc: "Age, employment and ties that signal a settled life.",         grad: "from-[#0EA5E9] to-[#38BDF8]" },
+              { icon: Wallet,         title: "Financial Strength Indicator",   desc: "Income and balances measured against trip cost.",              grad: "from-[#F59E0B] to-[#FBBF24]" },
+              { icon: Plane,          title: "Travel Footprint Analysis",      desc: "Past trips that build credibility with consulates.",           grad: "from-[#4055FF] to-[#22D3EE]" },
+              { icon: ShieldAlert,    title: "Rejection Risk Signals",         desc: "Prior refusals and red-flag patterns we look for.",            grad: "from-[#EF4444] to-[#F87171]" },
+              { icon: CalendarCheck,  title: "Trip Logic Evaluation",          desc: "Does the duration and itinerary make sense end-to-end?",       grad: "from-[#9033F5] to-[#4055FF]" },
+              { icon: TicketCheck,    title: "Return Assurance Check",         desc: "Onward tickets and return commitments verified.",              grad: "from-[#06B6D4] to-[#67E8F9]" },
+              { icon: Hotel,          title: "Stay Credibility Score",         desc: "Accommodation proof tested for plausibility.",                 grad: "from-[#EC4899] to-[#F472B6]" },
+              { icon: CreditCard,     title: "Funding Transparency",           desc: "Who pays the trip — and how cleanly that's documented.",       grad: "from-[#14B8A6] to-[#5EEAD4]" },
+              { icon: FolderCheck,    title: "Documentation Readiness Index",  desc: "Are all required papers complete, current, and consistent?",   grad: "from-[#6366F1] to-[#A5B4FC]" },
+              { icon: Bot,            title: "Behavioral Pattern Matching",    desc: "AI compares your profile to thousands of real outcomes.",      grad: "from-[#F97316] to-[#FDBA74]" },
+            ].map(({ icon: Icon, title, desc, grad }, i) => (
+              <Card
+                key={title}
+                className="group relative overflow-hidden rounded-2xl border bg-background/80 backdrop-blur-sm hover-elevate transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+                style={{ animationDelay: `${i * 60}ms` }}
                 data-testid={`factor-${i}`}
               >
-                <CheckCircle className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
-                <span className="font-medium text-xs">{factor}</span>
-              </div>
+                {/* gradient sheen on hover */}
+                <div aria-hidden className={`absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 bg-gradient-to-br ${grad}`} />
+                {/* corner glow */}
+                <div aria-hidden className={`absolute -top-10 -right-10 w-28 h-28 rounded-full opacity-30 blur-2xl bg-gradient-to-br ${grad} group-hover:opacity-60 transition-opacity duration-500`} />
+
+                <CardContent className="relative p-5 text-left">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 text-white shadow-lg bg-gradient-to-br ${grad} group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300`}>
+                    <Icon className="w-6 h-6" />
+                  </div>
+                  <h3 className="font-semibold text-sm md:text-base mb-1.5 leading-snug">{title}</h3>
+                  <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">{desc}</p>
+                </CardContent>
+              </Card>
             ))}
           </div>
         </div>
