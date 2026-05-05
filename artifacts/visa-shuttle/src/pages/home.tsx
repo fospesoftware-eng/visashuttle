@@ -269,7 +269,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Hero */}
-      <section className="relative overflow-hidden pt-14 pb-10 md:pt-24 md:pb-20">
+      <section className="relative overflow-hidden pt-14 pb-6 md:pt-24 md:pb-10">
         {/* Minimal premium aurora background */}
         <div className="hero-aurora-bg absolute inset-0 pointer-events-none" aria-hidden="true">
           <div className="hero-aurora-base" />
@@ -436,7 +436,7 @@ export default function HomePage() {
       </section>
 
       {/* What the AI Looks At — single-row marquee carousel */}
-      <section className="relative py-20 md:py-28 overflow-hidden">
+      <section className="relative py-10 md:py-14 overflow-hidden">
         {/* Inline keyframes — kept local to this section */}
         <style>{`
           @keyframes signal-marquee {
@@ -586,7 +586,7 @@ export default function HomePage() {
       </section>
 
       {/* How It Works — animated journey */}
-      <section id="how-it-works" className="relative py-20 md:py-28 px-4 overflow-hidden">
+      <section id="how-it-works" className="relative py-10 md:py-14 px-4 overflow-hidden">
         {/* Inline keyframes — local to this section */}
         <style>{`
           @keyframes how-ring-spin { to { transform: rotate(360deg); } }
@@ -747,7 +747,7 @@ export default function HomePage() {
 
                   {/* Inner orb with icon */}
                   <div
-                    className="how-orb absolute inset-2 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-[#4055FF]/30 transition-transform duration-500 group-hover:scale-110"
+                    className="how-orb absolute inset-2 rounded-full flex items-center justify-center text-white shadow-lg shadow-[#4055FF]/30 transition-transform duration-500 group-hover:scale-110"
                     style={{
                       background:
                         "linear-gradient(135deg,#4055FF,#9033F5,#FF2060)",
@@ -799,7 +799,7 @@ export default function HomePage() {
       </section>
 
       {/* Trust */}
-      <section className="py-14 md:py-20 bg-muted/30 border-y px-4">
+      <section className="py-10 md:py-14 bg-muted/30 border-y px-4">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-10">
             <h2 className="text-2xl md:text-3xl font-bold mb-3">Why Travelers Trust Visa Shuttle</h2>
@@ -825,7 +825,7 @@ export default function HomePage() {
       </section>
 
       {/* CTA */}
-      <section className="py-16 md:py-24 px-4">
+      <section className="py-12 md:py-16 px-4">
         <div className="max-w-3xl mx-auto text-center">
           <div className="relative rounded-3xl overflow-hidden p-10 md:p-16 text-white shadow-2xl shadow-[#4055FF]/20" style={{background:"linear-gradient(135deg,#4055FF 0%,#9033F5 50%,#FF2060 100%)"}}>
             <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
@@ -853,7 +853,7 @@ export default function HomePage() {
       </section>
 
       {/* Contact */}
-      <section id="contact" className="py-16 md:py-24 px-4 bg-muted/30 border-y">
+      <section id="contact" className="py-12 md:py-16 px-4 bg-muted/30 border-y">
         <div className="max-w-6xl mx-auto grid lg:grid-cols-[0.85fr_1.15fr] gap-8 items-start">
           <div>
             <Badge className="mb-5 bg-[#4055FF]/10 text-[#4055FF] dark:bg-[#4055FF]/20 dark:text-[#8899FF] border-[#4055FF]/20 hover:bg-[#4055FF]/10">
