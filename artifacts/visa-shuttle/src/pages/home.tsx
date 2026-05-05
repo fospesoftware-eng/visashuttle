@@ -8,6 +8,20 @@ import {
   Plane, ShieldAlert, CalendarCheck, TicketCheck,
   Hotel, CreditCard, FolderCheck, Bot,
 } from "lucide-react";
+import signalNationality  from "@assets/signals/nationality.jpg";
+import signalDestination  from "@assets/signals/destination.jpg";
+import signalVisaType     from "@assets/signals/visatype.jpg";
+import signalIntent       from "@assets/signals/intent.jpg";
+import signalProfile      from "@assets/signals/profile.jpg";
+import signalFinance      from "@assets/signals/finance.jpg";
+import signalFootprint    from "@assets/signals/footprint.jpg";
+import signalRejection    from "@assets/signals/rejection.jpg";
+import signalTripLogic    from "@assets/signals/triplogic.jpg";
+import signalReturn       from "@assets/signals/return.jpg";
+import signalStay         from "@assets/signals/stay.jpg";
+import signalFunding      from "@assets/signals/funding.jpg";
+import signalDocs         from "@assets/signals/docs.jpg";
+import signalBehavioral   from "@assets/signals/behavioral.jpg";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -494,78 +508,103 @@ export default function HomePage() {
           </p>
         </div>
 
-        {/* Marquee row */}
+        {/* Marquee row of vertical cards */}
         <div
-          className="relative w-full"
+          className="relative w-full py-6"
           style={{
             maskImage:
-              "linear-gradient(to right, transparent, black 8%, black 92%, transparent)",
+              "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
             WebkitMaskImage:
-              "linear-gradient(to right, transparent, black 8%, black 92%, transparent)",
+              "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
           }}
         >
-          <div className="signal-marquee-track flex w-max gap-4 md:gap-5 py-4">
+          <div className="signal-marquee-track flex w-max gap-5 md:gap-6">
             {(() => {
               const SIGNALS = [
-                { icon: Flag,           title: "Nationality Strength",     desc: "Passport mobility ranking" },
-                { icon: Map,            title: "Destination Risk Mapping", desc: "Country approval patterns" },
-                { icon: Stamp,          title: "Visa Type Complexity",     desc: "Tourist, business, study" },
-                { icon: Compass,        title: "Travel Intent Clarity",    desc: "Purpose reads cleanly" },
-                { icon: UserCheck,      title: "Profile Stability",        desc: "Settled-life signals" },
-                { icon: Wallet,         title: "Financial Strength",       desc: "Income vs. trip cost" },
-                { icon: Plane,          title: "Travel Footprint",         desc: "Past-trip credibility" },
-                { icon: ShieldAlert,    title: "Rejection Risk Signals",   desc: "Red-flag detection" },
-                { icon: CalendarCheck,  title: "Trip Logic",               desc: "Itinerary makes sense" },
-                { icon: TicketCheck,    title: "Return Assurance",         desc: "Onward & return checks" },
-                { icon: Hotel,          title: "Stay Credibility",         desc: "Accommodation proof" },
-                { icon: CreditCard,     title: "Funding Transparency",     desc: "Documented sponsorship" },
-                { icon: FolderCheck,    title: "Documentation Readiness",  desc: "Complete & consistent" },
-                { icon: Bot,            title: "Behavioral Pattern Match", desc: "Real-outcome similarity" },
+                { icon: Flag,          img: signalNationality, title: "Nationality Strength",     desc: "How your passport ranks against global mobility data — the first lens every consulate uses." },
+                { icon: Map,           img: signalDestination, title: "Destination Risk Mapping", desc: "Country-specific approval patterns and recent refusal trends shape your odds." },
+                { icon: Stamp,         img: signalVisaType,    title: "Visa Type Complexity",     desc: "Tourist, business, or study — each carries its own bar of scrutiny." },
+                { icon: Compass,       img: signalIntent,      title: "Travel Intent Clarity",    desc: "How clearly your purpose of travel reads to an officer in 30 seconds." },
+                { icon: UserCheck,     img: signalProfile,     title: "Profile Stability Score",  desc: "Age, employment and ties that signal a settled life back home." },
+                { icon: Wallet,        img: signalFinance,     title: "Financial Strength",       desc: "Income and balances measured against the real cost of your trip." },
+                { icon: Plane,         img: signalFootprint,   title: "Travel Footprint",         desc: "Past trips that build credibility with consulates over time." },
+                { icon: ShieldAlert,   img: signalRejection,   title: "Rejection Risk Signals",   desc: "Prior refusals and the red-flag patterns AI is trained to catch." },
+                { icon: CalendarCheck, img: signalTripLogic,   title: "Trip Logic Evaluation",    desc: "Does the duration, route and itinerary actually make sense end-to-end?" },
+                { icon: TicketCheck,   img: signalReturn,      title: "Return Assurance Check",   desc: "Onward tickets and return commitments verified before you submit." },
+                { icon: Hotel,         img: signalStay,        title: "Stay Credibility Score",   desc: "Accommodation proof tested for plausibility against your itinerary." },
+                { icon: CreditCard,    img: signalFunding,     title: "Funding Transparency",     desc: "Who pays for the trip — and how cleanly that story is documented." },
+                { icon: FolderCheck,   img: signalDocs,        title: "Documentation Readiness",  desc: "Every required paper checked for completeness, currency and consistency." },
+                { icon: Bot,           img: signalBehavioral,  title: "Behavioral Pattern Match", desc: "AI compares your profile to thousands of real applicant outcomes." },
               ];
-              // Duplicate for seamless loop (translate -50%).
-              return [...SIGNALS, ...SIGNALS].map(({ icon: Icon, title, desc }, i) => (
-                <div
+              // Duplicate for seamless infinite loop (translate -50%).
+              return [...SIGNALS, ...SIGNALS].map(({ icon: Icon, img, title, desc }, i) => (
+                <article
                   key={`${title}-${i}`}
                   data-testid={i < SIGNALS.length ? `factor-${i}` : undefined}
-                  className="group relative shrink-0 w-[240px] md:w-[260px] rounded-2xl border border-border/60 bg-background/70 backdrop-blur-sm px-5 py-5 transition-all duration-300 hover:-translate-y-1 hover:border-transparent hover:shadow-[0_18px_40px_-18px_rgba(64,85,255,0.45)] dark:hover:shadow-[0_18px_40px_-18px_rgba(144,51,245,0.55)]"
+                  className="group relative shrink-0 w-[260px] md:w-[280px] rounded-2xl overflow-hidden border border-border/60 bg-background/70 backdrop-blur-sm transition-all duration-500 hover:-translate-y-2 hover:border-transparent hover:shadow-[0_24px_50px_-20px_rgba(64,85,255,0.45)] dark:hover:shadow-[0_24px_50px_-20px_rgba(144,51,245,0.55)] flex flex-col"
                 >
-                  {/* gradient border on hover */}
+                  {/* gradient border ring on hover */}
                   <div
                     aria-hidden
-                    className="absolute inset-0 rounded-2xl p-[1px] opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+                    className="absolute inset-0 rounded-2xl p-[1.5px] opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none z-20"
                     style={{
-                      background:
-                        "linear-gradient(135deg,#4055FF,#9033F5,#FF2060)",
-                      WebkitMask:
-                        "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+                      background: "linear-gradient(135deg,#4055FF,#9033F5,#FF2060)",
+                      WebkitMask: "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
                       WebkitMaskComposite: "xor",
                       maskComposite: "exclude",
                     }}
                   />
-                  {/* corner glow */}
-                  <div
-                    aria-hidden
-                    className="absolute -top-6 -right-6 w-20 h-20 rounded-full opacity-0 group-hover:opacity-60 blur-2xl transition-opacity duration-500 pointer-events-none"
-                    style={{ background: "linear-gradient(135deg,#4055FF,#FF2060)" }}
-                  />
 
-                  <div className="relative flex items-center gap-3">
-                    <span className="relative inline-flex items-center justify-center w-10 h-10 rounded-xl border border-border/80 bg-background/80 text-foreground/70 transition-all duration-300 group-hover:text-white group-hover:border-transparent group-hover:[background:linear-gradient(135deg,#4055FF,#9033F5,#FF2060)] group-hover:rotate-[6deg] group-hover:scale-110">
-                      <Icon className="w-[18px] h-[18px]" strokeWidth={1.75} />
+                  {/* Image */}
+                  <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
+                    <img
+                      src={img}
+                      alt=""
+                      aria-hidden="true"
+                      loading="lazy"
+                      decoding="async"
+                      draggable={false}
+                      className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
+                    />
+                    {/* Bottom fade so text below feels connected */}
+                    <div
+                      aria-hidden
+                      className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background to-transparent"
+                    />
+                    {/* Brand tint on hover */}
+                    <div
+                      aria-hidden
+                      className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 mix-blend-overlay"
+                      style={{ background: "linear-gradient(135deg,#4055FF55,#FF206055)" }}
+                    />
+                    {/* Floating icon chip */}
+                    <span className="absolute top-3 left-3 inline-flex items-center justify-center w-9 h-9 rounded-xl border border-white/20 bg-black/40 backdrop-blur-md text-white shadow-lg transition-transform duration-500 group-hover:scale-110 group-hover:rotate-[6deg]">
+                      <Icon className="w-[16px] h-[16px]" strokeWidth={1.9} />
                     </span>
-                    <div className="min-w-0">
-                      <h3 className="text-[14px] font-semibold tracking-tight leading-tight truncate">{title}</h3>
-                      <p className="text-[12px] text-muted-foreground mt-0.5 truncate">{desc}</p>
-                    </div>
                   </div>
-                </div>
+
+                  {/* Text */}
+                  <div className="relative px-5 pt-3 pb-5 flex-1 flex flex-col">
+                    <h3 className="text-[15px] font-semibold tracking-tight leading-snug">
+                      {title}
+                    </h3>
+                    <span
+                      aria-hidden
+                      className="block h-px w-6 my-2.5 origin-left scale-x-50 group-hover:scale-x-100 transition-transform duration-500"
+                      style={{ background: "linear-gradient(90deg,#4055FF,#FF2060)" }}
+                    />
+                    <p className="text-[12.5px] text-muted-foreground leading-relaxed">
+                      {desc}
+                    </p>
+                  </div>
+                </article>
               ));
             })()}
           </div>
         </div>
 
         {/* Footer cue */}
-        <p className="relative mt-8 text-center text-[11px] tracking-[0.18em] uppercase text-muted-foreground/70">
+        <p className="relative mt-6 text-center text-[11px] tracking-[0.18em] uppercase text-muted-foreground/70">
           Hover to pause · Scrolls automatically
         </p>
       </section>
