@@ -434,61 +434,108 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* What the AI Looks At — 14 signals */}
-      <section className="relative py-16 md:py-24 px-4 bg-muted/30 border-y overflow-hidden">
-        {/* decorative blurs */}
-        <div aria-hidden className="pointer-events-none absolute -top-24 -left-24 w-72 h-72 rounded-full bg-[#4055FF]/20 blur-3xl animate-pulse" />
-        <div aria-hidden className="pointer-events-none absolute -bottom-24 -right-24 w-72 h-72 rounded-full bg-[#FF2060]/20 blur-3xl animate-pulse [animation-delay:1.5s]" />
+      {/* What the AI Looks At — minimal signal grid */}
+      <section className="relative py-20 md:py-28 px-4 overflow-hidden">
+        {/* Subtle ambient backdrop — blends with surrounding sections */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-[0.4] dark:opacity-[0.25]"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 20% 20%, rgba(64,85,255,0.08), transparent 45%), radial-gradient(circle at 80% 75%, rgba(255,32,96,0.07), transparent 45%)",
+          }}
+        />
+        {/* whisper-thin grid lines */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-[0.04] dark:opacity-[0.06]"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)",
+            backgroundSize: "56px 56px",
+            maskImage: "radial-gradient(ellipse at center, black 40%, transparent 80%)",
+            WebkitMaskImage: "radial-gradient(ellipse at center, black 40%, transparent 80%)",
+          }}
+        />
 
-        <div className="relative max-w-6xl mx-auto text-center">
-          <Badge className="mb-5 bg-[#4055FF]/10 text-[#4055FF] dark:bg-[#4055FF]/20 dark:text-[#8899FF] border-[#4055FF]/20 hover:bg-[#4055FF]/10">
-            <Sparkles className="w-3 h-3 mr-1.5" />
-            What the AI Looks At
-          </Badge>
-          <h2 className="text-3xl md:text-4xl font-black tracking-tight mb-3 bg-clip-text text-transparent bg-gradient-to-r from-[#4055FF] via-[#9033F5] to-[#FF2060]">
-            The Signals Behind Every Decision
-          </h2>
-          <p className="text-muted-foreground mb-12 max-w-2xl mx-auto leading-relaxed">
-            The same factors immigration officers evaluate — now analyzed by AI in seconds.
-          </p>
+        <div className="relative max-w-6xl mx-auto">
+          {/* Header */}
+          <div className="max-w-2xl mx-auto text-center mb-16 md:mb-20">
+            <div className="inline-flex items-center gap-2 mb-5 text-xs font-medium tracking-[0.18em] uppercase text-muted-foreground">
+              <span className="h-px w-8 bg-gradient-to-r from-transparent to-[#4055FF]/50" />
+              <Sparkles className="w-3.5 h-3.5 text-[#4055FF]" />
+              What the AI Looks At
+              <span className="h-px w-8 bg-gradient-to-l from-transparent to-[#FF2060]/50" />
+            </div>
+            <h2 className="text-3xl md:text-5xl font-black tracking-tight leading-[1.1] mb-4">
+              The signals behind <br className="hidden sm:block" />
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#4055FF] via-[#9033F5] to-[#FF2060]">
+                every decision.
+              </span>
+            </h2>
+            <p className="text-muted-foreground leading-relaxed">
+              The same factors immigration officers evaluate — now read by AI in seconds.
+            </p>
+          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[
-              { icon: Flag,           title: "Nationality Strength Index",     desc: "How your passport ranks against global mobility data.",        grad: "from-[#4055FF] to-[#6B7CFF]" },
-              { icon: Map,            title: "Destination Risk Mapping",       desc: "Country-specific approval patterns and refusal trends.",       grad: "from-[#9033F5] to-[#C56BFF]" },
-              { icon: Stamp,          title: "Visa Type Complexity",           desc: "Tourist, business, study — each carries its own scrutiny.",    grad: "from-[#FF2060] to-[#FF6B8E]" },
-              { icon: Compass,        title: "Travel Intent Clarity",          desc: "How clearly your purpose of travel reads to an officer.",      grad: "from-[#10B981] to-[#34D399]" },
-              { icon: UserCheck,      title: "Profile Stability Score",        desc: "Age, employment and ties that signal a settled life.",         grad: "from-[#0EA5E9] to-[#38BDF8]" },
-              { icon: Wallet,         title: "Financial Strength Indicator",   desc: "Income and balances measured against trip cost.",              grad: "from-[#F59E0B] to-[#FBBF24]" },
-              { icon: Plane,          title: "Travel Footprint Analysis",      desc: "Past trips that build credibility with consulates.",           grad: "from-[#4055FF] to-[#22D3EE]" },
-              { icon: ShieldAlert,    title: "Rejection Risk Signals",         desc: "Prior refusals and red-flag patterns we look for.",            grad: "from-[#EF4444] to-[#F87171]" },
-              { icon: CalendarCheck,  title: "Trip Logic Evaluation",          desc: "Does the duration and itinerary make sense end-to-end?",       grad: "from-[#9033F5] to-[#4055FF]" },
-              { icon: TicketCheck,    title: "Return Assurance Check",         desc: "Onward tickets and return commitments verified.",              grad: "from-[#06B6D4] to-[#67E8F9]" },
-              { icon: Hotel,          title: "Stay Credibility Score",         desc: "Accommodation proof tested for plausibility.",                 grad: "from-[#EC4899] to-[#F472B6]" },
-              { icon: CreditCard,     title: "Funding Transparency",           desc: "Who pays the trip — and how cleanly that's documented.",       grad: "from-[#14B8A6] to-[#5EEAD4]" },
-              { icon: FolderCheck,    title: "Documentation Readiness Index",  desc: "Are all required papers complete, current, and consistent?",   grad: "from-[#6366F1] to-[#A5B4FC]" },
-              { icon: Bot,            title: "Behavioral Pattern Matching",    desc: "AI compares your profile to thousands of real outcomes.",      grad: "from-[#F97316] to-[#FDBA74]" },
-            ].map(({ icon: Icon, title, desc, grad }, i) => (
-              <Card
-                key={title}
-                className="group relative overflow-hidden rounded-2xl border bg-background/80 backdrop-blur-sm hover-elevate transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
-                style={{ animationDelay: `${i * 60}ms` }}
-                data-testid={`factor-${i}`}
-              >
-                {/* gradient sheen on hover */}
-                <div aria-hidden className={`absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 bg-gradient-to-br ${grad}`} />
-                {/* corner glow */}
-                <div aria-hidden className={`absolute -top-10 -right-10 w-28 h-28 rounded-full opacity-30 blur-2xl bg-gradient-to-br ${grad} group-hover:opacity-60 transition-opacity duration-500`} />
+          {/* Signal grid — borderless cells separated by hairline dividers */}
+          <div className="relative rounded-3xl border border-border/60 bg-background/40 backdrop-blur-sm overflow-hidden">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 divide-y sm:divide-y-0 divide-border/60 [&>*]:border-border/60 sm:[&>*]:border-r [&>*:nth-child(2n)]:sm:border-r-0 lg:[&>*:nth-child(2n)]:sm:border-r lg:[&>*:nth-child(3n)]:lg:border-r-0 xl:[&>*:nth-child(3n)]:lg:border-r xl:[&>*:nth-child(4n)]:xl:border-r-0 sm:[&>*:nth-child(n+3)]:sm:border-t lg:[&>*:nth-child(n+4)]:lg:border-t xl:[&>*:nth-child(n+5)]:xl:border-t">
+              {[
+                { icon: Flag,           title: "Nationality Strength",      desc: "How your passport ranks in global mobility." },
+                { icon: Map,            title: "Destination Risk Mapping",  desc: "Country-specific approval patterns." },
+                { icon: Stamp,          title: "Visa Type Complexity",      desc: "Tourist, business, study — each its own bar." },
+                { icon: Compass,        title: "Travel Intent Clarity",     desc: "How clearly your purpose reads to an officer." },
+                { icon: UserCheck,      title: "Profile Stability",         desc: "Age, work and ties that signal a settled life." },
+                { icon: Wallet,         title: "Financial Strength",        desc: "Income and balances vs. trip cost." },
+                { icon: Plane,          title: "Travel Footprint",          desc: "Past trips that build consular credibility." },
+                { icon: ShieldAlert,    title: "Rejection Risk Signals",    desc: "Prior refusals and red-flag patterns." },
+                { icon: CalendarCheck,  title: "Trip Logic",                desc: "Does the itinerary make sense end-to-end?" },
+                { icon: TicketCheck,    title: "Return Assurance",          desc: "Onward tickets and return commitments." },
+                { icon: Hotel,          title: "Stay Credibility",          desc: "Accommodation proof tested for plausibility." },
+                { icon: CreditCard,     title: "Funding Transparency",      desc: "Who pays — and how cleanly it's documented." },
+                { icon: FolderCheck,    title: "Documentation Readiness",   desc: "All papers complete, current, consistent." },
+                { icon: Bot,            title: "Behavioral Pattern Match",  desc: "Compared to thousands of real outcomes." },
+              ].map(({ icon: Icon, title, desc }, i) => (
+                <div
+                  key={title}
+                  className="group relative p-6 md:p-7 transition-colors duration-300 hover:bg-muted/40"
+                  data-testid={`factor-${i}`}
+                >
+                  {/* hover gradient sheen — uses theme accents */}
+                  <div
+                    aria-hidden
+                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+                    style={{
+                      background:
+                        "radial-gradient(circle at top left, rgba(64,85,255,0.08), transparent 70%)",
+                    }}
+                  />
 
-                <CardContent className="relative p-5 text-left">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 text-white shadow-lg bg-gradient-to-br ${grad} group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300`}>
-                    <Icon className="w-6 h-6" />
+                  {/* Icon — outline by default, fills with gradient on hover */}
+                  <div className="relative mb-4 inline-flex items-center justify-center">
+                    <span
+                      aria-hidden
+                      className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 blur-md transition-opacity duration-500"
+                      style={{ background: "linear-gradient(135deg,#4055FF,#9033F5,#FF2060)" }}
+                    />
+                    <span className="relative w-11 h-11 rounded-xl border border-border/80 bg-background/80 flex items-center justify-center text-foreground/70 group-hover:text-white group-hover:border-transparent transition-all duration-300 group-hover:[background:linear-gradient(135deg,#4055FF,#9033F5,#FF2060)]">
+                      <Icon className="w-[18px] h-[18px] transition-transform duration-500 group-hover:rotate-[8deg] group-hover:scale-110" strokeWidth={1.75} />
+                    </span>
                   </div>
-                  <h3 className="font-semibold text-sm md:text-base mb-1.5 leading-snug">{title}</h3>
-                  <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">{desc}</p>
-                </CardContent>
-              </Card>
-            ))}
+
+                  <h3 className="relative text-[15px] font-semibold tracking-tight mb-1.5 leading-snug">
+                    {title}
+                    <span
+                      aria-hidden
+                      className="block h-px w-6 mt-2 origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-500"
+                      style={{ background: "linear-gradient(90deg,#4055FF,#FF2060)" }}
+                    />
+                  </h3>
+                  <p className="relative text-[13px] text-muted-foreground leading-relaxed">{desc}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
