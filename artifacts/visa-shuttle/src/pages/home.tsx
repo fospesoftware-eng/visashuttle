@@ -585,28 +585,216 @@ export default function HomePage() {
         </p>
       </section>
 
-      {/* How It Works */}
-      <section id="how-it-works" className="py-16 md:py-24 px-4">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-2xl md:text-3xl font-bold mb-3">How It Works</h2>
-            <p className="text-muted-foreground max-w-md mx-auto">From your details to a full AI visa analysis in under 2 minutes</p>
+      {/* How It Works — animated journey */}
+      <section id="how-it-works" className="relative py-20 md:py-28 px-4 overflow-hidden">
+        {/* Inline keyframes — local to this section */}
+        <style>{`
+          @keyframes how-ring-spin { to { transform: rotate(360deg); } }
+          @keyframes how-orb-float {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50%      { transform: translateY(-4px) scale(1.02); }
+          }
+          @keyframes how-particle-bob {
+            0%, 100% { transform: translateY(0); opacity: 0.55; }
+            50%      { transform: translateY(-6px); opacity: 1; }
+          }
+          @keyframes how-line-flow {
+            0%   { background-position: 220% 50%; }
+            100% { background-position: -220% 50%; }
+          }
+          @keyframes how-pulse-travel {
+            0%   { left: 0%;   opacity: 0; }
+            8%   { opacity: 1; }
+            92%  { opacity: 1; }
+            100% { left: 100%; opacity: 0; }
+          }
+          @keyframes how-eyebrow-pulse {
+            0%, 100% { opacity: 0.35; transform: scale(1); }
+            50%      { opacity: 1;    transform: scale(1.4); }
+          }
+          .how-ring   { animation: how-ring-spin 14s linear infinite; transform-origin: 50% 50%; }
+          .how-orb    { animation: how-orb-float 5s ease-in-out infinite; }
+          .how-particle    { animation: how-particle-bob 3.4s ease-in-out infinite; }
+          .how-particle-2  { animation-delay: 0.6s; animation-duration: 3.0s; }
+          .how-particle-3  { animation-delay: 1.2s; animation-duration: 3.8s; }
+          .how-line {
+            background-image: linear-gradient(90deg,
+              transparent 0%,
+              rgba(64,85,255,0.35) 18%,
+              #9033F5 50%,
+              rgba(255,32,96,0.35) 82%,
+              transparent 100%);
+            background-size: 220% 100%;
+            animation: how-line-flow 5s linear infinite;
+          }
+          .how-pulse        { animation: how-pulse-travel 3s linear infinite; }
+          .how-pulse-2      { animation-delay: 1.5s; }
+          .how-eyebrow-dot  { animation: how-eyebrow-pulse 2.4s ease-in-out infinite; }
+          .how-eyebrow-dot-2{ animation-delay: 0.8s; }
+          .how-eyebrow-dot-3{ animation-delay: 1.6s; }
+          @media (prefers-reduced-motion: reduce) {
+            .how-ring, .how-orb, .how-particle,
+            .how-line, .how-pulse, .how-eyebrow-dot { animation: none; }
+          }
+        `}</style>
+
+        {/* Soft brand wash */}
+        <div
+          aria-hidden
+          className="absolute inset-0 -z-10 pointer-events-none"
+          style={{
+            background:
+              "radial-gradient(ellipse at center, rgba(144,51,245,0.10), transparent 60%)",
+          }}
+        />
+
+        <div className="max-w-5xl mx-auto">
+          {/* Eyebrow + heading */}
+          <div className="flex items-center justify-center gap-2 text-[11px] tracking-[0.24em] uppercase text-muted-foreground mb-3">
+            <span
+              className="how-eyebrow-dot inline-block w-1.5 h-1.5 rounded-full"
+              style={{ background: "#4055FF" }}
+            />
+            <span>The Journey</span>
+            <span
+              className="how-eyebrow-dot how-eyebrow-dot-2 inline-block w-1.5 h-1.5 rounded-full"
+              style={{ background: "#9033F5" }}
+            />
+            <span>How It Works</span>
+            <span
+              className="how-eyebrow-dot how-eyebrow-dot-3 inline-block w-1.5 h-1.5 rounded-full"
+              style={{ background: "#FF2060" }}
+            />
           </div>
-          <div className="grid md:grid-cols-3 gap-8 relative">
-            <div className="hidden md:block absolute top-10 left-[33%] w-[34%] h-0.5" style={{background:"linear-gradient(90deg,#4055FF,#FF2060)"}} />
-            {STEPS.map(({ step, icon: Icon, title, desc }) => (
-              <div key={step} className="text-center relative">
-                <div className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-[#4055FF]/20" style={{background:"linear-gradient(135deg,#4055FF,#9033F5,#FF2060)"}}>
-                  <Icon className="w-9 h-9 text-white" />
+          <div className="text-center mb-14 md:mb-16">
+            <h2 className="text-3xl md:text-5xl font-bold tracking-tight leading-[1.1]">
+              From details to a{" "}
+              <span className="bg-gradient-to-r from-[#4055FF] via-[#9033F5] to-[#FF2060] bg-clip-text text-transparent">
+                decision
+              </span>
+              <br className="hidden md:block" /> — in seconds.
+            </h2>
+            <p className="mt-4 text-muted-foreground max-w-md mx-auto">
+              Three clean steps. A full AI visa analysis in under two minutes.
+            </p>
+          </div>
+
+          {/* Steps */}
+          <div className="relative grid md:grid-cols-3 gap-10 md:gap-6">
+            {/* Animated connector — sits behind the icon tiles, runs through middle icon */}
+            <div
+              aria-hidden
+              className="hidden md:block absolute top-12 left-[16.67%] right-[16.67%] h-px how-line z-0 pointer-events-none"
+            >
+              <span
+                className="how-pulse absolute -top-[3px] w-2 h-2 rounded-full"
+                style={{ background: "#4055FF", boxShadow: "0 0 14px #4055FF" }}
+              />
+              <span
+                className="how-pulse how-pulse-2 absolute -top-[3px] w-2 h-2 rounded-full"
+                style={{ background: "#FF2060", boxShadow: "0 0 14px #FF2060" }}
+              />
+            </div>
+
+            {STEPS.map(({ step, icon: Icon, title, desc }, i) => (
+              <article
+                key={step}
+                className="group relative text-center z-10"
+                data-testid={`step-${i}`}
+              >
+                {/* Icon tile cluster */}
+                <div className="relative w-24 h-24 mx-auto mb-6">
+                  {/* Rotating gradient arc ring */}
+                  <svg
+                    className="how-ring absolute inset-0 w-full h-full"
+                    viewBox="0 0 100 100"
+                    aria-hidden="true"
+                  >
+                    <defs>
+                      <linearGradient
+                        id={`how-ring-${i}`}
+                        x1="0%"
+                        y1="0%"
+                        x2="100%"
+                        y2="100%"
+                      >
+                        <stop offset="0%"   stopColor="#4055FF" />
+                        <stop offset="50%"  stopColor="#9033F5" />
+                        <stop offset="100%" stopColor="#FF2060" />
+                      </linearGradient>
+                    </defs>
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="46"
+                      fill="none"
+                      stroke={`url(#how-ring-${i})`}
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeDasharray="190 100"
+                    />
+                  </svg>
+
+                  {/* Halo */}
+                  <div
+                    aria-hidden
+                    className="absolute inset-0 rounded-full blur-2xl opacity-60 transition-opacity duration-500 group-hover:opacity-90"
+                    style={{
+                      background:
+                        "radial-gradient(circle, rgba(144,51,245,0.45), transparent 70%)",
+                    }}
+                  />
+
+                  {/* Inner orb with icon */}
+                  <div
+                    className="how-orb absolute inset-2 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-[#4055FF]/30 transition-transform duration-500 group-hover:scale-110"
+                    style={{
+                      background:
+                        "linear-gradient(135deg,#4055FF,#9033F5,#FF2060)",
+                    }}
+                  >
+                    <Icon className="w-9 h-9" strokeWidth={1.8} />
+                  </div>
+
+                  {/* Floating particles */}
+                  <span
+                    aria-hidden
+                    className="how-particle absolute -top-1 right-2 w-2 h-2 rounded-full"
+                    style={{ background: "#4055FF" }}
+                  />
+                  <span
+                    aria-hidden
+                    className="how-particle how-particle-2 absolute -bottom-1 left-3 w-1.5 h-1.5 rounded-full"
+                    style={{ background: "#FF2060" }}
+                  />
+                  <span
+                    aria-hidden
+                    className="how-particle how-particle-3 absolute top-1/2 -right-2 w-1.5 h-1.5 rounded-full"
+                    style={{ background: "#9033F5" }}
+                  />
                 </div>
-                <div className="absolute top-0 right-1/4 w-6 h-6 rounded-full text-white text-xs font-bold flex items-center justify-center" style={{background:"#4055FF"}}>
-                  {step.replace("0", "")}
+
+                {/* Step number */}
+                <div className="text-[11px] font-semibold tracking-[0.24em] uppercase mb-2">
+                  <span className="bg-gradient-to-r from-[#4055FF] via-[#9033F5] to-[#FF2060] bg-clip-text text-transparent">
+                    Step {step}
+                  </span>
                 </div>
-                <h3 className="font-semibold mb-2">{title}</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed">{desc}</p>
-              </div>
+
+                <h3 className="text-lg font-semibold mb-2 tracking-tight">
+                  {title}
+                </h3>
+                <p className="text-sm text-muted-foreground leading-relaxed max-w-[260px] mx-auto">
+                  {desc}
+                </p>
+              </article>
             ))}
           </div>
+
+          {/* Foot note */}
+          <p className="mt-14 text-center text-[11px] tracking-[0.18em] uppercase text-muted-foreground/70">
+            No credit card · No download · ~120 seconds
+          </p>
         </div>
       </section>
 
