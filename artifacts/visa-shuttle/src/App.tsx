@@ -29,6 +29,7 @@ import SettingsPage from "@/pages/settings";
 
 import VisaCheckPage from "@/pages/visa-check";
 import VisaCheckPublicPage from "@/pages/visa-check-public";
+import { VisaCheckAgencyResultPage, VisaCheckPublicResultPage } from "@/pages/visa-check-result";
 import AgencyDashboard from "@/pages/agency/dashboard";
 import LeadsPage from "@/pages/agency/leads";
 import CustomersPage from "@/pages/agency/customers";
@@ -122,6 +123,7 @@ function Router() {
       <Route path="/payment/deep-check" component={DeepCheckPaymentPage} />
       <Route path="/saved-profile" component={SavedProfilePage} />
       <Route path="/settings" component={SettingsPage} />
+      <Route path="/visa-check/results" component={VisaCheckPublicResultPage} />
       <Route path="/visa-check" component={VisaCheckPublicPage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/signup" component={SignupPage} />
@@ -207,6 +209,7 @@ function Router() {
       <Route path="/app/reports" component={ReportsPage} />
       <Route path="/app/settings" component={AgencySettingsPage} />
       <Route path="/app/support" component={AgencySupportPage} />
+      <Route path="/app/visa-check/results" component={VisaCheckAgencyResultPage} />
       <Route path="/app/visa-check" component={VisaCheckPage} />
 
       <Route path="/customer" component={CustomerDashboard} />

@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import {
   AlertTriangle,
+  ArrowLeft,
   ArrowRight,
   BadgeCheck,
   CalendarDays,
@@ -60,6 +62,7 @@ import {
 
 type TravelDocVisaCheckProps = {
   surface?: "public" | "dashboard";
+  mode?: "form" | "result";
 };
 
 const DOCUMENT_TYPES = [
@@ -201,6 +204,16 @@ function checklistToneClass(tone: string) {
   return "border-border bg-background text-foreground";
 }
 
+function getInitialParam(name: string, fallback = "") {
+  if (typeof window === "undefined") return fallback;
+  return new URLSearchParams(window.location.search).get(name) || fallback;
+}
+
+function getInitialHeldVisas() {
+  const held = getInitialParam("held");
+  return held ? held.split(",").filter(Boolean).map(decodeURIComponent) : [];
+}
+
 function StatPill({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
   return (
     <div className="rounded-lg border bg-background px-3 py-2">
@@ -269,20 +282,21 @@ function CountrySelect({
   );
 }
 
-export function TravelDocVisaCheck({ surface = "public" }: TravelDocVisaCheckProps) {
-  const [documentType, setDocumentType] = useState(DOCUMENT_TYPES[0]);
-  const [nationality, setNationality] = useState("India");
-  const [residence, setResidence] = useState("India");
-  const [fromCountry, setFromCountry] = useState("India");
-  const [toCountry, setToCountry] = useState("");
-  const [transferCountry, setTransferCountry] = useState("");
-  const [showTransfer, setShowTransfer] = useState(false);
-  const [visaType, setVisaType] = useState("");
-  const [purpose, setPurpose] = useState(PURPOSES[0]);
-  const [passportValidity, setPassportValidity] = useState(PASSPORT_VALIDITY[0]);
-  const [departureDate, setDepartureDate] = useState("");
-  const [selectedVisas, setSelectedVisas] = useState<string[]>([]);
-  const [checked, setChecked] = useState(false);
+export function TravelDocVisaCheck({ surface = "public", mode = "form" }: TravelDocVisaCheckProps) {
+  const [, setLocation] = useLocation();
+  const [documentType, setDocumentType] = useState(getInitialParam("doc", DOCUMENT_TYPES[0]));
+  const [nationality, setNationality] = useState(getInitialParam("nat", "India"));
+  const [residence, setResidence] = useState(getInitialParam("res", "India"));
+  const [fromCountry, setFromCountry] = useState(getInitialParam("from", "India"));
+  const [toCountry, setToCountry] = useState(getInitialParam("to"));
+  const [transferCountry, setTransferCountry] = useState(getInitialParam("via"));
+  const [showTransfer, setShowTransfer] = useState(Boolean(getInitialParam("via")));
+  const [visaType, setVisaType] = useState(getInitialParam("visa"));
+  const [purpose, setPurpose] = useState(getInitialParam("purpose", PURPOSES[0]));
+  const [passportValidity, setPassportValidity] = useState(getInitialParam("validity", PASSPORT_VALIDITY[0]));
+  const [departureDate, setDepartureDate] = useState(getInitialParam("date"));
+  const [selectedVisas, setSelectedVisas] = useState<string[]>(getInitialHeldVisas);
+  const checked = mode === "result";
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     "Americas & Western": true,
     Europe: true,
@@ -331,7 +345,6 @@ export function TravelDocVisaCheck({ surface = "public" }: TravelDocVisaCheckPro
 
   function handleDestinationChange(value: string) {
     setToCountry(value);
-    setChecked(false);
     const nextTypes = visaTypeOptions(value);
     if (!nextTypes.includes(visaType)) {
       setVisaType(nextTypes[0] ?? "");
@@ -342,21 +355,43 @@ export function TravelDocVisaCheck({ surface = "public" }: TravelDocVisaCheckPro
     setSelectedVisas((previous) =>
       previous.includes(id) ? previous.filter((visa) => visa !== id) : [...previous, id],
     );
-    setChecked(false);
   }
 
   function toggleGroup(group: string) {
     setOpenGroups((previous) => ({ ...previous, [group]: !previous[group] }));
   }
 
+  function goToResults() {
+    if (!canCheck) return;
+    const params = new URLSearchParams({
+      doc: documentType,
+      nat: nationality,
+      res: residence,
+      from: fromCountry,
+      to: toCountry,
+      visa: visaType,
+      purpose,
+      validity: passportValidity,
+      date: departureDate,
+    });
+    if (showTransfer && transferCountry) params.set("via", transferCountry);
+    if (selectedVisas.length) params.set("held", selectedVisas.map(encodeURIComponent).join(","));
+    const base = surface === "dashboard" ? "/app/visa-check" : "/visa-check";
+    setLocation(`${base}/results?${params.toString()}`);
+  }
+
+  function goBackToForm() {
+    setLocation(surface === "dashboard" ? "/app/visa-check" : "/visa-check");
+  }
+
   const shellClass = surface === "dashboard"
     ? "space-y-6"
-    : "mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8";
+    : "mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8";
 
   return (
     <div className={shellClass}>
       <div className={surface === "dashboard" ? "space-y-6" : "space-y-8"}>
-        {surface === "public" && (
+        {surface === "public" && mode === "form" && (
           <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-end">
             <div className="space-y-4">
               <Badge className="w-fit border-[#4055FF]/20 bg-[#4055FF]/10 text-[#4055FF] hover:bg-[#4055FF]/10">
@@ -380,7 +415,7 @@ export function TravelDocVisaCheck({ surface = "public" }: TravelDocVisaCheckPro
           </section>
         )}
 
-        {surface === "dashboard" && (
+        {surface === "dashboard" && mode === "form" && (
           <div>
             <h1 className="text-2xl font-bold text-foreground">Visa Check</h1>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -389,7 +424,21 @@ export function TravelDocVisaCheck({ surface = "public" }: TravelDocVisaCheckPro
           </div>
         )}
 
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
+        {mode === "result" && (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Button variant="outline" className="gap-2" onClick={goBackToForm}>
+              <ArrowLeft className="h-4 w-4" />
+              New search
+            </Button>
+            <div className="text-right">
+              <p className="text-sm font-semibold text-foreground">Travel requirement result</p>
+              <p className="text-xs text-muted-foreground">{nationality} passport · {fromCountry} to {toCountry || "destination"}</p>
+            </div>
+          </div>
+        )}
+
+        {mode === "form" && (
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
           <Card className="overflow-hidden border-border/80 shadow-sm">
             <CardContent className="p-0">
               <div className="border-b bg-muted/30 px-4 py-4 sm:px-5">
@@ -459,7 +508,7 @@ export function TravelDocVisaCheck({ surface = "public" }: TravelDocVisaCheckPro
                   <CountrySelect
                     label="I'm leaving from"
                     value={fromCountry}
-                    onValueChange={(value) => { setFromCountry(value); setChecked(false); }}
+                    onValueChange={(value) => { setFromCountry(value); }}
                     placeholder="Select departure country"
                     items={JOURNEY_COUNTRIES}
                     testId="select-from-country"
@@ -491,7 +540,7 @@ export function TravelDocVisaCheck({ surface = "public" }: TravelDocVisaCheckPro
                       <CountrySelect
                         label="Transfer country"
                         value={transferCountry}
-                        onValueChange={(value) => { setTransferCountry(value); setChecked(false); }}
+                        onValueChange={(value) => { setTransferCountry(value); }}
                         placeholder="Select transfer country"
                         items={JOURNEY_COUNTRIES}
                         testId="select-transfer-country"
@@ -503,7 +552,7 @@ export function TravelDocVisaCheck({ surface = "public" }: TravelDocVisaCheckPro
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label>Visa / permit type</Label>
-                    <Select value={visaType} onValueChange={(value) => { setVisaType(value); setChecked(false); }} disabled={!toCountry}>
+                    <Select value={visaType} onValueChange={(value) => { setVisaType(value); }} disabled={!toCountry}>
                       <SelectTrigger className="h-12 bg-background" data-testid="select-visa-type">
                         <SelectValue placeholder={toCountry ? "Select visa type" : "Select destination first"} />
                       </SelectTrigger>
@@ -526,7 +575,7 @@ export function TravelDocVisaCheck({ surface = "public" }: TravelDocVisaCheckPro
 
                   <div className="space-y-2">
                     <Label>Purpose of travel</Label>
-                    <Select value={purpose} onValueChange={(value) => { setPurpose(value); setChecked(false); }}>
+                    <Select value={purpose} onValueChange={(value) => { setPurpose(value); }}>
                       <SelectTrigger className="h-12 bg-background" data-testid="select-purpose">
                         <SelectValue />
                       </SelectTrigger>
@@ -545,7 +594,7 @@ export function TravelDocVisaCheck({ surface = "public" }: TravelDocVisaCheckPro
                     <Input
                       type="date"
                       value={departureDate}
-                      onChange={(event) => { setDepartureDate(event.target.value); setChecked(false); }}
+                      onChange={(event) => { setDepartureDate(event.target.value); }}
                       className="h-12 bg-background"
                       data-testid="input-departure-date"
                     />
@@ -553,7 +602,7 @@ export function TravelDocVisaCheck({ surface = "public" }: TravelDocVisaCheckPro
                   <Button
                     className="h-12 min-w-44 border-0 bg-gradient-to-r from-[#4055FF] to-[#FF2060] px-6 text-white hover:opacity-95"
                     disabled={!canCheck}
-                    onClick={() => setChecked(true)}
+                    onClick={goToResults}
                     data-testid="button-check-visa"
                   >
                     Check requirements
@@ -627,6 +676,7 @@ export function TravelDocVisaCheck({ surface = "public" }: TravelDocVisaCheckPro
             </Card>
           </div>
         </div>
+        )}
 
         {checked && record && cfg && baseCfg && (
           <Card className={`overflow-hidden border-2 ${cfg.border} ${cfg.bg}`}>
