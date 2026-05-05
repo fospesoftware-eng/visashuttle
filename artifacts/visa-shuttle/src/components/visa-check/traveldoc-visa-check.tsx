@@ -59,6 +59,7 @@ import {
   getCountryVisaConfig,
   getCountryVisaTypes,
 } from "@/shared/visa-catalog";
+import { researchEntryRequirement } from "@/lib/entry-requirements-ai";
 
 type TravelDocVisaCheckProps = {
   surface?: "public" | "dashboard";
@@ -97,7 +98,7 @@ const JOURNEY_COUNTRIES = Array.from(new Set(["India", "Schengen Area", ...ALL_D
 const NATIONALITY_COUNTRIES = JOURNEY_COUNTRIES;
 
 const TRAVELDOC_DATA_NOTE =
-  "Live worldwide entry requirements require a licensed TravelDoc/IATA Timatic provider feed. This screen is ready for that data source and uses Visa Shuttle's verified India dataset where available.";
+  "This AI guidance uses researched rule patterns and official-source references. It is not a licensed Timatic response, so travellers should verify with the airline or destination authority before booking.";
 
 function compactDate(dateValue: string) {
   if (!dateValue) return "Not selected";
@@ -172,36 +173,25 @@ function buildRequirementChecklist(status: string, maxStay: number | null | unde
   ];
 }
 
-function providerPendingChecklist(nationality: string, fromCountry: string, toCountry: string, visaType: string) {
-  return [
-    {
-      title: "Provider data needed",
-      detail: `Connect a licensed TravelDoc/IATA Timatic feed to return exact rules for ${nationality} passport holders travelling from ${fromCountry} to ${toCountry}.`,
-      tone: "warning",
-    },
-    {
-      title: "Visa / authorization",
-      detail: `${visaType || "Selected visa type"} must be validated against official rules before ticketing or check-in.`,
-      tone: "neutral",
-    },
-    {
-      title: "Transit rules",
-      detail: "Transit visa and airside/landside transfer rules can differ by airport, terminal, ticket type, and baggage collection.",
-      tone: "neutral",
-    },
-    {
-      title: "Document conditions",
-      detail: "Passport validity, blank pages, residence permits, previous visas, and return ticket rules should be checked in the live provider response.",
-      tone: "neutral",
-    },
-  ];
-}
-
 function checklistToneClass(tone: string) {
   if (tone === "success") return "border-emerald-200 bg-emerald-50 text-emerald-800";
   if (tone === "danger") return "border-red-200 bg-red-50 text-red-800";
   if (tone === "warning") return "border-amber-200 bg-amber-50 text-amber-800";
   return "border-border bg-background text-foreground";
+}
+
+function aiStatusClass(status: string) {
+  if (status === "visa_free") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (status === "e_visa") return "border-purple-200 bg-purple-50 text-purple-800";
+  if (status === "visa_on_arrival") return "border-blue-200 bg-blue-50 text-blue-800";
+  if (status === "visa_required") return "border-red-200 bg-red-50 text-red-800";
+  return "border-amber-200 bg-amber-50 text-amber-800";
+}
+
+function confidenceLabel(confidence: string) {
+  if (confidence === "high") return "High confidence";
+  if (confidence === "medium") return "Medium confidence";
+  return "Needs official verification";
 }
 
 function getInitialParam(name: string, fallback = "") {
@@ -308,6 +298,14 @@ export function TravelDocVisaCheck({ surface = "public", mode = "form" }: Travel
 
   const destinationVisaTypes = useMemo(() => visaTypeOptions(toCountry), [toCountry]);
   const destinationVisaGroups = useMemo(() => visaTypeGroups(toCountry), [toCountry]);
+  const aiGuidance = useMemo(() => researchEntryRequirement({
+    nationality,
+    fromCountry,
+    destination: toCountry,
+    transferCountry: showTransfer ? transferCountry : undefined,
+    purpose,
+    visaType,
+  }), [nationality, fromCountry, toCountry, transferCountry, showTransfer, purpose, visaType]);
 
   const hasLocalRuleData = nationality === "India";
   const record = checked && hasLocalRuleData ? findDestination(toCountry) : null;
@@ -346,7 +344,11 @@ export function TravelDocVisaCheck({ surface = "public", mode = "form" }: Travel
   const requirementChecklist = record
     ? buildRequirementChecklist(effectiveStatus, effectiveMaxStay, visaType)
     : providerDataNeeded
-      ? providerPendingChecklist(nationality, fromCountry, toCountry, visaType)
+      ? aiGuidance.conditions.map((condition, index) => ({
+          title: index === 0 ? aiGuidance.label : `Requirement ${index + 1}`,
+          detail: condition,
+          tone: aiGuidance.confidence === "low" ? "warning" : "neutral",
+        }))
       : [];
 
   function handleDestinationChange(value: string) {
@@ -907,35 +909,68 @@ export function TravelDocVisaCheck({ surface = "public", mode = "form" }: Travel
                     <ArrowRight className="h-3 w-3" />
                     {toCountry}
                   </Badge>
-                  <h2 className="text-xl font-bold text-foreground">Live provider data required</h2>
+                  <h2 className="text-xl font-bold text-foreground">{aiGuidance.label}</h2>
                   <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-                    {TRAVELDOC_DATA_NOTE}
+                    {aiGuidance.summary}
                   </p>
                 </div>
-                <Badge className="border-amber-200 bg-amber-50 px-3 py-1.5 text-amber-800 hover:bg-amber-50">
-                  TravelDoc/Timatic feed not connected
+                <Badge className={`px-3 py-1.5 hover:bg-current/0 ${aiStatusClass(aiGuidance.status)}`}>
+                  {confidenceLabel(aiGuidance.confidence)}
                 </Badge>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <StatPill icon={Globe2} label="Nationality" value={nationality} />
-                <StatPill icon={FileText} label="Visa type" value={visaType || "Not selected"} />
+                <StatPill icon={FileText} label="Entry status" value={aiGuidance.label} />
                 <StatPill icon={CalendarDays} label="Departure" value={compactDate(departureDate)} />
-                <StatPill icon={Plane} label="Transfer" value={showTransfer && transferCountry ? transferCountry : "None selected"} />
+                <StatPill icon={Timer} label="Stay guidance" value={aiGuidance.maxStayDays ? `${aiGuidance.maxStayDays} days` : "Verify"} />
               </div>
 
-              <div className="grid gap-2 md:grid-cols-2">
-                {requirementChecklist.map((item) => (
-                  <div key={item.title} className={`rounded-lg border p-3 ${checklistToneClass(item.tone)}`}>
+              <div className="grid gap-3 md:grid-cols-2">
+                {[
+                  ...requirementChecklist,
+                  ...aiGuidance.healthAndTransit.map((detail, index) => ({
+                    title: index === 0 ? "Transit / airline check" : `Travel note ${index + 1}`,
+                    detail,
+                    tone: "neutral",
+                  })),
+                ].map((item) => (
+                  <div key={`${item.title}-${item.detail}`} className={`rounded-lg border p-3 ${checklistToneClass(item.tone)}`}>
                     <p className="text-sm font-semibold">{item.title}</p>
                     <p className="mt-1 text-xs leading-5 opacity-80">{item.detail}</p>
                   </div>
                 ))}
               </div>
 
+              <div>
+                <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <FileText className="h-3.5 w-3.5" />
+                  Typical documents
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {aiGuidance.documents.map((document) => (
+                    <span key={document} className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs text-foreground/75">
+                      <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                      {document}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1 text-[11px] text-muted-foreground">
+                <p className="font-semibold uppercase tracking-wide text-foreground/50">Research sources</p>
+                {aiGuidance.sources.map((source) => (
+                  <p key={source.url}>
+                    <a href={source.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                      {source.name}
+                    </a>
+                  </p>
+                ))}
+              </div>
+
               <div className="rounded-lg border bg-muted/40 p-3">
                 <p className="text-xs leading-5 text-muted-foreground">
-                  To make this match TravelDoc exactly, connect an authorized TravelDoc or IATA Timatic API account. Scraping the live rules database is not reliable and may violate provider terms.
+                  {TRAVELDOC_DATA_NOTE}
                 </p>
               </div>
             </CardContent>
