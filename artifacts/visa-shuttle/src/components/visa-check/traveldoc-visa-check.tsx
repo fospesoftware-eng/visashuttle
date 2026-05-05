@@ -91,7 +91,10 @@ const PURPOSES = [
 const JOURNEY_COUNTRIES = Array.from(new Set(["India", "Schengen Area", ...ALL_DESTINATIONS]))
   .sort((a, b) => a.localeCompare(b));
 
-const NATIONALITY_COUNTRIES = ["India"];
+const NATIONALITY_COUNTRIES = JOURNEY_COUNTRIES;
+
+const TRAVELDOC_DATA_NOTE =
+  "Live worldwide entry requirements require a licensed TravelDoc/IATA Timatic provider feed. This screen is ready for that data source and uses Visa Shuttle's verified India dataset where available.";
 
 function compactDate(dateValue: string) {
   if (!dateValue) return "Not selected";
@@ -122,6 +125,80 @@ function visaTypeGroups(destination: string) {
     label,
     types: value.types,
   }));
+}
+
+function buildRequirementChecklist(status: string, maxStay: number | null | undefined, visaType: string) {
+  const normalized = normalizeStatus(status);
+  const visaRequired = normalized === "visa_required";
+  const onlineVisa = normalized === "e_visa";
+  const arrivalVisa = normalized === "visa_on_arrival";
+  const visaFree = normalized === "visa_free";
+
+  return [
+    {
+      title: "Passport",
+      detail: "Passport should normally be valid for 6 months after arrival and have at least 2 blank pages.",
+      tone: "neutral",
+    },
+    {
+      title: "Visa / authorization",
+      detail: visaRequired
+        ? `${visaType || "Correct visa type"} should be approved before travel. Airline check-in may deny boarding without proof.`
+        : onlineVisa
+          ? "Online authorization or eVisa should be obtained before travel where required by the destination."
+          : arrivalVisa
+            ? "Visa may be issued on arrival, subject to airline acceptance, fees, and border officer discretion."
+            : "Visa-free entry may be available for the stated purpose and stay duration.",
+      tone: visaFree ? "success" : visaRequired ? "danger" : "warning",
+    },
+    {
+      title: "Stay limit",
+      detail: maxStay ? `Maximum stay shown by current rule data: ${maxStay} days.` : "Stay duration must be verified with the destination authority.",
+      tone: "neutral",
+    },
+    {
+      title: "Proof of trip",
+      detail: "Carry return/onward ticket, accommodation proof, travel purpose evidence, and sufficient funds.",
+      tone: "neutral",
+    },
+    {
+      title: "Health / insurance",
+      detail: "Some destinations require travel insurance, vaccination proof, or health declarations depending on route and season.",
+      tone: "neutral",
+    },
+  ];
+}
+
+function providerPendingChecklist(nationality: string, fromCountry: string, toCountry: string, visaType: string) {
+  return [
+    {
+      title: "Provider data needed",
+      detail: `Connect a licensed TravelDoc/IATA Timatic feed to return exact rules for ${nationality} passport holders travelling from ${fromCountry} to ${toCountry}.`,
+      tone: "warning",
+    },
+    {
+      title: "Visa / authorization",
+      detail: `${visaType || "Selected visa type"} must be validated against official rules before ticketing or check-in.`,
+      tone: "neutral",
+    },
+    {
+      title: "Transit rules",
+      detail: "Transit visa and airside/landside transfer rules can differ by airport, terminal, ticket type, and baggage collection.",
+      tone: "neutral",
+    },
+    {
+      title: "Document conditions",
+      detail: "Passport validity, blank pages, residence permits, previous visas, and return ticket rules should be checked in the live provider response.",
+      tone: "neutral",
+    },
+  ];
+}
+
+function checklistToneClass(tone: string) {
+  if (tone === "success") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (tone === "danger") return "border-red-200 bg-red-50 text-red-800";
+  if (tone === "warning") return "border-amber-200 bg-amber-50 text-amber-800";
+  return "border-border bg-background text-foreground";
 }
 
 function StatPill({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
@@ -217,7 +294,8 @@ export function TravelDocVisaCheck({ surface = "public" }: TravelDocVisaCheckPro
   const destinationVisaTypes = useMemo(() => visaTypeOptions(toCountry), [toCountry]);
   const destinationVisaGroups = useMemo(() => visaTypeGroups(toCountry), [toCountry]);
 
-  const record = checked ? findDestination(toCountry) : null;
+  const hasLocalRuleData = nationality === "India";
+  const record = checked && hasLocalRuleData ? findDestination(toCountry) : null;
   const conditionalRule = record ? findBestConditionalRule(record, selectedVisas) : null;
   const effectiveStatus = conditionalRule?.rule_status ?? record?.base_entry.status ?? "";
   const cfg = effectiveStatus ? getEntryConfig(effectiveStatus) : null;
@@ -244,7 +322,12 @@ export function TravelDocVisaCheck({ surface = "public" }: TravelDocVisaCheckPro
     : [];
 
   const canCheck = Boolean(nationality && fromCountry && toCountry && visaType && purpose);
-  const isIndiaOnlyWarning = nationality !== "India";
+  const providerDataNeeded = checked && canCheck && !hasLocalRuleData;
+  const requirementChecklist = record
+    ? buildRequirementChecklist(effectiveStatus, effectiveMaxStay, visaType)
+    : providerDataNeeded
+      ? providerPendingChecklist(nationality, fromCountry, toCountry, visaType)
+      : [];
 
   function handleDestinationChange(value: string) {
     setToCountry(value);
@@ -469,7 +552,7 @@ export function TravelDocVisaCheck({ surface = "public" }: TravelDocVisaCheckPro
                   </div>
                   <Button
                     className="h-12 min-w-44 border-0 bg-gradient-to-r from-[#4055FF] to-[#FF2060] px-6 text-white hover:opacity-95"
-                    disabled={!canCheck || isIndiaOnlyWarning}
+                    disabled={!canCheck}
                     onClick={() => setChecked(true)}
                     data-testid="button-check-visa"
                   >
@@ -478,10 +561,10 @@ export function TravelDocVisaCheck({ surface = "public" }: TravelDocVisaCheckPro
                   </Button>
                 </div>
 
-                {isIndiaOnlyWarning && (
+                {!hasLocalRuleData && (
                   <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                     <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-                    Visa Shuttle currently validates requirements for Indian ordinary passport holders.
+                    {TRAVELDOC_DATA_NOTE}
                   </div>
                 )}
               </div>
@@ -536,7 +619,7 @@ export function TravelDocVisaCheck({ surface = "public" }: TravelDocVisaCheckPro
                   <div className="space-y-1">
                     <p className="text-sm font-semibold">What this checks</p>
                     <p className="text-xs leading-5 text-muted-foreground">
-                      Passport nationality, route, destination, visa type, transfer point, maximum stay, documents, conditional visa-free/eVisa options, and source confidence.
+                      Passport nationality, route, destination, visa type, transfer point, maximum stay, documents, conditional visa-free/eVisa options, transit notes, health reminders, and source confidence.
                     </p>
                   </div>
                 </div>
@@ -634,6 +717,23 @@ export function TravelDocVisaCheck({ surface = "public" }: TravelDocVisaCheckPro
                     </div>
                   )}
 
+                  {requirementChecklist.length > 0 && (
+                    <div>
+                      <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        Detailed requirement checks
+                      </p>
+                      <div className="mt-2 grid gap-2">
+                        {requirementChecklist.map((item) => (
+                          <div key={item.title} className={`rounded-lg border p-3 ${checklistToneClass(item.tone)}`}>
+                            <p className="text-sm font-semibold">{item.title}</p>
+                            <p className="mt-1 text-xs leading-5 opacity-80">{item.detail}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {!isConditional && !isConditionalEVisa(record.base_entry.status) && availableConditionals.length > 0 && (
                     <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
                       <div className="flex items-start gap-2">
@@ -684,11 +784,47 @@ export function TravelDocVisaCheck({ surface = "public" }: TravelDocVisaCheckPro
 
         {checked && !record && toCountry && (
           <Card>
-            <CardContent className="py-10 text-center">
-              <XCircle className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                No rule data found for <strong>{toCountry}</strong>. Please verify requirements with the destination embassy.
-              </p>
+            <CardContent className="space-y-5 p-5">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <Badge variant="secondary" className="mb-3 gap-1.5">
+                    <MapPin className="h-3.5 w-3.5" />
+                    {fromCountry}
+                    {transferCountry && showTransfer ? ` via ${transferCountry}` : ""}
+                    <ArrowRight className="h-3 w-3" />
+                    {toCountry}
+                  </Badge>
+                  <h2 className="text-xl font-bold text-foreground">Live provider data required</h2>
+                  <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+                    {TRAVELDOC_DATA_NOTE}
+                  </p>
+                </div>
+                <Badge className="border-amber-200 bg-amber-50 px-3 py-1.5 text-amber-800 hover:bg-amber-50">
+                  TravelDoc/Timatic feed not connected
+                </Badge>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <StatPill icon={Globe2} label="Nationality" value={nationality} />
+                <StatPill icon={FileText} label="Visa type" value={visaType} />
+                <StatPill icon={CalendarDays} label="Departure" value={compactDate(departureDate)} />
+                <StatPill icon={Plane} label="Transfer" value={showTransfer && transferCountry ? transferCountry : "None selected"} />
+              </div>
+
+              <div className="grid gap-2 md:grid-cols-2">
+                {requirementChecklist.map((item) => (
+                  <div key={item.title} className={`rounded-lg border p-3 ${checklistToneClass(item.tone)}`}>
+                    <p className="text-sm font-semibold">{item.title}</p>
+                    <p className="mt-1 text-xs leading-5 opacity-80">{item.detail}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="rounded-lg border bg-muted/40 p-3">
+                <p className="text-xs leading-5 text-muted-foreground">
+                  To make this match TravelDoc exactly, connect an authorized TravelDoc or IATA Timatic API account. Scraping the live rules database is not reliable and may violate provider terms.
+                </p>
+              </div>
             </CardContent>
           </Card>
         )}
