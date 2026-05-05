@@ -8,20 +8,7 @@ import {
   Plane, ShieldAlert, CalendarCheck, TicketCheck,
   Hotel, CreditCard, FolderCheck, Bot,
 } from "lucide-react";
-import signalNationality  from "@assets/signals/nationality.jpg";
-import signalDestination  from "@assets/signals/destination.jpg";
-import signalVisaType     from "@assets/signals/visatype.jpg";
-import signalIntent       from "@assets/signals/intent.jpg";
-import signalProfile      from "@assets/signals/profile.jpg";
-import signalFinance      from "@assets/signals/finance.jpg";
-import signalFootprint    from "@assets/signals/footprint.jpg";
-import signalRejection    from "@assets/signals/rejection.jpg";
-import signalTripLogic    from "@assets/signals/triplogic.jpg";
-import signalReturn       from "@assets/signals/return.jpg";
-import signalStay         from "@assets/signals/stay.jpg";
-import signalFunding      from "@assets/signals/funding.jpg";
-import signalDocs         from "@assets/signals/docs.jpg";
-import signalBehavioral   from "@assets/signals/behavioral.jpg";
+import { SignalArt, type SignalKind } from "@/components/signal-art";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -520,24 +507,24 @@ export default function HomePage() {
         >
           <div className="signal-marquee-track flex w-max gap-5 md:gap-6">
             {(() => {
-              const SIGNALS = [
-                { icon: Flag,          img: signalNationality, title: "Nationality Strength",     desc: "How your passport ranks against global mobility data — the first lens every consulate uses." },
-                { icon: Map,           img: signalDestination, title: "Destination Risk Mapping", desc: "Country-specific approval patterns and recent refusal trends shape your odds." },
-                { icon: Stamp,         img: signalVisaType,    title: "Visa Type Complexity",     desc: "Tourist, business, or study — each carries its own bar of scrutiny." },
-                { icon: Compass,       img: signalIntent,      title: "Travel Intent Clarity",    desc: "How clearly your purpose of travel reads to an officer in 30 seconds." },
-                { icon: UserCheck,     img: signalProfile,     title: "Profile Stability Score",  desc: "Age, employment and ties that signal a settled life back home." },
-                { icon: Wallet,        img: signalFinance,     title: "Financial Strength",       desc: "Income and balances measured against the real cost of your trip." },
-                { icon: Plane,         img: signalFootprint,   title: "Travel Footprint",         desc: "Past trips that build credibility with consulates over time." },
-                { icon: ShieldAlert,   img: signalRejection,   title: "Rejection Risk Signals",   desc: "Prior refusals and the red-flag patterns AI is trained to catch." },
-                { icon: CalendarCheck, img: signalTripLogic,   title: "Trip Logic Evaluation",    desc: "Does the duration, route and itinerary actually make sense end-to-end?" },
-                { icon: TicketCheck,   img: signalReturn,      title: "Return Assurance Check",   desc: "Onward tickets and return commitments verified before you submit." },
-                { icon: Hotel,         img: signalStay,        title: "Stay Credibility Score",   desc: "Accommodation proof tested for plausibility against your itinerary." },
-                { icon: CreditCard,    img: signalFunding,     title: "Funding Transparency",     desc: "Who pays for the trip — and how cleanly that story is documented." },
-                { icon: FolderCheck,   img: signalDocs,        title: "Documentation Readiness",  desc: "Every required paper checked for completeness, currency and consistency." },
-                { icon: Bot,           img: signalBehavioral,  title: "Behavioral Pattern Match", desc: "AI compares your profile to thousands of real applicant outcomes." },
+              const SIGNALS: Array<{ icon: typeof Flag; kind: SignalKind; title: string; desc: string }> = [
+                { icon: Flag,          kind: "nationality", title: "Nationality Strength",     desc: "How your passport ranks against global mobility data — the first lens every consulate uses." },
+                { icon: Map,           kind: "destination", title: "Destination Risk Mapping", desc: "Country-specific approval patterns and recent refusal trends shape your odds." },
+                { icon: Stamp,         kind: "visatype",    title: "Visa Type Complexity",     desc: "Tourist, business, or study — each carries its own bar of scrutiny." },
+                { icon: Compass,       kind: "intent",      title: "Travel Intent Clarity",    desc: "How clearly your purpose of travel reads to an officer in 30 seconds." },
+                { icon: UserCheck,     kind: "profile",     title: "Profile Stability Score",  desc: "Age, employment and ties that signal a settled life back home." },
+                { icon: Wallet,        kind: "finance",     title: "Financial Strength",       desc: "Income and balances measured against the real cost of your trip." },
+                { icon: Plane,         kind: "footprint",   title: "Travel Footprint",         desc: "Past trips that build credibility with consulates over time." },
+                { icon: ShieldAlert,   kind: "rejection",   title: "Rejection Risk Signals",   desc: "Prior refusals and the red-flag patterns AI is trained to catch." },
+                { icon: CalendarCheck, kind: "triplogic",   title: "Trip Logic Evaluation",    desc: "Does the duration, route and itinerary actually make sense end-to-end?" },
+                { icon: TicketCheck,   kind: "return",      title: "Return Assurance Check",   desc: "Onward tickets and return commitments verified before you submit." },
+                { icon: Hotel,         kind: "stay",        title: "Stay Credibility Score",   desc: "Accommodation proof tested for plausibility against your itinerary." },
+                { icon: CreditCard,    kind: "funding",     title: "Funding Transparency",     desc: "Who pays for the trip — and how cleanly that story is documented." },
+                { icon: FolderCheck,   kind: "docs",        title: "Documentation Readiness",  desc: "Every required paper checked for completeness, currency and consistency." },
+                { icon: Bot,           kind: "behavioral",  title: "Behavioral Pattern Match", desc: "AI compares your profile to thousands of real applicant outcomes." },
               ];
               // Duplicate for seamless infinite loop (translate -50%).
-              return [...SIGNALS, ...SIGNALS].map(({ icon: Icon, img, title, desc }, i) => (
+              return [...SIGNALS, ...SIGNALS].map(({ icon: Icon, kind, title, desc }, i) => (
                 <article
                   key={`${title}-${i}`}
                   data-testid={i < SIGNALS.length ? `factor-${i}` : undefined}
@@ -555,30 +542,19 @@ export default function HomePage() {
                     }}
                   />
 
-                  {/* Image */}
-                  <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
-                    <img
-                      src={img}
-                      alt=""
-                      aria-hidden="true"
-                      loading="lazy"
-                      decoding="async"
-                      draggable={false}
-                      className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
+                  {/* Brand-uniform SVG illustration */}
+                  <div className="relative aspect-[4/3] w-full overflow-hidden">
+                    <SignalArt
+                      kind={kind}
+                      className="absolute inset-0 w-full h-full transition-transform duration-700 ease-out group-hover:scale-105"
                     />
-                    {/* Bottom fade so text below feels connected */}
+                    {/* Bottom fade so the artwork blends into the card body */}
                     <div
                       aria-hidden
                       className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background to-transparent"
                     />
-                    {/* Brand tint on hover */}
-                    <div
-                      aria-hidden
-                      className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 mix-blend-overlay"
-                      style={{ background: "linear-gradient(135deg,#4055FF55,#FF206055)" }}
-                    />
                     {/* Floating icon chip */}
-                    <span className="absolute top-3 left-3 inline-flex items-center justify-center w-9 h-9 rounded-xl border border-white/20 bg-black/40 backdrop-blur-md text-white shadow-lg transition-transform duration-500 group-hover:scale-110 group-hover:rotate-[6deg]">
+                    <span className="absolute top-3 left-3 inline-flex items-center justify-center w-9 h-9 rounded-xl border border-border/60 bg-background/80 backdrop-blur-md text-foreground shadow-sm transition-all duration-500 group-hover:scale-110 group-hover:rotate-[6deg] group-hover:border-transparent group-hover:text-white group-hover:[background:linear-gradient(135deg,#4055FF,#9033F5,#FF2060)]">
                       <Icon className="w-[16px] h-[16px]" strokeWidth={1.9} />
                     </span>
                   </div>
