@@ -284,6 +284,7 @@ function CountrySelect({
 
 export function TravelDocVisaCheck({ surface = "public", mode = "form" }: TravelDocVisaCheckProps) {
   const [, setLocation] = useLocation();
+  const [currentStep, setCurrentStep] = useState(0);
   const [documentType, setDocumentType] = useState(getInitialParam("doc", DOCUMENT_TYPES[0]));
   const [nationality, setNationality] = useState(getInitialParam("nat", "India"));
   const [residence, setResidence] = useState(getInitialParam("res", "India"));
@@ -335,7 +336,12 @@ export function TravelDocVisaCheck({ surface = "public", mode = "form" }: Travel
       )
     : [];
 
-  const canCheck = Boolean(nationality && fromCountry && toCountry && visaType && purpose);
+  const canCheck = Boolean(documentType && nationality && fromCountry && toCountry);
+  const canGoNext = currentStep === 0
+    ? Boolean(documentType && nationality)
+    : currentStep === 1
+      ? Boolean(fromCountry && toCountry)
+      : canCheck;
   const providerDataNeeded = checked && canCheck && !hasLocalRuleData;
   const requirementChecklist = record
     ? buildRequirementChecklist(effectiveStatus, effectiveMaxStay, visaType)
@@ -382,6 +388,15 @@ export function TravelDocVisaCheck({ surface = "public", mode = "form" }: Travel
 
   function goBackToForm() {
     setLocation(surface === "dashboard" ? "/app/visa-check" : "/visa-check");
+  }
+
+  function nextStep() {
+    if (!canGoNext) return;
+    setCurrentStep((step) => Math.min(step + 1, 2));
+  }
+
+  function previousStep() {
+    setCurrentStep((step) => Math.max(step - 1, 0));
   }
 
   const shellClass = surface === "dashboard"
@@ -438,23 +453,52 @@ export function TravelDocVisaCheck({ surface = "public", mode = "form" }: Travel
         )}
 
         {mode === "form" && (
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="mx-auto max-w-3xl">
           <Card className="overflow-hidden border-border/80 shadow-sm">
             <CardContent className="p-0">
-              <div className="border-b bg-muted/30 px-4 py-4 sm:px-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="border-b bg-gradient-to-r from-[#4055FF]/5 via-background to-[#FF2060]/5 px-4 py-4 sm:px-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-foreground">Trip details</p>
-                    <p className="text-xs text-muted-foreground">Select each field to calculate entry requirements.</p>
+                    <p className="text-sm font-semibold text-foreground">Check travel requirements</p>
+                    <p className="text-xs text-muted-foreground">Same core flow as TravelDoc: document, nationality, route, transfer, result.</p>
                   </div>
                   <Badge variant="secondary" className="gap-1.5">
                     <Route className="h-3.5 w-3.5" />
                     {fromCountry || "From"} <ArrowRight className="h-3 w-3" /> {toCountry || "Destination"}
                   </Badge>
                 </div>
+                <div className="mt-5 grid grid-cols-3 gap-2">
+                  {[
+                    { label: "Document", icon: FileText },
+                    { label: "Route", icon: Plane },
+                    { label: "Review", icon: ShieldCheck },
+                  ].map((step, index) => {
+                    const Icon = step.icon;
+                    const active = currentStep === index;
+                    const complete = currentStep > index;
+                    return (
+                      <button
+                        key={step.label}
+                        type="button"
+                        onClick={() => setCurrentStep(index)}
+                        className={`flex h-10 items-center justify-center gap-2 rounded-lg border text-xs font-semibold transition-colors ${
+                          active
+                            ? "border-[#4055FF] bg-[#4055FF] text-white"
+                            : complete
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                              : "border-border bg-background text-muted-foreground"
+                        }`}
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                        {step.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="space-y-6 p-4 sm:p-5">
+                {currentStep === 0 && (
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label>My travel document is</Label>
@@ -479,7 +523,9 @@ export function TravelDocVisaCheck({ surface = "public", mode = "form" }: Travel
                     testId="select-nationality"
                   />
                 </div>
+                )}
 
+                {currentStep === 2 && (
                 <div className="grid gap-4 md:grid-cols-2">
                   <CountrySelect
                     label="Country of residence"
@@ -503,7 +549,10 @@ export function TravelDocVisaCheck({ surface = "public", mode = "form" }: Travel
                     </Select>
                   </div>
                 </div>
+                )}
 
+                {currentStep === 1 && (
+                <>
                 <div className="grid gap-4 md:grid-cols-2">
                   <CountrySelect
                     label="I'm leaving from"
@@ -548,10 +597,14 @@ export function TravelDocVisaCheck({ surface = "public", mode = "form" }: Travel
                     </div>
                   )}
                 </div>
+                </>
+                )}
 
+                {currentStep === 2 && (
+                <>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label>Visa / permit type</Label>
+                    <Label>Visa / permit type <span className="font-normal text-muted-foreground">(optional)</span></Label>
                     <Select value={visaType} onValueChange={(value) => { setVisaType(value); }} disabled={!toCountry}>
                       <SelectTrigger className="h-12 bg-background" data-testid="select-visa-type">
                         <SelectValue placeholder={toCountry ? "Select visa type" : "Select destination first"} />
@@ -588,7 +641,45 @@ export function TravelDocVisaCheck({ surface = "public", mode = "form" }: Travel
                   </div>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
+                <div className="space-y-3 rounded-xl border bg-muted/20 p-3">
+                  <div>
+                    <p className="text-sm font-semibold">Documents / visas already held</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Optional. Add qualifying documents for conditional entry checks.</p>
+                  </div>
+                  <div className="divide-y overflow-hidden rounded-lg border bg-background">
+                    {VISA_GROUPS.map((group) => {
+                      const groupVisas = VALID_VISAS.filter((visa) => visa.group === group);
+                      const selectedCount = groupVisas.filter((visa) => selectedVisas.includes(visa.id)).length;
+                      return (
+                        <Collapsible key={group} open={openGroups[group]} onOpenChange={() => toggleGroup(group)}>
+                          <CollapsibleTrigger className="flex w-full items-center justify-between bg-muted/30 px-3 py-2.5 text-left hover:bg-muted/50">
+                            <span className="flex items-center gap-2 text-sm font-medium">
+                              {group}
+                              {selectedCount > 0 && <Badge variant="secondary" className="h-5 px-1.5 text-[11px]">{selectedCount}</Badge>}
+                            </span>
+                            <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${openGroups[group] ? "rotate-180" : ""}`} />
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <div className="grid gap-2 p-3 sm:grid-cols-2">
+                              {groupVisas.map((visa) => (
+                                <label key={visa.id} className="flex cursor-pointer items-start gap-2 text-sm leading-tight text-foreground/80">
+                                  <Checkbox
+                                    checked={selectedVisas.includes(visa.id)}
+                                    onCheckedChange={() => toggleVisa(visa.id)}
+                                    data-testid={`checkbox-held-visa-${visa.id}`}
+                                  />
+                                  <span>{visa.label}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label>Departure date</Label>
                     <Input
@@ -599,16 +690,9 @@ export function TravelDocVisaCheck({ surface = "public", mode = "form" }: Travel
                       data-testid="input-departure-date"
                     />
                   </div>
-                  <Button
-                    className="h-12 min-w-44 border-0 bg-gradient-to-r from-[#4055FF] to-[#FF2060] px-6 text-white hover:opacity-95"
-                    disabled={!canCheck}
-                    onClick={goToResults}
-                    data-testid="button-check-visa"
-                  >
-                    Check requirements
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
                 </div>
+                </>
+                )}
 
                 {!hasLocalRuleData && (
                   <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
@@ -616,65 +700,44 @@ export function TravelDocVisaCheck({ surface = "public", mode = "form" }: Travel
                     {TRAVELDOC_DATA_NOTE}
                   </div>
                 )}
-              </div>
-            </CardContent>
-          </Card>
 
-          <div className="space-y-5">
-            <Card className="border-border/80 shadow-sm">
-              <CardContent className="space-y-4 p-4">
-                <div>
-                  <p className="text-sm font-semibold">Documents / visas already held</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Optional. Some countries unlock easier entry if you hold a qualifying visa.</p>
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+                  <Button variant="outline" onClick={previousStep} disabled={currentStep === 0}>
+                    Back
+                  </Button>
+                  {currentStep < 2 ? (
+                    <Button
+                      className="border-0 bg-gradient-to-r from-[#4055FF] to-[#FF2060] px-6 text-white hover:opacity-95"
+                      disabled={!canGoNext}
+                      onClick={nextStep}
+                    >
+                      Continue
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <Button
+                      className="border-0 bg-gradient-to-r from-[#4055FF] to-[#FF2060] px-6 text-white hover:opacity-95"
+                      disabled={!canCheck}
+                      onClick={goToResults}
+                      data-testid="button-check-visa"
+                    >
+                      Check requirements
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
-                <div className="divide-y overflow-hidden rounded-lg border">
-                  {VISA_GROUPS.map((group) => {
-                    const groupVisas = VALID_VISAS.filter((visa) => visa.group === group);
-                    const selectedCount = groupVisas.filter((visa) => selectedVisas.includes(visa.id)).length;
-                    return (
-                      <Collapsible key={group} open={openGroups[group]} onOpenChange={() => toggleGroup(group)}>
-                        <CollapsibleTrigger className="flex w-full items-center justify-between bg-muted/30 px-3 py-2.5 text-left hover:bg-muted/50">
-                          <span className="flex items-center gap-2 text-sm font-medium">
-                            {group}
-                            {selectedCount > 0 && <Badge variant="secondary" className="h-5 px-1.5 text-[11px]">{selectedCount}</Badge>}
-                          </span>
-                          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${openGroups[group] ? "rotate-180" : ""}`} />
-                        </CollapsibleTrigger>
-                        <CollapsibleContent>
-                          <div className="space-y-2 p-3">
-                            {groupVisas.map((visa) => (
-                              <label key={visa.id} className="flex cursor-pointer items-start gap-2 text-sm leading-tight text-foreground/80">
-                                <Checkbox
-                                  checked={selectedVisas.includes(visa.id)}
-                                  onCheckedChange={() => toggleVisa(visa.id)}
-                                  data-testid={`checkbox-held-visa-${visa.id}`}
-                                />
-                                <span>{visa.label}</span>
-                              </label>
-                            ))}
-                          </div>
-                        </CollapsibleContent>
-                      </Collapsible>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
 
-            <Card className="border-[#4055FF]/15 bg-[#4055FF]/[0.03]">
-              <CardContent className="p-4">
-                <div className="flex gap-3">
-                  <CircleHelp className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#4055FF]" />
-                  <div className="space-y-1">
-                    <p className="text-sm font-semibold">What this checks</p>
+                <div className="rounded-xl border border-[#4055FF]/15 bg-[#4055FF]/[0.03] p-4">
+                  <div className="flex gap-3">
+                    <CircleHelp className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#4055FF]" />
                     <p className="text-xs leading-5 text-muted-foreground">
-                      Passport nationality, route, destination, visa type, transfer point, maximum stay, documents, conditional visa-free/eVisa options, transit notes, health reminders, and source confidence.
+                      Checks passport nationality, route, destination, transfer points, maximum stay, documents, conditional entry options, transit notes, and source confidence.
                     </p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
         )}
 
@@ -692,9 +755,9 @@ export function TravelDocVisaCheck({ surface = "public", mode = "form" }: Travel
                       {record.destination}
                     </Badge>
                     <Badge variant="outline">{documentType}</Badge>
-                    <Badge variant="outline">{visaType}</Badge>
+                    <Badge variant="outline">{visaType || "Visa type not selected"}</Badge>
                   </div>
-                  <h2 className="text-2xl font-bold text-foreground">India passport holders travelling to {record.destination}</h2>
+                  <h2 className="text-2xl font-bold text-foreground">{nationality} passport holders travelling to {record.destination}</h2>
                   <p className="text-sm text-muted-foreground">
                     Purpose: {purpose} · Residence: {residence} · Departure: {compactDate(departureDate)}
                   </p>
@@ -856,7 +919,7 @@ export function TravelDocVisaCheck({ surface = "public", mode = "form" }: Travel
 
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <StatPill icon={Globe2} label="Nationality" value={nationality} />
-                <StatPill icon={FileText} label="Visa type" value={visaType} />
+                <StatPill icon={FileText} label="Visa type" value={visaType || "Not selected"} />
                 <StatPill icon={CalendarDays} label="Departure" value={compactDate(departureDate)} />
                 <StatPill icon={Plane} label="Transfer" value={showTransfer && transferCountry ? transferCountry : "None selected"} />
               </div>
