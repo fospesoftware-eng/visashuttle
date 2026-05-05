@@ -556,7 +556,7 @@ export default function HomePage() {
                   <MapPin className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="font-semibold">Visa Shuttle</p>
+                  <p className="font-semibold">Fospe Software Private Limited</p>
                   <p className="text-sm text-muted-foreground">Level 8, Tower I, UBB</p>
                   <p className="text-sm text-muted-foreground">Cessna Business Park, ORR, Bangalore – 560 103</p>
                 </div>

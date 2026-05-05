@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Link } from "wouter";
 import { FileText } from "lucide-react";
 
 const SUPPORT_EMAIL = "support@visashuttle.com";
@@ -21,192 +22,155 @@ export default function TermsAndConditionsPage() {
             <FileText className="w-5 h-5" />
           </div>
           <h1 className="text-3xl md:text-4xl font-black tracking-tight mb-3">Terms and Conditions</h1>
-          <p className="text-sm text-muted-foreground">Effective Date: May 1, 2026</p>
+          <p className="text-sm text-muted-foreground">Effective Date: May 5, 2026</p>
+          <p className="text-sm text-muted-foreground">Website: visashuttle.com</p>
+          <p className="text-sm text-muted-foreground">Legal Entity: Fospe Software Private Limited</p>
         </div>
 
         <div className="prose prose-sm dark:prose-invert max-w-none space-y-8 text-sm md:text-base">
-          <p className="text-muted-foreground leading-relaxed">
-            Welcome to visashuttle.com (“Website”, “Platform”), a product of Fospe Software Private Limited (“Company”, “we”, “our”, “us”).
-          </p>
-          <p className="text-muted-foreground leading-relaxed">
-            By accessing or using this Platform, you agree to be bound by these Terms and Conditions (“Terms”). If you do not agree, you must not use the Platform.
-          </p>
-
-          <Section title="1. Use of the Platform">
-            <p>Visa Shuttle provides AI-powered visa assistance tools, including but not limited to:</p>
-            <ul className="list-disc pl-5 space-y-1">
-              <li>Visa eligibility assessments</li>
-              <li>Approval probability predictions</li>
-              <li>Document guidance and automation</li>
-              <li>User dashboards and saved profiles</li>
-            </ul>
-            <p>You agree to use the Platform only for lawful purposes and in compliance with applicable laws.</p>
+          <Section title="1. Introduction">
+            <p>
+              Welcome to Visa Shuttle (“Platform”), a product of Fospe Software Private Limited (“Company”, “we”, “our”, “us”).
+              By accessing or using our website and services, you agree to be bound by these Terms and Conditions (“Terms”).
+              If you do not agree, please do not use the Platform.
+            </p>
           </Section>
 
-          <Section title="2. Eligibility">
-            <p>You must:</p>
+          <Section title="2. Nature of Service">
+            <p>
+              Visa Shuttle is an AI-powered platform that provides visa approval probability assessments based on
+              user-provided information and AI-driven analysis.
+            </p>
             <ul className="list-disc pl-5 space-y-1">
-              <li>Be at least 18 years old</li>
-              <li>Provide accurate and complete information</li>
-              <li>Not use the Platform for fraudulent or illegal activities</li>
+              <li>We provide informational insights only</li>
+              <li>We do not process visas</li>
+              <li>We do not guarantee visa approval</li>
+              <li>We are not affiliated with any embassy, consulate, or government authority</li>
             </ul>
           </Section>
 
-          <Section title="3. User Accounts">
+          <Section title="3. Eligibility">
+            <p>
+              You must be at least 18 years old or accessing the service under the supervision of a legal guardian to
+              use this Platform.
+            </p>
+          </Section>
+
+          <Section title="4. User Account">
             <p>To access certain features, you must create an account.</p>
             <p>You agree to:</p>
             <ul className="list-disc pl-5 space-y-1">
-              <li>Maintain confidentiality of login credentials</li>
-              <li>Accept responsibility for all activities under your account</li>
-              <li>Notify us immediately of unauthorized access</li>
-            </ul>
-            <p>We reserve the right to suspend or terminate accounts at our discretion.</p>
-          </Section>
-
-          <Section title="4. Services & Disclaimer">
-            <p>Visa Shuttle provides informational and predictive services only.</p>
-            <p className="font-semibold text-foreground">Important:</p>
-            <ul className="list-disc pl-5 space-y-1">
-              <li>We are not a government authority</li>
-              <li>We do not guarantee visa approval</li>
-              <li>AI-based predictions are estimates only</li>
-            </ul>
-            <p>Final decisions are made solely by:</p>
-            <ul className="list-disc pl-5 space-y-1">
-              <li>Embassies</li>
-              <li>Consulates</li>
-              <li>Immigration authorities</li>
+              <li>Provide accurate and complete information</li>
+              <li>Maintain confidentiality of your login credentials</li>
+              <li>Be responsible for all activities under your account</li>
             </ul>
           </Section>
 
-          <Section title="5. Payments & Subscriptions">
-            <p>Some features may be paid, including:</p>
+          <Section title="5. Services & Access">
+            <p>Visa Shuttle offers two types of services:</p>
+            <p className="font-semibold text-foreground">a. Basic Check (Free)</p>
+            <p>Limited assessment based on basic inputs.</p>
+            <p className="font-semibold text-foreground">b. Deep Check (Paid)</p>
+            <p>Advanced AI-based analysis with detailed insights and recommendations.</p>
+            <p>All payments are processed securely via third-party payment gateways.</p>
+          </Section>
+
+          <Section title="6. No Refund Policy">
+            <p>All payments made on Visa Shuttle are non-refundable.</p>
+            <p>By making a payment, you acknowledge that:</p>
             <ul className="list-disc pl-5 space-y-1">
-              <li>Deep visa checks</li>
-              <li>Advanced analytics</li>
-              <li>Premium tools</li>
-            </ul>
-            <p className="font-semibold text-foreground">Payment Terms:</p>
-            <ul className="list-disc pl-5 space-y-1">
-              <li>All fees are non-refundable unless stated otherwise</li>
-              <li>Pricing may change without prior notice</li>
-              <li>Subscription plans renew automatically unless canceled</li>
+              <li>Results are generated instantly</li>
+              <li>The service is consumed immediately upon purchase</li>
             </ul>
           </Section>
 
-          <Section title="6. Intellectual Property">
-            <p>All content, including:</p>
+          <Section title="7. User Responsibilities">
+            <p>You agree:</p>
             <ul className="list-disc pl-5 space-y-1">
-              <li>Software</li>
-              <li>Design</li>
-              <li>Branding</li>
-              <li>Algorithms</li>
-            </ul>
-            <p>are owned by Fospe Software Private Limited.</p>
-            <p>You may not:</p>
-            <ul className="list-disc pl-5 space-y-1">
-              <li>Copy, reproduce, or distribute</li>
-              <li>Reverse engineer the system</li>
-              <li>Use the platform for competitive purposes</li>
+              <li>Not to provide false or misleading information</li>
+              <li>Not to misuse or attempt to manipulate the system</li>
+              <li>Not to use the Platform for unlawful purposes</li>
             </ul>
           </Section>
 
-          <Section title="7. User Data & Privacy">
-            <p>
-              By using the Platform, you agree to our{" "}
-              <Link href="/privacy-policy" className="text-[#4055FF] underline">
-                Privacy Policy
-              </Link>
-              .
-            </p>
-            <p>You consent to:</p>
+          <Section title="8. Disclaimer">
+            <p>The results provided by Visa Shuttle:</p>
             <ul className="list-disc pl-5 space-y-1">
-              <li>Collection of personal data</li>
-              <li>Use of data for AI processing and improvements</li>
-              <li>Storage of user inputs for service functionality</li>
+              <li>Are AI-generated estimates</li>
+              <li>Are not official decisions</li>
+              <li>May not reflect actual visa outcomes</li>
             </ul>
-            <p>We take reasonable measures to protect your data but cannot guarantee absolute security.</p>
-          </Section>
-
-          <Section title="8. Prohibited Activities">
-            <p>You agree NOT to:</p>
+            <p>The Company shall not be held liable for:</p>
             <ul className="list-disc pl-5 space-y-1">
-              <li>Submit false or misleading information</li>
-              <li>Attempt to hack or disrupt the system</li>
-              <li>Use bots or automation to abuse the platform</li>
-              <li>Resell services without authorization</li>
+              <li>Visa rejections</li>
+              <li>Losses incurred based on platform results</li>
+              <li>Any decisions made using our insights</li>
             </ul>
           </Section>
 
           <Section title="9. Limitation of Liability">
-            <p>To the maximum extent permitted by law:</p>
-            <p>We are not liable for:</p>
-            <ul className="list-disc pl-5 space-y-1">
-              <li>Visa rejections</li>
-              <li>Financial losses</li>
-              <li>Incorrect predictions</li>
-              <li>Service interruptions</li>
-            </ul>
-            <p>Your use of the Platform is at your own risk.</p>
+            <p>
+              To the maximum extent permitted by law, Fospe Software Private Limited shall not be liable for any
+              indirect, incidental, or consequential damages arising from the use of the Platform.
+            </p>
           </Section>
 
-          <Section title="10. Third-Party Services">
-            <p>The Platform may integrate with third-party services.</p>
-            <p>We are not responsible for:</p>
-            <ul className="list-disc pl-5 space-y-1">
-              <li>Third-party content</li>
-              <li>External links</li>
-              <li>Service reliability of third parties</li>
-            </ul>
+          <Section title="10. Intellectual Property">
+            <p>
+              All content, branding, algorithms, and software on this Platform are the property of Fospe Software
+              Private Limited and are protected under applicable intellectual property laws.
+            </p>
           </Section>
 
-          <Section title="11. Termination">
-            <p>We may suspend or terminate access if:</p>
+          <Section title="11. Privacy">
+            <p>
+              Your use of the Platform is also governed by our{" "}
+              <Link href="/privacy-policy" className="text-[#4055FF] underline">
+                Privacy Policy
+              </Link>
+              . By using the service, you consent to data collection and usage as described therein.
+            </p>
+          </Section>
+
+          <Section title="12. Third-Party Services">
+            <p>
+              We may use third-party services (such as payment gateways and AI APIs). We are not responsible for the
+              availability or performance of such third-party services.
+            </p>
+          </Section>
+
+          <Section title="13. Modifications">
+            <p>
+              We reserve the right to update or modify these Terms at any time. Continued use of the Platform after
+              changes constitutes acceptance of the revised Terms.
+            </p>
+          </Section>
+
+          <Section title="14. Termination">
+            <p>We may suspend or terminate access to the Platform if:</p>
             <ul className="list-disc pl-5 space-y-1">
               <li>You violate these Terms</li>
-              <li>You misuse the platform</li>
-              <li>Required by law</li>
+              <li>We suspect fraudulent or abusive activity</li>
             </ul>
           </Section>
 
-          <Section title="12. Changes to Terms">
-            <p>We may update these Terms at any time.</p>
-            <p>Continued use of the Platform means:</p>
-            <ul className="list-disc pl-5 space-y-1">
-              <li>You accept the updated Terms</li>
-            </ul>
+          <Section title="15. Governing Law">
+            <p>
+              These Terms shall be governed by and construed in accordance with the laws of Bangalore, India.
+            </p>
           </Section>
 
-          <Section title="13. Governing Law">
-            <p>These Terms are governed by the laws of India.</p>
-            <p>Any disputes shall be subject to the exclusive jurisdiction of the courts in Bangalore, Karnataka, India.</p>
-          </Section>
-
-          <Section title="14. Contact Information">
-            <p>For any questions or concerns:</p>
+          <Section title="16. Contact Information">
+            <p>For any queries or support, please contact:</p>
             <div>
-              <p className="font-semibold text-foreground">Fospe Software Private Limited</p>
               <p>
                 Email:{" "}
                 <a href={`mailto:${SUPPORT_EMAIL}`} className="text-[#4055FF] underline">
                   {SUPPORT_EMAIL}
                 </a>
               </p>
-              <p>
-                Website:{" "}
-                <a href="https://visashuttle.com" className="text-[#4055FF] underline">
-                  https://visashuttle.com
-                </a>
-              </p>
+              <p className="font-semibold text-foreground mt-2">Company: Fospe Software Private Limited</p>
             </div>
-          </Section>
-
-          <Section title="15. Acceptance of Terms">
-            <p>By using this Platform, you confirm that:</p>
-            <ul className="list-disc pl-5 space-y-1">
-              <li>You have read these Terms</li>
-              <li>You agree to be legally bound by them</li>
-            </ul>
           </Section>
         </div>
       </main>

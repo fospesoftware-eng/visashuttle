@@ -1,0 +1,107 @@
+Terms and Conditions
+
+Effective Date: May 5, 2026
+Website: visashuttle.com
+Legal Entity: Fospe Software Private Limited
+
+1. Introduction
+
+Welcome to Visa Shuttle (“Platform”), a product of Fospe Software Private Limited (“Company”, “we”, “our”, “us”). By accessing or using our website and services, you agree to be bound by these Terms and Conditions (“Terms”). If you do not agree, please do not use the Platform.
+
+2. Nature of Service
+
+Visa Shuttle is an AI-powered platform that provides visa approval probability assessments based on user-provided information and AI-driven analysis.
+
+We provide informational insights only
+We do not process visas
+We do not guarantee visa approval
+We are not affiliated with any embassy, consulate, or government authority
+3. Eligibility
+
+You must be at least 18 years old or accessing the service under the supervision of a legal guardian to use this Platform.
+
+4. User Account
+
+To access certain features, you must create an account.
+
+You agree to:
+
+Provide accurate and complete information
+Maintain confidentiality of your login credentials
+Be responsible for all activities under your account
+5. Services & Access
+
+Visa Shuttle offers two types of services:
+
+a. Basic Check (Free)
+Limited assessment based on basic inputs
+b. Deep Check (Paid)
+Advanced AI-based analysis with detailed insights and recommendations
+
+All payments are processed securely via third-party payment gateways.
+
+6. No Refund Policy
+
+All payments made on Visa Shuttle are non-refundable.
+
+By making a payment, you acknowledge that:
+
+Results are generated instantly
+The service is consumed immediately upon purchase
+7. User Responsibilities
+
+You agree:
+
+Not to provide false or misleading information
+Not to misuse or attempt to manipulate the system
+Not to use the Platform for unlawful purposes
+8. Disclaimer
+
+The results provided by Visa Shuttle:
+
+Are AI-generated estimates
+Are not official decisions
+May not reflect actual visa outcomes
+
+The Company shall not be held liable for:
+
+Visa rejections
+Losses incurred based on platform results
+Any decisions made using our insights
+9. Limitation of Liability
+
+To the maximum extent permitted by law, Fospe Software Private Limited shall not be liable for any indirect, incidental, or consequential damages arising from the use of the Platform.
+
+10. Intellectual Property
+
+All content, branding, algorithms, and software on this Platform are the property of Fospe Software Private Limited and are protected under applicable intellectual property laws.
+
+11. Privacy
+
+Your use of the Platform is also governed by our Privacy Policy. By using the service, you consent to data collection and usage as described therein.
+
+12. Third-Party Services
+
+We may use third-party services (such as payment gateways and AI APIs). We are not responsible for the availability or performance of such third-party services.
+
+13. Modifications
+
+We reserve the right to update or modify these Terms at any time. Continued use of the Platform after changes constitutes acceptance of the revised Terms.
+
+14. Termination
+
+We may suspend or terminate access to the Platform if:
+
+You violate these Terms
+We suspect fraudulent or abusive activity
+15. Governing Law
+
+These Terms shall be governed by and construed in accordance with the laws of Bangalore, India.
+
+16. Contact Information
+
+For any queries or support, please contact:
+
+Email: support@visashuttle.com
+
+Company: Fospe Software Private Limited
