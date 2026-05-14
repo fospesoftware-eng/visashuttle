@@ -40,13 +40,21 @@ try {
 // risks subtle corruption (sessions, auth, in-flight queries). Exit with
 // non-zero so the deploy infra restarts us cleanly instead of leaving a
 // half-broken process serving traffic.
+// uncaughtException means synchronous code threw without a catch — the
+// process state is undefined so we must exit. Log the full stack first.
 process.on("uncaughtException", (err) => {
   bootLog(`uncaughtException: ${(err as Error)?.stack ?? err}`);
   process.exit(1);
 });
+// unhandledRejection can legitimately come from pino's internal worker
+// threads during startup in certain environments. Exiting here turned out
+// to be counterproductive — it killed the process before any preload
+// markers could run, causing a crash loop with no diagnostics. Log it
+// instead and let the boot sequence proceed; if the real app never loads,
+// bootFatal will be set and healthz will return 503 to trigger a clean
+// restart by the deploy infra.
 process.on("unhandledRejection", (reason) => {
-  bootLog(`unhandledRejection: ${(reason as any)?.stack ?? reason}`);
-  process.exit(1);
+  bootLog(`unhandledRejection (non-fatal): ${(reason as any)?.stack ?? reason}`);
 });
 
 import { createServer, type IncomingMessage, type ServerResponse } from "http";
