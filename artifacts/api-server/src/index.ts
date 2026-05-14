@@ -35,13 +35,18 @@ try {
   bootLog(`setBlocking failed: ${(err as Error)?.message ?? err}`);
 }
 
-// Top-level error nets so any thrown error during async init is visible
-// in deploy logs instead of dying silently.
+// Top-level error nets — log full stack to stderr, then terminate. Node's
+// process state after an uncaught exception is undefined, so continuing
+// risks subtle corruption (sessions, auth, in-flight queries). Exit with
+// non-zero so the deploy infra restarts us cleanly instead of leaving a
+// half-broken process serving traffic.
 process.on("uncaughtException", (err) => {
   bootLog(`uncaughtException: ${(err as Error)?.stack ?? err}`);
+  process.exit(1);
 });
 process.on("unhandledRejection", (reason) => {
   bootLog(`unhandledRejection: ${(reason as any)?.stack ?? reason}`);
+  process.exit(1);
 });
 
 import { createServer, type IncomingMessage, type ServerResponse } from "http";
@@ -67,8 +72,17 @@ bootLog(`PORT=${port}`);
 // app once it's been loaded.
 const stubApp: Express = express();
 let realApp: Express | undefined;
+let bootFatal = false;
 
+// Healthz returns 503 if async init permanently failed, so the deploy
+// startup probe fails (and the platform restarts us) rather than serving
+// 503s to real traffic indefinitely. While still warming up (no fatal
+// error yet, real app not ready) we return 200 so the probe passes.
 stubApp.get("/api/healthz", (_req: Request, res: Response) => {
+  if (bootFatal) {
+    res.status(503).json({ status: "error", ready: false, fatal: true });
+    return;
+  }
   res.json({ status: "ok", ready: Boolean(realApp) });
 });
 
@@ -104,6 +118,31 @@ httpServer.listen({ port, host: "0.0.0.0" }, () => {
     const appMod = await import("./app");
     const fullApp = appMod.default as Express;
     bootLog("imported ./app");
+
+    // Preload routes.ts's heavy transitive deps individually so that if any
+    // one of them hangs at top-level evaluation the deploy log pinpoints it.
+    bootLog("preload: ./storage");
+    await import("./storage");
+    bootLog("preload: ../ai");
+    await import("./ai" as any);
+    bootLog("preload: ../sms");
+    await import("./sms" as any);
+    bootLog("preload: ../shared/visa-free");
+    await import("./shared/visa-free" as any);
+    bootLog("preload: ../shared/destinations");
+    await import("./shared/destinations" as any);
+    bootLog("preload: ../shared/visa-catalog");
+    await import("./shared/visa-catalog" as any);
+    bootLog("preload: ./api-platform");
+    await import("./routes/api-platform" as any);
+    bootLog("preload: ./platform-extensions");
+    await import("./routes/platform-extensions" as any);
+    bootLog("preload: bcryptjs");
+    await import("bcryptjs" as any);
+    bootLog("preload: express-rate-limit");
+    await import("express-rate-limit" as any);
+    bootLog("preload: exceljs");
+    await import("exceljs" as any);
 
     bootLog("importing ./routes/routes");
     const routesMod = await import("./routes/routes");
@@ -144,7 +183,9 @@ httpServer.listen({ port, host: "0.0.0.0" }, () => {
     logger.info({ port }, "Server fully ready");
   } catch (err) {
     bootLog(`FATAL during async init: ${(err as Error)?.stack ?? err}`);
-    // Don't exit — keep the stub serving healthz so the deploy stays up
-    // and the operator can see the diagnostic in the logs.
+    // Flip the fatal flag so /api/healthz starts returning 503. The deploy
+    // startup probe will then fail and the platform will restart us with a
+    // clean process instead of leaving real traffic stuck on 503s forever.
+    bootFatal = true;
   }
 })();
