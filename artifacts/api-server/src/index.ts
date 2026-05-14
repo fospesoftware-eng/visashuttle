@@ -1,105 +1,150 @@
-// Boot diagnostics go to stderr because:
-//   1. Node line-buffers stderr but block-buffers stdout when piped to a
-//      non-TTY (the case under the deploy infra), so stderr writes show up
-//      immediately in deploy logs while stdout writes can sit in a 4KB
-//      buffer until SIGKILL discards them.
-//   2. Pino (our structured logger) writes to stdout via SonicBoom, which
-//      compounds the buffering risk during the first ~100ms of boot before
-//      its async flush loop kicks in.
-// Once the listening socket is open we still use the structured logger for
-// everything else.
+// ──────────────────────────────────────────────────────────────────────────
+// Boot strategy
+//
+// The deploy infra requires that port $PORT be opened within ~30s of process
+// start. Previously the entry module imported `./app` and `./routes/routes`
+// statically — but ES module imports are **hoisted**, so any slow top-level
+// code in those modules (or anything they transitively import) executes
+// BEFORE the entry module's body, blocking `httpServer.listen()` and causing
+// the deploy to fail with no diagnostic output.
+//
+// To make port binding bulletproof we:
+//   1. Statically import only Node built-ins + Express (fast, no I/O).
+//   2. Open the listening socket IMMEDIATELY with a stub Express app that
+//      answers /api/healthz so the deploy port-probe succeeds.
+//   3. Load the real app + routes asynchronously via `await import(...)`.
+//      A delegating middleware on the stub forwards real requests to the
+//      full app once it's ready; before then everything else returns 503.
+//   4. Every step writes a marker to stderr (line-buffered, guaranteed
+//      flush) so deploy logs always show exactly how far boot got.
+// ──────────────────────────────────────────────────────────────────────────
+
 const bootLog = (msg: string) => process.stderr.write(`[boot] ${msg}\n`);
 
-bootLog("index.ts top-level start");
+bootLog("entry start");
 
-// Force stdout into blocking/sync mode so the structured logger's
-// "Server listening" line is guaranteed to flush before the deploy
-// port-probe / health-check evaluates the process.
+// Force stdout into blocking mode so the structured logger's lines flush
+// reliably (Node block-buffers stdout when piped to a non-TTY).
 try {
   const handle = (process.stdout as any)._handle;
   if (handle && typeof handle.setBlocking === "function") {
     handle.setBlocking(true);
-    bootLog("stdout set to blocking mode");
+    bootLog("stdout set to blocking");
   }
 } catch (err) {
-  bootLog(`failed to set stdout blocking: ${(err as Error)?.message ?? err}`);
+  bootLog(`setBlocking failed: ${(err as Error)?.message ?? err}`);
 }
 
-import { createServer } from "http";
-bootLog("imported http");
+// Top-level error nets so any thrown error during async init is visible
+// in deploy logs instead of dying silently.
+process.on("uncaughtException", (err) => {
+  bootLog(`uncaughtException: ${(err as Error)?.stack ?? err}`);
+});
+process.on("unhandledRejection", (reason) => {
+  bootLog(`unhandledRejection: ${(reason as any)?.stack ?? reason}`);
+});
 
-import app from "./app";
-bootLog("imported ./app");
+import { createServer, type IncomingMessage, type ServerResponse } from "http";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 
-import { registerRoutes } from "./routes/routes";
-bootLog("imported ./routes/routes");
-
-import { logger } from "./lib/logger";
-bootLog("imported ./lib/logger");
-
-import { serveStatic } from "./static";
-bootLog("imported ./static");
+bootLog("static imports complete");
 
 const rawPort = process.env["PORT"];
-
 if (!rawPort) {
+  bootLog("FATAL: PORT env var missing");
   throw new Error("PORT environment variable is required but was not provided.");
 }
-
 const port = Number(rawPort);
-
 if (Number.isNaN(port) || port <= 0) {
+  bootLog(`FATAL: invalid PORT "${rawPort}"`);
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
+bootLog(`PORT=${port}`);
 
-bootLog(`creating http server (port=${port})`);
-const httpServer = createServer(app);
+// ── Stub server ──────────────────────────────────────────────────────────
+// Minimal Express instance that owns the listening socket. It answers
+// /api/healthz immediately and delegates every other request to the real
+// app once it's been loaded.
+const stubApp: Express = express();
+let realApp: Express | undefined;
 
-// Register the deploy health-check route immediately, before any async work.
-// The deploy infra port-probe times out fast, so we MUST open the listening
-// socket as soon as possible — heavy startup work (DB seeding, route
-// registration, etc.) happens after `listen()` returns.
-app.get("/api/healthz", (_req, res) => {
-  res.json({ status: "ok" });
+stubApp.get("/api/healthz", (_req: Request, res: Response) => {
+  res.json({ status: "ok", ready: Boolean(realApp) });
+});
+
+stubApp.use((req: Request, res: Response, next: NextFunction) => {
+  if (realApp) {
+    return (realApp as unknown as (
+      req: IncomingMessage,
+      res: ServerResponse,
+      next: NextFunction,
+    ) => void)(req, res, next);
+  }
+  if (req.path === "/api/healthz") return next();
+  res.status(503).json({ error: "Server warming up, please retry shortly." });
+});
+
+const httpServer = createServer(stubApp);
+
+httpServer.on("error", (err) => {
+  bootLog(`httpServer error: ${(err as Error)?.message ?? err}`);
 });
 
 bootLog("calling httpServer.listen");
 httpServer.listen({ port, host: "0.0.0.0" }, () => {
-  // Stderr write first (guaranteed flush) so deploy logs always show the
-  // bind succeeded, then the structured info log.
-  bootLog(`listen callback fired on port ${port}`);
-  logger.info({ port }, "Server listening");
+  bootLog(`LISTENING on ${port}`);
 });
 
-httpServer.on("error", (err) => {
-  bootLog(`httpServer error: ${(err as Error)?.message ?? err}`);
-  logger.error({ err }, "[Boot] httpServer error");
-});
-
+// ── Async heavy load ─────────────────────────────────────────────────────
+// Load the real app AFTER the listening socket is open. Any slow top-level
+// code in `./app` or `./routes/routes` can no longer block port binding.
 (async () => {
   try {
+    bootLog("importing ./app");
+    const appMod = await import("./app");
+    const fullApp = appMod.default as Express;
+    bootLog("imported ./app");
+
+    bootLog("importing ./routes/routes");
+    const routesMod = await import("./routes/routes");
+    bootLog("imported ./routes/routes");
+
+    bootLog("importing ./lib/logger");
+    const { logger } = await import("./lib/logger");
+    bootLog("imported ./lib/logger");
+
+    bootLog("importing ./static");
+    const { serveStatic } = await import("./static");
+    bootLog("imported ./static");
+
     bootLog("registerRoutes start");
-    await registerRoutes(httpServer, app);
+    await routesMod.registerRoutes(httpServer, fullApp);
     bootLog("registerRoutes complete");
-  } catch (err) {
-    bootLog(`registerRoutes failed: ${(err as Error)?.message ?? err}`);
-    logger.error({ err }, "[Boot] registerRoutes failed");
-    throw err;
-  }
 
-  app.use((err: any, _req: any, res: any, _next: any) => {
-    const status = err.status || err.statusCode || 500;
-    logger.error({ err }, `[error] ${status} ${err?.message ?? "Unknown error"}`);
-    const isProd = process.env.NODE_ENV === "production";
-    const safeMessage =
-      isProd && status >= 500 ? "Internal Server Error" : err?.message || "Internal Server Error";
-    if (!res.headersSent) {
-      res.status(status).json({ message: safeMessage });
+    fullApp.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      logger.error({ err }, `[error] ${status} ${err?.message ?? "Unknown error"}`);
+      const isProd = process.env.NODE_ENV === "production";
+      const safeMessage =
+        isProd && status >= 500 ? "Internal Server Error" : err?.message || "Internal Server Error";
+      if (!res.headersSent) {
+        res.status(status).json({ message: safeMessage });
+      }
+    });
+
+    if (process.env.NODE_ENV === "production") {
+      serveStatic(fullApp);
+      bootLog("serveStatic mounted");
     }
-  });
 
-  if (process.env.NODE_ENV === "production") {
-    serveStatic(app);
-    bootLog("serveStatic mounted");
+    // Atomic swap: from this point on the stub delegates every request to
+    // the real app, including session/CORS/CSRF middleware.
+    realApp = fullApp;
+    bootLog("real app live");
+    logger.info({ port }, "Server fully ready");
+  } catch (err) {
+    bootLog(`FATAL during async init: ${(err as Error)?.stack ?? err}`);
+    // Don't exit — keep the stub serving healthz so the deploy stays up
+    // and the operator can see the diagnostic in the logs.
   }
 })();
