@@ -14,7 +14,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { getDocumentChecklist } from "@/data/document-checklists";
+import { getDocumentChecklist, type DocumentRequirement } from "@/data/document-checklists";
 
 // Public payload shape — server returns proposal + minimal tenant branding.
 interface ProposalPublicData {
@@ -44,6 +44,8 @@ interface ProposalPublicData {
     contactEmail: string | null;
     contactPhone: string | null;
   };
+  checklist?: DocumentRequirement[];
+  checklistSource?: "agency" | "database" | "default";
 }
 
 export default function ProposalApplyPage() {
@@ -62,8 +64,8 @@ export default function ProposalApplyPage() {
 
   const checklist = useMemo(() => {
     if (!proposal) return [];
-    return getDocumentChecklist(proposal.destinationCountry, proposal.visaType);
-  }, [proposal?.destinationCountry, proposal?.visaType]);
+    return data?.checklist?.length ? data.checklist : getDocumentChecklist(proposal.destinationCountry, proposal.visaType);
+  }, [data?.checklist, proposal?.destinationCountry, proposal?.visaType]);
 
   const [form, setForm] = useState({
     applicantName: "",

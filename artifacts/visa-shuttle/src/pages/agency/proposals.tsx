@@ -352,10 +352,21 @@ function ProposalCreateDialog({
     }
   }, [defaultAssignee]); // eslint-disable-line
 
+  const { data: effectiveChecklist } = useQuery<{ checklist: ReturnType<typeof getDocumentChecklist> }>({
+    queryKey: ["/api/tenants", tenantId, "application-settings", "checklists", form.destinationCountry, form.visaType],
+    queryFn: async () => {
+      const qs = new URLSearchParams({ country: form.destinationCountry, visaType: form.visaType });
+      const res = await fetch(`/api/tenants/${tenantId}/application-settings/checklists?${qs.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load document checklist");
+      return res.json();
+    },
+    enabled: !!tenantId && !!form.destinationCountry && !!form.visaType,
+  });
+
   const checklistPreview = useMemo(() => {
     if (!form.destinationCountry || !form.visaType) return [];
-    return getDocumentChecklist(form.destinationCountry, form.visaType);
-  }, [form.destinationCountry, form.visaType]);
+    return effectiveChecklist?.checklist?.length ? effectiveChecklist.checklist : getDocumentChecklist(form.destinationCountry, form.visaType);
+  }, [effectiveChecklist, form.destinationCountry, form.visaType]);
 
   const createMutation = useMutation({
     mutationFn: async () => {

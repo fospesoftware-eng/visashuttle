@@ -370,6 +370,21 @@ export const insertVisaTemplateSchema = createInsertSchema(visaTemplates).omit({
 export type InsertVisaTemplate = z.infer<typeof insertVisaTemplateSchema>;
 export type VisaTemplate = typeof visaTemplates.$inferSelect;
 
+// Per-agency checklist overrides. These replace the effective checklist for a
+// specific destination + visa type only for the owning tenant.
+export const tenantDocumentChecklists = pgTable("tenant_document_checklists", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull(),
+  country: text("country").notNull(),
+  visaType: text("visa_type").notNull(),
+  requirements: jsonb("requirements").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertTenantDocumentChecklistSchema = createInsertSchema(tenantDocumentChecklists).omit({ id: true, updatedAt: true });
+export type InsertTenantDocumentChecklist = z.infer<typeof insertTenantDocumentChecklistSchema>;
+export type TenantDocumentChecklist = typeof tenantDocumentChecklists.$inferSelect;
+
 // Activity Logs table
 export const activityLogs = pgTable("activity_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

@@ -12,6 +12,13 @@ import bcrypt from "bcryptjs";
 import rateLimit from "express-rate-limit";
 import { randomUUID, randomBytes } from "crypto";
 
+type DocumentRequirement = {
+  type: string;
+  name: string;
+  description: string;
+  required: boolean;
+};
+
 // ── Rate limiters ─────────────────────────────────────────────────────────
 // Brute-force defence on credential endpoints. Limits are per-IP and reset
 // each window. They're intentionally permissive enough not to break a real
@@ -1475,6 +1482,77 @@ export async function registerRoutes(
     return caller;
   }
 
+  const checklistItemSchema = z.object({
+    type: z.string().trim().min(1).max(80),
+    name: z.string().trim().min(1).max(160),
+    description: z.string().trim().max(500).default(""),
+    required: z.boolean().default(true),
+  });
+
+  function normalizeChecklistItems(input: unknown): DocumentRequirement[] {
+    const parsed = z.array(checklistItemSchema).parse(input);
+    const seen = new Map<string, DocumentRequirement>();
+    for (const item of parsed) {
+      const type = item.type.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+      if (!type) continue;
+      seen.set(type, {
+        type,
+        name: item.name.trim(),
+        description: item.description?.trim() ?? "",
+        required: !!item.required,
+      });
+    }
+    return Array.from(seen.values());
+  }
+
+  async function getVisaTemplateChecklist(country: string, visaType: string): Promise<DocumentRequirement[] | null> {
+    const templates = await storage.getAllVisaTemplates();
+    const template = templates.find((t) =>
+      t.isActive !== false &&
+      t.country.toLowerCase() === country.toLowerCase() &&
+      t.visaType.toLowerCase() === visaType.toLowerCase()
+    );
+    if (!template) return null;
+    try {
+      const items = normalizeChecklistItems(template.requirements);
+      return items.length ? items : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function getEffectiveDocumentChecklist(tenantId: string, country: string, visaType: string) {
+    const override = await storage.getTenantDocumentChecklist(tenantId, country, visaType);
+    if (override) {
+      return {
+        source: "agency" as const,
+        country,
+        visaType,
+        checklist: normalizeChecklistItems(override.requirements),
+        override,
+      };
+    }
+
+    const templateChecklist = await getVisaTemplateChecklist(country, visaType);
+    if (templateChecklist) {
+      return {
+        source: "database" as const,
+        country,
+        visaType,
+        checklist: templateChecklist,
+        override: null,
+      };
+    }
+
+    return {
+      source: "default" as const,
+      country,
+      visaType,
+      checklist: [] as DocumentRequirement[],
+      override: null,
+    };
+  }
+
   app.get("/api/tenants/:tenantId/proposals", requireAgencyAuth, async (req, res) => {
     const tenantId = req.params.tenantId;
     const caller = await requireTenantTeamMember(req, res, tenantId);
@@ -1614,6 +1692,58 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  app.get("/api/tenants/:tenantId/application-settings/checklists", requireAgencyAuth, async (req, res) => {
+    const tenantId = req.params.tenantId;
+    const caller = await requireTenantTeamMember(req, res, tenantId);
+    if (!caller) return;
+
+    const country = typeof req.query.country === "string" ? req.query.country.trim() : "";
+    const visaType = typeof req.query.visaType === "string" ? req.query.visaType.trim() : "";
+    if (country && visaType) {
+      return res.json(await getEffectiveDocumentChecklist(tenantId, country, visaType));
+    }
+
+    const overrides = await storage.getTenantDocumentChecklists(tenantId);
+    res.json({ overrides });
+  });
+
+  app.put("/api/tenants/:tenantId/application-settings/checklists", requireAgencyAuth, async (req, res) => {
+    const tenantId = req.params.tenantId;
+    const caller = await requireTenantTeamMember(req, res, tenantId);
+    if (!caller) return;
+    if (!["saas_admin", "agency_owner", "agency_manager"].includes(caller.role)) {
+      return res.status(403).json({ error: "Only an agency owner or manager can edit application settings" });
+    }
+
+    try {
+      const body = z.object({
+        country: z.string().trim().min(1),
+        visaType: z.string().trim().min(1),
+        checklist: z.array(checklistItemSchema).min(1),
+      }).parse(req.body ?? {});
+      const checklist = normalizeChecklistItems(body.checklist);
+      const override = await storage.upsertTenantDocumentChecklist(tenantId, body.country, body.visaType, checklist);
+      res.json({ source: "agency", country: body.country, visaType: body.visaType, checklist, override });
+    } catch (error: any) {
+      res.status(400).json({ error: error?.message ?? "Invalid checklist" });
+    }
+  });
+
+  app.delete("/api/tenants/:tenantId/application-settings/checklists", requireAgencyAuth, async (req, res) => {
+    const tenantId = req.params.tenantId;
+    const caller = await requireTenantTeamMember(req, res, tenantId);
+    if (!caller) return;
+    if (!["saas_admin", "agency_owner", "agency_manager"].includes(caller.role)) {
+      return res.status(403).json({ error: "Only an agency owner or manager can edit application settings" });
+    }
+
+    const country = typeof req.query.country === "string" ? req.query.country.trim() : "";
+    const visaType = typeof req.query.visaType === "string" ? req.query.visaType.trim() : "";
+    if (!country || !visaType) return res.status(400).json({ error: "country and visaType are required" });
+    await storage.deleteTenantDocumentChecklist(tenantId, country, visaType);
+    res.json(await getEffectiveDocumentChecklist(tenantId, country, visaType));
+  });
+
   // --- Public proposal endpoints (no auth — token IS the credential) ---
 
   // Returns the proposal + minimal tenant branding so the public apply page
@@ -1644,6 +1774,11 @@ export async function registerRoutes(
     // estimate amount correctly (falls back to USD if no settings row yet).
     const settings = await storage.getInvoiceSettings(proposal.tenantId);
     const currency = settings?.currency || "USD";
+    const documentChecklist = await getEffectiveDocumentChecklist(
+      proposal.tenantId,
+      proposal.destinationCountry,
+      proposal.visaType,
+    );
 
     res.json({
       proposal: {
@@ -1672,6 +1807,8 @@ export async function registerRoutes(
         contactEmail: tenant.contactEmail,
         contactPhone: tenant.contactPhone,
       },
+      checklist: documentChecklist.checklist,
+      checklistSource: documentChecklist.source,
     });
   });
 

@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Building2, Users, Bell, CreditCard, Save, Palette, Eye, EyeOff, Loader2, Check, ExternalLink, Copy, Globe, Link2, Plus, Trash2, ChevronRight, UserCheck, UserX, Zap, Crown, Shield, ArrowUpRight, MessageSquare, Send, AlertCircle } from "lucide-react";
+import { Building2, Users, Bell, CreditCard, Save, Palette, Eye, EyeOff, Loader2, Check, ExternalLink, Copy, Globe, Link2, Plus, Trash2, ChevronRight, UserCheck, UserX, Zap, Crown, Shield, ArrowUpRight, MessageSquare, Send, AlertCircle, ClipboardList, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +29,8 @@ import { apiRequest } from "@/lib/queryClient";
 import type { Tenant } from "@workspace/db";
 import { AGENCY_PERMISSIONS, type AgencyPermission } from "@/shared/schema-constants";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { COUNTRIES, VISA_TYPES as GENERIC_VISA_TYPES } from "@/shared/destinations";
+import { CHECKLIST_COUNTRIES, CHECKLIST_VISA_TYPES, getDocumentChecklist, type DocumentRequirement } from "@/data/document-checklists";
 
 // ─── Team Tab Component ────────────────────────────────────────────────────────
 
@@ -427,6 +430,203 @@ function TeamTab({ tenantId, currentUserId }: { tenantId?: string; currentUserId
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+function ApplicationSettingsTab({ tenantId }: { tenantId?: string }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const countryOptions = useMemo(
+    () => Array.from(new Set([...CHECKLIST_COUNTRIES, ...COUNTRIES])).sort(),
+    [],
+  );
+  const visaTypeOptions = useMemo(
+    () => Array.from(new Set([...CHECKLIST_VISA_TYPES, ...GENERIC_VISA_TYPES])).sort(),
+    [],
+  );
+  const [country, setCountry] = useState("United States");
+  const [visaType, setVisaType] = useState("Tourist Visa");
+  const [items, setItems] = useState<DocumentRequirement[]>([]);
+  const [loadedKey, setLoadedKey] = useState("");
+
+  const checklistKey = ["/api/tenants", tenantId, "application-settings", "checklists", country, visaType];
+  const { data, isLoading } = useQuery<{
+    source: "agency" | "database" | "default";
+    checklist: DocumentRequirement[];
+    override: unknown | null;
+  }>({
+    queryKey: checklistKey,
+    queryFn: async () => {
+      const qs = new URLSearchParams({ country, visaType });
+      const res = await fetch(`/api/tenants/${tenantId}/application-settings/checklists?${qs.toString()}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to load checklist");
+      return res.json();
+    },
+    enabled: !!tenantId && !!country && !!visaType,
+  });
+
+  useEffect(() => {
+    const key = `${country}::${visaType}::${data?.source ?? ""}`;
+    if (!data || loadedKey === key) return;
+    setItems(data.checklist?.length ? data.checklist : getDocumentChecklist(country, visaType));
+    setLoadedKey(key);
+  }, [country, data, loadedKey, visaType]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const cleaned = items
+        .map((item) => ({
+          ...item,
+          type: item.type.trim(),
+          name: item.name.trim(),
+          description: item.description.trim(),
+        }))
+        .filter((item) => item.type && item.name);
+      const res = await apiRequest("PUT", `/api/tenants/${tenantId}/application-settings/checklists`, {
+        country,
+        visaType,
+        checklist: cleaned,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: checklistKey });
+      toast({ title: "Saved", description: "This checklist now applies only to your agency." });
+    },
+    onError: (error: Error) => toast({ title: "Save failed", description: error.message, variant: "destructive" }),
+  });
+
+  const resetMutation = useMutation({
+    mutationFn: async () => {
+      const qs = new URLSearchParams({ country, visaType });
+      const res = await apiRequest("DELETE", `/api/tenants/${tenantId}/application-settings/checklists?${qs.toString()}`);
+      return res.json();
+    },
+    onSuccess: (next) => {
+      setItems(next.checklist ?? getDocumentChecklist(country, visaType));
+      setLoadedKey("");
+      queryClient.invalidateQueries({ queryKey: checklistKey });
+      toast({ title: "Reset", description: "Agency override removed. The default checklist is active again." });
+    },
+    onError: (error: Error) => toast({ title: "Reset failed", description: error.message, variant: "destructive" }),
+  });
+
+  const updateItem = (index: number, patch: Partial<DocumentRequirement>) => {
+    setItems((current) => current.map((item, i) => i === index ? { ...item, ...patch } : item));
+  };
+
+  const addItem = () => {
+    setItems((current) => [
+      ...current,
+      { type: `custom_${current.length + 1}`, name: "", description: "", required: true },
+    ]);
+  };
+
+  const sourceLabel = data?.source === "agency"
+    ? "Agency override"
+    : data?.source === "database"
+      ? "Database template"
+      : "Default template";
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <ClipboardList className="w-4 h-4" />
+            Application Checklist Settings
+          </CardTitle>
+          <CardDescription>
+            Customize required documents by destination and visa type. Changes stay private to this agency.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
+            <div className="space-y-2">
+              <Label>Destination country</Label>
+              <Select value={country} onValueChange={(value) => { setCountry(value); setLoadedKey(""); }}>
+                <SelectTrigger data-testid="select-checklist-country">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {countryOptions.map((option) => (
+                    <SelectItem key={option} value={option}>{option}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Visa type</Label>
+              <Select value={visaType} onValueChange={(value) => { setVisaType(value); setLoadedKey(""); }}>
+                <SelectTrigger data-testid="select-checklist-visa-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {visaTypeOptions.map((option) => (
+                    <SelectItem key={option} value={option}>{option}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Badge variant={data?.source === "agency" ? "default" : "secondary"} className="h-10 justify-center px-3">
+              {isLoading ? "Loading..." : sourceLabel}
+            </Badge>
+          </div>
+
+          <div className="rounded-lg border divide-y overflow-hidden">
+            {items.length === 0 && (
+              <div className="p-6 text-sm text-muted-foreground text-center">
+                No checklist items yet. Add the first document requirement below.
+              </div>
+            )}
+            {items.map((item, index) => (
+              <div key={`${item.type}-${index}`} className="p-4 space-y-3">
+                <div className="grid gap-3 md:grid-cols-[0.8fr_1.2fr_auto_auto] md:items-center">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Document key</Label>
+                    <Input value={item.type} onChange={(e) => updateItem(index, { type: e.target.value })} placeholder="bank_statement" data-testid={`input-checklist-type-${index}`} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Document name</Label>
+                    <Input value={item.name} onChange={(e) => updateItem(index, { name: e.target.value })} placeholder="Bank statements" data-testid={`input-checklist-name-${index}`} />
+                  </div>
+                  <label className="flex items-center gap-2 text-sm md:pt-5">
+                    <Checkbox checked={item.required} onCheckedChange={(checked) => updateItem(index, { required: checked === true })} data-testid={`checkbox-checklist-required-${index}`} />
+                    Required
+                  </label>
+                  <Button variant="ghost" size="icon" className="md:mt-5" onClick={() => setItems((current) => current.filter((_, i) => i !== index))} data-testid={`button-remove-checklist-item-${index}`} aria-label="Remove document">
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Description</Label>
+                  <Textarea value={item.description} onChange={(e) => updateItem(index, { description: e.target.value })} rows={2} placeholder="Tell the applicant exactly what this document should include." data-testid={`textarea-checklist-description-${index}`} />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <Button variant="outline" onClick={addItem} className="gap-2" data-testid="button-add-checklist-item">
+              <Plus className="w-4 h-4" />
+              Add document
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => resetMutation.mutate()} disabled={resetMutation.isPending || data?.source !== "agency"} className="gap-2" data-testid="button-reset-checklist">
+                {resetMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+                Reset
+              </Button>
+              <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || items.length === 0} className="gap-2" data-testid="button-save-checklist">
+                {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Save checklist
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -1213,7 +1413,7 @@ export default function AgencySettingsPage() {
         </div>
 
         <Tabs defaultValue={typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "subscription" ? "subscription" : "branding"} className="space-y-4">
-          <TabsList>
+          <TabsList className="h-auto flex-wrap justify-start">
             <TabsTrigger value="branding" data-testid="tab-branding">
               <Palette className="w-4 h-4 mr-2" />
               Branding
@@ -1225,6 +1425,10 @@ export default function AgencySettingsPage() {
             <TabsTrigger value="general" data-testid="tab-general">General</TabsTrigger>
             <TabsTrigger value="notifications" data-testid="tab-notifications">Notifications</TabsTrigger>
             <TabsTrigger value="team" data-testid="tab-team">Team</TabsTrigger>
+            <TabsTrigger value="application" data-testid="tab-application-settings">
+              <ClipboardList className="w-4 h-4 mr-2" />
+              Application
+            </TabsTrigger>
             <TabsTrigger value="payments" data-testid="tab-payments">
               <CreditCard className="w-4 h-4 mr-2" />
               Payments
@@ -1710,6 +1914,10 @@ export default function AgencySettingsPage() {
 
           <TabsContent value="team" className="space-y-4">
             <TeamTab tenantId={tenant?.id} currentUserId={authData?.user?.id} />
+          </TabsContent>
+
+          <TabsContent value="application" className="space-y-4">
+            <ApplicationSettingsTab tenantId={tenant?.id} />
           </TabsContent>
 
           <TabsContent value="payments" className="space-y-4">

@@ -135,6 +135,9 @@ const BY_COUNTRY_VISA: Record<string, DocumentRequirement[]> = {
   ],
 };
 
+export const CHECKLIST_COUNTRIES = Object.keys(BY_COUNTRY).sort();
+export const CHECKLIST_VISA_TYPES = Object.keys(BY_VISA_TYPE).sort();
+
 export function getDocumentChecklist(country: string, visaType: string): DocumentRequirement[] {
   if (!country || !visaType) return [];
   const seen = new Map<string, DocumentRequirement>();

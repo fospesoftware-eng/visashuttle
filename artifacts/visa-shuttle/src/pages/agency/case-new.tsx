@@ -516,9 +516,20 @@ export default function NewCasePage() {
   // Which person tab is currently visible in step 5.
   const [activeDocPerson, setActiveDocPerson] = useState<PersonKey>(APPLICANT_KEY);
 
+  const { data: effectiveChecklist } = useQuery<{ checklist: DocumentRequirement[] }>({
+    queryKey: ["/api/tenants", tenantId, "application-settings", "checklists", form.destinationCountry, form.visaType],
+    queryFn: async () => {
+      const qs = new URLSearchParams({ country: form.destinationCountry, visaType: form.visaType });
+      const res = await fetch(`/api/tenants/${tenantId}/application-settings/checklists?${qs.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load document checklist");
+      return res.json();
+    },
+    enabled: !!tenantId && !!form.destinationCountry && !!form.visaType,
+  });
+
   const checklist = useMemo<DocumentRequirement[]>(
-    () => getDocumentChecklist(form.destinationCountry, form.visaType),
-    [form.destinationCountry, form.visaType],
+    () => effectiveChecklist?.checklist?.length ? effectiveChecklist.checklist : getDocumentChecklist(form.destinationCountry, form.visaType),
+    [effectiveChecklist, form.destinationCountry, form.visaType],
   );
 
   // Stable list of person tabs. Includes the main applicant + every co-traveller

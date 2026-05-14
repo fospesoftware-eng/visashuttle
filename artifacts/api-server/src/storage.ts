@@ -9,6 +9,7 @@ import {
   type Document, type InsertDocument,
   type Message, type InsertMessage,
   type VisaTemplate, type InsertVisaTemplate,
+  type TenantDocumentChecklist,
   type ActivityLog, type InsertActivityLog,
   type CustomerAccount, type InsertCustomerAccount,
   type CustomerTenantLink, type InsertCustomerTenantLink,
@@ -32,8 +33,9 @@ import {
   paymentGatewayConfig as paymentGatewayConfigTable,
   tenantPaymentGatewayConfig as tenantPaymentGatewayConfigTable,
   tenantSmsConfig as tenantSmsConfigTable,
+  tenantDocumentChecklists as tenantDocumentChecklistsTable,
 } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
 import { db, hasDatabase } from "./db";
@@ -126,6 +128,10 @@ export interface IStorage {
   createVisaTemplate(template: InsertVisaTemplate): Promise<VisaTemplate>;
   updateVisaTemplate(id: string, data: Partial<InsertVisaTemplate>): Promise<VisaTemplate | undefined>;
   deleteVisaTemplate(id: string): Promise<boolean>;
+  getTenantDocumentChecklists(tenantId: string): Promise<TenantDocumentChecklist[]>;
+  getTenantDocumentChecklist(tenantId: string, country: string, visaType: string): Promise<TenantDocumentChecklist | undefined>;
+  upsertTenantDocumentChecklist(tenantId: string, country: string, visaType: string, requirements: unknown): Promise<TenantDocumentChecklist>;
+  deleteTenantDocumentChecklist(tenantId: string, country: string, visaType: string): Promise<boolean>;
   
   getActivityLogsByTenantId(tenantId: string): Promise<ActivityLog[]>;
   getAllActivityLogs(): Promise<ActivityLog[]>;
@@ -237,6 +243,7 @@ export class MemStorage implements IStorage {
   private documents: Map<string, Document>;
   private messages: Map<string, Message>;
   private visaTemplates: Map<string, VisaTemplate>;
+  private tenantDocumentChecklists: Map<string, TenantDocumentChecklist> = new Map();
   private activityLogs: Map<string, ActivityLog>;
   private customerAccounts: Map<string, CustomerAccount>;
   private customerTenantLinks: Map<string, CustomerTenantLink>;
@@ -1444,6 +1451,39 @@ export class MemStorage implements IStorage {
     return this.visaTemplates.delete(id);
   }
 
+  private tenantChecklistKey(tenantId: string, country: string, visaType: string): string {
+    return `${tenantId}::${country.trim().toLowerCase()}::${visaType.trim().toLowerCase()}`;
+  }
+
+  async getTenantDocumentChecklists(tenantId: string): Promise<TenantDocumentChecklist[]> {
+    return Array.from(this.tenantDocumentChecklists.values())
+      .filter((row) => row.tenantId === tenantId)
+      .sort((a, b) => a.country.localeCompare(b.country) || a.visaType.localeCompare(b.visaType));
+  }
+
+  async getTenantDocumentChecklist(tenantId: string, country: string, visaType: string): Promise<TenantDocumentChecklist | undefined> {
+    return this.tenantDocumentChecklists.get(this.tenantChecklistKey(tenantId, country, visaType));
+  }
+
+  async upsertTenantDocumentChecklist(tenantId: string, country: string, visaType: string, requirements: unknown): Promise<TenantDocumentChecklist> {
+    const key = this.tenantChecklistKey(tenantId, country, visaType);
+    const existing = this.tenantDocumentChecklists.get(key);
+    const next: TenantDocumentChecklist = {
+      id: existing?.id ?? randomUUID(),
+      tenantId,
+      country,
+      visaType,
+      requirements,
+      updatedAt: new Date(),
+    };
+    this.tenantDocumentChecklists.set(key, next);
+    return next;
+  }
+
+  async deleteTenantDocumentChecklist(tenantId: string, country: string, visaType: string): Promise<boolean> {
+    return this.tenantDocumentChecklists.delete(this.tenantChecklistKey(tenantId, country, visaType));
+  }
+
   async getActivityLogsByTenantId(tenantId: string): Promise<ActivityLog[]> {
     return Array.from(this.activityLogs.values()).filter(log => log.tenantId === tenantId);
   }
@@ -1904,6 +1944,67 @@ export class MemStorage implements IStorage {
 
 // HybridStorage: uses MemStorage for agency/seed data, PostgreSQL for B2C user data
 class HybridStorage extends MemStorage {
+  async getTenantDocumentChecklists(tenantId: string): Promise<TenantDocumentChecklist[]> {
+    try {
+      const rows = await db.select().from(tenantDocumentChecklistsTable).where(eq(tenantDocumentChecklistsTable.tenantId, tenantId));
+      return rows.sort((a, b) => a.country.localeCompare(b.country) || a.visaType.localeCompare(b.visaType));
+    } catch (error) {
+      if (isMissingRelationError(error)) return super.getTenantDocumentChecklists(tenantId);
+      throw error;
+    }
+  }
+
+  async getTenantDocumentChecklist(tenantId: string, country: string, visaType: string): Promise<TenantDocumentChecklist | undefined> {
+    try {
+      const rows = await db.select().from(tenantDocumentChecklistsTable).where(and(
+        eq(tenantDocumentChecklistsTable.tenantId, tenantId),
+        eq(tenantDocumentChecklistsTable.country, country),
+        eq(tenantDocumentChecklistsTable.visaType, visaType),
+      )).limit(1);
+      return rows[0] ?? undefined;
+    } catch (error) {
+      if (isMissingRelationError(error)) return super.getTenantDocumentChecklist(tenantId, country, visaType);
+      throw error;
+    }
+  }
+
+  async upsertTenantDocumentChecklist(tenantId: string, country: string, visaType: string, requirements: unknown): Promise<TenantDocumentChecklist> {
+    try {
+      const existing = await this.getTenantDocumentChecklist(tenantId, country, visaType);
+      if (existing) {
+        const rows = await db.update(tenantDocumentChecklistsTable)
+          .set({ requirements, updatedAt: new Date() })
+          .where(eq(tenantDocumentChecklistsTable.id, existing.id))
+          .returning();
+        return rows[0];
+      }
+      const rows = await db.insert(tenantDocumentChecklistsTable).values({
+        tenantId,
+        country,
+        visaType,
+        requirements,
+      }).returning();
+      return rows[0];
+    } catch (error) {
+      if (isMissingRelationError(error)) return super.upsertTenantDocumentChecklist(tenantId, country, visaType, requirements);
+      throw error;
+    }
+  }
+
+  async deleteTenantDocumentChecklist(tenantId: string, country: string, visaType: string): Promise<boolean> {
+    try {
+      const rows = await db.delete(tenantDocumentChecklistsTable).where(and(
+        eq(tenantDocumentChecklistsTable.tenantId, tenantId),
+        eq(tenantDocumentChecklistsTable.country, country),
+        eq(tenantDocumentChecklistsTable.visaType, visaType),
+      )).returning({ id: tenantDocumentChecklistsTable.id });
+      return rows.length > 0;
+    } catch (error) {
+      if (isMissingRelationError(error)) return super.deleteTenantDocumentChecklist(tenantId, country, visaType);
+      throw error;
+    }
+  }
+
   // Seed demo users into PostgreSQL on startup so they persist reliably
   async seedDemoUsersToDb(): Promise<void> {
     const demoAccounts = [
