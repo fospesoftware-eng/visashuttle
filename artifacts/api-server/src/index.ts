@@ -2,6 +2,7 @@ import { createServer } from "http";
 import app from "./app";
 import { registerRoutes } from "./routes/routes";
 import { logger } from "./lib/logger";
+import { serveStatic } from "./static";
 
 const rawPort = process.env["PORT"];
 
@@ -31,7 +32,11 @@ const httpServer = createServer(app);
     }
   });
 
-  httpServer.listen({ port, host: "0.0.0.0", reusePort: true }, () => {
+  if (process.env.NODE_ENV === "production") {
+    serveStatic(app);
+  }
+
+  httpServer.listen({ port, host: "0.0.0.0" }, () => {
     logger.info({ port }, "Server listening");
   });
 })();

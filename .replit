@@ -4,7 +4,7 @@ hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["nano"]
+packages = ["nano", "pnpm"]
 
 [[ports]]
 localPort = 5000
@@ -27,8 +27,8 @@ PORT = "5000"
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["node", "./dist/index.cjs"]
-build = ["npm", "run", "build"]
+run = ["sh", "-lc", "NODE_ENV=production node ./artifacts/api-server/dist/index.mjs"]
+build = ["sh", "-lc", "pnpm install --frozen-lockfile && pnpm run build"]
 
 [workflows]
 runButton = "Project"
@@ -48,7 +48,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "pnpm --filter @workspace/api-server run dev & PORT=5000 BASE_PATH=/ pnpm --filter @workspace/visa-shuttle run dev"
+args = "pnpm install --frozen-lockfile && (pnpm --filter @workspace/api-server run dev & PORT=5000 BASE_PATH=/ pnpm --filter @workspace/visa-shuttle run dev)"
 waitForPort = 5000
 
 [workflows.workflow.metadata]
