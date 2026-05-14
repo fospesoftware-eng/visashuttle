@@ -360,6 +360,7 @@ export default function NewCasePage() {
   const { toast } = useToast();
   const { data: authData } = useCurrentUser();
   const tenantId = authData?.user?.tenantId;
+  const currentUserId = authData?.user?.id ?? "";
   const today = useMemo(() => todayISO(), []);
 
   const [step, setStep] = useState<StepId>(1);
@@ -417,10 +418,9 @@ export default function NewCasePage() {
   // Default assignee to the signed-in user once auth resolves. Only seeds
   // when the field is still empty so we never clobber a manual choice.
   useEffect(() => {
-    const meId = authData?.user?.id;
-    if (!meId) return;
-    setForm((f) => (f.assignedTo ? f : { ...f, assignedTo: meId }));
-  }, [authData?.user?.id]);
+    if (!currentUserId) return;
+    setForm((f) => (f.assignedTo ? f : { ...f, assignedTo: currentUserId }));
+  }, [currentUserId]);
 
   // Team members for the assignee dropdown. Filtered to actual agency staff —
   // we never want to show customers in here.
@@ -444,8 +444,9 @@ export default function NewCasePage() {
       }
       return team;
     },
-    [staffRaw, authData?.user?.id, authData?.user?.name, authData?.user?.email],
+    [staffRaw, currentUserId, authData?.user?.name, authData?.user?.email],
   );
+  const effectiveAssignedTo = form.assignedTo || currentUserId;
 
   // Passport upload + auto-scan state
   const [passportMode, setPassportMode] = useState<"upload" | "manual">("upload");
@@ -621,12 +622,12 @@ export default function NewCasePage() {
       customerPhone: f.customerPhone || originatingLead.phone || "",
       destinationCountry: f.destinationCountry || originatingLead.destinationCountry || "",
       visaType: f.visaType || originatingLead.visaType || "",
-      assignedTo: f.assignedTo || authData?.user?.id || "",
+      assignedTo: f.assignedTo || currentUserId,
     }));
     // The applicant name now has a real value, so the passport-name auto-derive
     // effect should leave it alone unless the agent clears it.
     if (originatingLead.name) applicantNameTouchedRef.current = true;
-  }, [originatingLead, authData?.user?.id]);
+  }, [originatingLead, currentUserId]);
 
   // Auto-derive applicantName from "given-names + surname" — but only when the
   // user hasn't manually edited the applicant-name field.
@@ -972,7 +973,7 @@ export default function NewCasePage() {
     if (s === 1) {
       if (!form.destinationCountry) return "Please select a destination country.";
       if (!form.visaType) return "Please select a visa type.";
-      if (!form.assignedTo) return "Please assign a team member to this case.";
+      if (!effectiveAssignedTo) return "Please assign a team member to this case.";
     }
     if (s === 2) {
       // Either passport surname+given-name OR free-text applicant name must be present.
@@ -1115,7 +1116,7 @@ export default function NewCasePage() {
       notes: form.notes || null,
       // Send the picked team member; the server still validates that the user
       // belongs to this tenant and falls back to the session user if missing.
-      assignedTo: form.assignedTo || null,
+      assignedTo: effectiveAssignedTo || null,
       status,
       caseNumber: generateCaseNumber(),
       // --- Visa workflow ---
@@ -2068,7 +2069,7 @@ export default function NewCasePage() {
                 <div className="space-y-2">
                   <Label htmlFor="case-assignee">Assigned Team Member *</Label>
                   <Select
-                    value={form.assignedTo}
+                    value={effectiveAssignedTo}
                     onValueChange={(v) => setForm({ ...form, assignedTo: v })}
                   >
                     <SelectTrigger id="case-assignee" data-testid="select-case-assignee">
@@ -2077,7 +2078,7 @@ export default function NewCasePage() {
                     <SelectContent>
                       {staff.map((s) => (
                         <SelectItem key={s.id} value={s.id}>
-                          {s.name}{s.id === authData?.user?.id ? " (you)" : ""}
+                          {s.name}{s.id === currentUserId ? " (you)" : ""}
                         </SelectItem>
                       ))}
                     </SelectContent>
