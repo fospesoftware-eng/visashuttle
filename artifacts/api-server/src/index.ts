@@ -18,8 +18,25 @@ if (Number.isNaN(port) || port <= 0) {
 
 const httpServer = createServer(app);
 
+// Register the deploy health-check route immediately, before any async work.
+// The deploy infra port-probe times out at 60s, so we MUST open the listening
+// socket as soon as possible — heavy startup work (DB seeding, route
+// registration, etc.) happens after `listen()` returns.
+app.get("/api/healthz", (_req, res) => {
+  res.json({ status: "ok" });
+});
+
+httpServer.listen({ port, host: "0.0.0.0" }, () => {
+  logger.info({ port }, "Server listening");
+});
+
 (async () => {
-  await registerRoutes(httpServer, app);
+  try {
+    await registerRoutes(httpServer, app);
+  } catch (err) {
+    logger.error({ err }, "[Boot] registerRoutes failed");
+    throw err;
+  }
 
   app.use((err: any, _req: any, res: any, _next: any) => {
     const status = err.status || err.statusCode || 500;
@@ -35,8 +52,4 @@ const httpServer = createServer(app);
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);
   }
-
-  httpServer.listen({ port, host: "0.0.0.0" }, () => {
-    logger.info({ port }, "Server listening");
-  });
 })();

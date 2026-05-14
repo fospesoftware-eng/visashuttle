@@ -201,6 +201,8 @@ app.use(session(sessionOptions));
 const SITE_PASSWORD = process.env.SITE_PASSWORD;
 app.use((req: Request, res: Response, next: NextFunction) => {
   if (!SITE_PASSWORD) return next();
+  // Deploy probe must always succeed regardless of site-password gating.
+  if (req.path === "/api/healthz") return next();
   if (req.path.startsWith("/api/site-auth")) return next();
   if (req.path.startsWith("/api/proposals/")) return next();
   if (req.path.startsWith("/api/public/invoice/")) return next();

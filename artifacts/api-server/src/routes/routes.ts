@@ -702,8 +702,14 @@ export async function registerRoutes(
     res.json({ status: "ok" });
   });
 
-  // Seed demo B2C users into PostgreSQL on startup
-  await (storage as any).seedDemoUsersToDb?.();
+  // Seed demo B2C users into PostgreSQL on startup. Fire-and-forget — we
+  // never want a slow/cold DB connection to delay the server opening its
+  // listening port (the deploy infra port-probe times out at 60s).
+  void Promise.resolve((storage as any).seedDemoUsersToDb?.()).catch((err) => {
+    // Use console here because the request-scoped logger isn't available at boot.
+    // eslint-disable-next-line no-console
+    console.error("[Boot] seedDemoUsersToDb failed:", err);
+  });
 
   // === Site Password Protection ===
   app.post("/api/site-auth/verify", siteAuthRateLimiter, (req, res) => {
