@@ -257,6 +257,80 @@ type CustomerLookupResult = {
   validPassport: CustomerLookupPassport | null;
 };
 
+type AgencyCustomerOption = NonNullable<CustomerLookupResult["customer"]> & {
+  passportNumbers?: string[];
+  passportHolderNames?: string[];
+  latestPassportNumber?: string | null;
+  passportCount?: number;
+  caseCount?: number;
+};
+
+type CustomerDetailResult = {
+  account: NonNullable<CustomerLookupResult["customer"]>;
+  cases: Array<{
+    id: string;
+    applicantName: string | null;
+    applicantDob: string | null;
+    passportSurname: string | null;
+    passportGivenName: string | null;
+    passportMiddleName: string | null;
+    passportNumber: string | null;
+    passportNationality: string | null;
+    passportGender: "M" | "F" | "X" | null;
+    passportDateOfIssue: string | null;
+    passportDateOfExpiry: string | null;
+    passportPlaceOfIssue: string | null;
+    passportPlaceOfBirth: string | null;
+    passportFileUrl: string | null;
+    createdAt: string | null;
+    updatedAt: string | null;
+  }>;
+  passports: CustomerLookupPassport[];
+};
+
+function phoneDigits(value: string | null | undefined): string {
+  return (value ?? "").replace(/\D/g, "");
+}
+
+function pickValidCustomerPassport(detail: CustomerDetailResult, today: string): CustomerLookupPassport | null {
+  const validPassports = [...(detail.passports ?? [])]
+    .filter((p) => !!p.passportNumber && !!p.passportDateOfExpiry && p.passportDateOfExpiry >= today)
+    .sort((a, b) => {
+      if ((b.isPrimary ? 1 : 0) !== (a.isPrimary ? 1 : 0)) {
+        return (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0);
+      }
+      return String(b.passportDateOfExpiry ?? "").localeCompare(String(a.passportDateOfExpiry ?? ""));
+    });
+  if (validPassports[0]) return validPassports[0];
+
+  const latestCase = [...(detail.cases ?? [])]
+    .filter((c) => !!c.passportNumber && !!c.passportDateOfExpiry && c.passportDateOfExpiry >= today)
+    .sort((a, b) => {
+      const ta = (a.updatedAt ?? a.createdAt) ? new Date(a.updatedAt ?? a.createdAt!).getTime() : 0;
+      const tb = (b.updatedAt ?? b.createdAt) ? new Date(b.updatedAt ?? b.createdAt!).getTime() : 0;
+      return tb - ta;
+    })[0];
+
+  return latestCase ? {
+    id: `case:${latestCase.id}`,
+    holderName: latestCase.applicantName,
+    relationship: "self",
+    isPrimary: true,
+    passportSurname: latestCase.passportSurname,
+    passportGivenName: latestCase.passportGivenName,
+    passportMiddleName: latestCase.passportMiddleName,
+    passportNumber: latestCase.passportNumber,
+    passportNationality: latestCase.passportNationality,
+    passportGender: latestCase.passportGender,
+    passportDateOfBirth: latestCase.applicantDob,
+    passportDateOfIssue: latestCase.passportDateOfIssue,
+    passportDateOfExpiry: latestCase.passportDateOfExpiry,
+    passportPlaceOfIssue: latestCase.passportPlaceOfIssue,
+    passportPlaceOfBirth: latestCase.passportPlaceOfBirth,
+    passportFileUrl: latestCase.passportFileUrl,
+  } : null;
+}
+
 export default function NewCasePage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -360,48 +434,75 @@ export default function NewCasePage() {
   // do, the auto-derive-from-passport-name effect stops touching it.
   const applicantNameTouchedRef = useRef(false);
   const passportFileRef = useRef<HTMLInputElement | null>(null);
-  const appliedCustomerLookupRef = useRef<string>("");
 
-  const customerLookupEmail = form.customerEmail.trim().toLowerCase();
-  const customerLookupPhone = form.customerPhone.trim();
-  const { data: customerLookup, isFetching: isCustomerLookupFetching } = useQuery<CustomerLookupResult>({
-    queryKey: ["/api/tenants", tenantId, "customers", "lookup", customerLookupEmail, customerLookupPhone],
+  const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
+  const [selectedCustomerPassportNumber, setSelectedCustomerPassportNumber] = useState<string | null>(null);
+
+  const { data: agencyCustomers = [], isFetching: isCustomersFetching } = useQuery<AgencyCustomerOption[]>({
+    queryKey: ["/api/tenants", tenantId, "customers"],
     queryFn: async () => {
-      const qs = new URLSearchParams();
-      if (customerLookupEmail) qs.set("email", customerLookupEmail);
-      if (customerLookupPhone) qs.set("phone", customerLookupPhone);
-      const res = await fetch(`/api/tenants/${tenantId}/customers/lookup?${qs.toString()}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to look up customer");
+      const res = await fetch(`/api/tenants/${tenantId}/customers`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load customers");
       return res.json();
     },
-    enabled: !!tenantId && (customerLookupEmail.length >= 5 || customerLookupPhone.replace(/\D/g, "").length >= 6),
-    staleTime: 30_000,
+    enabled: !!tenantId,
+    staleTime: 60_000,
   });
 
-  useEffect(() => {
-    const customer = customerLookup?.customer;
-    if (!customer) {
-      if (!isCustomerLookupFetching && form.customerAccountId) {
-        setForm((f) => ({ ...f, customerAccountId: "" }));
-        appliedCustomerLookupRef.current = "";
-      }
+  const customerEmailQuery = form.customerEmail.trim().toLowerCase();
+  const customerPhoneQuery = phoneDigits(form.customerPhone);
+  const customerPickerHasQuery = customerEmailQuery.length >= 2 || customerPhoneQuery.length >= 3;
+  const selectedAgencyCustomer = useMemo(
+    () => agencyCustomers.find((customer) => customer.id === form.customerAccountId) ?? null,
+    [agencyCustomers, form.customerAccountId],
+  );
+  const customerMatches = useMemo(() => {
+    if (!customerPickerHasQuery) return [];
+    return agencyCustomers
+      .filter((customer) => {
+        const email = (customer.email ?? "").toLowerCase();
+        const phone = phoneDigits(customer.phone);
+        const name = (customer.name ?? "").toLowerCase();
+        const passports = (customer.passportNumbers ?? []).map((p) => p.toLowerCase());
+        const holders = (customer.passportHolderNames ?? []).map((n) => n.toLowerCase());
+        return (
+          (!!customerEmailQuery && (
+            email.includes(customerEmailQuery) ||
+            name.includes(customerEmailQuery) ||
+            passports.some((p) => p.includes(customerEmailQuery)) ||
+            holders.some((n) => n.includes(customerEmailQuery))
+          )) ||
+          (!!customerPhoneQuery && phone.includes(customerPhoneQuery))
+        );
+      })
+      .slice(0, 8);
+  }, [agencyCustomers, customerEmailQuery, customerPhoneQuery, customerPickerHasQuery]);
+
+  const applyCustomerSelection = async (customerId: string) => {
+    if (!tenantId) return;
+    const res = await fetch(`/api/tenants/${tenantId}/customers/${customerId}`, { credentials: "include" });
+    if (!res.ok) {
+      toast({
+        title: "Could not load customer",
+        description: "Please try selecting the customer again.",
+        variant: "destructive",
+      });
       return;
     }
-    const passport = customerLookup.validPassport;
-    const applyKey = `${customer.id}:${passport?.id ?? "no-passport"}`;
-    if (appliedCustomerLookupRef.current === applyKey) return;
-    appliedCustomerLookupRef.current = applyKey;
 
+    const detail: CustomerDetailResult = await res.json();
+    const customer = detail.account;
+    const passport = pickValidCustomerPassport(detail, today);
     setForm((f) => {
       const next = {
         ...f,
         customerAccountId: customer.id,
-        customerEmail: f.customerEmail || customer.email || "",
-        customerPhone: f.customerPhone || customer.phone || "",
-        applicantName: f.applicantName || customer.name || passport?.holderName || "",
+        customerEmail: customer.email || f.customerEmail,
+        customerPhone: customer.phone || f.customerPhone,
+        applicantName: customer.name || passport?.holderName || f.applicantName,
       };
       if (passport) {
-        next.applicantDob = f.applicantDob || passport.passportDateOfBirth || "";
+        next.applicantDob = passport.passportDateOfBirth || f.applicantDob;
         next.passportSurname = passport.passportSurname || f.passportSurname;
         next.passportGivenName = passport.passportGivenName || f.passportGivenName;
         next.passportMiddleName = passport.passportMiddleName || f.passportMiddleName;
@@ -428,13 +529,15 @@ export default function NewCasePage() {
       setPassportMode("manual");
     }
 
+    setSelectedCustomerPassportNumber(passport?.passportNumber ?? null);
+    setCustomerPickerOpen(false);
     toast({
-      title: passport ? "Customer and passport auto-filled" : "Customer auto-filled",
+      title: passport ? "Customer and passport selected" : "Customer selected",
       description: passport
-        ? `Loaded ${customer.name || "customer"} and valid passport ${passport.passportNumber}.`
-        : `Loaded ${customer.name || "customer"} from your customer database.`,
+        ? `Loaded ${customer.name || "customer"} with passport ${passport.passportNumber}.`
+        : `Loaded ${customer.name || "customer"} from this agency's customer database.`,
     });
-  }, [customerLookup, form.customerAccountId, isCustomerLookupFetching, toast]);
+  };
 
   // Seed visa/destination from the convert-modal URL params on first mount —
   // these are independent from the lead fetch so they apply even before the
@@ -1809,7 +1912,12 @@ export default function NewCasePage() {
                       type="email"
                       placeholder="customer@example.com"
                       value={form.customerEmail}
-                      onChange={(e) => setForm({ ...form, customerEmail: e.target.value })}
+                      onFocus={() => setCustomerPickerOpen(true)}
+                      onChange={(e) => {
+                        setCustomerPickerOpen(true);
+                        setSelectedCustomerPassportNumber(null);
+                        setForm({ ...form, customerEmail: e.target.value, customerAccountId: "" });
+                      }}
                       data-testid="input-customer-email"
                     />
                   </div>
@@ -1820,28 +1928,95 @@ export default function NewCasePage() {
                       type="tel"
                       placeholder="+1 234 567 8900"
                       value={form.customerPhone}
-                      onChange={(e) => setForm({ ...form, customerPhone: e.target.value })}
+                      onFocus={() => setCustomerPickerOpen(true)}
+                      onChange={(e) => {
+                        setCustomerPickerOpen(true);
+                        setSelectedCustomerPassportNumber(null);
+                        setForm({ ...form, customerPhone: e.target.value, customerAccountId: "" });
+                      }}
                       data-testid="input-customer-phone"
                     />
                   </div>
                 </div>
-                {(isCustomerLookupFetching || customerLookup?.customer) && (
-                  <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between" data-testid="customer-lookup-status">
-                    <div className="flex items-center gap-2">
-                      {isCustomerLookupFetching ? (
-                        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                {customerPickerOpen && (
+                  <div className="rounded-xl border bg-background shadow-sm" data-testid="customer-picker">
+                    <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                          <Users className="h-4 w-4 text-primary" />
+                          Select existing agency customer
+                        </div>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          Search by email, mobile, name, passport number, or passport holder.
+                        </p>
+                      </div>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => setCustomerPickerOpen(false)}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="max-h-72 overflow-y-auto p-2">
+                      {isCustomersFetching ? (
+                        <div className="flex items-center gap-2 px-3 py-4 text-sm text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Loading agency customers...
+                        </div>
+                      ) : !customerPickerHasQuery ? (
+                        <div className="px-3 py-4 text-sm text-muted-foreground">
+                          Start typing in email or mobile to find an existing customer.
+                        </div>
+                      ) : customerMatches.length === 0 ? (
+                        <div className="px-3 py-4 text-sm text-muted-foreground">
+                          No matching customer found in this agency database.
+                        </div>
                       ) : (
-                        <Check className="w-4 h-4 text-emerald-600" />
+                        <div className="space-y-1">
+                          {customerMatches.map((customer) => (
+                            <button
+                              key={customer.id}
+                              type="button"
+                              onClick={() => applyCustomerSelection(customer.id)}
+                              className="w-full rounded-lg px-3 py-3 text-left transition hover:bg-muted focus:bg-muted focus:outline-none"
+                              data-testid={`customer-option-${customer.id}`}
+                            >
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="min-w-0">
+                                  <div className="truncate text-sm font-medium">
+                                    {customer.name || "Unnamed customer"}
+                                  </div>
+                                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                    {customer.email && <span>{customer.email}</span>}
+                                    {customer.phone && <span>{customer.phone}</span>}
+                                  </div>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  {customer.latestPassportNumber && (
+                                    <Badge variant="secondary" className="whitespace-nowrap">
+                                      Passport {customer.latestPassportNumber}
+                                    </Badge>
+                                  )}
+                                  <Badge variant="outline" className="whitespace-nowrap">
+                                    {(customer.caseCount ?? 0)} cases
+                                  </Badge>
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
                       )}
+                    </div>
+                  </div>
+                )}
+                {selectedAgencyCustomer && (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between" data-testid="selected-customer-status">
+                    <div className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-emerald-600" />
                       <span>
-                        {isCustomerLookupFetching
-                          ? "Checking existing customers..."
-                          : `${customerLookup?.customer?.name || "Existing customer"} found`}
+                        {selectedAgencyCustomer.name || "Existing customer"} selected from agency customer database
                       </span>
                     </div>
-                    {!isCustomerLookupFetching && customerLookup?.validPassport && (
-                      <Badge variant="secondary" className="w-fit">
-                        Passport {customerLookup.validPassport.passportNumber} auto-filled
+                    {selectedCustomerPassportNumber && (
+                      <Badge variant="secondary" className="w-fit bg-white text-emerald-900">
+                        Passport {selectedCustomerPassportNumber} auto-filled
                       </Badge>
                     )}
                   </div>
