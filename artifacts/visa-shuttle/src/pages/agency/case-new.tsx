@@ -292,42 +292,66 @@ function phoneDigits(value: string | null | undefined): string {
   return (value ?? "").replace(/\D/g, "");
 }
 
-function pickValidCustomerPassport(detail: CustomerDetailResult, today: string): CustomerLookupPassport | null {
-  const validPassports = [...(detail.passports ?? [])]
-    .filter((p) => !!p.passportNumber && !!p.passportDateOfExpiry && p.passportDateOfExpiry >= today)
-    .sort((a, b) => {
-      if ((b.isPrimary ? 1 : 0) !== (a.isPrimary ? 1 : 0)) {
-        return (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0);
-      }
-      return String(b.passportDateOfExpiry ?? "").localeCompare(String(a.passportDateOfExpiry ?? ""));
-    });
+function hasAnyPassportDetails(passport: any): boolean {
+  return !!(
+    passport.passportNumber ||
+    passport.passportSurname ||
+    passport.passportGivenName ||
+    passport.passportNationality ||
+    passport.applicantDob ||
+    passport.passportDateOfBirth ||
+    passport.passportDateOfIssue ||
+    passport.passportDateOfExpiry ||
+    passport.passportPlaceOfIssue ||
+    passport.passportPlaceOfBirth
+  );
+}
+
+function pickCustomerPassport(detail: CustomerDetailResult, today: string): CustomerLookupPassport | null {
+  const sortStoredPassports = (passports: CustomerLookupPassport[]) => passports.sort((a, b) => {
+    if ((b.isPrimary ? 1 : 0) !== (a.isPrimary ? 1 : 0)) {
+      return (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0);
+    }
+    return String(b.passportDateOfExpiry ?? "").localeCompare(String(a.passportDateOfExpiry ?? ""));
+  });
+
+  const storedPassports = [...(detail.passports ?? [])].filter(hasAnyPassportDetails);
+  const validPassports = sortStoredPassports(
+    storedPassports.filter((p) => !!p.passportDateOfExpiry && p.passportDateOfExpiry >= today),
+  );
   if (validPassports[0]) return validPassports[0];
 
-  const latestCase = [...(detail.cases ?? [])]
-    .filter((c) => !!c.passportNumber && !!c.passportDateOfExpiry && c.passportDateOfExpiry >= today)
+  const latestStoredPassport = sortStoredPassports(storedPassports)[0];
+  if (latestStoredPassport) return latestStoredPassport;
+
+  const caseWithPassport = [...(detail.cases ?? [])]
+    .filter(hasAnyPassportDetails)
     .sort((a, b) => {
+      const aValid = !!a.passportDateOfExpiry && a.passportDateOfExpiry >= today;
+      const bValid = !!b.passportDateOfExpiry && b.passportDateOfExpiry >= today;
+      if (aValid !== bValid) return bValid ? 1 : -1;
       const ta = (a.updatedAt ?? a.createdAt) ? new Date(a.updatedAt ?? a.createdAt!).getTime() : 0;
       const tb = (b.updatedAt ?? b.createdAt) ? new Date(b.updatedAt ?? b.createdAt!).getTime() : 0;
       return tb - ta;
     })[0];
 
-  return latestCase ? {
-    id: `case:${latestCase.id}`,
-    holderName: latestCase.applicantName,
+  return caseWithPassport ? {
+    id: `case:${caseWithPassport.id}`,
+    holderName: caseWithPassport.applicantName,
     relationship: "self",
     isPrimary: true,
-    passportSurname: latestCase.passportSurname,
-    passportGivenName: latestCase.passportGivenName,
-    passportMiddleName: latestCase.passportMiddleName,
-    passportNumber: latestCase.passportNumber,
-    passportNationality: latestCase.passportNationality,
-    passportGender: latestCase.passportGender,
-    passportDateOfBirth: latestCase.applicantDob,
-    passportDateOfIssue: latestCase.passportDateOfIssue,
-    passportDateOfExpiry: latestCase.passportDateOfExpiry,
-    passportPlaceOfIssue: latestCase.passportPlaceOfIssue,
-    passportPlaceOfBirth: latestCase.passportPlaceOfBirth,
-    passportFileUrl: latestCase.passportFileUrl,
+    passportSurname: caseWithPassport.passportSurname,
+    passportGivenName: caseWithPassport.passportGivenName,
+    passportMiddleName: caseWithPassport.passportMiddleName,
+    passportNumber: caseWithPassport.passportNumber,
+    passportNationality: caseWithPassport.passportNationality,
+    passportGender: caseWithPassport.passportGender,
+    passportDateOfBirth: caseWithPassport.applicantDob,
+    passportDateOfIssue: caseWithPassport.passportDateOfIssue,
+    passportDateOfExpiry: caseWithPassport.passportDateOfExpiry,
+    passportPlaceOfIssue: caseWithPassport.passportPlaceOfIssue,
+    passportPlaceOfBirth: caseWithPassport.passportPlaceOfBirth,
+    passportFileUrl: caseWithPassport.passportFileUrl,
   } : null;
 }
 
@@ -494,7 +518,7 @@ export default function NewCasePage() {
 
     const detail: CustomerDetailResult = await res.json();
     const customer = detail.account;
-    const passport = pickValidCustomerPassport(detail, today);
+    const passport = pickCustomerPassport(detail, today);
     setForm((f) => {
       const next = {
         ...f,
