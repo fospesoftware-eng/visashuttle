@@ -434,10 +434,17 @@ export default function NewCasePage() {
     enabled: !!tenantId,
   });
   const staff = useMemo(
-    () => staffRaw
+    () => {
+      const team = staffRaw
       .filter((u: any) => ["agency_owner", "agency_manager", "agency_staff"].includes(u.role))
-      .map((u: any) => ({ id: u.id as string, name: u.name as string })),
-    [staffRaw],
+      .map((u: any) => ({ id: u.id as string, name: u.name as string }));
+      const me = authData?.user;
+      if (me?.id && !team.some((u) => u.id === me.id)) {
+        team.unshift({ id: me.id, name: me.name || me.email || "You" });
+      }
+      return team;
+    },
+    [staffRaw, authData?.user?.id, authData?.user?.name, authData?.user?.email],
   );
 
   // Passport upload + auto-scan state
@@ -614,14 +621,12 @@ export default function NewCasePage() {
       customerPhone: f.customerPhone || originatingLead.phone || "",
       destinationCountry: f.destinationCountry || originatingLead.destinationCountry || "",
       visaType: f.visaType || originatingLead.visaType || "",
-      // Inherit the lead's owner so the case stays with the same agent unless
-      // the user picks someone else explicitly.
-      assignedTo: f.assignedTo || originatingLead.assignedTo || "",
+      assignedTo: f.assignedTo || authData?.user?.id || "",
     }));
     // The applicant name now has a real value, so the passport-name auto-derive
     // effect should leave it alone unless the agent clears it.
     if (originatingLead.name) applicantNameTouchedRef.current = true;
-  }, [originatingLead]);
+  }, [originatingLead, authData?.user?.id]);
 
   // Auto-derive applicantName from "given-names + surname" — but only when the
   // user hasn't manually edited the applicant-name field.
