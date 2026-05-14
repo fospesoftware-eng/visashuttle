@@ -15,10 +15,15 @@ interface PasswordGateProps {
 // their own credential (e.g. proposal token) or are intended for fully
 // anonymous customer-facing flows.
 const PUBLIC_ROUTE_PREFIXES = ["/p/", "/pay/"];
+// Exact-path matches that bypass the gate (used for the landing page where a
+// `startsWith("/")` rule would unintentionally cover every route).
+const PUBLIC_ROUTE_EXACT = new Set(["/"]);
 
 function isPublicRoute(): boolean {
   if (typeof window === "undefined") return false;
-  return PUBLIC_ROUTE_PREFIXES.some((p) => window.location.pathname.startsWith(p));
+  const path = window.location.pathname;
+  if (PUBLIC_ROUTE_EXACT.has(path)) return true;
+  return PUBLIC_ROUTE_PREFIXES.some((p) => path.startsWith(p));
 }
 
 export function PasswordGate({ children }: PasswordGateProps) {
