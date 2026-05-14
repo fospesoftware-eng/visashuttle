@@ -227,6 +227,36 @@ function fmtFeeMoney(cents: number, currency = "USD") {
 
 type StepId = typeof STEPS[number]["id"];
 
+type CustomerLookupPassport = {
+  id: string;
+  holderName: string | null;
+  relationship: string | null;
+  isPrimary: boolean | null;
+  passportSurname: string | null;
+  passportGivenName: string | null;
+  passportMiddleName: string | null;
+  passportNumber: string | null;
+  passportNationality: string | null;
+  passportGender: "M" | "F" | "X" | null;
+  passportDateOfBirth: string | null;
+  passportDateOfIssue: string | null;
+  passportDateOfExpiry: string | null;
+  passportPlaceOfIssue: string | null;
+  passportPlaceOfBirth: string | null;
+  passportFileUrl: string | null;
+};
+
+type CustomerLookupResult = {
+  customer: {
+    id: string;
+    name: string | null;
+    email: string | null;
+    phone: string | null;
+  } | null;
+  passports: CustomerLookupPassport[];
+  validPassport: CustomerLookupPassport | null;
+};
+
 export default function NewCasePage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -258,6 +288,7 @@ export default function NewCasePage() {
     visaType: "",
     applicantName: "",
     applicantDob: "",
+    customerAccountId: "",
     customerEmail: "",
     customerPhone: "",
     travelDate: "",
@@ -329,6 +360,81 @@ export default function NewCasePage() {
   // do, the auto-derive-from-passport-name effect stops touching it.
   const applicantNameTouchedRef = useRef(false);
   const passportFileRef = useRef<HTMLInputElement | null>(null);
+  const appliedCustomerLookupRef = useRef<string>("");
+
+  const customerLookupEmail = form.customerEmail.trim().toLowerCase();
+  const customerLookupPhone = form.customerPhone.trim();
+  const { data: customerLookup, isFetching: isCustomerLookupFetching } = useQuery<CustomerLookupResult>({
+    queryKey: ["/api/tenants", tenantId, "customers", "lookup", customerLookupEmail, customerLookupPhone],
+    queryFn: async () => {
+      const qs = new URLSearchParams();
+      if (customerLookupEmail) qs.set("email", customerLookupEmail);
+      if (customerLookupPhone) qs.set("phone", customerLookupPhone);
+      const res = await fetch(`/api/tenants/${tenantId}/customers/lookup?${qs.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to look up customer");
+      return res.json();
+    },
+    enabled: !!tenantId && (customerLookupEmail.length >= 5 || customerLookupPhone.replace(/\D/g, "").length >= 6),
+    staleTime: 30_000,
+  });
+
+  useEffect(() => {
+    const customer = customerLookup?.customer;
+    if (!customer) {
+      if (!isCustomerLookupFetching && form.customerAccountId) {
+        setForm((f) => ({ ...f, customerAccountId: "" }));
+        appliedCustomerLookupRef.current = "";
+      }
+      return;
+    }
+    const passport = customerLookup.validPassport;
+    const applyKey = `${customer.id}:${passport?.id ?? "no-passport"}`;
+    if (appliedCustomerLookupRef.current === applyKey) return;
+    appliedCustomerLookupRef.current = applyKey;
+
+    setForm((f) => {
+      const next = {
+        ...f,
+        customerAccountId: customer.id,
+        customerEmail: f.customerEmail || customer.email || "",
+        customerPhone: f.customerPhone || customer.phone || "",
+        applicantName: f.applicantName || customer.name || passport?.holderName || "",
+      };
+      if (passport) {
+        next.applicantDob = f.applicantDob || passport.passportDateOfBirth || "";
+        next.passportSurname = passport.passportSurname || f.passportSurname;
+        next.passportGivenName = passport.passportGivenName || f.passportGivenName;
+        next.passportMiddleName = passport.passportMiddleName || f.passportMiddleName;
+        next.passportNumber = passport.passportNumber || f.passportNumber;
+        next.passportNationality = passport.passportNationality || f.passportNationality;
+        next.passportGender = (passport.passportGender || f.passportGender || "") as "" | "M" | "F" | "X";
+        next.passportDateOfIssue = passport.passportDateOfIssue || f.passportDateOfIssue;
+        next.passportDateOfExpiry = passport.passportDateOfExpiry || f.passportDateOfExpiry;
+        next.passportPlaceOfIssue = passport.passportPlaceOfIssue || f.passportPlaceOfIssue;
+        next.passportPlaceOfBirth = passport.passportPlaceOfBirth || f.passportPlaceOfBirth;
+      }
+      return next;
+    });
+
+    if (passport?.passportFileUrl && passport.passportFileUrl.startsWith("data:image/")) {
+      setPassportMode("manual");
+      setPassportPreview(passport.passportFileUrl);
+      setPassportMimeType(passport.passportFileUrl.slice(5, passport.passportFileUrl.indexOf(";")) || "image/jpeg");
+      setScanCompleted(true);
+      setScanStatus("ok");
+      setScanError(null);
+      setScanWarnings([]);
+    } else if (passport) {
+      setPassportMode("manual");
+    }
+
+    toast({
+      title: passport ? "Customer and passport auto-filled" : "Customer auto-filled",
+      description: passport
+        ? `Loaded ${customer.name || "customer"} and valid passport ${passport.passportNumber}.`
+        : `Loaded ${customer.name || "customer"} from your customer database.`,
+    });
+  }, [customerLookup, form.customerAccountId, isCustomerLookupFetching, toast]);
 
   // Seed visa/destination from the convert-modal URL params on first mount —
   // these are independent from the lead fetch so they apply even before the
@@ -848,6 +954,7 @@ export default function NewCasePage() {
     return {
       applicantName: form.applicantName.trim() || (status === "draft" ? "Untitled draft" : ""),
       applicantDob: form.applicantDob || null,
+      customerAccountId: form.customerAccountId || null,
       customerEmail: form.customerEmail.trim() || null,
       customerPhone: form.customerPhone.trim() || null,
       passportSurname: form.passportSurname.trim() || null,
@@ -1718,6 +1825,27 @@ export default function NewCasePage() {
                     />
                   </div>
                 </div>
+                {(isCustomerLookupFetching || customerLookup?.customer) && (
+                  <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between" data-testid="customer-lookup-status">
+                    <div className="flex items-center gap-2">
+                      {isCustomerLookupFetching ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                      ) : (
+                        <Check className="w-4 h-4 text-emerald-600" />
+                      )}
+                      <span>
+                        {isCustomerLookupFetching
+                          ? "Checking existing customers..."
+                          : `${customerLookup?.customer?.name || "Existing customer"} found`}
+                      </span>
+                    </div>
+                    {!isCustomerLookupFetching && customerLookup?.validPassport && (
+                      <Badge variant="secondary" className="w-fit">
+                        Passport {customerLookup.validPassport.passportNumber} auto-filled
+                      </Badge>
+                    )}
+                  </div>
+                )}
                 {leadIdParam && (
                   <p className="text-xs text-muted-foreground -mt-2">
                     Pre-filled from the originating lead — edit if needed before continuing.

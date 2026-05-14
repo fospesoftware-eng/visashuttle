@@ -3080,6 +3080,71 @@ export async function registerRoutes(
     res.json(enriched);
   });
 
+  app.get("/api/tenants/:tenantId/customers/lookup", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
+    const tenantId = req.params.tenantId;
+    const email = typeof req.query.email === "string" ? req.query.email.trim().toLowerCase() : "";
+    const phone = typeof req.query.phone === "string" ? req.query.phone.trim() : "";
+    if (!email && !phone) return res.json({ customer: null, passports: [], validPassport: null });
+
+    const byEmail = email ? await storage.getCustomerAccountByEmail(email) : undefined;
+    const byPhone = phone ? await storage.getCustomerAccountByPhone(phone) : undefined;
+    const customer = byEmail ?? byPhone;
+    if (!customer) return res.json({ customer: null, passports: [], validPassport: null });
+
+    const link = await storage.getCustomerTenantLink(customer.id, tenantId);
+    if (!link) return res.json({ customer: null, passports: [], validPassport: null });
+
+    const [passports, cases] = await Promise.all([
+      storage.getPassportsByCustomerId(customer.id, tenantId),
+      storage.getCasesByCustomerAccountId(customer.id, tenantId),
+    ]);
+    const today = startOfToday().toISOString().slice(0, 10);
+    const validPassports = passports
+      .filter((p) => !!p.passportNumber && !!p.passportDateOfExpiry && p.passportDateOfExpiry >= today)
+      .sort((a, b) => {
+        if ((b.isPrimary ? 1 : 0) !== (a.isPrimary ? 1 : 0)) return (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0);
+        return String(b.passportDateOfExpiry ?? "").localeCompare(String(a.passportDateOfExpiry ?? ""));
+      });
+    const validPassport = validPassports[0] ?? null;
+    const latestCase = cases
+      .filter((c) => c.passportNumber && c.passportDateOfExpiry && c.passportDateOfExpiry >= today)
+      .sort((a, b) => {
+        const ta = (a.updatedAt ?? a.createdAt) ? new Date(a.updatedAt ?? a.createdAt!).getTime() : 0;
+        const tb = (b.updatedAt ?? b.createdAt) ? new Date(b.updatedAt ?? b.createdAt!).getTime() : 0;
+        return tb - ta;
+      })[0];
+    const fallbackPassport = validPassport ? null : latestCase ? {
+      id: `case:${latestCase.id}`,
+      customerAccountId: customer.id,
+      tenantId,
+      holderName: latestCase.applicantName,
+      relationship: "self",
+      isPrimary: true,
+      passportSurname: latestCase.passportSurname,
+      passportGivenName: latestCase.passportGivenName,
+      passportMiddleName: latestCase.passportMiddleName,
+      passportNumber: latestCase.passportNumber,
+      passportNationality: latestCase.passportNationality,
+      passportGender: latestCase.passportGender,
+      passportDateOfBirth: latestCase.applicantDob,
+      passportDateOfIssue: latestCase.passportDateOfIssue,
+      passportDateOfExpiry: latestCase.passportDateOfExpiry,
+      passportPlaceOfIssue: latestCase.passportPlaceOfIssue,
+      passportPlaceOfBirth: latestCase.passportPlaceOfBirth,
+      passportFileUrl: latestCase.passportFileUrl,
+      notes: null,
+      createdAt: latestCase.createdAt,
+      updatedAt: latestCase.updatedAt,
+    } : null;
+
+    res.json({
+      customer,
+      passports,
+      validPassport: validPassport ?? fallbackPassport,
+    });
+  });
+
   // Single customer with their applications and full passport library.
   // Passports live at the customer level (master record reused across
   // applications, including co-travellers' passports), not on individual
@@ -3255,8 +3320,14 @@ export async function registerRoutes(
     if (!assignedTo) {
       return res.status(400).json({ error: "A team member must be assigned to this case." });
     }
+    let customerAccountId = req.body?.customerAccountId || null;
+    if (customerAccountId) {
+      const link = await storage.getCustomerTenantLink(customerAccountId, req.params.tenantId);
+      if (!link) return res.status(400).json({ error: "Customer does not belong to this agency" });
+    }
     const caseData = await storage.createCase({
       ...req.body,
+      customerAccountId,
       assignedTo,
       tenantId: req.params.tenantId,
       referenceId: req.body.referenceId || generateReferenceId()
