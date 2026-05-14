@@ -349,6 +349,7 @@ export default function NewCasePage() {
     return new URLSearchParams(window.location.search);
   }, []);
   const leadIdParam = queryParams.get("leadId");
+  const seedCustomerIdParam = queryParams.get("customerId");
   const seedVisaTypeParam = queryParams.get("visaType") ?? "";
   const seedDestinationParam = queryParams.get("destinationCountry") ?? "";
   const seedPriorityParam = queryParams.get("priority") ?? "";
@@ -356,6 +357,7 @@ export default function NewCasePage() {
   // Track whether we've already seeded the form from the lead so the user can
   // edit fields without us clobbering their changes when the query revalidates.
   const leadSeededRef = useRef(false);
+  const customerSeededRef = useRef(false);
 
   const [form, setForm] = useState({
     destinationCountry: "",
@@ -538,6 +540,13 @@ export default function NewCasePage() {
         : `Loaded ${customer.name || "customer"} from this agency's customer database.`,
     });
   };
+
+  useEffect(() => {
+    if (!seedCustomerIdParam || !tenantId || customerSeededRef.current) return;
+    customerSeededRef.current = true;
+    void applyCustomerSelection(seedCustomerIdParam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seedCustomerIdParam, tenantId]);
 
   // Seed visa/destination from the convert-modal URL params on first mount —
   // these are independent from the lead fetch so they apply even before the

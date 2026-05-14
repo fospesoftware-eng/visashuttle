@@ -2940,6 +2940,113 @@ export async function registerRoutes(
     }
     return null;
   }
+
+  function cleanString(value: unknown): string | null {
+    return typeof value === "string" && value.trim() ? value.trim() : null;
+  }
+
+  function normalizeEmail(value: unknown): string | null {
+    const v = cleanString(value);
+    return v ? v.toLowerCase() : null;
+  }
+
+  function makeAgencyPlaceholderEmail(tenantId: string, seed: string): string {
+    const safeSeed = seed.replace(/[^a-zA-Z0-9]/g, "").slice(0, 32) || randomUUID().replace(/-/g, "");
+    return `agency+${tenantId.slice(0, 12)}+${safeSeed}@visashuttle.local`;
+  }
+
+  async function getOrCreateAgencyCustomer(
+    tenantId: string,
+    input: { name?: unknown; email?: unknown; phone?: unknown; seed?: string },
+  ) {
+    const email = normalizeEmail(input.email);
+    const phone = cleanString(input.phone);
+    const phoneNorm = phone ? normalizePhoneDigits(phone) : "";
+    const name = cleanString(input.name);
+
+    const agencyCustomers = await storage.getCustomersByTenantId(tenantId);
+    let customer = agencyCustomers.find((c) => {
+      const cEmail = c.email?.toLowerCase();
+      const cPhone = c.phone ? normalizePhoneDigits(c.phone) : "";
+      return (!!email && cEmail === email) || (!!phoneNorm && cPhone === phoneNorm);
+    });
+
+    if (!customer && email) {
+      customer = await storage.getCustomerAccountByEmail(email);
+    }
+
+    if (!customer) {
+      const placeholderSeed = phoneNorm || input.seed || randomUUID();
+      customer = await storage.createCustomerAccount({
+        email: email ?? makeAgencyPlaceholderEmail(tenantId, String(placeholderSeed)),
+        phone: phone || null,
+        name: name || null,
+        avatarUrl: null,
+        isVerified: false,
+      } as InsertCustomerAccount);
+    } else {
+      const patch: Partial<InsertCustomerAccount> = {};
+      if (name && !customer.name) patch.name = name;
+      if (phone && !customer.phone) patch.phone = phone;
+      if (email && customer.email.endsWith("@visashuttle.local")) patch.email = email;
+      if (Object.keys(patch).length > 0) {
+        customer = await storage.updateCustomerAccount(customer.id, patch) ?? customer;
+      }
+    }
+
+    const existingLink = await storage.getCustomerTenantLink(customer.id, tenantId);
+    if (!existingLink) {
+      await storage.createCustomerTenantLink({
+        customerAccountId: customer.id,
+        tenantId,
+        role: "customer",
+      });
+    }
+
+    return customer;
+  }
+
+  function caseHasCustomerData(body: any): boolean {
+    return !!(
+      cleanString(body?.customerEmail) ||
+      cleanString(body?.customerPhone) ||
+      cleanString(body?.applicantName) ||
+      cleanString(body?.passportNumber)
+    );
+  }
+
+  async function saveApplicationPassportToCustomer(tenantId: string, customerAccountId: string | null, body: any) {
+    const passportNumber = cleanString(body?.passportNumber);
+    if (!customerAccountId || !passportNumber) return;
+
+    const existing = await storage.getPassportsByCustomerId(customerAccountId, tenantId);
+    const normalizedIncoming = passportNumber.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+    const samePassport = existing.find((p) =>
+      p.passportNumber?.replace(/[^a-zA-Z0-9]/g, "").toLowerCase() === normalizedIncoming
+    );
+    if (samePassport) return;
+
+    await storage.createPassport({
+      customerAccountId,
+      tenantId,
+      holderName: cleanString(body?.applicantName),
+      relationship: "self",
+      isPrimary: existing.length === 0,
+      passportSurname: cleanString(body?.passportSurname),
+      passportGivenName: cleanString(body?.passportGivenName),
+      passportMiddleName: cleanString(body?.passportMiddleName),
+      passportNumber,
+      passportNationality: cleanString(body?.passportNationality),
+      passportGender: cleanString(body?.passportGender) as any,
+      passportDateOfBirth: cleanString(body?.applicantDob),
+      passportDateOfIssue: cleanString(body?.passportDateOfIssue),
+      passportDateOfExpiry: cleanString(body?.passportDateOfExpiry),
+      passportPlaceOfIssue: cleanString(body?.passportPlaceOfIssue),
+      passportPlaceOfBirth: cleanString(body?.passportPlaceOfBirth),
+      passportFileUrl: null,
+      notes: "Saved from agency application onboarding",
+    } as InsertPassport);
+  }
   function validateCoTraveller(body: any): string | null {
     if (!body?.name || typeof body.name !== "string" || !body.name.trim()) return "Co-traveller name is required";
     if (!body?.relationship || typeof body.relationship !== "string") return "Relationship is required";
@@ -3078,6 +3185,24 @@ export async function registerRoutes(
       return tb - ta;
     });
     res.json(enriched);
+  });
+
+  app.post("/api/tenants/:tenantId/customers", async (req, res) => {
+    if (!requireTenantAccess(req, res, req.params.tenantId)) return;
+    const name = cleanString(req.body?.name);
+    const email = normalizeEmail(req.body?.email);
+    const phone = cleanString(req.body?.phone);
+    if (!name && !email && !phone) {
+      return res.status(400).json({ error: "Customer name, email, or mobile is required" });
+    }
+
+    const customer = await getOrCreateAgencyCustomer(req.params.tenantId, {
+      name,
+      email,
+      phone,
+      seed: email ?? phone ?? randomUUID(),
+    });
+    res.status(201).json(customer);
   });
 
   app.get("/api/tenants/:tenantId/customers/lookup", async (req, res) => {
@@ -3320,18 +3445,28 @@ export async function registerRoutes(
     if (!assignedTo) {
       return res.status(400).json({ error: "A team member must be assigned to this case." });
     }
+    const referenceId = req.body.referenceId || generateReferenceId();
     let customerAccountId = req.body?.customerAccountId || null;
     if (customerAccountId) {
       const link = await storage.getCustomerTenantLink(customerAccountId, req.params.tenantId);
       if (!link) return res.status(400).json({ error: "Customer does not belong to this agency" });
+    } else if (caseHasCustomerData(req.body)) {
+      const customer = await getOrCreateAgencyCustomer(req.params.tenantId, {
+        name: req.body?.applicantName,
+        email: req.body?.customerEmail,
+        phone: req.body?.customerPhone,
+        seed: referenceId,
+      });
+      customerAccountId = customer.id;
     }
     const caseData = await storage.createCase({
       ...req.body,
       customerAccountId,
       assignedTo,
       tenantId: req.params.tenantId,
-      referenceId: req.body.referenceId || generateReferenceId()
+      referenceId
     });
+    await saveApplicationPassportToCustomer(req.params.tenantId, customerAccountId, req.body);
     res.status(201).json(caseData);
   });
 

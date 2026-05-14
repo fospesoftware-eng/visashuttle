@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, Search, MoreVertical, Mail, Phone, Loader2, AlertCircle, Briefcase, GripVertical, MapPin, UserCog, User, Globe2, StickyNote } from "lucide-react";
+import { Plus, Search, MoreVertical, Mail, Phone, Loader2, AlertCircle, Briefcase, GripVertical, MapPin, UserCog, User, Globe2, StickyNote, UserPlus } from "lucide-react";
 import { getCountryVisaConfig } from "@/data/country-visa-types";
 import { Combobox, type ComboboxOption } from "@/components/combobox";
 import {
@@ -129,6 +129,7 @@ function generateCaseNumber(): string {
 interface LeadCardContentProps {
   lead: Lead;
   onEdit: (lead: Lead) => void;
+  onCreateCustomer: (lead: Lead) => void;
   onConvert: (lead: Lead) => void;
   onDelete: (id: string) => void;
   onMove: (id: string, stage: string) => void;
@@ -138,7 +139,7 @@ interface LeadCardContentProps {
   assigneeName?: string | null;
 }
 
-function LeadCardBody({ lead, onEdit, onConvert, onDelete, onMove, onReassign, currentStage, staff = [], assigneeName }: LeadCardContentProps) {
+function LeadCardBody({ lead, onEdit, onCreateCustomer, onConvert, onDelete, onMove, onReassign, currentStage, staff = [], assigneeName }: LeadCardContentProps) {
   return (
     <div className="p-3 rounded-xl bg-background/95 shadow-sm hover-elevate cursor-grab active:cursor-grabbing space-y-2 border border-border/40 select-none">
       <div className="flex items-start justify-between gap-2">
@@ -169,6 +170,13 @@ function LeadCardBody({ lead, onEdit, onConvert, onDelete, onMove, onReassign, c
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuItem onClick={() => onEdit(lead)} data-testid={`button-edit-lead-${lead.id}`}>
               Edit Lead
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onCreateCustomer(lead)}
+              data-testid={`button-create-customer-lead-${lead.id}`}
+            >
+              <UserPlus className="w-3.5 h-3.5 mr-2" />
+              Create Customer
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => onConvert(lead)}
@@ -370,6 +378,23 @@ export default function LeadsPage() {
       toast({ title: "Lead deleted" });
     },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const createCustomerMutation = useMutation({
+    mutationFn: async (lead: Lead) => {
+      const res = await apiRequest("POST", `/api/tenants/${tenantId}/customers`, {
+        name: lead.name,
+        email: lead.email,
+        phone: lead.phone || null,
+      });
+      return res.json();
+    },
+    onSuccess: (customer) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "customers"] });
+      toast({ title: "Customer created", description: "Lead details are now saved in this agency customer database." });
+      setLocation(`/app/customers/${customer.id}`);
+    },
+    onError: (e: Error) => toast({ title: "Could not create customer", description: e.message, variant: "destructive" }),
   });
 
   const moveStageMutation = useMutation({
@@ -726,6 +751,7 @@ export default function LeadsPage() {
                             <LeadCardBody
                               lead={lead}
                               onEdit={openEdit}
+                              onCreateCustomer={(l) => createCustomerMutation.mutate(l)}
                               onConvert={openConvert}
                               onDelete={(id) => setDeleteLeadId(id)}
                               onMove={(id, s) => moveStageMutation.mutate({ id, stage: s })}
@@ -748,6 +774,7 @@ export default function LeadsPage() {
                   <LeadCardBody
                     lead={activeDragLead}
                     onEdit={() => {}}
+                    onCreateCustomer={() => {}}
                     onConvert={() => {}}
                     onDelete={() => {}}
                     onMove={() => {}}

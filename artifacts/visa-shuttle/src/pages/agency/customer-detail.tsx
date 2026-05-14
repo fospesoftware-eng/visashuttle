@@ -876,6 +876,11 @@ export default function CustomerDetailPage() {
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-2">
+                  <Link href={`/app/cases/new?customerId=${customerId}`}>
+                    <Button data-testid="button-create-application-from-customer">
+                      <Briefcase className="h-4 w-4 mr-1" /> Create application
+                    </Button>
+                  </Link>
                   <Badge variant="outline" data-testid="badge-total-applications">
                     {data.cases.length} application{data.cases.length === 1 ? "" : "s"}
                   </Badge>
