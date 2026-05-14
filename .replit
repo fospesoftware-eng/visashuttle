@@ -27,9 +27,16 @@ externalPort = 80
 localPort = 8080
 externalPort = 8080
 
+<<<<<<< HEAD
 [[ports]]
 localPort = 8081
 externalPort = 8081
+=======
+[deployment]
+deploymentTarget = "autoscale"
+run = ["node", "dist/index.cjs"]
+build = ["npm", "run", "build"]
+>>>>>>> 2805829 (Saved progress at the end of the loop)
 
 [[ports]]
 localPort = 8082
