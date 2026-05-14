@@ -364,12 +364,6 @@ export default function WhiteLabelLoginPage() {
                   </Button>
                 </form>
                 
-                <div className="mt-6 p-3 rounded-lg bg-muted/50 border border-dashed">
-                  <p className="text-xs text-muted-foreground text-center">
-                    Demo: Use code <span className="font-mono font-bold text-foreground">123456</span> for testing
-                  </p>
-                </div>
-                
                 <p className="text-xs text-muted-foreground text-center mt-4">
                   We'll send you a one-time code to verify your {method === "email" ? "email" : "mobile number"}. No password required.
                 </p>

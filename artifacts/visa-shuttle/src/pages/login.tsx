@@ -70,17 +70,6 @@ export default function LoginPage() {
     }
   };
 
-  const fillDemo = (type: "admin" | "agency" | "customer") => {
-    const creds = {
-      admin: { email: "admin@visashuttle.com", password: "Admin@12345" },
-      agency: { email: "owner@demoagency.com", password: "Demo@12345" },
-      customer: { email: "customer@demo.com", password: "Demo@12345" },
-    };
-    setEmail(creds[type].email);
-    setPassword(creds[type].password);
-    setError("");
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex flex-col">
       <main className="flex-1 flex items-center justify-center p-4">
@@ -186,29 +175,6 @@ export default function LoginPage() {
                   {isLoading ? "Signing in…" : "Sign In"}
                 </Button>
               </form>
-
-              <div className="mt-6 border-t pt-5">
-                <p className="text-xs text-muted-foreground mb-3 font-medium text-center uppercase tracking-wide">
-                  Demo credentials — click to fill
-                </p>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { label: "SaaS Admin", type: "admin" as const, color: "border-violet-300 hover:bg-violet-50 dark:hover:bg-violet-950/30" },
-                    { label: "Agency Owner", type: "agency" as const, color: "border-cyan-300 hover:bg-cyan-50 dark:hover:bg-cyan-950/30" },
-                    { label: "Customer", type: "customer" as const, color: "border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30" },
-                  ].map(({ label, type, color }) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => fillDemo(type)}
-                      className={`text-xs p-2.5 rounded-lg border text-center transition-colors cursor-pointer ${color}`}
-                      data-testid={`button-demo-${type}`}
-                    >
-                      <p className="font-semibold">{label}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
 
               <p className="mt-5 text-center text-sm text-muted-foreground">
                 Don't have an account?{" "}

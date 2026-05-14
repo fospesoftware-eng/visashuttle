@@ -612,11 +612,8 @@ export default function JoinPage() {
                   </div>
                   <h2 className="text-2xl font-bold mb-1">Verify your phone</h2>
                   <p className="text-muted-foreground">
-                    Use the demo verification code for{" "}
+                    Enter the verification code sent to{" "}
                     <span className="font-medium text-foreground">{getFullPhone()}</span>
-                  </p>
-                  <p className="mt-2 inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-                    Demo OTP: 1234
                   </p>
                 </div>
 
@@ -641,7 +638,6 @@ export default function JoinPage() {
                         />
                       ))}
                     </div>
-                    <p className="text-xs text-muted-foreground text-center mt-2">For demo signup, enter 1234</p>
                   </div>
 
                   <Button
@@ -665,7 +661,6 @@ export default function JoinPage() {
                   </Button>
 
                   <div className="text-center">
-                    <p className="text-sm text-muted-foreground mb-1">No SMS is sent in demo mode.</p>
                     {resendCountdown > 0 ? (
                       <p className="text-sm text-muted-foreground">
                         Resend in <span className="font-medium text-foreground tabular-nums">{resendCountdown}s</span>
