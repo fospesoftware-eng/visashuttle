@@ -362,7 +362,7 @@ export default function NewCasePage() {
   const { data: authData } = useCurrentUser();
   const tenantId = authData?.user?.tenantId;
   const currentUserId = authData?.user?.id ?? "";
-  const agencyPhoneCode = defaultPhoneCodeFrom((authData?.tenant as any)?.contactPhone);
+  const agencyPhoneCode = defaultPhoneCodeFrom((authData?.tenant as any)?.baseCountry ?? (authData?.tenant as any)?.country ?? (authData?.tenant as any)?.contactPhone);
   const today = useMemo(() => todayISO(), []);
 
   const [step, setStep] = useState<StepId>(1);

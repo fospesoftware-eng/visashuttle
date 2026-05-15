@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type SyntheticEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Plus, Search, MoreVertical, Mail, Phone, Loader2, AlertCircle, Briefcase, GripVertical, MapPin, UserCog, User, Globe2, StickyNote, UserPlus, ClipboardList } from "lucide-react";
@@ -129,6 +129,7 @@ function generateCaseNumber(): string {
 
 interface LeadCardContentProps {
   lead: Lead;
+  dragHandleProps?: Record<string, any>;
   onEdit: (lead: Lead) => void;
   onCreateCustomer: (lead: Lead) => void;
   onConvert: (lead: Lead) => void;
@@ -141,12 +142,23 @@ interface LeadCardContentProps {
   assigneeName?: string | null;
 }
 
-function LeadCardBody({ lead, onEdit, onCreateCustomer, onConvert, onConvertProposal, onDelete, onMove, onReassign, currentStage, staff = [], assigneeName }: LeadCardContentProps) {
+function LeadCardBody({ lead, dragHandleProps, onEdit, onCreateCustomer, onConvert, onConvertProposal, onDelete, onMove, onReassign, currentStage, staff = [], assigneeName }: LeadCardContentProps) {
+  const stopMenuPointer = (event: SyntheticEvent) => {
+    event.stopPropagation();
+  };
+
   return (
-    <div className="p-3 rounded-xl bg-background/95 shadow-sm hover-elevate cursor-grab active:cursor-grabbing space-y-2 border border-border/40 select-none">
+    <div className="group relative overflow-visible rounded-xl border border-border/60 bg-background p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-md">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <GripVertical className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />
+          <button
+            type="button"
+            className="grid h-7 w-5 shrink-0 cursor-grab place-items-center rounded-md text-muted-foreground/45 transition-colors hover:bg-muted hover:text-muted-foreground active:cursor-grabbing"
+            aria-label={`Drag ${lead.name}`}
+            {...dragHandleProps}
+          >
+            <GripVertical className="w-3.5 h-3.5" />
+          </button>
           <Avatar className="w-7 h-7 shrink-0">
             <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
               {lead.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
@@ -162,14 +174,16 @@ function LeadCardBody({ lead, onEdit, onCreateCustomer, onConvert, onConvertProp
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 shrink-0"
-              onPointerDown={(e) => e.stopPropagation()}
+              className="h-8 w-8 shrink-0 rounded-full opacity-100 sm:opacity-70 sm:transition-opacity sm:group-hover:opacity-100"
+              onPointerDownCapture={stopMenuPointer}
+              onMouseDownCapture={stopMenuPointer}
+              onClickCapture={stopMenuPointer}
               data-testid={`button-lead-actions-${lead.id}`}
             >
-              <MoreVertical className="w-3.5 h-3.5" />
+              <MoreVertical className="w-4 h-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuContent align="end" className="z-[90] w-52">
             <DropdownMenuItem onClick={() => onEdit(lead)} data-testid={`button-edit-lead-${lead.id}`}>
               Edit Lead
             </DropdownMenuItem>
@@ -225,12 +239,12 @@ function LeadCardBody({ lead, onEdit, onCreateCustomer, onConvert, onConvertProp
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <div className="text-xs text-muted-foreground flex items-center gap-1 truncate">
+      <div className="text-xs text-muted-foreground flex items-center gap-1 truncate rounded-md bg-muted/30 px-2 py-1">
         <Mail className="w-3 h-3 shrink-0" />
         <span className="truncate">{lead.email}</span>
       </div>
       {lead.phone && (
-        <div className="text-xs text-muted-foreground flex items-center gap-1">
+        <div className="text-xs text-muted-foreground flex items-center gap-1 rounded-md bg-muted/30 px-2 py-1">
           <Phone className="w-3 h-3 shrink-0" />
           {lead.phone}
         </div>
@@ -255,7 +269,13 @@ function LeadCardBody({ lead, onEdit, onCreateCustomer, onConvert, onConvertProp
   );
 }
 
-function DraggableLead({ lead, children }: { lead: Lead; children: React.ReactNode }) {
+function DraggableLead({
+  lead,
+  children,
+}: {
+  lead: Lead;
+  children: (dragHandleProps: Record<string, any>) => React.ReactNode;
+}) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `lead:${lead.id}`,
     data: { leadId: lead.id, stage: lead.stage },
@@ -266,9 +286,8 @@ function DraggableLead({ lead, children }: { lead: Lead; children: React.ReactNo
       style={transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 50 } : undefined}
       className={isDragging ? "opacity-30" : ""}
       {...attributes}
-      {...listeners}
     >
-      {children}
+      {children(listeners ?? {})}
     </div>
   );
 }
@@ -301,7 +320,7 @@ export default function LeadsPage() {
   const { data: authData } = useCurrentUser();
   const tenantId = authData?.user?.tenantId;
   const currentUserId = authData?.user?.id;
-  const agencyPhoneCode = defaultPhoneCodeFrom((authData?.tenant as any)?.contactPhone);
+  const agencyPhoneCode = defaultPhoneCodeFrom((authData?.tenant as any)?.baseCountry ?? (authData?.tenant as any)?.country ?? (authData?.tenant as any)?.contactPhone);
   const [convertForm, setConvertForm] = useState({ visaType: "", destinationCountry: "", priority: "normal" });
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -556,7 +575,7 @@ export default function LeadsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold" data-testid="text-page-title">Leads Pipeline</h1>
-            <p className="text-muted-foreground">Drag cards between columns to move leads through your pipeline.</p>
+            <p className="text-muted-foreground">Use the handle on each card to move leads through your pipeline.</p>
           </div>
           <Dialog open={isAddOpen || !!editLead} onOpenChange={(open) => {
             if (!open) { setIsAddOpen(false); setEditLead(null); setForm(emptyForm); }
@@ -758,8 +777,8 @@ export default function LeadsPage() {
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setActiveDragLead(null)}>
             <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
               {stages.map((stage) => (
-                <DroppableStage key={stage} stage={stage} className="min-w-[260px]">
-                  <Card className={`${STAGE_COLORS[stage]} border-0 h-full`} data-testid={`column-${stage}`}>
+                <DroppableStage key={stage} stage={stage} className="min-w-[260px] overflow-visible">
+                  <Card className={`${STAGE_COLORS[stage]} h-full overflow-visible border border-border/40 shadow-sm`} data-testid={`column-${stage}`}>
                     <CardHeader className="pb-3 pt-4 px-4">
                       <div className="flex items-center gap-2">
                         <span className={`w-2.5 h-2.5 rounded-full ${STAGE_DOT[stage]}`} />
@@ -771,14 +790,16 @@ export default function LeadsPage() {
                         </span>
                       </div>
                     </CardHeader>
-                    <CardContent className="space-y-2 px-3 pb-4 min-h-[140px]">
+                    <CardContent className="space-y-3 px-3 pb-4 min-h-[140px] overflow-visible">
                       {getLeadsByStage(stage).length === 0 ? (
                         <p className="text-xs text-muted-foreground text-center py-6">Drop leads here</p>
                       ) : (
                         getLeadsByStage(stage).map((lead) => (
                           <DraggableLead key={lead.id} lead={lead}>
+                            {(dragHandleProps) => (
                             <LeadCardBody
                               lead={lead}
+                              dragHandleProps={dragHandleProps}
                               onEdit={openEdit}
                               onCreateCustomer={(l) => createCustomerMutation.mutate(l)}
                               onConvert={openConvert}
@@ -790,6 +811,7 @@ export default function LeadsPage() {
                               staff={staff}
                               assigneeName={assigneeNameById(lead.assignedTo)}
                             />
+                            )}
                           </DraggableLead>
                         ))
                       )}

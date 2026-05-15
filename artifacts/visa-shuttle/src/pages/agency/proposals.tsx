@@ -101,7 +101,7 @@ export default function ProposalsPage() {
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
   const tenantId = tenant?.id ?? user?.tenantId ?? "";
-  const agencyPhoneCode = defaultPhoneCodeFrom((tenant as any)?.contactPhone);
+  const agencyPhoneCode = defaultPhoneCodeFrom((tenant as any)?.baseCountry ?? (tenant as any)?.country ?? (tenant as any)?.contactPhone);
   const leadIdParam = useMemo(() => {
     if (typeof window === "undefined") return "";
     return new URLSearchParams(window.location.search).get("leadId") ?? "";
@@ -523,15 +523,16 @@ function ProposalCreateDialog({
   }, 0);
 
   return (
-    <DialogContent className="max-w-2xl">
-      <DialogHeader>
-        <DialogTitle>New Proposal</DialogTitle>
+    <DialogContent className="flex max-h-[92vh] max-w-4xl flex-col overflow-hidden p-0">
+      <DialogHeader className="border-b px-6 py-5">
+        <DialogTitle className="text-xl">New Proposal</DialogTitle>
         <DialogDescription>
-          Generate a shareable application link for your client. They'll see the document checklist and can apply directly without signing up.
+          Generate a shareable application link with customer details, visa route, fees, and checklist.
         </DialogDescription>
       </DialogHeader>
 
-      <div className="grid gap-4">
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+        <div className="grid gap-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
             <Label htmlFor="p-name">Customer name <span className="text-red-500">*</span></Label>
@@ -622,7 +623,7 @@ function ProposalCreateDialog({
               never sees "Schengen Visa") via getCountryVisaTypes().
               Changing the country resets the visa type so a stale value
               from a previous country can't sneak through. */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:col-span-2">
             <div>
               <Label>Destination country <span className="text-red-500">*</span></Label>
               <Combobox
@@ -810,9 +811,10 @@ function ProposalCreateDialog({
             </ul>
           </div>
         )}
+        </div>
       </div>
 
-      <DialogFooter>
+      <DialogFooter className="border-t bg-background px-6 py-4">
         <Button
           onClick={() => createMutation.mutate()}
           disabled={!canSubmit || createMutation.isPending}

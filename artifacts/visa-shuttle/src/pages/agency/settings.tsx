@@ -892,7 +892,7 @@ function SmsTab({ tenantId }: { tenantId?: string }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: authData } = useCurrentUser();
-  const agencyPhoneCode = defaultPhoneCodeFrom((authData?.tenant as any)?.contactPhone);
+  const agencyPhoneCode = defaultPhoneCodeFrom((authData?.tenant as any)?.baseCountry ?? (authData?.tenant as any)?.country ?? (authData?.tenant as any)?.contactPhone);
   const { data: cfg, isLoading } = useQuery<any>({
     queryKey: ["/api/tenants", tenantId, "sms-config"],
     queryFn: async () => {
@@ -1339,7 +1339,7 @@ export default function AgencySettingsPage() {
       return res.json();
     }
   });
-  const agencyPhoneCode = defaultPhoneCodeFrom(tenant?.contactPhone);
+  const agencyPhoneCode = defaultPhoneCodeFrom((tenant as any)?.baseCountry ?? (tenant as any)?.country ?? tenant?.contactPhone);
 
   // Branding form state
   const [branding, setBranding] = useState({

@@ -1129,7 +1129,7 @@ function ComposeInvoiceDialog({
     queryKey: ["/api/tenants", tenantId, "invoice-settings"],
   });
   const { data: authData } = useCurrentUser();
-  const agencyPhoneCode = defaultPhoneCodeFrom((authData?.tenant as any)?.contactPhone);
+  const agencyPhoneCode = defaultPhoneCodeFrom((authData?.tenant as any)?.baseCountry ?? (authData?.tenant as any)?.country ?? (authData?.tenant as any)?.contactPhone);
 
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
