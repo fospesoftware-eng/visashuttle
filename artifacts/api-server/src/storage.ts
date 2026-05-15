@@ -53,7 +53,18 @@ function normalizePhone(input: string | null | undefined): string {
 }
 
 function isMissingRelationError(error: unknown): boolean {
-  return Boolean(error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "42P01");
+  if (!error || typeof error !== "object") return false;
+  const err = error as { code?: string; message?: string; cause?: unknown };
+  if (err.code === "42P01") return true;
+  const message = err.message ?? "";
+  if (
+    message.includes("42P01") ||
+    message.includes("relation") && message.includes("does not exist") ||
+    message.includes("tenant_document_checklists")
+  ) {
+    return true;
+  }
+  return isMissingRelationError(err.cause);
 }
 
 export interface IStorage {
