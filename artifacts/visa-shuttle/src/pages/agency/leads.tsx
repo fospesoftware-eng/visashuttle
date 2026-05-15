@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type SyntheticEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Plus, Search, MoreVertical, Mail, Phone, Loader2, AlertCircle, Briefcase, GripVertical, MapPin, UserCog, User, Globe2, StickyNote, UserPlus, ClipboardList } from "lucide-react";
@@ -143,12 +143,8 @@ interface LeadCardContentProps {
 }
 
 function LeadCardBody({ lead, dragHandleProps, onEdit, onCreateCustomer, onConvert, onConvertProposal, onDelete, onMove, onReassign, currentStage, staff = [], assigneeName }: LeadCardContentProps) {
-  const stopMenuPointer = (event: SyntheticEvent) => {
-    event.stopPropagation();
-  };
-
   return (
-    <div className="group relative overflow-visible rounded-xl border border-border/60 bg-background p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-md">
+    <div className="group relative overflow-visible rounded-xl border border-border/60 bg-background p-3 shadow-sm transition-all hover:border-primary/25 hover:shadow-md">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <button
@@ -175,9 +171,6 @@ function LeadCardBody({ lead, dragHandleProps, onEdit, onCreateCustomer, onConve
               variant="ghost"
               size="icon"
               className="h-8 w-8 shrink-0 rounded-full opacity-100 sm:opacity-70 sm:transition-opacity sm:group-hover:opacity-100"
-              onPointerDownCapture={stopMenuPointer}
-              onMouseDownCapture={stopMenuPointer}
-              onClickCapture={stopMenuPointer}
               data-testid={`button-lead-actions-${lead.id}`}
             >
               <MoreVertical className="w-4 h-4" />
@@ -285,9 +278,8 @@ function DraggableLead({
       ref={setNodeRef}
       style={transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 50 } : undefined}
       className={isDragging ? "opacity-30" : ""}
-      {...attributes}
     >
-      {children(listeners ?? {})}
+      {children({ ...attributes, ...(listeners ?? {}) })}
     </div>
   );
 }
@@ -742,15 +734,17 @@ export default function LeadsPage() {
         </div>
 
         {/* Summary bar */}
-        <div className="flex flex-wrap gap-4 text-sm">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/60">
+        <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7">
+          <div className="flex items-center justify-between gap-2 rounded-lg border bg-background px-3 py-2 shadow-sm">
             <span className="text-muted-foreground">Total leads:</span>
             <span className="font-semibold">{leads.length}</span>
           </div>
           {stages.map((s) => (
-            <div key={s} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted/40">
-              <span className={`w-2 h-2 rounded-full ${STAGE_DOT[s]}`} />
-              <span className="capitalize text-muted-foreground">{s}:</span>
+            <div key={s} className="flex items-center justify-between gap-2 rounded-lg border bg-background px-3 py-2 shadow-sm">
+              <span className="flex min-w-0 items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${STAGE_DOT[s]}`} />
+                <span className="truncate capitalize text-muted-foreground">{s.replace("_", " ")}</span>
+              </span>
               <span className="font-medium">{getLeadsByStage(s).length}</span>
             </div>
           ))}
@@ -775,50 +769,54 @@ export default function LeadsPage() {
           </div>
         ) : (
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setActiveDragLead(null)}>
-            <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-              {stages.map((stage) => (
-                <DroppableStage key={stage} stage={stage} className="min-w-[260px] overflow-visible">
-                  <Card className={`${STAGE_COLORS[stage]} h-full overflow-visible border border-border/40 shadow-sm`} data-testid={`column-${stage}`}>
-                    <CardHeader className="pb-3 pt-4 px-4">
-                      <div className="flex items-center gap-2">
-                        <span className={`w-2.5 h-2.5 rounded-full ${STAGE_DOT[stage]}`} />
-                        <CardTitle className="text-sm font-semibold capitalize">
-                          {stage.replace("_", " ")}
-                        </CardTitle>
-                        <span className="ml-auto text-xs font-medium text-muted-foreground bg-background/70 rounded px-1.5 py-0.5">
-                          {getLeadsByStage(stage).length}
-                        </span>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3 px-3 pb-4 min-h-[140px] overflow-visible">
-                      {getLeadsByStage(stage).length === 0 ? (
-                        <p className="text-xs text-muted-foreground text-center py-6">Drop leads here</p>
-                      ) : (
-                        getLeadsByStage(stage).map((lead) => (
-                          <DraggableLead key={lead.id} lead={lead}>
-                            {(dragHandleProps) => (
-                            <LeadCardBody
-                              lead={lead}
-                              dragHandleProps={dragHandleProps}
-                              onEdit={openEdit}
-                              onCreateCustomer={(l) => createCustomerMutation.mutate(l)}
-                              onConvert={openConvert}
-                              onConvertProposal={convertToProposal}
-                              onDelete={(id) => setDeleteLeadId(id)}
-                              onMove={(id, s) => moveStageMutation.mutate({ id, stage: s })}
-                              onReassign={(id, userId) => updateMutation.mutate({ id, data: { assignedTo: userId } as Partial<Lead> })}
-                              currentStage={stage}
-                              staff={staff}
-                              assigneeName={assigneeNameById(lead.assignedTo)}
-                            />
-                            )}
-                          </DraggableLead>
-                        ))
-                      )}
-                    </CardContent>
-                  </Card>
-                </DroppableStage>
-              ))}
+            <div className="-mx-2 overflow-x-auto px-2 pb-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:flex lg:min-w-max">
+                {stages.map((stage) => (
+                  <DroppableStage key={stage} stage={stage} className="overflow-visible lg:w-[304px] lg:flex-none">
+                    <Card className={`${STAGE_COLORS[stage]} h-full overflow-visible border border-border/50 shadow-sm`} data-testid={`column-${stage}`}>
+                      <CardHeader className="pb-3 pt-4 px-4">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2.5 h-2.5 rounded-full ${STAGE_DOT[stage]}`} />
+                          <CardTitle className="text-sm font-semibold capitalize">
+                            {stage.replace("_", " ")}
+                          </CardTitle>
+                          <span className="ml-auto rounded-full bg-background/80 px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                            {getLeadsByStage(stage).length}
+                          </span>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-3 px-3 pb-4 min-h-[180px] overflow-visible">
+                        {getLeadsByStage(stage).length === 0 ? (
+                          <div className="rounded-xl border border-dashed bg-background/45 py-8 text-center text-xs text-muted-foreground">
+                            Drop leads here
+                          </div>
+                        ) : (
+                          getLeadsByStage(stage).map((lead) => (
+                            <DraggableLead key={lead.id} lead={lead}>
+                              {(dragHandleProps) => (
+                                <LeadCardBody
+                                  lead={lead}
+                                  dragHandleProps={dragHandleProps}
+                                  onEdit={openEdit}
+                                  onCreateCustomer={(l) => createCustomerMutation.mutate(l)}
+                                  onConvert={openConvert}
+                                  onConvertProposal={convertToProposal}
+                                  onDelete={(id) => setDeleteLeadId(id)}
+                                  onMove={(id, s) => moveStageMutation.mutate({ id, stage: s })}
+                                  onReassign={(id, userId) => updateMutation.mutate({ id, data: { assignedTo: userId } as Partial<Lead> })}
+                                  currentStage={stage}
+                                  staff={staff}
+                                  assigneeName={assigneeNameById(lead.assignedTo)}
+                                />
+                              )}
+                            </DraggableLead>
+                          ))
+                        )}
+                      </CardContent>
+                    </Card>
+                  </DroppableStage>
+                ))}
+              </div>
             </div>
             <DragOverlay dropAnimation={null}>
               {activeDragLead ? (
