@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Link } from "wouter";
 import { motion, useInView } from "framer-motion";
 import {
@@ -6,9 +6,12 @@ import {
   CheckCircle, ArrowRight, Globe, Star, Code2,
   WalletCards, KeyRound, Activity, Building2,
   Sparkles, Layers3, BadgeCheck, ChevronRight,
-  BarChart3, Lock, Cpu, Terminal
+  BarChart3, Lock, Cpu, Terminal, ChevronDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // ── Animation helpers ──────────────────────────────────────────────────────
 
@@ -316,11 +319,27 @@ const planCategories = [
   },
 ];
 
+// ── Currency switcher ──────────────────────────────────────────────────────
+const CURRENCIES = [
+  { code: "USD", symbol: "$",  rate: 1,     flag: "🇺🇸" },
+  { code: "GBP", symbol: "£",  rate: 0.79,  flag: "🇬🇧" },
+  { code: "EUR", symbol: "€",  rate: 0.92,  flag: "🇪🇺" },
+  { code: "INR", symbol: "₹",  rate: 83,    flag: "🇮🇳" },
+  { code: "AED", symbol: "AED ", rate: 3.67, flag: "🇦🇪" },
+] as const;
+type CurrencyCode = typeof CURRENCIES[number]["code"];
+
+function convertPrice(usdAmount: number, curr: typeof CURRENCIES[number]): string {
+  const val = usdAmount * curr.rate;
+  if (curr.code === "INR") return `${curr.symbol}${Math.round(val).toLocaleString("en-IN")}`;
+  return `${curr.symbol}${Math.round(val)}`;
+}
+
 const pricingPlans = [
   {
     category: "Agency CRM",
     name: "Starter",
-    price: "$49",
+    usdPrice: 49,
     period: "/mo",
     description: "For small agencies moving away from spreadsheets.",
     features: ["50 cases/month", "2 team members", "Document checks", "Email support"],
@@ -330,7 +349,7 @@ const pricingPlans = [
   {
     category: "Agency CRM",
     name: "Professional",
-    price: "$149",
+    usdPrice: 149,
     period: "/mo",
     description: "For growing agencies that need AI and customer portals.",
     features: ["200 cases/month", "10 team members", "AI document analysis", "Customer portal", "Priority support"],
@@ -341,7 +360,7 @@ const pricingPlans = [
   {
     category: "Business API",
     name: "API",
-    price: "PAYG",
+    usdPrice: null,
     period: "",
     description: "Standalone visa intelligence APIs. Add credits, use only what you need.",
     features: ["Deep Check API", "Visa Requirements API", "Scoped API keys", "Usage wallet", "Reseller ready"],
@@ -352,7 +371,7 @@ const pricingPlans = [
   {
     category: "Enterprise",
     name: "Enterprise",
-    price: "Custom",
+    usdPrice: null,
     period: "",
     description: "For large operations, branches, custom controls, or reseller networks.",
     features: ["Unlimited cases", "Unlimited members", "Custom AI training", "Dedicated support", "SLA"],
@@ -385,6 +404,9 @@ const testimonials = [
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function BusinessPage() {
+  const [currencyCode, setCurrencyCode] = useState<CurrencyCode>("USD");
+  const curr = CURRENCIES.find(c => c.code === currencyCode) ?? CURRENCIES[0];
+
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
 
@@ -466,7 +488,7 @@ export default function BusinessPage() {
       </section>
 
       {/* ── MODELS ── */}
-      <section id="models" className="py-20 md:py-28">
+      <section id="models" className="py-12 md:py-16">
         <div className="mx-auto max-w-7xl px-4">
           <FadeUp>
             <div className="mb-14 text-center">
@@ -522,7 +544,7 @@ export default function BusinessPage() {
       </section>
 
       {/* ── FEATURES BENTO ── */}
-      <section id="features" className="py-20 md:py-28 bg-muted/30">
+      <section id="features" className="py-12 md:py-16 bg-muted/30">
         <div className="mx-auto max-w-7xl px-4">
           <div className="grid lg:grid-cols-[1fr_1.6fr] gap-16 items-start">
             <FadeUp>
@@ -560,7 +582,7 @@ export default function BusinessPage() {
       </section>
 
       {/* ── API SECTION ── */}
-      <section id="business-api" className="py-20 md:py-28 overflow-hidden">
+      <section id="business-api" className="py-12 md:py-16 overflow-hidden">
         <div className="mx-auto max-w-7xl px-4">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             {/* Terminal art */}
@@ -642,71 +664,101 @@ export default function BusinessPage() {
       </section>
 
       {/* ── PRICING ── */}
-      <section id="plans" className="py-20 md:py-28 bg-muted/30">
+      <section id="plans" className="py-12 md:py-16 bg-muted/30">
         <div className="mx-auto max-w-7xl px-4">
           <FadeUp>
-            <div className="mb-14 text-center">
-              <p className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-3">Pricing</p>
-              <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">
-                Simple, transparent plans
-              </h2>
-              <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-                Start with the plan that fits your model. Upgrade or add API access as you grow.
-              </p>
+            <div className="mb-10 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-widest text-muted-foreground mb-3">Pricing</p>
+                <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-2">
+                  Simple, transparent plans
+                </h2>
+                <p className="text-muted-foreground max-w-lg">
+                  Start with the plan that fits your model. Upgrade or add API access as you grow.
+                </p>
+              </div>
+              {/* Currency switcher */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-2 rounded-xl border bg-card px-4 py-2.5 text-sm font-semibold shadow-sm hover:bg-muted/60 transition-colors whitespace-nowrap">
+                    <span>{curr.flag}</span>
+                    <span>{curr.code}</span>
+                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-[130px]">
+                  {CURRENCIES.map((c) => (
+                    <DropdownMenuItem
+                      key={c.code}
+                      onSelect={() => setCurrencyCode(c.code)}
+                      className={`gap-2 font-medium ${currencyCode === c.code ? "text-primary" : ""}`}
+                    >
+                      <span>{c.flag}</span>
+                      <span>{c.code}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </FadeUp>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {pricingPlans.map((plan, i) => (
-              <FadeUp key={plan.name} delay={i * 0.08}>
-                <div className={`relative flex flex-col h-full rounded-2xl border bg-card p-6 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${plan.accent ? "border-primary/40 shadow-md" : ""}`}>
-                  {plan.popular && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-[#4055FF] to-[#9033F5] px-3 py-1 text-[11px] font-semibold text-white shadow-lg">
-                      Most popular
+            {pricingPlans.map((plan, i) => {
+              const displayPrice = plan.usdPrice != null
+                ? convertPrice(plan.usdPrice, curr)
+                : plan.name === "API" ? "PAYG" : "Custom";
+              const showPeriod = plan.usdPrice != null && plan.period;
+              return (
+                <FadeUp key={plan.name} delay={i * 0.08}>
+                  <div className={`relative flex flex-col h-full rounded-2xl border bg-card p-6 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 ${plan.accent ? "border-primary/40 shadow-md" : ""}`}>
+                    {plan.popular && (
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-[#4055FF] to-[#9033F5] px-3 py-1 text-[11px] font-semibold text-white shadow-lg">
+                        Most popular
+                      </div>
+                    )}
+                    {plan.api && (
+                      <div className="absolute inset-x-0 top-0 h-0.5 rounded-t-2xl bg-gradient-to-r from-[#9033F5] via-[#FF2060] to-[#4055FF]" />
+                    )}
+                    {plan.accent && !plan.popular && !plan.api && (
+                      <div className="absolute inset-x-0 top-0 h-0.5 rounded-t-2xl bg-gradient-to-r from-[#4055FF] to-[#9033F5]" />
+                    )}
+
+                    <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">{plan.category}</p>
+                    <h3 className="text-xl font-bold mb-1">{plan.name}</h3>
+                    <p className="text-sm text-muted-foreground mb-5 flex-grow-0 min-h-[40px]">{plan.description}</p>
+
+                    <div className="mb-6">
+                      <span className="text-4xl font-bold tracking-tight">{displayPrice}</span>
+                      {showPeriod && <span className="text-base text-muted-foreground ml-1">{plan.period}</span>}
                     </div>
-                  )}
-                  {plan.api && (
-                    <div className="absolute inset-x-0 top-0 h-0.5 rounded-t-2xl bg-gradient-to-r from-[#9033F5] via-[#FF2060] to-[#4055FF]" />
-                  )}
-                  {plan.accent && !plan.popular && !plan.api && (
-                    <div className="absolute inset-x-0 top-0 h-0.5 rounded-t-2xl bg-gradient-to-r from-[#4055FF] to-[#9033F5]" />
-                  )}
 
-                  <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">{plan.category}</p>
-                  <h3 className="text-xl font-bold mb-1">{plan.name}</h3>
-                  <p className="text-sm text-muted-foreground mb-5 flex-grow-0 min-h-[40px]">{plan.description}</p>
+                    <ul className="space-y-2.5 mb-6 flex-1">
+                      {plan.features.map((f) => (
+                        <li key={f} className="flex items-center gap-2 text-sm">
+                          <CheckCircle className="h-3.5 w-3.5 flex-shrink-0 text-[#4055FF]" />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
 
-                  <div className="mb-6">
-                    <span className="text-4xl font-bold tracking-tight">{plan.price}</span>
-                    {plan.period && <span className="text-base text-muted-foreground ml-1">{plan.period}</span>}
+                    <Link href="/agency-register" className="mt-auto">
+                      <Button
+                        className={`w-full ${plan.accent ? "bg-gradient-to-r from-[#4055FF] to-[#9033F5] border-0 hover:opacity-90 text-white" : ""}`}
+                        variant={plan.accent ? "default" : "outline"}
+                      >
+                        {plan.cta}
+                      </Button>
+                    </Link>
                   </div>
-
-                  <ul className="space-y-2.5 mb-6 flex-1">
-                    {plan.features.map((f) => (
-                      <li key={f} className="flex items-center gap-2 text-sm">
-                        <CheckCircle className="h-3.5 w-3.5 flex-shrink-0 text-[#4055FF]" />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-
-                  <Link href="/agency-register" className="mt-auto">
-                    <Button
-                      className={`w-full ${plan.accent ? "bg-gradient-to-r from-[#4055FF] to-[#9033F5] border-0 hover:opacity-90 text-white" : ""}`}
-                      variant={plan.accent ? "default" : "outline"}
-                    >
-                      {plan.cta}
-                    </Button>
-                  </Link>
-                </div>
-              </FadeUp>
-            ))}
+                </FadeUp>
+              );
+            })}
           </div>
         </div>
       </section>
 
       {/* ── TESTIMONIALS ── */}
-      <section className="py-20 md:py-28">
+      <section className="py-12 md:py-16">
         <div className="mx-auto max-w-7xl px-4">
           <FadeUp>
             <div className="mb-14 text-center">
@@ -745,7 +797,7 @@ export default function BusinessPage() {
       </section>
 
       {/* ── CTA STRIP ── */}
-      <section className="py-20 md:py-24">
+      <section className="py-12 md:py-16">
         <div className="mx-auto max-w-7xl px-4">
           <FadeUp>
             <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#4055FF] via-[#9033F5] to-[#FF2060] p-12 md:p-16 text-center">
