@@ -499,7 +499,9 @@ export default function ProposalApplyPage() {
       >
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
           {tenant!.logoUrl ? (
-            <img src={tenant!.logoUrl} alt={tenant!.name} className="w-10 h-10 rounded-md object-cover" />
+            <span className="agency-logo-shell">
+              <img src={tenant!.logoUrl} alt={tenant!.name} className="agency-logo-flex agency-logo-flex-sm" />
+            </span>
           ) : (
             <div
               className="w-10 h-10 rounded-md flex items-center justify-center text-white font-bold"

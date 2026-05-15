@@ -200,13 +200,15 @@ export default function InvoicePayPage() {
         <Card>
           <CardContent className="pt-6 flex items-center gap-3">
             {agency.logoUrl ? (
-              <img
-                src={agency.logoUrl}
-                alt={agency.name}
-                className="h-12 w-12 object-contain rounded border bg-white p-1"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                data-testid="img-agency-logo"
-              />
+              <span className="agency-logo-shell rounded border bg-white">
+                <img
+                  src={agency.logoUrl}
+                  alt={agency.name}
+                  className="agency-logo-flex agency-logo-flex-sm"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  data-testid="img-agency-logo"
+                />
+              </span>
             ) : (
               <div className="h-12 w-12 rounded bg-primary/10 flex items-center justify-center text-primary font-bold">
                 {agency.name?.[0] ?? "A"}

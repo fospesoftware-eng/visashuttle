@@ -358,3 +358,36 @@
   40% { opacity: 0.18; }
   72%, 100% { transform: translateX(58%) skewX(-16deg); opacity: 0; }
 }
+
+.agency-logo-flex {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: min(12rem, 46vw);
+  max-height: 3.25rem;
+  object-fit: contain;
+}
+
+.agency-logo-flex-sm {
+  max-width: min(9.5rem, 42vw);
+  max-height: 2.25rem;
+}
+
+.agency-logo-flex-lg {
+  max-width: min(18rem, 70vw);
+  max-height: 5rem;
+}
+
+.agency-logo-shell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
+  max-width: min(18rem, 70vw);
+  padding: 0.125rem;
+}
+
+.agency-logo-shell-on-brand {
+  padding: 0.25rem 0.375rem;
+  border-radius: 0.5rem;
+}

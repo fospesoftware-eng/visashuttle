@@ -136,7 +136,9 @@ export default function WhiteLabelPortalPage() {
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {tenant.logoUrl ? (
-              <img src={tenant.logoUrl} alt={tenant.name} className="h-8" />
+              <span className="agency-logo-shell">
+                <img src={tenant.logoUrl} alt={tenant.name} className="agency-logo-flex agency-logo-flex-sm" />
+              </span>
             ) : (
               <span className="font-bold text-lg" style={{ color: primaryColor }}>
                 {tenant.name}

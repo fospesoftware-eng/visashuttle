@@ -118,7 +118,9 @@ export default function WhiteLabelLoginPage() {
         <div className="relative z-10 flex flex-col justify-center p-12 text-white">
           <div className="mb-12">
             {tenant.logoUrl ? (
-              <img src={tenant.logoUrl} alt={tenant.name} className="h-16 brightness-0 invert" />
+              <span className="agency-logo-shell agency-logo-shell-on-brand">
+                <img src={tenant.logoUrl} alt={tenant.name} className="agency-logo-flex agency-logo-flex-lg brightness-0 invert" />
+              </span>
             ) : (
               <h1 className="text-4xl font-bold">{tenant.name}</h1>
             )}
@@ -181,7 +183,9 @@ export default function WhiteLabelLoginPage() {
         >
           <div className="flex items-center gap-3 mb-4">
             {tenant.logoUrl ? (
-              <img src={tenant.logoUrl} alt={tenant.name} className="h-10 brightness-0 invert" />
+              <span className="agency-logo-shell agency-logo-shell-on-brand">
+                <img src={tenant.logoUrl} alt={tenant.name} className="agency-logo-flex agency-logo-flex-sm brightness-0 invert" />
+              </span>
             ) : (
               <h1 className="text-xl font-bold">{tenant.name}</h1>
             )}

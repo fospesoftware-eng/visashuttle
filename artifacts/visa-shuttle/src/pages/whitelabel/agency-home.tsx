@@ -98,7 +98,9 @@ export default function AgencyHomePage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {tenant.logoUrl ? (
-              <img src={tenant.logoUrl} alt={tenant.name} className="h-9 object-contain" />
+              <span className="agency-logo-shell">
+                <img src={tenant.logoUrl} alt={tenant.name} className="agency-logo-flex agency-logo-flex-sm" />
+              </span>
             ) : (
               <span className="text-xl font-bold" style={{ color: primary }}>{tenant.name}</span>
             )}
@@ -456,7 +458,9 @@ export default function AgencyHomePage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-10 mb-10">
             <div>
               {tenant.logoUrl ? (
-                <img src={tenant.logoUrl} alt={tenant.name} className="h-10 object-contain mb-4 brightness-0 invert" />
+                <span className="agency-logo-shell agency-logo-shell-on-brand mb-4">
+                  <img src={tenant.logoUrl} alt={tenant.name} className="agency-logo-flex agency-logo-flex-sm brightness-0 invert" />
+                </span>
               ) : (
                 <h3 className="text-xl font-bold mb-4" style={{ color: primary }}>{tenant.name}</h3>
               )}

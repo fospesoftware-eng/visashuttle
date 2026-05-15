@@ -173,7 +173,9 @@ export default function WhiteLabelVerifyPage() {
             Back
           </Button>
           {tenant.logoUrl ? (
-            <img src={tenant.logoUrl} alt={tenant.name} className="h-8 brightness-0 invert" />
+            <span className="agency-logo-shell agency-logo-shell-on-brand">
+              <img src={tenant.logoUrl} alt={tenant.name} className="agency-logo-flex agency-logo-flex-sm brightness-0 invert" />
+            </span>
           ) : (
             <span className="text-white font-semibold">{tenant.name}</span>
           )}
