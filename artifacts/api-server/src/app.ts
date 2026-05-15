@@ -150,6 +150,12 @@ app.use(
   express.json({ limit: "3mb" }),
 );
 
+// Dashboard customizer estimates can include one reference image.
+app.use(
+  /^\/api\/agency\/[^/]+\/customizer\/estimate$/,
+  express.json({ limit: "8mb" }),
+);
+
 // Visa-copy upload endpoint
 app.use(
   /^\/api\/cases\/[^/]+\/visa-copy$/,

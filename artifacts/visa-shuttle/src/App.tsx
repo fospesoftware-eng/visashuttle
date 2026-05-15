@@ -46,6 +46,7 @@ import ReportsPage from "@/pages/agency/reports";
 import AccountingPage from "@/pages/agency/accounting";
 import AgencySettingsPage from "@/pages/agency/settings";
 import ApiPlatformPage from "@/pages/agency/api-platform";
+import AgencyCustomizerPage from "@/pages/agency/customizer";
 import ApiPricingPublicPage from "@/pages/public/api-pricing";
 import ApiDocsPublicPage from "@/pages/public/api-docs";
 import TutorialPage from "@/pages/tutorial";
@@ -207,6 +208,7 @@ function Router() {
       <Route path="/app/business/api/docs"      >{() => <ApiPlatformPage view="docs"      />}</Route>
       <Route path="/app/business/api/resellers" >{() => <ApiPlatformPage view="resellers" />}</Route>
       <Route path="/app/reports" component={ReportsPage} />
+      <Route path="/app/customizer" component={AgencyCustomizerPage} />
       <Route path="/app/settings" component={AgencySettingsPage} />
       <Route path="/app/support" component={AgencySupportPage} />
       <Route path="/app/visa-check/results" component={VisaCheckAgencyResultPage} />

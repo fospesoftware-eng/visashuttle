@@ -7,7 +7,7 @@ import {
   Menu, X, Building2, ShieldCheck, Database, Activity, Globe, CreditCard,
   CheckCircle, AlertCircle, Inbox, Receipt, Banknote, ClipboardList,
   Send, Stamp, Loader2, XCircle, UserSquare2, KeyRound, BookOpen, LayoutDashboard,
-  LifeBuoy, Wallet
+  LifeBuoy, Wallet, Sparkles
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -81,6 +81,7 @@ const agencyNavItems: NavItem[] = [
   },
   { icon: BarChart3, label: "Reports", href: "/app/reports" },
   { icon: Globe, label: "Visa Check", href: "/app/visa-check" },
+  { icon: Sparkles, label: "Customizer", href: "/app/customizer" },
   {
     // Agency API Platform — paid pay-per-call public APIs the agency can resell.
     icon: Briefcase, label: "Business", href: "/app/business/api",

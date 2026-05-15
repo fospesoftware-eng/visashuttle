@@ -137,6 +137,110 @@ const adminSubscriptionPatchSchema = z.object({
   notes: z.string().max(2000).nullable().optional(),
 });
 
+const customizerEstimateSchema = z.object({
+  prompt: z.string().trim().min(10).max(5000),
+  imageBase64: z.string().max(7_500_000).optional(),
+  imageMimeType: z.string().startsWith("image/").optional(),
+});
+
+function fallbackCustomizationEstimate(prompt: string) {
+  const lower = prompt.toLowerCase();
+  const signals = [
+    lower.includes("new menu"),
+    lower.includes("new module"),
+    lower.includes("payment"),
+    lower.includes("api"),
+    lower.includes("field"),
+    lower.includes("report"),
+    lower.includes("dashboard"),
+    lower.includes("automation"),
+    lower.includes("upload"),
+  ].filter(Boolean).length;
+  const estimatedHours = Math.min(80, Math.max(8, 8 + signals * 6 + Math.ceil(prompt.length / 450) * 4));
+  const priceCents = estimatedHours * 250000;
+  const days = Math.max(2, Math.ceil(estimatedHours / 6));
+  return {
+    summary: "AI-prepared customization estimate based on the submitted requirement.",
+    effortLevel: estimatedHours >= 48 ? "High" : estimatedHours >= 24 ? "Medium" : "Low",
+    estimatedHours,
+    timeline: `${days}-${days + 2} working days`,
+    priceCents,
+    currency: "INR",
+    phases: [
+      { name: "Requirement mapping", duration: "0.5-1 day", work: "Clarify scope, screens, fields, and affected workflows." },
+      { name: "AI development", duration: `${Math.max(1, days - 1)}-${days + 1} days`, work: "Implement dashboard UI, API changes, validation, and integration." },
+      { name: "Testing and release", duration: "0.5-1 day", work: "Run build checks, verify flows, and prepare deployment notes." },
+    ],
+    assumptions: [
+      "Estimate assumes the requested change fits the current Visa Shuttle architecture.",
+      "Final delivery may change if third-party APIs, database migrations, or external approvals are required.",
+      "Development is AI-assisted and reviewed before release.",
+    ],
+  };
+}
+
+async function estimateCustomizationWithAnthropic(prompt: string, imageBase64?: string, imageMimeType?: string) {
+  const cfg = await storage.getPlatformAiConfig().catch(() => undefined);
+  const apiKey = cfg?.anthropicApiKey || process.env.ANTHROPIC_API_KEY;
+  const model = cfg?.anthropicModel || process.env.ANTHROPIC_MODEL || "claude-opus-4-5";
+  if (!apiKey) return { ...fallbackCustomizationEstimate(prompt), provider: "heuristic" };
+
+  const content: any[] = [
+    {
+      type: "text",
+      text: `You are estimating a Visa Shuttle agency-dashboard customization.
+
+Requirement:
+${prompt}
+
+Return ONLY valid JSON with this exact shape:
+{
+  "summary": "one sentence",
+  "effortLevel": "Low|Medium|High",
+  "estimatedHours": 16,
+  "timeline": "3-5 working days",
+  "priceCents": 40000,
+  "currency": "INR",
+  "phases": [{"name":"...","duration":"...","work":"..."}],
+  "assumptions": ["..."]
+}
+
+Pricing rule: priceCents = estimatedHours * 250000 (INR paise, equal to INR 2,500/hour). Assume all development is AI-assisted, but include review/testing time. Be practical for a production SaaS app.`,
+    },
+  ];
+  if (imageBase64 && imageMimeType) {
+    const cleaned = imageBase64.includes(",") ? imageBase64.split(",").pop()! : imageBase64;
+    content.push({
+      type: "image",
+      source: { type: "base64", media_type: imageMimeType, data: cleaned },
+    });
+  }
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 1200,
+      temperature: 0.2,
+      messages: [{ role: "user", content }],
+    }),
+  });
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(text || `Anthropic estimate failed (${response.status})`);
+  }
+  const data: any = await response.json();
+  const text = data?.content?.find((part: any) => part?.type === "text")?.text ?? "";
+  const jsonText = text.match(/\{[\s\S]*\}/)?.[0] ?? text;
+  const parsed = JSON.parse(jsonText);
+  return { ...fallbackCustomizationEstimate(prompt), ...parsed, provider: "anthropic" };
+}
+
 // ─── Registration ─────────────────────────────────────────────────────────────
 export function registerPlatformExtensions(app: Express, helpers: ExtensionsHelpers) {
   const { getPlatformGateway, getRequestOrigin, readCashfreeBody } = helpers;
@@ -145,6 +249,26 @@ export function registerPlatformExtensions(app: Express, helpers: ExtensionsHelp
   const adminReadRoles = ["saas_admin", "platform_readonly", "platform_finance", "platform_support"];
   const adminTicketRoles = ["saas_admin", "platform_support"];
   const adminBillingRoles = ["saas_admin", "platform_finance"];
+
+  app.post("/api/agency/:tenantId/customizer/estimate", async (req, res) => {
+    try {
+      if (!callerIsTenantMember(req, String(req.params.tenantId))) {
+        res.status(403).json({ error: "Forbidden" }); return;
+      }
+      const parsed = customizerEstimateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid customization request" }); return;
+      }
+      const estimate = await estimateCustomizationWithAnthropic(
+        parsed.data.prompt,
+        parsed.data.imageBase64,
+        parsed.data.imageMimeType,
+      );
+      res.json(estimate);
+    } catch (e: any) {
+      res.status(502).json({ error: e?.message ?? "Failed to estimate customization" });
+    }
+  });
 
   // ───────────────────────────────────────────────────────────────────────────
   // SUPPORT TICKETS — admin side
