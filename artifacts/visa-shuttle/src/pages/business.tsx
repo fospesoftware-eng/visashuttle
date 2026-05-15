@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { 
   Shield, Zap, FileCheck, Brain, Users, 
   CheckCircle, ArrowRight, Globe, Star, Code2, WalletCards, KeyRound, Activity,
-  Building2, Sparkles, Receipt, Layers3, BadgeCheck, BarChart3
+  Building2, Sparkles, Layers3, BadgeCheck
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -45,13 +45,6 @@ const stats = [
   { value: "50K+", label: "Visas Processed" },
   { value: "99.2%", label: "Success Rate" },
   { value: "24/7", label: "Support" }
-];
-
-const workflow = [
-  { label: "Lead capture", value: "Portal + forms", icon: Users },
-  { label: "AI document review", value: "Auto gaps", icon: Brain },
-  { label: "Proposal to payment", value: "One journey", icon: Receipt },
-  { label: "Visa operations", value: "Tracked status", icon: BarChart3 },
 ];
 
 const testimonials = [
@@ -166,25 +159,21 @@ const pricingPlans = [
 export default function BusinessPage() {
   return (
     <div className="min-h-screen bg-background">
-      <section className="relative overflow-hidden py-16 md:py-24">
-        <div className="absolute inset-0 gradient-subtle" />
-        <div className="absolute left-[-10%] top-16 h-72 w-72 rounded-full bg-primary/15 blur-3xl" />
-        <div className="absolute bottom-8 right-[-8%] h-80 w-80 rounded-full bg-secondary/20 blur-3xl" />
-        
-        <div className="relative mx-auto grid max-w-7xl gap-12 px-4 lg:grid-cols-[1.02fr_0.98fr] lg:items-center">
-          <div>
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border bg-background/80 px-4 py-2 text-sm font-medium text-primary shadow-sm backdrop-blur">
+      <section className="relative overflow-hidden border-b bg-gradient-to-b from-muted/35 via-background to-background py-16 md:py-24">
+        <div className="relative mx-auto grid max-w-7xl gap-12 px-4 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+          <div className="max-w-2xl">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border bg-background px-4 py-2 text-sm font-medium text-primary shadow-sm">
               <Sparkles className="h-4 w-4" />
-              AI visa operating system for agencies and API businesses
+              AI visa platform for agencies, enterprises, and API teams
             </div>
             
-            <h1 className="mb-6 max-w-3xl text-4xl font-bold leading-tight md:text-6xl">
-              Grow your visa business with
-              <span className="gradient-text block">AI, portals, and APIs</span>
+            <h1 className="mb-6 text-4xl font-bold leading-tight md:text-6xl">
+              A calmer, smarter way to run
+              <span className="gradient-text block">visa business operations</span>
             </h1>
             
-            <p className="mb-8 max-w-2xl text-lg text-muted-foreground md:text-xl">
-              Visa Shuttle helps agencies convert leads, collect documents, run AI checks, collect fees, and manage applications. Businesses can also use standalone pay-as-you-go APIs inside their own products.
+            <p className="mb-8 text-lg leading-8 text-muted-foreground md:text-xl">
+              Convert visa inquiries into paid applications with branded portals, AI document checks, fee collection, and standalone pay-as-you-go APIs for your own digital products.
             </p>
             
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -202,10 +191,10 @@ export default function BusinessPage() {
               </a>
             </div>
 
-            <div className="mt-10 grid grid-cols-2 gap-4 md:grid-cols-4">
+            <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {stats.map((stat) => (
-                <div key={stat.label} className="rounded-xl border bg-background/75 p-4 shadow-sm backdrop-blur">
-                  <p className="text-2xl font-bold gradient-text" data-testid={`stat-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}>
+                <div key={stat.label} className="rounded-lg border bg-background p-4 shadow-sm">
+                  <p className="text-2xl font-bold" data-testid={`stat-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}>
                     {stat.value}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">{stat.label}</p>
@@ -214,45 +203,40 @@ export default function BusinessPage() {
             </div>
           </div>
 
-          <div className="relative">
-            <div className="rounded-2xl border bg-card/95 p-4 shadow-xl">
-              <div className="rounded-xl border bg-muted/30 p-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Today in your agency</p>
-                    <p className="text-2xl font-bold">32 active visa journeys</p>
-                  </div>
-                  <div className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-                    AI ready
-                  </div>
-                </div>
-                <div className="mt-5 grid gap-3">
-                  {workflow.map((item) => (
-                    <div key={item.label} className="flex items-center gap-3 rounded-lg bg-background p-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                        <item.icon className="h-5 w-5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium">{item.label}</p>
-                        <p className="text-sm text-muted-foreground">{item.value}</p>
-                      </div>
-                      <CheckCircle className="h-5 w-5 text-primary" />
-                    </div>
-                  ))}
-                </div>
+          <div className="relative lg:min-h-[560px]">
+            <div className="overflow-hidden rounded-2xl border bg-card shadow-2xl">
+              <div className="relative aspect-[4/3] min-h-[420px]">
+                <img
+                  src="https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=1400&q=85"
+                  alt="Business traveler preparing documents for an international trip"
+                  className="h-full w-full object-cover"
+                  loading="eager"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/15 to-transparent" />
               </div>
-              <div className="mt-4 grid grid-cols-3 gap-3">
-                <div className="rounded-xl border bg-background p-4">
-                  <p className="text-xs text-muted-foreground">Docs checked</p>
-                  <p className="mt-1 text-xl font-bold">186</p>
+            </div>
+
+            <div className="absolute inset-x-4 bottom-4 rounded-xl border bg-background/95 p-4 shadow-lg backdrop-blur md:inset-x-8 md:bottom-8">
+              <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-center">
+                <div>
+                  <p className="text-sm font-semibold">Agency workspace + Business API</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Start with your CRM, then add API usage when your business is ready to scale.
+                  </p>
                 </div>
-                <div className="rounded-xl border bg-background p-4">
-                  <p className="text-xs text-muted-foreground">Fees ready</p>
-                  <p className="mt-1 text-xl font-bold">14</p>
-                </div>
-                <div className="rounded-xl border bg-background p-4">
-                  <p className="text-xs text-muted-foreground">API calls</p>
-                  <p className="mt-1 text-xl font-bold">2.8k</p>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="rounded-lg bg-muted/60 px-3 py-2">
+                    <p className="text-xs text-muted-foreground">Checks</p>
+                    <p className="font-semibold">AI</p>
+                  </div>
+                  <div className="rounded-lg bg-muted/60 px-3 py-2">
+                    <p className="text-xs text-muted-foreground">Portal</p>
+                    <p className="font-semibold">Live</p>
+                  </div>
+                  <div className="rounded-lg bg-muted/60 px-3 py-2">
+                    <p className="text-xs text-muted-foreground">API</p>
+                    <p className="font-semibold">PAYG</p>
+                  </div>
                 </div>
               </div>
             </div>
