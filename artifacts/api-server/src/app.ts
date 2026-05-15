@@ -132,6 +132,18 @@ app.use(
   express.json({ limit: "12mb" }),
 );
 
+// Public proposal apply can carry checklist uploads as base64 data URLs.
+app.use(
+  /^\/api\/proposals\/[^/]+\/apply$/,
+  express.json({ limit: "60mb" }),
+);
+
+// Public proposal passport scan receives the same image payload as agency scan.
+app.use(
+  /^\/api\/proposals\/[^/]+\/passport\/scan$/,
+  express.json({ limit: "12mb" }),
+);
+
 // Visa-copy upload endpoint
 app.use(
   /^\/api\/cases\/[^/]+\/visa-copy$/,

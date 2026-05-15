@@ -1844,6 +1844,44 @@ export async function registerRoutes(
     });
   });
 
+  app.post("/api/proposals/:token/passport/scan", async (req, res) => {
+    const proposal = await storage.getProposalByToken(req.params.token);
+    if (!proposal) return res.status(404).json({ error: "Invalid proposal link." });
+    if (proposal.status === "revoked") return res.status(410).json({ error: "This proposal has been revoked." });
+    if (proposal.expiresAt && proposal.expiresAt.getTime() < Date.now()) {
+      return res.status(410).json({ error: "This proposal has expired." });
+    }
+
+    const { imageBase64, mimeType } = req.body ?? {};
+    if (typeof imageBase64 !== "string" || imageBase64.length === 0) {
+      return res.status(400).json({ error: "imageBase64 is required" });
+    }
+    if (typeof mimeType !== "string" || !mimeType.startsWith("image/")) {
+      return res.status(400).json({ error: "mimeType must be an image/* type" });
+    }
+
+    const cleaned = imageBase64.includes(",") ? imageBase64.split(",").pop()! : imageBase64;
+    if (cleaned.length > 11 * 1024 * 1024) {
+      return res.status(413).json({ error: "Passport image is too large. Please upload an image under 8 MB." });
+    }
+
+    const aiConfig = await storage.getPlatformAiConfig();
+    if (!isPassportScanConfigured(aiConfig)) {
+      return res.status(503).json({
+        error: "Passport auto-scan is not configured. Please enter passport details manually.",
+        code: "ai_not_configured",
+      });
+    }
+
+    try {
+      const result = await scanPassportImage(cleaned, mimeType, aiConfig);
+      res.json(result);
+    } catch (err: any) {
+      console.error("[proposal-passport-scan] failed:", err?.message ?? err);
+      res.status(502).json({ error: "Passport scan failed. Please try again, or enter the details manually." });
+    }
+  });
+
   // Public apply: customer submits the form on the proposal page. Creates a
   // Case under the tenant, owned by the proposal's createdBy team member.
   // Per-token in-flight guard so a double-clicked submit can't create two
@@ -1872,8 +1910,10 @@ export async function registerRoutes(
 
     const {
       applicantName, applicantDob, email, phone,
-      passportNumber, passportNationality,
-      travelDate, notes,
+      passportNumber, passportNationality, passportSurname, passportGivenName,
+      passportMiddleName, passportGender, passportDateOfIssue, passportDateOfExpiry,
+      passportPlaceOfIssue, passportPlaceOfBirth, passportFileUrl,
+      travelDate, notes, documents,
     } = req.body ?? {};
 
     if (!applicantName || typeof applicantName !== "string" || !applicantName.trim()) {
@@ -1885,6 +1925,28 @@ export async function registerRoutes(
     // path, so they shouldn't get to bypass these checks.
     const dateError = validateCaseDates({ travelDate, applicantDob });
     if (dateError) return res.status(400).json({ error: dateError });
+    const expiryText = typeof passportDateOfExpiry === "string" ? passportDateOfExpiry.trim() : "";
+    if (expiryText) {
+      const expiry = new Date(expiryText);
+      if (!isNaN(expiry.getTime())) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (expiry < today) {
+          return res.status(400).json({ error: "Expired passports are not eligible. Please upload a valid current passport." });
+        }
+      }
+    }
+    if (Array.isArray(documents)) {
+      for (const raw of documents.slice(0, 30)) {
+        if (!raw || typeof raw !== "object") continue;
+        const d = raw as any;
+        const name = typeof d.name === "string" && d.name.trim() ? d.name.trim().slice(0, 160) : "Uploaded document";
+        const fileUrl = typeof d.fileUrl === "string" && d.fileUrl.startsWith("data:") ? d.fileUrl : null;
+        if (fileUrl && fileUrl.length > 11 * 1024 * 1024) {
+          return res.status(413).json({ error: `${name} is too large. Please upload files under 8 MB.` });
+        }
+      }
+    }
 
     // Legacy proposals created before the country↔visa-type catalog was
     // tightened could still hold an invalid pair (e.g. "Schengen Visa"
@@ -1939,17 +2001,17 @@ export async function registerRoutes(
       referenceId: generateReferenceId(),
       applicantName: applicantName.trim(),
       applicantDob: applicantDob || null,
-      passportSurname: null,
-      passportGivenName: null,
-      passportMiddleName: null,
+      passportSurname: passportSurname?.trim() || null,
+      passportGivenName: passportGivenName?.trim() || null,
+      passportMiddleName: passportMiddleName?.trim() || null,
       passportNumber: passportNumber?.trim() || null,
       passportNationality: passportNationality?.trim() || null,
-      passportGender: null,
-      passportDateOfIssue: null,
-      passportDateOfExpiry: null,
-      passportPlaceOfIssue: null,
-      passportPlaceOfBirth: null,
-      passportFileUrl: null,
+      passportGender: passportGender || null,
+      passportDateOfIssue: passportDateOfIssue || null,
+      passportDateOfExpiry: passportDateOfExpiry || null,
+      passportPlaceOfIssue: passportPlaceOfIssue?.trim() || null,
+      passportPlaceOfBirth: passportPlaceOfBirth?.trim() || null,
+      passportFileUrl: typeof passportFileUrl === "string" && passportFileUrl.startsWith("data:") ? passportFileUrl : null,
       visaType: proposal.visaType,
       destinationCountry: proposal.destinationCountry,
       status: "pending",
@@ -1959,6 +2021,27 @@ export async function registerRoutes(
       notes: notes?.trim() || null,
       readinessScore: 0,
     });
+    if (Array.isArray(documents)) {
+      for (const raw of documents.slice(0, 30)) {
+        if (!raw || typeof raw !== "object") continue;
+        const d = raw as any;
+        const name = typeof d.name === "string" && d.name.trim() ? d.name.trim().slice(0, 160) : "Uploaded document";
+        const type = typeof d.type === "string" && d.type.trim() ? d.type.trim().slice(0, 80) : "other";
+        const fileUrl = typeof d.fileUrl === "string" && d.fileUrl.startsWith("data:") ? d.fileUrl : null;
+        if (!fileUrl) continue;
+        await storage.createDocument({
+          caseId: newCase.id,
+          tenantId: proposal.tenantId,
+          name,
+          type,
+          fileUrl,
+          status: "pending",
+          qualityScore: null,
+          extractedData: d.extractedData ?? null,
+          notes: typeof d.notes === "string" ? d.notes.slice(0, 500) : null,
+        });
+      }
+    }
     if (proposal.leadId) {
       await storage.updateLead(proposal.leadId, {
         stage: "won",

@@ -3,7 +3,8 @@ import { useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Loader2, CheckCircle2, AlertCircle, ClipboardList, Building2,
-  Mail, Phone, Globe, Calendar, FileText, ArrowRight, ShieldCheck, CreditCard,
+  Mail, Phone, FileText, ArrowRight, ShieldCheck, CreditCard,
+  Upload, ScanLine, X, Check,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,55 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { getDocumentChecklist, type DocumentRequirement } from "@/data/document-checklists";
+
+type ProposalDocumentUpload = {
+  key: string;
+  name: string;
+  type: string;
+  fileName: string;
+  fileUrl: string;
+  notes?: string | null;
+  extractedData?: unknown;
+};
+
+type ScanResult = {
+  surname: string | null;
+  givenName: string | null;
+  middleName: string | null;
+  passportNumber: string | null;
+  nationality: string | null;
+  gender: "M" | "F" | "X" | null;
+  dateOfBirth: string | null;
+  dateOfIssue: string | null;
+  dateOfExpiry: string | null;
+  placeOfIssue: string | null;
+  placeOfBirth: string | null;
+  warnings?: string[];
+};
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error("Could not read file"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function todayIso() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString().slice(0, 10);
+}
+
+function isExpiredDate(value: string) {
+  if (!value) return false;
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return d < today;
+}
 
 // Public payload shape — server returns proposal + minimal tenant branding.
 interface ProposalPublicData {
@@ -52,6 +102,10 @@ export default function ProposalApplyPage() {
   const { token } = useParams<{ token: string }>();
   const { toast } = useToast();
   const [submitted, setSubmitted] = useState<{ referenceId: string; tenantSlug: string | null } | null>(null);
+  const [step, setStep] = useState(1);
+  const [documents, setDocuments] = useState<ProposalDocumentUpload[]>([]);
+  const [passportFileName, setPassportFileName] = useState("");
+  const [passportScanError, setPassportScanError] = useState<string | null>(null);
 
   const { data, isLoading, error } = useQuery<ProposalPublicData>({
     queryKey: ["/api/proposals", token],
@@ -74,6 +128,15 @@ export default function ProposalApplyPage() {
     phone: "",
     passportNumber: "",
     passportNationality: "",
+    passportSurname: "",
+    passportGivenName: "",
+    passportMiddleName: "",
+    passportGender: "" as "" | "M" | "F" | "X",
+    passportDateOfIssue: "",
+    passportDateOfExpiry: "",
+    passportPlaceOfIssue: "",
+    passportPlaceOfBirth: "",
+    passportFileUrl: "",
     travelDate: "",
     notes: "",
   });
@@ -91,7 +154,7 @@ export default function ProposalApplyPage() {
 
   const applyMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/proposals/${token}/apply`, form);
+      const res = await apiRequest("POST", `/api/proposals/${token}/apply`, { ...form, documents });
       return res.json() as Promise<{ success: boolean; referenceId: string; caseNumber: string; tenantSlug: string | null }>;
     },
     onSuccess: (r) => {
@@ -101,6 +164,76 @@ export default function ProposalApplyPage() {
       toast({ title: "Could not submit application", description: e?.message, variant: "destructive" });
     },
   });
+
+  const scanPassportMutation = useMutation({
+    mutationFn: async ({ dataUrl, mimeType }: { dataUrl: string; mimeType: string }) => {
+      const res = await apiRequest("POST", `/api/proposals/${token}/passport/scan`, { imageBase64: dataUrl, mimeType });
+      return res.json() as Promise<ScanResult>;
+    },
+    onSuccess: (result) => {
+      setForm((f) => ({
+        ...f,
+        applicantName: f.applicantName || [result.givenName, result.surname].filter(Boolean).join(" "),
+        applicantDob: f.applicantDob || result.dateOfBirth || "",
+        passportSurname: result.surname || f.passportSurname,
+        passportGivenName: result.givenName || f.passportGivenName,
+        passportMiddleName: result.middleName || f.passportMiddleName,
+        passportNumber: result.passportNumber || f.passportNumber,
+        passportNationality: result.nationality || f.passportNationality,
+        passportGender: result.gender || f.passportGender,
+        passportDateOfIssue: result.dateOfIssue || f.passportDateOfIssue,
+        passportDateOfExpiry: result.dateOfExpiry || f.passportDateOfExpiry,
+        passportPlaceOfIssue: result.placeOfIssue || f.passportPlaceOfIssue,
+        passportPlaceOfBirth: result.placeOfBirth || f.passportPlaceOfBirth,
+      }));
+      setPassportScanError(result.dateOfExpiry && isExpiredDate(result.dateOfExpiry)
+        ? "This passport is expired. Please upload a valid current passport."
+        : null);
+      setDocuments((items) => items.map((item) => (
+        item.type === "passport" ? { ...item, extractedData: result } : item
+      )));
+    },
+    onError: (e: any) => {
+      setPassportScanError(e?.message ?? "Passport scan failed. Please enter details manually.");
+    },
+  });
+
+  const addDocument = async (file: File, type: string, name: string, extractedData?: unknown, notes?: string | null) => {
+    if (file.size > 8 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Please upload files under 8 MB.", variant: "destructive" });
+      return;
+    }
+    const fileUrl = await fileToDataUrl(file);
+    setDocuments((items) => [
+      ...items.filter((item) => !(type === "passport" && item.type === "passport")),
+      { key: Math.random().toString(36).slice(2), name, type, fileName: file.name, fileUrl, extractedData, notes },
+    ]);
+    if (type === "passport") {
+      setForm((f) => ({ ...f, passportFileUrl: fileUrl }));
+      setPassportFileName(file.name);
+    }
+  };
+
+  const handlePassportFile = async (file: File | undefined) => {
+    if (!file) return;
+    setPassportScanError(null);
+    const fileUrl = await fileToDataUrl(file);
+    setDocuments((items) => [
+      ...items.filter((item) => item.type !== "passport"),
+      {
+        key: Math.random().toString(36).slice(2),
+        name: "Current passport bio page",
+        type: "passport",
+        fileName: file.name,
+        fileUrl,
+        extractedData: null,
+        notes: null,
+      },
+    ]);
+    setForm((f) => ({ ...f, passportFileUrl: fileUrl }));
+    setPassportFileName(file.name);
+    scanPassportMutation.mutate({ dataUrl: fileUrl, mimeType: file.type || "image/jpeg" });
+  };
 
   // Pay-estimate CTA on the success screen — fires `/initiate-payment` to
   // get a public invoice token, then redirects to the standard pay page.
@@ -266,7 +399,22 @@ export default function ProposalApplyPage() {
   }
 
   // ── Main apply form ──
-  const canSubmit = form.applicantName.trim().length > 0;
+  const passportExpired = isExpiredDate(form.passportDateOfExpiry);
+  const uploadedTypes = new Set(documents.map((doc) => doc.type));
+  const missingRequired = checklist.filter((doc) => doc.required && !uploadedTypes.has(doc.type));
+  const canSubmit = form.applicantName.trim().length > 0 && !passportExpired && !applyMutation.isPending;
+  const steps = [
+    { id: 1, label: "Details" },
+    { id: 2, label: "Passport" },
+    { id: 3, label: "Documents" },
+    { id: 4, label: "Review" },
+  ];
+  const goNext = () => setStep((s) => Math.min(4, s + 1));
+  const goBack = () => setStep((s) => Math.max(1, s - 1));
+  const removeDocument = (key: string) => {
+    setDocuments((items) => items.filter((item) => item.key !== key));
+  };
+  const uploadForType = (type: string) => documents.filter((doc) => doc.type === type);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
@@ -276,7 +424,7 @@ export default function ProposalApplyPage() {
         className="border-b bg-white dark:bg-slate-900"
         style={{ borderBottomColor: `${primary}25` }}
       >
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
           {tenant!.logoUrl ? (
             <img src={tenant!.logoUrl} alt={tenant!.name} className="w-10 h-10 rounded-md object-cover" />
           ) : (
@@ -301,7 +449,7 @@ export default function ProposalApplyPage() {
         </div>
       </header>
 
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
 
         {/* Hero / proposal context */}
         <Card>
@@ -313,7 +461,7 @@ export default function ProposalApplyPage() {
               {proposal!.destinationCountry} {proposal!.visaType}
             </h1>
             <p className="text-muted-foreground">
-              Hi <span className="font-medium text-foreground">{proposal!.customerName}</span> — {tenant!.name} has prepared this application for you. Fill in the form below and we'll handle the rest.
+              Hi <span className="font-medium text-foreground">{proposal!.customerName}</span> — {tenant!.name} has prepared this application for you. Complete the steps below and upload your documents securely.
             </p>
             {proposal!.notes && (
               <div className="mt-4 p-3 rounded-md bg-muted/50 text-sm">
@@ -324,158 +472,501 @@ export default function ProposalApplyPage() {
           </CardContent>
         </Card>
 
-        {/* Document checklist preview */}
-        {checklist.length > 0 && (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div>
-                  <h2 className="text-lg font-semibold flex items-center gap-2">
-                    <ClipboardList className="w-5 h-5" style={{ color: primary }} />
-                    What you'll need to provide
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    These are the documents required for your visa. You can upload them after applying.
-                  </p>
-                </div>
-                <Badge variant="secondary">{checklist.length} items</Badge>
-              </div>
-              <ul className="grid sm:grid-cols-2 gap-2 mt-3">
-                {checklist.map((d) => (
-                  <li
-                    key={d.type}
-                    className="flex items-start gap-2 text-sm p-2 rounded-md hover:bg-muted/50"
-                    data-testid={`item-checklist-${d.type}`}
-                  >
-                    <div
-                      className="mt-0.5 w-4 h-4 rounded border flex-shrink-0"
-                      style={{ borderColor: d.required ? primary : "#cbd5e1" }}
-                    />
-                    <div className="min-w-0">
-                      <div className="font-medium">
-                        {d.name}
-                        {!d.required && <span className="text-muted-foreground font-normal text-xs ml-1">(optional)</span>}
-                      </div>
-                      <div className="text-xs text-muted-foreground">{d.description}</div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Apply form */}
         <Card>
           <CardContent className="pt-6">
-            <h2 className="text-lg font-semibold mb-1">Your details</h2>
-            <p className="text-sm text-muted-foreground mb-4">
-              Fields marked with <span className="text-red-500">*</span> are required. You can update everything else later from your portal.
-            </p>
-
-            <div className="grid sm:grid-cols-2 gap-3">
-              <div className="sm:col-span-2">
-                <Label htmlFor="apply-name">Full name (as on passport) <span className="text-red-500">*</span></Label>
-                <Input
-                  id="apply-name"
-                  value={form.applicantName}
-                  onChange={(e) => setForm({ ...form, applicantName: e.target.value })}
-                  data-testid="input-applicant-name"
-                />
-              </div>
-              <div>
-                <Label htmlFor="apply-dob">Date of birth</Label>
-                <Input
-                  id="apply-dob"
-                  type="date"
-                  value={form.applicantDob}
-                  onChange={(e) => setForm({ ...form, applicantDob: e.target.value })}
-                  data-testid="input-dob"
-                />
-              </div>
-              <div>
-                <Label htmlFor="apply-travel">Planned travel date</Label>
-                <Input
-                  id="apply-travel"
-                  type="date"
-                  value={form.travelDate}
-                  onChange={(e) => setForm({ ...form, travelDate: e.target.value })}
-                  data-testid="input-travel-date"
-                />
-              </div>
-              <div>
-                <Label htmlFor="apply-email">Email</Label>
-                <Input
-                  id="apply-email"
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  placeholder="you@example.com"
-                  data-testid="input-email"
-                />
-              </div>
-              <div>
-                <Label htmlFor="apply-phone">Phone</Label>
-                <Input
-                  id="apply-phone"
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  placeholder="+1 234 567 8900"
-                  data-testid="input-phone"
-                />
-              </div>
-              <div>
-                <Label htmlFor="apply-passport">Passport number</Label>
-                <Input
-                  id="apply-passport"
-                  value={form.passportNumber}
-                  onChange={(e) => setForm({ ...form, passportNumber: e.target.value.toUpperCase() })}
-                  placeholder="optional — fill if known"
-                  data-testid="input-passport-number"
-                />
-              </div>
-              <div>
-                <Label htmlFor="apply-nationality">Nationality</Label>
-                <Input
-                  id="apply-nationality"
-                  value={form.passportNationality}
-                  onChange={(e) => setForm({ ...form, passportNationality: e.target.value })}
-                  placeholder="e.g. Indian"
-                  data-testid="input-nationality"
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <Label htmlFor="apply-notes">Anything we should know?</Label>
-                <Textarea
-                  id="apply-notes"
-                  value={form.notes}
-                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                  rows={3}
-                  placeholder="Past visa rejections, urgent travel dates, special requirements…"
-                  data-testid="input-applicant-notes"
-                />
-              </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {steps.map((item) => {
+                const active = step === item.id;
+                const done = step > item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setStep(item.id)}
+                    className="flex items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-muted/50"
+                    style={{ borderColor: active || done ? `${primary}80` : undefined }}
+                    data-testid={`button-proposal-step-${item.id}`}
+                  >
+                    <span
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold"
+                      style={{
+                        backgroundColor: active || done ? primary : "hsl(var(--muted))",
+                        color: active || done ? "white" : "hsl(var(--muted-foreground))",
+                      }}
+                    >
+                      {done ? <Check className="h-4 w-4" /> : item.id}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold">{item.label}</span>
+                      <span className="block text-xs text-muted-foreground">Step {item.id} of 4</span>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            {step === 1 && (
+              <div>
+                <h2 className="text-lg font-semibold mb-1">Applicant details</h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Start with the contact and travel details your agency will use for this application.
+                </p>
+
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div className="sm:col-span-2">
+                    <Label htmlFor="apply-name">Full name (as on passport) <span className="text-red-500">*</span></Label>
+                    <Input
+                      id="apply-name"
+                      value={form.applicantName}
+                      onChange={(e) => setForm({ ...form, applicantName: e.target.value })}
+                      data-testid="input-applicant-name"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="apply-dob">Date of birth</Label>
+                    <Input
+                      id="apply-dob"
+                      type="date"
+                      value={form.applicantDob}
+                      onChange={(e) => setForm({ ...form, applicantDob: e.target.value })}
+                      data-testid="input-dob"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="apply-travel">Planned travel date</Label>
+                    <Input
+                      id="apply-travel"
+                      type="date"
+                      value={form.travelDate}
+                      onChange={(e) => setForm({ ...form, travelDate: e.target.value })}
+                      data-testid="input-travel-date"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="apply-email">Email</Label>
+                    <Input
+                      id="apply-email"
+                      type="email"
+                      value={form.email}
+                      onChange={(e) => setForm({ ...form, email: e.target.value })}
+                      placeholder="you@example.com"
+                      data-testid="input-email"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="apply-phone">Phone</Label>
+                    <Input
+                      id="apply-phone"
+                      value={form.phone}
+                      onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                      placeholder="+1 234 567 8900"
+                      data-testid="input-phone"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label htmlFor="apply-notes">Anything we should know?</Label>
+                    <Textarea
+                      id="apply-notes"
+                      value={form.notes}
+                      onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                      rows={3}
+                      placeholder="Past visa rejections, urgent travel dates, special requirements..."
+                      data-testid="input-applicant-notes"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {step === 2 && (
+              <div>
+                <h2 className="text-lg font-semibold mb-1">Passport scan</h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Upload a clear image of the current passport bio page. Expired passports cannot be submitted as the active passport.
+                </p>
+
+                <div className="grid lg:grid-cols-[0.85fr_1.15fr] gap-5">
+                  <div className="space-y-4">
+                    <label
+                      htmlFor="passport-upload"
+                      className="flex min-h-44 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed bg-muted/20 p-6 text-center transition-colors hover:bg-muted/40"
+                      style={{ borderColor: `${primary}70` }}
+                    >
+                      <input
+                        id="passport-upload"
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={(e) => handlePassportFile(e.target.files?.[0])}
+                        data-testid="input-passport-file"
+                      />
+                      {scanPassportMutation.isPending ? (
+                        <Loader2 className="mb-3 h-9 w-9 animate-spin" style={{ color: primary }} />
+                      ) : (
+                        <ScanLine className="mb-3 h-9 w-9" style={{ color: primary }} />
+                      )}
+                      <span className="text-sm font-semibold">
+                        {passportFileName || "Upload and scan passport"}
+                      </span>
+                      <span className="mt-1 text-xs text-muted-foreground">JPG, PNG, or HEIC under 8 MB</span>
+                    </label>
+
+                    {passportScanError && (
+                      <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
+                        {passportScanError}
+                      </div>
+                    )}
+
+                    {passportExpired && (
+                      <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
+                        This passport is expired. Please upload a valid current passport before submitting.
+                      </div>
+                    )}
+
+                    <div className="rounded-lg border p-4">
+                      <div className="mb-2 flex items-center justify-between">
+                        <div className="font-medium">Old passports</div>
+                        <Badge variant="secondary">{uploadForType("old_passport").length} uploaded</Badge>
+                      </div>
+                      <p className="mb-3 text-sm text-muted-foreground">
+                        Add old passports if they support your travel history.
+                      </p>
+                      <Input
+                        type="file"
+                        accept="image/*,application/pdf"
+                        multiple
+                        onChange={async (e) => {
+                          const files = Array.from(e.target.files ?? []);
+                          for (const file of files) {
+                            await addDocument(file, "old_passport", "Old passport", null, "Uploaded by customer");
+                          }
+                          e.currentTarget.value = "";
+                        }}
+                        data-testid="input-old-passports"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="passport-given">Given name</Label>
+                      <Input
+                        id="passport-given"
+                        value={form.passportGivenName}
+                        onChange={(e) => setForm({ ...form, passportGivenName: e.target.value })}
+                        data-testid="input-passport-given"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="passport-surname">Surname</Label>
+                      <Input
+                        id="passport-surname"
+                        value={form.passportSurname}
+                        onChange={(e) => setForm({ ...form, passportSurname: e.target.value })}
+                        data-testid="input-passport-surname"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="passport-middle">Middle name</Label>
+                      <Input
+                        id="passport-middle"
+                        value={form.passportMiddleName}
+                        onChange={(e) => setForm({ ...form, passportMiddleName: e.target.value })}
+                        data-testid="input-passport-middle"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="apply-passport">Passport number</Label>
+                      <Input
+                        id="apply-passport"
+                        value={form.passportNumber}
+                        onChange={(e) => setForm({ ...form, passportNumber: e.target.value.toUpperCase() })}
+                        data-testid="input-passport-number"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="apply-nationality">Nationality</Label>
+                      <Input
+                        id="apply-nationality"
+                        value={form.passportNationality}
+                        onChange={(e) => setForm({ ...form, passportNationality: e.target.value })}
+                        data-testid="input-nationality"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="passport-gender">Gender</Label>
+                      <select
+                        id="passport-gender"
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        value={form.passportGender}
+                        onChange={(e) => setForm({ ...form, passportGender: e.target.value as "" | "M" | "F" | "X" })}
+                        data-testid="select-passport-gender"
+                      >
+                        <option value="">Select</option>
+                        <option value="M">Male</option>
+                        <option value="F">Female</option>
+                        <option value="X">Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <Label htmlFor="passport-issue">Date of issue</Label>
+                      <Input
+                        id="passport-issue"
+                        type="date"
+                        value={form.passportDateOfIssue}
+                        onChange={(e) => setForm({ ...form, passportDateOfIssue: e.target.value })}
+                        data-testid="input-passport-issue"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="passport-expiry">Date of expiry</Label>
+                      <Input
+                        id="passport-expiry"
+                        type="date"
+                        min={todayIso()}
+                        value={form.passportDateOfExpiry}
+                        onChange={(e) => setForm({ ...form, passportDateOfExpiry: e.target.value })}
+                        data-testid="input-passport-expiry"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="passport-issue-place">Place of issue</Label>
+                      <Input
+                        id="passport-issue-place"
+                        value={form.passportPlaceOfIssue}
+                        onChange={(e) => setForm({ ...form, passportPlaceOfIssue: e.target.value })}
+                        data-testid="input-passport-place-issue"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="passport-birth-place">Place of birth</Label>
+                      <Input
+                        id="passport-birth-place"
+                        value={form.passportPlaceOfBirth}
+                        onChange={(e) => setForm({ ...form, passportPlaceOfBirth: e.target.value })}
+                        data-testid="input-passport-place-birth"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {step === 3 && (
+              <div>
+                <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold flex items-center gap-2">
+                      <ClipboardList className="w-5 h-5" style={{ color: primary }} />
+                      Document checklist
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      Upload documents requested by your agency for this visa type.
+                    </p>
+                  </div>
+                  <Badge variant="secondary">{documents.length} uploaded</Badge>
+                </div>
+
+                <div className="grid gap-3">
+                  {checklist.length === 0 ? (
+                    <div className="rounded-lg border p-5 text-sm text-muted-foreground">
+                      No checklist is attached to this proposal yet. You can still submit the application.
+                    </div>
+                  ) : checklist.map((item) => {
+                    const uploaded = uploadForType(item.type);
+                    return (
+                      <div
+                        key={item.type}
+                        className="rounded-lg border bg-background p-4"
+                        data-testid={`card-upload-${item.type}`}
+                      >
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="font-semibold">{item.name}</h3>
+                              {item.required ? (
+                                <Badge variant="outline">Required</Badge>
+                              ) : (
+                                <Badge variant="secondary">Optional</Badge>
+                              )}
+                              {uploaded.length > 0 && (
+                                <Badge className="bg-emerald-600 hover:bg-emerald-600">
+                                  <Check className="mr-1 h-3 w-3" /> Uploaded
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
+                          </div>
+                          <label className="inline-flex cursor-pointer items-center justify-center rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted/60">
+                            <Upload className="mr-2 h-4 w-4" />
+                            Upload
+                            <input
+                              type="file"
+                              accept="image/*,application/pdf"
+                              className="sr-only"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (file) await addDocument(file, item.type, item.name, null, "Checklist upload");
+                                e.currentTarget.value = "";
+                              }}
+                              data-testid={`input-upload-${item.type}`}
+                            />
+                          </label>
+                        </div>
+                        {uploaded.length > 0 && (
+                          <div className="mt-3 space-y-2">
+                            {uploaded.map((doc) => (
+                              <div key={doc.key} className="flex items-center justify-between gap-3 rounded-md bg-muted/40 px-3 py-2 text-sm">
+                                <span className="truncate">{doc.fileName}</span>
+                                <button
+                                  type="button"
+                                  className="rounded p-1 text-muted-foreground hover:bg-background hover:text-foreground"
+                                  onClick={() => removeDocument(doc.key)}
+                                  aria-label={`Remove ${doc.fileName}`}
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {step === 4 && (
+              <div>
+                <h2 className="text-lg font-semibold mb-1">Review and submit</h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Check the details once. After submission, your agency receives the application and uploads.
+                </p>
+
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div className="rounded-lg border p-4">
+                    <div className="mb-3 flex items-center gap-2 font-semibold">
+                      <Building2 className="h-4 w-4" style={{ color: primary }} />
+                      Application
+                    </div>
+                    <dl className="space-y-2 text-sm">
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-muted-foreground">Applicant</dt>
+                        <dd className="text-right font-medium">{form.applicantName || "Not entered"}</dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-muted-foreground">Destination</dt>
+                        <dd className="text-right font-medium">{proposal!.destinationCountry}</dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-muted-foreground">Visa type</dt>
+                        <dd className="text-right font-medium">{proposal!.visaType}</dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-muted-foreground">Passport</dt>
+                        <dd className="text-right font-medium">{form.passportNumber || "Not entered"}</dd>
+                      </div>
+                    </dl>
+                  </div>
+
+                  <div className="rounded-lg border p-4">
+                    <div className="mb-3 flex items-center gap-2 font-semibold">
+                      <FileText className="h-4 w-4" style={{ color: primary }} />
+                      Upload summary
+                    </div>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Current passport</span>
+                        <span className={uploadedTypes.has("passport") ? "font-medium text-emerald-600" : "font-medium"}>
+                          {uploadedTypes.has("passport") ? "Uploaded" : "Not uploaded"}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Old passports</span>
+                        <span className="font-medium">{uploadForType("old_passport").length}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Checklist documents</span>
+                        <span className="font-medium">{documents.filter((doc) => !["passport", "old_passport"].includes(doc.type)).length}</span>
+                      </div>
+                    </div>
+                    {missingRequired.length > 0 && (
+                      <div className="mt-4 rounded-md bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                        Missing required uploads: {missingRequired.map((doc) => doc.name).join(", ")}.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {proposal!.estimateAmountCents && proposal!.estimateAmountCents > 0 && (
+                  <div
+                    className="mt-4 rounded-lg border p-4"
+                    style={{ borderColor: `${primary}40`, backgroundColor: `${primary}08` }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md"
+                        style={{ backgroundColor: `${primary}20`, color: primary }}
+                      >
+                        <CreditCard className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <div className="font-semibold">Customer fee payment</div>
+                        <p className="text-sm text-muted-foreground">
+                          Estimate amount:{" "}
+                          <span className="font-semibold text-foreground">
+                            {formatEstimate(proposal!.estimateAmountCents, proposal!.currency)}
+                          </span>
+                          . The secure payment button appears immediately after you submit these details.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="mt-6 flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
               <div className="text-xs text-muted-foreground flex items-start gap-1.5">
                 <ShieldCheck className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 Your data is sent securely to {tenant!.name} only.
               </div>
-              <Button
-                size="lg"
-                onClick={() => applyMutation.mutate()}
-                disabled={!canSubmit || applyMutation.isPending}
-                style={{ backgroundColor: primary }}
-                data-testid="button-submit-application"
-              >
-                {applyMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <ArrowRight className="w-4 h-4 mr-2" />
+              <div className="flex flex-col-reverse gap-2 sm:flex-row">
+                {step > 1 && (
+                  <Button variant="outline" onClick={goBack} data-testid="button-step-back">
+                    Back
+                  </Button>
                 )}
-                Submit application
-              </Button>
+                {step < 4 ? (
+                  <Button
+                    onClick={goNext}
+                    style={{ backgroundColor: primary }}
+                    data-testid="button-step-next"
+                  >
+                    Continue <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    size="lg"
+                    onClick={() => applyMutation.mutate()}
+                    disabled={!canSubmit}
+                    style={{ backgroundColor: primary }}
+                    data-testid="button-submit-application"
+                  >
+                    {applyMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <ArrowRight className="w-4 h-4 mr-2" />
+                    )}
+                    Submit application
+                  </Button>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
