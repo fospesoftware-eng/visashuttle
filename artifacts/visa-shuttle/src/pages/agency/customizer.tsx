@@ -1,12 +1,14 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, ImagePlus, Loader2, Send, Sparkles, Upload, X } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CheckCircle2, History, ImagePlus, Loader2, Send, Sparkles, X } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -22,6 +24,17 @@ type Estimate = {
   phases: Array<{ name: string; duration: string; work: string }>;
   assumptions: string[];
   provider?: string;
+};
+
+type Ticket = {
+  id: string;
+  subject: string;
+  category: string;
+  status: string;
+  priority: string;
+  lastMessageAt: string | null;
+  lastMessageBy: string | null;
+  createdAt: string | null;
 };
 
 function fileToDataUrl(file: File): Promise<string> {
@@ -45,7 +58,27 @@ function formatMoney(cents: number, currency: string) {
   }
 }
 
-function estimateTicketBody(prompt: string, estimate: Estimate, imageName: string) {
+const STATUS_BADGE: Record<string, string> = {
+  open: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+  pending: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+  resolved: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+  closed: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+};
+
+function approvalLabel(status: string) {
+  if (status === "resolved" || status === "closed") return "Approved / completed";
+  if (status === "pending") return "Under SaaS admin review";
+  return "Submitted";
+}
+
+function parseCustomizerPrice(subject: string) {
+  const submitted = subject.match(/bid:\s*([^)]*)\)/i)?.[1]?.trim();
+  const estimated = subject.match(/estimate:\s*([^|)]*)/i)?.[1]?.trim();
+  return { submitted, estimated };
+}
+
+function estimateTicketBody(prompt: string, estimate: Estimate, imageName: string, bidDiscountPercent: number) {
+  const bidPriceCents = Math.round(estimate.priceCents * (1 - bidDiscountPercent / 100));
   return [
     "Customization request confirmed by agency.",
     "",
@@ -60,6 +93,9 @@ function estimateTicketBody(prompt: string, estimate: Estimate, imageName: strin
     `Timeline: ${estimate.timeline}`,
     `Estimated hours: ${estimate.estimatedHours}`,
     `Estimated price: ${formatMoney(estimate.priceCents, estimate.currency)}`,
+    `Negotiation bid discount: ${bidDiscountPercent}%`,
+    `Agency submitted bid price: ${formatMoney(bidPriceCents, estimate.currency)}`,
+    "Approval rule: SaaS admin must approve any negotiated bid before work starts.",
     "",
     "Development phases:",
     ...estimate.phases.map((p, index) => `${index + 1}. ${p.name} (${p.duration}) - ${p.work}`),
@@ -80,6 +116,23 @@ export default function AgencyCustomizerPage() {
   const [image, setImage] = useState<{ name: string; dataUrl: string; mimeType: string } | null>(null);
   const [estimate, setEstimate] = useState<Estimate | null>(null);
   const [submittedTicketId, setSubmittedTicketId] = useState<string | null>(null);
+  const [bidDiscountPercent, setBidDiscountPercent] = useState(0);
+
+  const ticketsQuery = useQuery<Ticket[]>({
+    queryKey: ["/api/agency", tenantId, "tickets"],
+    queryFn: async () => {
+      const r = await fetch(`/api/agency/${tenantId}/tickets`, { credentials: "include" });
+      if (!r.ok) throw new Error("Failed to load customization history");
+      return r.json();
+    },
+    enabled: !!tenantId,
+  });
+
+  const customizerTickets = (ticketsQuery.data ?? []).filter(
+    (ticket) => ticket.category === "feature_request" && ticket.subject.toLowerCase().startsWith("customization request:"),
+  );
+
+  const bidPriceCents = estimate ? Math.round(estimate.priceCents * (1 - bidDiscountPercent / 100)) : 0;
 
   const estimateMutation = useMutation({
     mutationFn: async () => {
@@ -93,6 +146,7 @@ export default function AgencyCustomizerPage() {
     onSuccess: (data) => {
       setEstimate(data);
       setSubmittedTicketId(null);
+      setBidDiscountPercent(0);
       toast({ title: "Estimate ready", description: "Review timeline and price before confirming." });
     },
     onError: (e: any) => toast({ title: "Could not estimate", description: e?.message ?? "Try again", variant: "destructive" }),
@@ -102,10 +156,10 @@ export default function AgencyCustomizerPage() {
     mutationFn: async () => {
       if (!estimate) throw new Error("Generate an estimate first.");
       const res = await apiRequest("POST", `/api/agency/${tenantId}/tickets`, {
-        subject: `Customization request: ${prompt.slice(0, 80)}`,
+        subject: `Customization request: ${prompt.slice(0, 60)} (estimate: ${formatMoney(estimate.priceCents, estimate.currency)} | bid: ${formatMoney(bidPriceCents, estimate.currency)})`,
         category: "feature_request",
         priority: estimate.effortLevel === "High" ? "high" : "normal",
-        body: estimateTicketBody(prompt, estimate, image?.name ?? ""),
+        body: estimateTicketBody(prompt, estimate, image?.name ?? "", bidDiscountPercent),
       });
       return res.json() as Promise<{ id: string }>;
     },
@@ -255,6 +309,36 @@ export default function AgencyCustomizerPage() {
                     <p className="mt-1 text-sm text-muted-foreground">{estimate.summary}</p>
                   </div>
 
+                  <div className="rounded-lg border bg-muted/20 p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-medium">Negotiation bid</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Agency can request up to 25% price modification. SaaS admin approval is required before development starts.
+                        </p>
+                      </div>
+                      <Badge variant="outline">{bidDiscountPercent}% off</Badge>
+                    </div>
+                    <div className="mt-4 space-y-3">
+                      <Slider
+                        value={[bidDiscountPercent]}
+                        min={0}
+                        max={25}
+                        step={1}
+                        onValueChange={(value) => setBidDiscountPercent(value[0] ?? 0)}
+                        data-testid="slider-customizer-negotiation-bid"
+                      />
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Estimated {formatMoney(estimate.priceCents, estimate.currency)}</span>
+                        <span>Maximum 25%</span>
+                      </div>
+                      <div className="rounded-lg bg-background p-3">
+                        <p className="text-xs text-muted-foreground">Submitted bid price</p>
+                        <p className="text-xl font-bold">{formatMoney(bidPriceCents, estimate.currency)}</p>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
                     <p className="text-sm font-medium">Development phases</p>
                     {estimate.phases.map((phase, index) => (
@@ -296,6 +380,72 @@ export default function AgencyCustomizerPage() {
             </CardContent>
           </Card>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <History className="h-4 w-4 text-primary" />
+              Past customizer actions
+            </CardTitle>
+            <CardDescription>
+              Track submitted customization requests, bid prices, and SaaS admin approval status.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {ticketsQuery.isLoading ? (
+              <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+                <Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin opacity-60" />
+                Loading customization history...
+              </div>
+            ) : customizerTickets.length === 0 ? (
+              <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+                <Sparkles className="mx-auto mb-3 h-8 w-8 opacity-50" />
+                No customization requests submitted yet.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {customizerTickets.map((ticket) => {
+                  const prices = parseCustomizerPrice(ticket.subject);
+                  const cleanSubject = ticket.subject.replace(/\s*\(estimate:.*$/i, "");
+                  return (
+                    <div key={ticket.id} className="rounded-lg border p-4">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">{cleanSubject}</p>
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <span>Ticket {ticket.id.slice(0, 8)}</span>
+                            {ticket.createdAt && <span>Submitted {formatDistanceToNow(new Date(ticket.createdAt), { addSuffix: true })}</span>}
+                            {ticket.lastMessageBy && <span>Last update by {ticket.lastMessageBy}</span>}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="secondary" className={STATUS_BADGE[ticket.status] ?? ""}>
+                            {ticket.status}
+                          </Badge>
+                          <Badge variant="outline">{approvalLabel(ticket.status)}</Badge>
+                        </div>
+                      </div>
+                      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                        <div className="rounded-lg bg-muted/40 p-3">
+                          <p className="text-xs text-muted-foreground">Estimated price</p>
+                          <p className="font-semibold">{prices.estimated ?? "Pending"}</p>
+                        </div>
+                        <div className="rounded-lg bg-muted/40 p-3">
+                          <p className="text-xs text-muted-foreground">Submitted bid</p>
+                          <p className="font-semibold">{prices.submitted ?? "Pending"}</p>
+                        </div>
+                        <div className="rounded-lg bg-muted/40 p-3">
+                          <p className="text-xs text-muted-foreground">Price approval</p>
+                          <p className="font-semibold">{approvalLabel(ticket.status)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </DashboardLayout>
   );
