@@ -1056,3 +1056,20 @@ export const insertTenantSubscriptionInvoiceSchema = createInsertSchema(tenantSu
 });
 export type InsertTenantSubscriptionInvoice = z.infer<typeof insertTenantSubscriptionInvoiceSchema>;
 export type TenantSubscriptionInvoice = typeof tenantSubscriptionInvoices.$inferSelect;
+
+// ── Public contact submissions (homepage form, etc.) ────────────────────────────────────────────────────────
+export const contacts = pgTable("contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone"),
+  source: text("source").default("website"), // website, landing, business, help
+  pageUrl: text("page_url"),
+  message: text("message"),
+  status: text("status").notNull().default("new"), // new, contacted, closed
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export const insertContactSchema = createInsertSchema(contacts).omit({ id: true, createdAt: true });
+export type InsertContact = z.infer<typeof insertContactSchema>;
+export type Contact = typeof contacts.$inferSelect;
