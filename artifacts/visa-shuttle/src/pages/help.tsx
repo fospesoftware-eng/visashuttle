@@ -50,7 +50,7 @@ const travelerSteps: Step[] = [
       "No card details required to start",
       "Works on mobile, tablet and desktop",
     ],
-    image: "/tutorial-assets/01-home.jpg",
+    image: "/help-assets/01-home.jpg",
     imageAlt: "Visa Shuttle home page showing live visa scores",
     icon: PlayCircle,
   },
@@ -64,7 +64,7 @@ const travelerSteps: Step[] = [
       "Tap \"Send Verification Code\" — we'll text you a 4-digit code",
       "Accept the Terms and Privacy Policy and you're in",
     ],
-    image: "/tutorial-assets/02-check.jpg",
+    image: "/help-assets/02-check.jpg",
     imageAlt: "Sign-up form with phone verification",
     icon: UserPlus,
   },
@@ -92,7 +92,7 @@ const travelerSteps: Step[] = [
       "Get a downloadable PDF report you can share with an agent",
       "Includes document checklist and improvement plan",
     ],
-    image: "/tutorial-assets/03-deep-check.jpg",
+    image: "/help-assets/03-deep-check.jpg",
     imageAlt: "Deep Check upgrade page",
     icon: ShieldCheck,
   },
@@ -107,7 +107,7 @@ const travelerSteps: Step[] = [
       "Save profile to autofill future checks",
       "Get email + SMS notifications when a new visa rule affects you",
     ],
-    image: "/tutorial-assets/05-pricing.jpg",
+    image: "/help-assets/05-pricing.jpg",
     imageAlt: "Pricing page showing Basic and Deep plans",
     icon: LayoutDashboard,
   },
@@ -124,7 +124,7 @@ const agencySteps: Step[] = [
       "Step 2 — Admin account: name, email, password",
       "Step 3 — Review and launch — your portal goes live immediately",
     ],
-    image: "/tutorial-assets/06-agency-register.jpg",
+    image: "/help-assets/06-agency-register.jpg",
     imageAlt: "Agency registration wizard",
     icon: UserPlus,
   },
@@ -138,7 +138,7 @@ const agencySteps: Step[] = [
       "Role-based access: Owner, Manager, Staff",
       "Mobile responsive — manage cases from your phone",
     ],
-    image: "/tutorial-assets/07-signin.jpg",
+    image: "/help-assets/07-signin.jpg",
     imageAlt: "Sign in screen with agency login button",
     icon: ShieldCheck,
   },
@@ -153,7 +153,7 @@ const agencySteps: Step[] = [
       "Notes, tasks, and reminders per lead",
       "Send Proposals (with online accept + signature) directly from a lead",
     ],
-    image: "/tutorial-assets/04-business.jpg",
+    image: "/help-assets/04-business.jpg",
     imageAlt: "Visa Shuttle for Business landing page",
     icon: Users,
   },
@@ -181,7 +181,7 @@ const agencySteps: Step[] = [
       "Receipts auto-emailed; ledger updated in real time",
       "Export GSTR-1 ready CSV for your accountant",
     ],
-    image: "/tutorial-assets/05-pricing.jpg",
+    image: "/help-assets/05-pricing.jpg",
     imageAlt: "Plans and pricing surface",
     icon: CircleDollarSign,
   },
@@ -196,7 +196,7 @@ const agencySteps: Step[] = [
       "Bearer-token auth, scoped keys, 60 req/min rate limit",
       "Wallet-based billing with detailed usage logs",
     ],
-    image: "/tutorial-assets/08-api-pricing.jpg",
+    image: "/help-assets/08-api-pricing.jpg",
     imageAlt: "Pay-per-call API pricing page",
     icon: KeyRound,
   },
@@ -321,7 +321,7 @@ function StepCard({ step }: { step: Step }) {
   );
 }
 
-export default function TutorialPage() {
+export default function HelpPage() {
   const [tab, setTab] = useState<"travelers" | "agencies">("travelers");
 
   useEffect(() => {
@@ -347,7 +347,7 @@ export default function TutorialPage() {
             className="mb-4 border-0 text-white"
             style={{ background: BRAND_GRADIENT }}
           >
-            Tutorial &amp; FAQ
+            Help &amp; FAQ
           </Badge>
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
             Get up and running in minutes
