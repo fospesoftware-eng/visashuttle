@@ -106,6 +106,14 @@ export default function ProposalsPage() {
     if (typeof window === "undefined") return "";
     return new URLSearchParams(window.location.search).get("leadId") ?? "";
   }, [location]);
+  const seedDestinationParam = useMemo(() => {
+    if (typeof window === "undefined") return "";
+    return new URLSearchParams(window.location.search).get("destinationCountry") ?? "";
+  }, [location]);
+  const seedVisaTypeParam = useMemo(() => {
+    if (typeof window === "undefined") return "";
+    return new URLSearchParams(window.location.search).get("visaType") ?? "";
+  }, [location]);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -177,6 +185,8 @@ export default function ProposalsPage() {
               staff={staffForSelect}
               agencyPhoneCode={agencyPhoneCode}
               initialLead={leadQuery.data ?? null}
+              initialDestinationCountry={seedDestinationParam}
+              initialVisaType={seedVisaTypeParam}
               onCreated={(p) => {
                 setCreateOpen(false);
                 if (leadIdParam) setLocation("/app/proposals", { replace: true });
@@ -375,13 +385,15 @@ export default function ProposalsPage() {
 // =====================================================================
 
 function ProposalCreateDialog({
-  tenantId, defaultAssignee, staff, agencyPhoneCode, initialLead, onCreated,
+  tenantId, defaultAssignee, staff, agencyPhoneCode, initialLead, initialDestinationCountry, initialVisaType, onCreated,
 }: {
   tenantId: string;
   defaultAssignee: string;
   staff: StaffMember[];
   agencyPhoneCode: string;
   initialLead: Lead | null;
+  initialDestinationCountry: string;
+  initialVisaType: string;
   onCreated: (p: Proposal) => void;
 }) {
   const { toast } = useToast();
@@ -427,6 +439,15 @@ function ProposalCreateDialog({
       assignedTo: f.assignedTo || defaultAssignee,
     }));
   }, [initialLead, defaultAssignee]);
+
+  useEffect(() => {
+    if (!initialDestinationCountry && !initialVisaType) return;
+    setForm((f) => ({
+      ...f,
+      destinationCountry: f.destinationCountry || initialDestinationCountry,
+      visaType: f.visaType || initialVisaType,
+    }));
+  }, [initialDestinationCountry, initialVisaType]);
 
   const customerQuery = `${form.customerName} ${form.customerEmail}`.trim().toLowerCase();
   const customerMatches = useMemo(() => {

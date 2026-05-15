@@ -1571,23 +1571,33 @@ export async function registerRoutes(
       destinationCountry, visaType, notes, leadId,
       expiresInDays, estimateAmountCents,
     } = req.body ?? {};
+    const linkedLead = leadId ? await storage.getLead(String(leadId)) : undefined;
+    if (leadId && (!linkedLead || linkedLead.tenantId !== tenantId)) {
+      return res.status(404).json({ error: "Originating lead not found for this agency." });
+    }
+    const effectiveDestinationCountry = typeof destinationCountry === "string" && destinationCountry.trim()
+      ? destinationCountry.trim()
+      : linkedLead?.destinationCountry?.trim() || "";
+    const effectiveVisaType = typeof visaType === "string" && visaType.trim()
+      ? visaType.trim()
+      : linkedLead?.visaType?.trim() || "";
 
     if (!customerName || typeof customerName !== "string" || !customerName.trim()) {
       return res.status(400).json({ error: "Customer name is required" });
     }
-    if (!destinationCountry || typeof destinationCountry !== "string" || !destinationCountry.trim()) {
+    if (!effectiveDestinationCountry) {
       return res.status(400).json({ error: "Destination country is required" });
     }
-    if (!visaType || typeof visaType !== "string" || !visaType.trim()) {
+    if (!effectiveVisaType) {
       return res.status(400).json({ error: "Visa type is required" });
     }
     // Defense-in-depth: reject country↔visa-type mismatches that the
     // structured selectors should have prevented (e.g. "Schengen Visa" for
     // Algeria). The shared catalog is the single source of truth.
-    if (!isValidVisaTypeForCountry(destinationCountry.trim(), visaType.trim())) {
-      const allowed = getCountryVisaTypes(destinationCountry.trim()).slice(0, 6).join(", ");
+    if (!isValidVisaTypeForCountry(effectiveDestinationCountry, effectiveVisaType)) {
+      const allowed = getCountryVisaTypes(effectiveDestinationCountry).slice(0, 6).join(", ");
       return res.status(400).json({
-        error: `"${visaType.trim()}" is not a recognised visa type for ${destinationCountry.trim()}. Try one of: ${allowed}…`,
+        error: `"${effectiveVisaType}" is not a recognised visa type for ${effectiveDestinationCountry}. Try one of: ${allowed}…`,
       });
     }
 
@@ -1619,17 +1629,24 @@ export async function registerRoutes(
       tenantId,
       token: generateProposalToken(),
       createdBy,
-      leadId: leadId ?? null,
+      leadId: linkedLead?.id ?? null,
       customerName: customerName.trim(),
       customerEmail: customerEmail?.trim() || null,
       customerPhone: customerPhone?.trim() || null,
-      destinationCountry: destinationCountry.trim(),
-      visaType: visaType.trim(),
+      destinationCountry: effectiveDestinationCountry,
+      visaType: effectiveVisaType,
       notes: notes?.trim() || null,
       estimateAmountCents: estCents,
       status: "sent",
       expiresAt,
     });
+    if (linkedLead) {
+      await storage.updateLead(linkedLead.id, {
+        stage: "proposal",
+        destinationCountry: effectiveDestinationCountry,
+        visaType: effectiveVisaType,
+      });
+    }
 
     await storage.createActivityLog({
       tenantId,
@@ -1637,7 +1654,7 @@ export async function registerRoutes(
       action: "proposal.created",
       entityType: "proposal",
       entityId: proposal.id,
-      details: { customerName: proposal.customerName, destinationCountry, visaType },
+      details: { customerName: proposal.customerName, destinationCountry: effectiveDestinationCountry, visaType: effectiveVisaType, leadId: linkedLead?.id ?? null },
     });
 
     res.status(201).json(proposal);
@@ -1927,6 +1944,13 @@ export async function registerRoutes(
       notes: notes?.trim() || null,
       readinessScore: 0,
     });
+    if (proposal.leadId) {
+      await storage.updateLead(proposal.leadId, {
+        stage: "won",
+        destinationCountry: proposal.destinationCountry,
+        visaType: proposal.visaType,
+      });
+    }
 
     await storage.updateProposal(proposal.id, {
       status: "applied",

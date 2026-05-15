@@ -539,6 +539,8 @@ export default function LeadsPage() {
 
   const convertToProposal = (lead: Lead) => {
     const params = new URLSearchParams({ leadId: lead.id });
+    if (lead.destinationCountry) params.set("destinationCountry", lead.destinationCountry);
+    if (lead.visaType) params.set("visaType", lead.visaType);
     setLocation(`/app/proposals?${params.toString()}`);
   };
 
