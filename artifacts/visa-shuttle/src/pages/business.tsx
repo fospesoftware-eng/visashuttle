@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { 
   Plane, Shield, Zap, FileCheck, Brain, Users, 
-  CheckCircle, ArrowRight, Globe, Clock, Star
+  CheckCircle, ArrowRight, Globe, Clock, Star, Code2, WalletCards, KeyRound, Activity
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -65,6 +65,19 @@ const testimonials = [
     role: "CEO, Wanderlust Agency",
     avatar: "MR"
   }
+];
+
+const apiUseCases = [
+  "Embed AI visa eligibility scores into your own app",
+  "Run Deep Check and visa-requirement APIs without using the full agency CRM",
+  "Create reseller API keys for partner agencies or travel portals",
+  "Track usage, wallet balance, and endpoint pricing from one console",
+];
+
+const apiPlans = [
+  { name: "Deep Check API", price: "Pay per analysis", icon: Brain, description: "Embassy-style risk scoring, document gaps, and improvement guidance." },
+  { name: "Visa Requirements API", price: "Pay per lookup", icon: FileCheck, description: "Structured entry requirements and checklist data for customer journeys." },
+  { name: "Reseller Keys", price: "Usage wallet", icon: KeyRound, description: "Issue scoped keys and monitor usage across branches or partner brands." },
 ];
 
 export default function BusinessPage() {
@@ -140,6 +153,101 @@ export default function BusinessPage() {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="business-api" className="py-20 md:py-32 bg-background">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary mb-5">
+                <Code2 className="h-4 w-4" />
+                Business API - Pay as you go
+              </div>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">
+                Use Visa Shuttle AI without moving your whole operation
+              </h2>
+              <p className="text-lg text-muted-foreground mb-6">
+                Standalone API plans let businesses add visa intelligence to existing websites, CRMs, booking engines, and partner portals. Add credits, create API keys, and pay only for the calls you use.
+              </p>
+              <div className="grid gap-3 mb-8">
+                {apiUseCases.map((item) => (
+                  <div key={item} className="flex items-start gap-3 rounded-lg border bg-card p-3">
+                    <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <span className="text-sm text-muted-foreground">{item}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Link href="/agency-register">
+                  <Button size="lg" className="gap-2" data-testid="button-business-api-start">
+                    Start API wallet
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </Link>
+                <Link href="/docs/api">
+                  <Button size="lg" variant="outline" className="gap-2" data-testid="button-business-api-docs">
+                    View API docs
+                    <Code2 className="h-4 w-4" />
+                  </Button>
+                </Link>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border bg-card p-4 shadow-sm">
+              <div className="grid gap-4">
+                <div className="rounded-xl border bg-muted/30 p-5">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Wallet balance</p>
+                      <p className="text-3xl font-bold">Pay-as-you-go</p>
+                    </div>
+                    <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                      <WalletCards className="h-6 w-6" />
+                    </div>
+                  </div>
+                  <div className="mt-5 grid grid-cols-3 gap-3 text-center">
+                    <div className="rounded-lg bg-background p-3">
+                      <p className="text-xs text-muted-foreground">Keys</p>
+                      <p className="font-semibold">Scoped</p>
+                    </div>
+                    <div className="rounded-lg bg-background p-3">
+                      <p className="text-xs text-muted-foreground">Usage</p>
+                      <p className="font-semibold">Live</p>
+                    </div>
+                    <div className="rounded-lg bg-background p-3">
+                      <p className="text-xs text-muted-foreground">Billing</p>
+                      <p className="font-semibold">Credits</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-3">
+                  {apiPlans.map((plan) => (
+                    <div key={plan.name} className="flex items-start gap-4 rounded-xl border bg-background p-4" data-testid={`card-api-plan-${plan.name.toLowerCase().replace(/\s+/g, '-')}`}>
+                      <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                        <plan.icon className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-semibold">{plan.name}</h3>
+                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                            {plan.price}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-sm text-muted-foreground">{plan.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2 rounded-xl border bg-primary/5 p-4 text-sm text-muted-foreground">
+                  <Activity className="h-4 w-4 text-primary" />
+                  Monitor every endpoint call, spend, and partner key in the Business API dashboard.
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>

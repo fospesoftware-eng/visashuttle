@@ -31,6 +31,7 @@ interface NavItem {
   icon: React.ElementType;
   label: string;
   href: string;
+  badge?: string;
   children?: NavItem[];
 }
 
@@ -81,7 +82,7 @@ const agencyNavItems: NavItem[] = [
   },
   { icon: BarChart3, label: "Reports", href: "/app/reports" },
   { icon: Globe, label: "Visa Check", href: "/app/visa-check" },
-  { icon: Sparkles, label: "Customizer", href: "/app/customizer" },
+  { icon: Sparkles, label: "Customizer", href: "/app/customizer", badge: "Beta" },
   {
     // Agency API Platform — paid pay-per-call public APIs the agency can resell.
     icon: Briefcase, label: "Business", href: "/app/business/api",
@@ -265,7 +266,16 @@ export function DashboardLayout({ children, type }: DashboardLayoutProps) {
                         data-testid={testId}
                       >
                         <item.icon className="w-5 h-5 flex-shrink-0" />
-                        {!collapsed && <span className="truncate">{item.label}</span>}
+                        {!collapsed && (
+                          <>
+                            <span className="truncate">{item.label}</span>
+                            {item.badge && (
+                              <span className="ml-auto rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-normal text-primary">
+                                {item.badge}
+                              </span>
+                            )}
+                          </>
+                        )}
                       </a>
                     </Link>
                     {hasChildren && !collapsed && (
@@ -406,6 +416,11 @@ export function DashboardLayout({ children, type }: DashboardLayoutProps) {
                     >
                       <item.icon className="w-5 h-5 flex-shrink-0" />
                       <span>{item.label}</span>
+                      {item.badge && (
+                        <span className="ml-auto rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-normal text-primary">
+                          {item.badge}
+                        </span>
+                      )}
                     </a>
                   </Link>
                   {hasChildren && (
