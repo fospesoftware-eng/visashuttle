@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { getCountryVisaConfig } from "@/data/country-visa-types";
+import { PhoneInput, defaultPhoneCodeFrom } from "@/components/phone-input";
 import type {
   FeeTemplate, InvoiceSettings, Invoice, InvoiceItem, Payment, Case,
 } from "@workspace/db";
@@ -209,7 +210,6 @@ function PaymentsTab({
   const { data: settings } = useQuery<InvoiceSettings | null>({
     queryKey: ["/api/tenants", tenantId, "invoice-settings"],
   });
-
   const [methodFilter, setMethodFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -1128,6 +1128,8 @@ function ComposeInvoiceDialog({
   const { data: settings } = useQuery<InvoiceSettings | null>({
     queryKey: ["/api/tenants", tenantId, "invoice-settings"],
   });
+  const { data: authData } = useCurrentUser();
+  const agencyPhoneCode = defaultPhoneCodeFrom((authData?.tenant as any)?.contactPhone);
 
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
@@ -1338,7 +1340,12 @@ function ComposeInvoiceDialog({
             </div>
             <div className="space-y-2">
               <Label>Phone</Label>
-              <Input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} data-testid="input-customer-phone" />
+              <PhoneInput
+                value={customerPhone}
+                onChange={setCustomerPhone}
+                defaultCountryCode={agencyPhoneCode}
+                testId="input-customer-phone"
+              />
             </div>
             <div className="space-y-2">
               <Label>Destination country</Label>
@@ -2603,7 +2610,12 @@ function InvoiceSettingsTab({ tenantId }: { tenantId: string }) {
             </div>
             <div className="space-y-2">
               <Label>Phone</Label>
-              <Input value={form.companyPhone} onChange={(e) => setForm({ ...form, companyPhone: e.target.value })} data-testid="input-company-phone" />
+              <PhoneInput
+                value={form.companyPhone}
+                onChange={(companyPhone) => setForm({ ...form, companyPhone })}
+                defaultCountryCode={defaultPhoneCodeFrom(form.companyPhone)}
+                testId="input-company-phone"
+              />
             </div>
             <div className="space-y-2">
               <Label>Tax ID</Label>

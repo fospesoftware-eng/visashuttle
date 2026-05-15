@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, Search, MoreVertical, Mail, Phone, Loader2, AlertCircle, Briefcase, GripVertical, MapPin, UserCog, User, Globe2, StickyNote, UserPlus } from "lucide-react";
+import { Plus, Search, MoreVertical, Mail, Phone, Loader2, AlertCircle, Briefcase, GripVertical, MapPin, UserCog, User, Globe2, StickyNote, UserPlus, ClipboardList } from "lucide-react";
 import { getCountryVisaConfig } from "@/data/country-visa-types";
 import { Combobox, type ComboboxOption } from "@/components/combobox";
 import {
@@ -55,6 +55,7 @@ import {
 } from "@/components/ui/select";
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { EmptyState } from "@/components/empty-state";
+import { PhoneInput, defaultPhoneCodeFrom } from "@/components/phone-input";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -131,6 +132,7 @@ interface LeadCardContentProps {
   onEdit: (lead: Lead) => void;
   onCreateCustomer: (lead: Lead) => void;
   onConvert: (lead: Lead) => void;
+  onConvertProposal: (lead: Lead) => void;
   onDelete: (id: string) => void;
   onMove: (id: string, stage: string) => void;
   onReassign?: (id: string, userId: string) => void;
@@ -139,7 +141,7 @@ interface LeadCardContentProps {
   assigneeName?: string | null;
 }
 
-function LeadCardBody({ lead, onEdit, onCreateCustomer, onConvert, onDelete, onMove, onReassign, currentStage, staff = [], assigneeName }: LeadCardContentProps) {
+function LeadCardBody({ lead, onEdit, onCreateCustomer, onConvert, onConvertProposal, onDelete, onMove, onReassign, currentStage, staff = [], assigneeName }: LeadCardContentProps) {
   return (
     <div className="p-3 rounded-xl bg-background/95 shadow-sm hover-elevate cursor-grab active:cursor-grabbing space-y-2 border border-border/40 select-none">
       <div className="flex items-start justify-between gap-2">
@@ -184,6 +186,13 @@ function LeadCardBody({ lead, onEdit, onCreateCustomer, onConvert, onDelete, onM
             >
               <Briefcase className="w-3.5 h-3.5 mr-2" />
               Convert to Application
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onConvertProposal(lead)}
+              data-testid={`button-convert-proposal-lead-${lead.id}`}
+            >
+              <ClipboardList className="w-3.5 h-3.5 mr-2" />
+              Convert to Proposal
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <p className="text-xs text-muted-foreground px-2 py-1">Move to stage</p>
@@ -292,6 +301,7 @@ export default function LeadsPage() {
   const { data: authData } = useCurrentUser();
   const tenantId = authData?.user?.tenantId;
   const currentUserId = authData?.user?.id;
+  const agencyPhoneCode = defaultPhoneCodeFrom((authData?.tenant as any)?.contactPhone);
   const [convertForm, setConvertForm] = useState({ visaType: "", destinationCountry: "", priority: "normal" });
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -328,11 +338,19 @@ export default function LeadsPage() {
     enabled: !!tenantId,
   });
   const staff: StaffMember[] = useMemo(
-    () => staffRaw
+    () => {
+      const team = staffRaw
       .filter((u: any) => ["agency_owner", "agency_manager", "agency_staff"].includes(u.role))
-      .map((u: any) => ({ id: u.id, name: u.name, role: u.role })),
-    [staffRaw],
+      .map((u: any) => ({ id: u.id, name: u.name, role: u.role }));
+      const me = authData?.user;
+      if (me?.id && !team.some((u) => u.id === me.id)) {
+        team.unshift({ id: me.id, name: me.name || me.email || "You", role: me.role });
+      }
+      return team;
+    },
+    [staffRaw, authData?.user?.id, authData?.user?.name, authData?.user?.email, authData?.user?.role],
   );
+  const effectiveLeadAssignee = form.assignedTo || currentUserId || "";
   // Look up an assignee's display name by id. Falls back to "Unassigned"
   // (which should never happen for newly-created leads now that the API
   // requires it, but old rows may still have a null assignee).
@@ -461,14 +479,15 @@ export default function LeadsPage() {
       toast({ title: "Required fields", description: "Name and email are required.", variant: "destructive" });
       return;
     }
-    if (!form.assignedTo) {
+    if (!effectiveLeadAssignee) {
       toast({ title: "Assignee required", description: "Pick a team member who'll own this lead.", variant: "destructive" });
       return;
     }
+    const payload = { ...form, assignedTo: effectiveLeadAssignee };
     if (editLead) {
-      updateMutation.mutate({ id: editLead.id, data: form });
+      updateMutation.mutate({ id: editLead.id, data: payload });
     } else {
-      createMutation.mutate(form);
+      createMutation.mutate(payload);
     }
   };
 
@@ -505,6 +524,11 @@ export default function LeadsPage() {
       destinationCountry: lead.destinationCountry ?? "",
       priority: "normal",
     });
+  };
+
+  const convertToProposal = (lead: Lead) => {
+    const params = new URLSearchParams({ leadId: lead.id });
+    setLocation(`/app/proposals?${params.toString()}`);
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -570,7 +594,12 @@ export default function LeadsPage() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="lead-phone">Phone</Label>
-                      <Input id="lead-phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+1 234 567 8900" data-testid="input-lead-phone" />
+                      <PhoneInput
+                        value={form.phone}
+                        onChange={(phone) => setForm({ ...form, phone })}
+                        defaultCountryCode={agencyPhoneCode}
+                        testId="input-lead-phone"
+                      />
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -642,7 +671,7 @@ export default function LeadsPage() {
                   <div className="space-y-2">
                     <Label>Assigned Team Member <span className="text-red-500">*</span></Label>
                     <Select
-                      value={form.assignedTo}
+                      value={effectiveLeadAssignee}
                       onValueChange={(v) => setForm({ ...form, assignedTo: v })}
                     >
                       <SelectTrigger data-testid="select-lead-assignee">
@@ -753,6 +782,7 @@ export default function LeadsPage() {
                               onEdit={openEdit}
                               onCreateCustomer={(l) => createCustomerMutation.mutate(l)}
                               onConvert={openConvert}
+                              onConvertProposal={convertToProposal}
                               onDelete={(id) => setDeleteLeadId(id)}
                               onMove={(id, s) => moveStageMutation.mutate({ id, stage: s })}
                               onReassign={(id, userId) => updateMutation.mutate({ id, data: { assignedTo: userId } as Partial<Lead> })}
@@ -776,6 +806,7 @@ export default function LeadsPage() {
                     onEdit={() => {}}
                     onCreateCustomer={() => {}}
                     onConvert={() => {}}
+                    onConvertProposal={() => {}}
                     onDelete={() => {}}
                     onMove={() => {}}
                     currentStage={activeDragLead.stage}

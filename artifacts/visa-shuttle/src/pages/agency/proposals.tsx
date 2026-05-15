@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Link as LinkIcon, QrCode, Trash2, Copy, ExternalLink,
-  Loader2, Send, ClipboardList, MoreVertical, Search, AlertCircle,
+  Loader2, Send, ClipboardList, MoreVertical, Search, AlertCircle, X,
 } from "lucide-react";
+import { useLocation } from "wouter";
 import QRCode from "qrcode";
 
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
@@ -29,11 +31,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { EmptyState } from "@/components/empty-state";
+import { PhoneInput, defaultPhoneCodeFrom } from "@/components/phone-input";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getDocumentChecklist } from "@/data/document-checklists";
-import type { Proposal } from "@workspace/db";
+import type { Lead, Proposal } from "@workspace/db";
 import { COUNTRIES as POPULAR_COUNTRIES, VISA_TYPES as GENERIC_VISA_TYPES } from "@/shared/destinations";
 import { getCountryVisaConfig, getCountryVisaTypes } from "@/data/country-visa-types";
 import { Combobox, type ComboboxOption } from "@/components/combobox";
@@ -47,6 +50,30 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 type StaffMember = { id: string; name: string; role: string };
+type CustomerOption = {
+  id: string;
+  name: string | null;
+  email: string;
+  phone: string | null;
+  caseCount?: number;
+  latestPassportNumber?: string | null;
+};
+type ProposalFeeItem = {
+  key: string;
+  description: string;
+  category: string;
+  quantity: string;
+  unitPrice: string;
+};
+
+const FEE_CATEGORIES = [
+  { value: "visa_fee", label: "Visa Fees" },
+  { value: "agency_fee", label: "Agency Fees" },
+  { value: "government_fee", label: "Government Fees" },
+  { value: "service_charge", label: "Service Charge" },
+  { value: "gst", label: "GST" },
+  { value: "other", label: "Other" },
+];
 
 // Country options for the searchable destination picker — built once at module
 // scope from the global master, with flag emojis from the per-country wizard
@@ -72,7 +99,13 @@ export default function ProposalsPage() {
   const user = me?.user;
   const tenant = me?.tenant;
   const { toast } = useToast();
+  const [location, setLocation] = useLocation();
   const tenantId = tenant?.id ?? user?.tenantId ?? "";
+  const agencyPhoneCode = defaultPhoneCodeFrom((tenant as any)?.contactPhone);
+  const leadIdParam = useMemo(() => {
+    if (typeof window === "undefined") return "";
+    return new URLSearchParams(window.location.search).get("leadId") ?? "";
+  }, [location]);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -89,6 +122,22 @@ export default function ProposalsPage() {
     queryKey: ["/api/tenants", tenantId, "staff"],
     enabled: !!tenantId,
   });
+  const staffForSelect = useMemo(() => {
+    const team = (staffQuery.data ?? []).filter((u) => ["agency_owner", "agency_manager", "agency_staff"].includes(u.role));
+    if (user?.id && !team.some((u) => u.id === user.id)) {
+      return [{ id: user.id, name: user.name || user.email || "You", role: user.role }, ...team];
+    }
+    return team;
+  }, [staffQuery.data, user?.id, user?.name, user?.email, user?.role]);
+
+  const leadQuery = useQuery<Lead>({
+    queryKey: ["/api/leads", leadIdParam],
+    enabled: !!leadIdParam,
+  });
+
+  useEffect(() => {
+    if (leadIdParam) setCreateOpen(true);
+  }, [leadIdParam]);
 
   const filtered = useMemo(() => {
     const list = proposalsQuery.data ?? [];
@@ -125,9 +174,12 @@ export default function ProposalsPage() {
             <ProposalCreateDialog
               tenantId={tenantId}
               defaultAssignee={user?.id ?? ""}
-              staff={staffQuery.data ?? []}
+              staff={staffForSelect}
+              agencyPhoneCode={agencyPhoneCode}
+              initialLead={leadQuery.data ?? null}
               onCreated={(p) => {
                 setCreateOpen(false);
+                if (leadIdParam) setLocation("/app/proposals", { replace: true });
                 setShareProposal(p);
               }}
             />
@@ -323,14 +375,17 @@ export default function ProposalsPage() {
 // =====================================================================
 
 function ProposalCreateDialog({
-  tenantId, defaultAssignee, staff, onCreated,
+  tenantId, defaultAssignee, staff, agencyPhoneCode, initialLead, onCreated,
 }: {
   tenantId: string;
   defaultAssignee: string;
   staff: StaffMember[];
+  agencyPhoneCode: string;
+  initialLead: Lead | null;
   onCreated: (p: Proposal) => void;
 }) {
   const { toast } = useToast();
+  const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
   const [form, setForm] = useState({
     customerName: "",
     customerEmail: "",
@@ -345,12 +400,57 @@ function ProposalCreateDialog({
     expiresInDays: "30",
     assignedTo: defaultAssignee,
   });
+  const [feeItems, setFeeItems] = useState<ProposalFeeItem[]>([
+    { key: Math.random().toString(36).slice(2), description: "Agency Fee", category: "agency_fee", quantity: "1", unitPrice: "" },
+  ]);
+
+  const { data: customers = [] } = useQuery<CustomerOption[]>({
+    queryKey: ["/api/tenants", tenantId, "customers"],
+    enabled: !!tenantId,
+  });
 
   useEffect(() => {
     if (defaultAssignee && !form.assignedTo) {
       setForm((f) => ({ ...f, assignedTo: defaultAssignee }));
     }
   }, [defaultAssignee]); // eslint-disable-line
+
+  useEffect(() => {
+    if (!initialLead) return;
+    setForm((f) => ({
+      ...f,
+      customerName: f.customerName || initialLead.name || "",
+      customerEmail: f.customerEmail || initialLead.email || "",
+      customerPhone: f.customerPhone || initialLead.phone || "",
+      destinationCountry: f.destinationCountry || initialLead.destinationCountry || "",
+      visaType: f.visaType || initialLead.visaType || "",
+      assignedTo: f.assignedTo || defaultAssignee,
+    }));
+  }, [initialLead, defaultAssignee]);
+
+  const customerQuery = `${form.customerName} ${form.customerEmail}`.trim().toLowerCase();
+  const customerMatches = useMemo(() => {
+    if (customerQuery.length < 2) return [];
+    return customers
+      .filter((c) =>
+        (c.name ?? "").toLowerCase().includes(customerQuery) ||
+        c.email.toLowerCase().includes(customerQuery) ||
+        customerQuery.split(/\s+/).some((part) =>
+          part.length >= 2 && ((c.name ?? "").toLowerCase().includes(part) || c.email.toLowerCase().includes(part))
+        )
+      )
+      .slice(0, 6);
+  }, [customers, customerQuery]);
+
+  const applyCustomer = (customer: CustomerOption) => {
+    setForm((f) => ({
+      ...f,
+      customerName: customer.name || f.customerName,
+      customerEmail: customer.email || f.customerEmail,
+      customerPhone: customer.phone || f.customerPhone,
+    }));
+    setCustomerPickerOpen(false);
+  };
 
   const { data: effectiveChecklist } = useQuery<{ checklist: ReturnType<typeof getDocumentChecklist> }>({
     queryKey: ["/api/tenants", tenantId, "application-settings", "checklists", form.destinationCountry, form.visaType],
@@ -374,9 +474,22 @@ function ProposalCreateDialog({
       // Empty / invalid / zero → null so "no estimate" sticks.
       const estTrim = form.estimateAmount.trim();
       const estParsed = estTrim ? Number(estTrim) : NaN;
-      const estimateAmountCents = Number.isFinite(estParsed) && estParsed > 0
-        ? Math.round(estParsed * 100)
-        : null;
+      const lineTotalCents = feeItems.reduce((sum, item) => {
+        const qty = Math.max(1, Number(item.quantity) || 1);
+        const unit = Number(item.unitPrice);
+        return sum + (Number.isFinite(unit) && unit > 0 ? Math.round(unit * 100) * qty : 0);
+      }, 0);
+      const estimateAmountCents = lineTotalCents > 0
+        ? lineTotalCents
+        : Number.isFinite(estParsed) && estParsed > 0
+          ? Math.round(estParsed * 100)
+          : null;
+      const feeSummary = feeItems
+        .filter((item) => item.description.trim() && Number(item.unitPrice) > 0)
+        .map((item) => {
+          const category = FEE_CATEGORIES.find((c) => c.value === item.category)?.label ?? item.category;
+          return `${category}: ${item.description.trim()} x ${item.quantity || "1"} = ${item.unitPrice}`;
+        });
 
       const res = await apiRequest("POST", `/api/tenants/${tenantId}/proposals`, {
         customerName: form.customerName,
@@ -384,10 +497,11 @@ function ProposalCreateDialog({
         customerPhone: form.customerPhone || null,
         destinationCountry: form.destinationCountry,
         visaType: form.visaType,
-        notes: form.notes || null,
+        notes: [form.notes, feeSummary.length ? `Fee breakdown:\n${feeSummary.join("\n")}` : ""].filter(Boolean).join("\n\n") || null,
         estimateAmountCents,
         expiresInDays: form.expiresInDays === "never" ? null : Number(form.expiresInDays),
         assignedTo: form.assignedTo || null,
+        leadId: initialLead?.id ?? null,
       });
       return res.json() as Promise<Proposal>;
     },
@@ -402,6 +516,11 @@ function ProposalCreateDialog({
   });
 
   const canSubmit = form.customerName.trim() && form.destinationCountry && form.visaType;
+  const feeTotal = feeItems.reduce((sum, item) => {
+    const qty = Math.max(1, Number(item.quantity) || 1);
+    const unit = Number(item.unitPrice);
+    return sum + (Number.isFinite(unit) && unit > 0 ? unit * qty : 0);
+  }, 0);
 
   return (
     <DialogContent className="max-w-2xl">
@@ -419,7 +538,11 @@ function ProposalCreateDialog({
             <Input
               id="p-name"
               value={form.customerName}
-              onChange={(e) => setForm({ ...form, customerName: e.target.value })}
+              onFocus={() => setCustomerPickerOpen(true)}
+              onChange={(e) => {
+                setCustomerPickerOpen(true);
+                setForm({ ...form, customerName: e.target.value });
+              }}
               placeholder="e.g. Priya Sharma"
               data-testid="input-customer-name"
             />
@@ -430,19 +553,54 @@ function ProposalCreateDialog({
               id="p-email"
               type="email"
               value={form.customerEmail}
-              onChange={(e) => setForm({ ...form, customerEmail: e.target.value })}
+              onFocus={() => setCustomerPickerOpen(true)}
+              onChange={(e) => {
+                setCustomerPickerOpen(true);
+                setForm({ ...form, customerEmail: e.target.value });
+              }}
               placeholder="optional — used to email the link later"
               data-testid="input-customer-email"
             />
           </div>
+          {customerPickerOpen && customerMatches.length > 0 && (
+            <div className="md:col-span-2 rounded-lg border bg-background shadow-sm" data-testid="proposal-customer-picker">
+              <div className="flex items-center justify-between gap-3 border-b px-3 py-2">
+                <div className="text-sm font-medium">Select existing customer</div>
+                <Button type="button" variant="ghost" size="icon" onClick={() => setCustomerPickerOpen(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="divide-y">
+                {customerMatches.map((customer) => (
+                  <button
+                    key={customer.id}
+                    type="button"
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-muted/60"
+                    onClick={() => applyCustomer(customer)}
+                    data-testid={`button-select-proposal-customer-${customer.id}`}
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium">{customer.name || customer.email}</span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {customer.email}{customer.phone ? ` · ${customer.phone}` : ""}
+                      </span>
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {customer.caseCount ?? 0} cases
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div>
             <Label htmlFor="p-phone">Customer phone</Label>
-            <Input
-              id="p-phone"
+            <PhoneInput
               value={form.customerPhone}
-              onChange={(e) => setForm({ ...form, customerPhone: e.target.value })}
+              onChange={(customerPhone) => setForm({ ...form, customerPhone })}
+              defaultCountryCode={agencyPhoneCode}
               placeholder="optional"
-              data-testid="input-customer-phone"
+              testId="input-customer-phone"
             />
           </div>
           <div>
@@ -521,21 +679,103 @@ function ProposalCreateDialog({
           </div>
         </div>
 
-        <div>
-          <Label htmlFor="p-estimate">Estimated total (optional)</Label>
-          <Input
-            id="p-estimate"
-            type="number"
-            inputMode="decimal"
-            min="0"
-            step="0.01"
-            value={form.estimateAmount}
-            onChange={(e) => setForm({ ...form, estimateAmount: e.target.value })}
-            placeholder="e.g. 250.00"
-            data-testid="input-estimate-amount"
-          />
-          <p className="text-xs text-muted-foreground mt-1">
-            When set, the customer sees a "Pay estimate" button after submitting — collects payment via bank, UPI, or online gateway.
+        <Separator />
+
+        <div className="rounded-lg border bg-muted/20 p-4 space-y-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <Label className="text-base font-semibold">Fees</Label>
+              <p className="text-xs text-muted-foreground">Add proposal fee lines using the same categories as invoices.</p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setFeeItems((items) => [
+                ...items,
+                { key: Math.random().toString(36).slice(2), description: "", category: "agency_fee", quantity: "1", unitPrice: "" },
+              ])}
+              data-testid="button-add-proposal-fee"
+            >
+              <Plus className="w-4 h-4 mr-1.5" />
+              Add Fee
+            </Button>
+          </div>
+
+          <div className="space-y-3">
+            {feeItems.map((item, index) => (
+              <div key={item.key} className="grid grid-cols-1 md:grid-cols-[1fr_1.2fr_0.55fr_0.8fr_auto] gap-2 rounded-md bg-background p-3 border">
+                <div>
+                  <Label className="text-xs">Category</Label>
+                  <Select
+                    value={item.category}
+                    onValueChange={(category) => setFeeItems((items) => items.map((row, i) => i === index ? { ...row, category } : row))}
+                  >
+                    <SelectTrigger data-testid={`select-proposal-fee-category-${index}`}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FEE_CATEGORIES.map((category) => (
+                        <SelectItem key={category.value} value={category.value}>{category.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Description</Label>
+                  <Input
+                    value={item.description}
+                    onChange={(e) => setFeeItems((items) => items.map((row, i) => i === index ? { ...row, description: e.target.value } : row))}
+                    placeholder="e.g. Visa consultation"
+                    data-testid={`input-proposal-fee-description-${index}`}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Qty</Label>
+                  <Input
+                    value={item.quantity}
+                    onChange={(e) => setFeeItems((items) => items.map((row, i) => i === index ? { ...row, quantity: e.target.value } : row))}
+                    type="number"
+                    min="1"
+                    inputMode="numeric"
+                    data-testid={`input-proposal-fee-quantity-${index}`}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Amount</Label>
+                  <Input
+                    value={item.unitPrice}
+                    onChange={(e) => setFeeItems((items) => items.map((row, i) => i === index ? { ...row, unitPrice: e.target.value } : row))}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    data-testid={`input-proposal-fee-amount-${index}`}
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setFeeItems((items) => items.length > 1 ? items.filter((_, i) => i !== index) : items)}
+                    disabled={feeItems.length === 1}
+                    data-testid={`button-remove-proposal-fee-${index}`}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-between rounded-md border bg-background px-3 py-2 text-sm">
+            <span className="text-muted-foreground">Proposal total</span>
+            <span className="font-semibold">₹{feeTotal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            If fees are added, the customer sees a payment estimate after submitting.
           </p>
         </div>
 

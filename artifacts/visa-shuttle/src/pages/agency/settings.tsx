@@ -31,6 +31,7 @@ import { AGENCY_PERMISSIONS, type AgencyPermission } from "@/shared/schema-const
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { COUNTRIES, VISA_TYPES as GENERIC_VISA_TYPES } from "@/shared/destinations";
 import { CHECKLIST_COUNTRIES, CHECKLIST_VISA_TYPES, getDocumentChecklist, type DocumentRequirement } from "@/data/document-checklists";
+import { PhoneInput, defaultPhoneCodeFrom } from "@/components/phone-input";
 
 // ─── Team Tab Component ────────────────────────────────────────────────────────
 
@@ -890,6 +891,8 @@ function PaymentsTab({ tenantId }: { tenantId?: string }) {
 function SmsTab({ tenantId }: { tenantId?: string }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { data: authData } = useCurrentUser();
+  const agencyPhoneCode = defaultPhoneCodeFrom((authData?.tenant as any)?.contactPhone);
   const { data: cfg, isLoading } = useQuery<any>({
     queryKey: ["/api/tenants", tenantId, "sms-config"],
     queryFn: async () => {
@@ -1045,13 +1048,12 @@ function SmsTab({ tenantId }: { tenantId?: string }) {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex gap-2">
-            <Input
-              type="tel"
+            <PhoneInput
               value={testPhone}
-              onChange={(e) => setTestPhone(e.target.value)}
-              placeholder="+91 98765 43210 (with country code)"
-              className="flex-1"
-              data-testid="input-mc-test-phone"
+              onChange={setTestPhone}
+              defaultCountryCode={agencyPhoneCode}
+              placeholder="98765 43210"
+              testId="input-mc-test-phone"
             />
             <Button
               variant="outline"
@@ -1337,6 +1339,7 @@ export default function AgencySettingsPage() {
       return res.json();
     }
   });
+  const agencyPhoneCode = defaultPhoneCodeFrom(tenant?.contactPhone);
 
   // Branding form state
   const [branding, setBranding] = useState({
@@ -1617,24 +1620,22 @@ export default function AgencySettingsPage() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="contactPhone">Contact Phone</Label>
-                    <Input
-                      id="contactPhone"
-                      type="tel"
+                    <PhoneInput
                       value={branding.contactPhone}
-                      onChange={(e) => setBranding({ ...branding, contactPhone: e.target.value })}
-                      placeholder="+1 234 567 8900"
-                      data-testid="input-contact-phone"
+                      onChange={(contactPhone) => setBranding({ ...branding, contactPhone })}
+                      defaultCountryCode={agencyPhoneCode}
+                      placeholder="98765 43210"
+                      testId="input-contact-phone"
                     />
                   </div>
                   <div className="space-y-2 sm:col-span-2">
                     <Label htmlFor="whatsappNumber">WhatsApp Number</Label>
-                    <Input
-                      id="whatsappNumber"
-                      type="tel"
+                    <PhoneInput
                       value={branding.whatsappNumber}
-                      onChange={(e) => setBranding({ ...branding, whatsappNumber: e.target.value })}
-                      placeholder="+1 234 567 8900"
-                      data-testid="input-whatsapp"
+                      onChange={(whatsappNumber) => setBranding({ ...branding, whatsappNumber })}
+                      defaultCountryCode={agencyPhoneCode}
+                      placeholder="98765 43210"
+                      testId="input-whatsapp"
                     />
                     <p className="text-xs text-muted-foreground">Customers can chat with you via WhatsApp from the portal</p>
                   </div>

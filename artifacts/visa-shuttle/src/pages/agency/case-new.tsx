@@ -27,6 +27,7 @@ import { CO_TRAVELLER_RELATIONSHIPS, APPOINTMENT_TYPES, APPOINTMENT_STATUSES } f
 import { getDocumentChecklist, type DocumentRequirement } from "@/data/document-checklists";
 import { getCountryVisaConfig } from "@/data/country-visa-types";
 import { COUNTRIES, VISA_TYPES as GENERIC_VISA_TYPES } from "@/shared/destinations";
+import { PhoneInput, defaultPhoneCodeFrom } from "@/components/phone-input";
 
 const RELATIONSHIP_LABELS: Record<CoTravellerRelationship, string> = {
   spouse: "Spouse",
@@ -361,6 +362,7 @@ export default function NewCasePage() {
   const { data: authData } = useCurrentUser();
   const tenantId = authData?.user?.tenantId;
   const currentUserId = authData?.user?.id ?? "";
+  const agencyPhoneCode = defaultPhoneCodeFrom((authData?.tenant as any)?.contactPhone);
   const today = useMemo(() => todayISO(), []);
 
   const [step, setStep] = useState<StepId>(1);
@@ -1962,18 +1964,16 @@ export default function NewCasePage() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="customer-phone">Customer Mobile</Label>
-                    <Input
-                      id="customer-phone"
-                      type="tel"
-                      placeholder="+1 234 567 8900"
+                    <PhoneInput
                       value={form.customerPhone}
-                      onFocus={() => setCustomerPickerOpen(true)}
-                      onChange={(e) => {
+                      onChange={(customerPhone) => {
                         setCustomerPickerOpen(true);
                         setSelectedCustomerPassportNumber(null);
-                        setForm({ ...form, customerPhone: e.target.value, customerAccountId: "" });
+                        setForm({ ...form, customerPhone, customerAccountId: "" });
                       }}
-                      data-testid="input-customer-phone"
+                      defaultCountryCode={agencyPhoneCode}
+                      placeholder="98765 43210"
+                      testId="input-customer-phone"
                     />
                   </div>
                 </div>
