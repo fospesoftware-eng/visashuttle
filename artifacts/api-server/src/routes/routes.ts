@@ -61,7 +61,8 @@ import { VISA_STAGES, VISA_PROCESSING_STATUSES, SUBMISSION_METHODS, APPOINTMENT_
 import { VISA_TYPES } from "../shared/destinations";
 import { isValidVisaTypeForCountry, getCountryVisaTypes } from "../shared/visa-catalog";
 import { z } from "zod";
-import ExcelJS from "exceljs";
+// ExcelJS is lazy-loaded inside the GSTR export handler to avoid adding
+// its large module footprint to the startup bundle.
 import {
   insertFeeTemplateSchema,
   insertInvoiceSchema,
@@ -2290,6 +2291,7 @@ export async function registerRoutes(
         return d >= startUtc && d < endUtc && inv.status !== "cancelled";
       });
 
+      const ExcelJS = (await import("exceljs")).default;
       const wb = new ExcelJS.Workbook();
       wb.creator = "VisaShuttle";
       wb.created = new Date();
