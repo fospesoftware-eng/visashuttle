@@ -144,6 +144,12 @@ app.use(
   express.json({ limit: "12mb" }),
 );
 
+// Agency branding can include a small uploaded logo data URL.
+app.use(
+  /^\/api\/tenants\/[^/]+\/branding$/,
+  express.json({ limit: "3mb" }),
+);
+
 // Visa-copy upload endpoint
 app.use(
   /^\/api\/cases\/[^/]+\/visa-copy$/,

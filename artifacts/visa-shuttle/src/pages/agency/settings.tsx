@@ -1725,7 +1725,58 @@ export default function AgencySettingsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="logoUrl">Logo URL</Label>
+                    <Label htmlFor="logoUrl">Agency Logo</Label>
+                    <div className="rounded-lg border p-3 space-y-3">
+                      <div className="flex items-center gap-3">
+                        {branding.logoUrl ? (
+                          <img
+                            src={branding.logoUrl}
+                            alt="Agency logo preview"
+                            className="h-14 w-14 rounded-md border bg-white object-contain p-1"
+                            data-testid="img-agency-logo-preview"
+                          />
+                        ) : (
+                          <div className="h-14 w-14 rounded-md border bg-muted flex items-center justify-center text-lg font-semibold text-muted-foreground">
+                            {branding.name?.charAt(0)?.toUpperCase() || "A"}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium">Customer portal and proposal logo</p>
+                          <p className="text-xs text-muted-foreground">
+                            Upload a PNG/JPG/SVG under 2 MB. This appears on customer portal links and proposal share URLs.
+                          </p>
+                        </div>
+                      </div>
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          if (file.size > 2 * 1024 * 1024) {
+                            toast({ title: "Logo too large", description: "Please upload a logo under 2 MB.", variant: "destructive" });
+                            return;
+                          }
+                          const reader = new FileReader();
+                          reader.onload = () => setBranding((b) => ({ ...b, logoUrl: String(reader.result || "") }));
+                          reader.readAsDataURL(file);
+                          e.currentTarget.value = "";
+                        }}
+                        data-testid="input-agency-logo-file"
+                      />
+                      {branding.logoUrl && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setBranding({ ...branding, logoUrl: "" })}
+                          data-testid="button-remove-agency-logo"
+                        >
+                          Remove logo
+                        </Button>
+                      )}
+                    </div>
+                    <Label htmlFor="logoUrl" className="text-xs text-muted-foreground">Or paste logo URL</Label>
                     <Input
                       id="logoUrl"
                       value={branding.logoUrl}
