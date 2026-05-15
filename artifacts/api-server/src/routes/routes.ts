@@ -1806,6 +1806,8 @@ export async function registerRoutes(
     // estimate amount correctly (falls back to USD if no settings row yet).
     const settings = await storage.getInvoiceSettings(proposal.tenantId);
     const currency = settings?.currency || "USD";
+    const gatewayConfig = await storage.getTenantPaymentGatewayConfig(proposal.tenantId).catch(() => undefined);
+    const gatewayConfigured = !!(gatewayConfig?.enabled && (gatewayConfig.testClientId || gatewayConfig.liveClientId));
     const documentChecklist = await getEffectiveDocumentChecklist(
       proposal.tenantId,
       proposal.destinationCountry,
@@ -1827,6 +1829,15 @@ export async function registerRoutes(
         status: proposal.status === "sent" ? "viewed" : proposal.status,
         appliedCaseId: proposal.appliedCaseId,
         expiresAt: proposal.expiresAt,
+      },
+      payment: {
+        amountCents: proposal.estimateAmountCents,
+        currency,
+        gatewayConfigured,
+        bankDetails: settings?.bankDetails || null,
+        upiId: settings?.upiId || null,
+        upiQrFileUrl: settings?.upiQrFileUrl || null,
+        paymentInstructions: settings?.paymentInstructions || null,
       },
       tenant: {
         id: tenant.id,
@@ -2050,6 +2061,13 @@ export async function registerRoutes(
       });
     }
 
+    const preSubmissionInvoices = await storage.getInvoicesByTenantId(proposal.tenantId);
+    for (const invoice of preSubmissionInvoices) {
+      if (!invoice.caseId && invoice.notes?.startsWith(`Estimate from proposal ${proposal.token}`)) {
+        await storage.updateInvoice(invoice.id, { caseId: newCase.id } as any);
+      }
+    }
+
     await storage.updateProposal(proposal.id, {
       status: "applied",
       appliedCaseId: newCase.id,
@@ -2095,8 +2113,9 @@ export async function registerRoutes(
 
   // POST /api/public/proposal/:token/initiate-payment — customer-facing
   // "Pay estimate" CTA on the proposal-apply success screen. Requires the
-  // customer to have already applied (so we have a case to attach the
-  // invoice to) AND the proposal to carry an estimateAmountCents > 0.
+  // proposal to carry an estimateAmountCents > 0. If the customer starts
+  // payment before final submission, the invoice is created without a case
+  // and linked to the case when /apply succeeds.
   // Idempotent: re-calling returns the same unpaid invoice's public URL
   // instead of stacking duplicates.
   app.post("/api/public/proposal/:token/initiate-payment", async (req, res) => {
@@ -2111,9 +2130,6 @@ export async function registerRoutes(
     }
     if (proposal.expiresAt && proposal.expiresAt.getTime() < Date.now()) {
       return res.status(410).json({ error: "This proposal has expired." });
-    }
-    if (!proposal.appliedCaseId) {
-      return res.status(409).json({ error: "Submit the application before paying the estimate." });
     }
     if (!proposal.estimateAmountCents || proposal.estimateAmountCents <= 0) {
       return res.status(400).json({ error: "This proposal has no estimate amount to collect." });
@@ -2135,7 +2151,10 @@ export async function registerRoutes(
       // statuses — a paid/cancelled invoice from a prior attempt should
       // never be re-served as a payment link.
       const REUSABLE_STATUSES = new Set(["draft", "sent", "partial", "overdue"]);
-      const existingInvoices = await storage.getInvoicesByCaseId(proposal.appliedCaseId);
+      const allTenantInvoices = await storage.getInvoicesByTenantId(tenantId);
+      const existingInvoices = proposal.appliedCaseId
+        ? await storage.getInvoicesByCaseId(proposal.appliedCaseId)
+        : allTenantInvoices.filter((inv) => !inv.caseId);
       let invoice = existingInvoices.find(
         (inv) =>
           inv.notes?.startsWith(`Estimate from proposal ${proposal.token}`) &&
@@ -2159,7 +2178,6 @@ export async function registerRoutes(
       }
 
       if (!invoice) {
-        const allTenantInvoices = await storage.getInvoicesByTenantId(tenantId);
         const year = new Date().getFullYear();
         const seq = allTenantInvoices.length + 1;
         const invoiceNumber = `${prefix}-${year}-${String(seq).padStart(4, "0")}`;
@@ -2168,7 +2186,7 @@ export async function registerRoutes(
           {
             tenantId,
             invoiceNumber,
-            caseId: proposal.appliedCaseId,
+            caseId: proposal.appliedCaseId ?? null,
             leadId: proposal.leadId ?? null,
             customerName: proposal.customerName,
             customerEmail: proposal.customerEmail,

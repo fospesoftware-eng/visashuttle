@@ -83,6 +83,15 @@ interface ProposalPublicData {
     appliedCaseId: string | null;
     expiresAt: string | null;
   };
+  payment?: {
+    amountCents: number | null;
+    currency: string;
+    gatewayConfigured: boolean;
+    bankDetails: string | null;
+    upiId: string | null;
+    upiQrFileUrl: string | null;
+    paymentInstructions: string | null;
+  };
   tenant: {
     id: string;
     name: string;
@@ -106,6 +115,9 @@ export default function ProposalApplyPage() {
   const [documents, setDocuments] = useState<ProposalDocumentUpload[]>([]);
   const [passportFileName, setPassportFileName] = useState("");
   const [passportScanError, setPassportScanError] = useState<string | null>(null);
+  const [paymentChoice, setPaymentChoice] = useState<"online" | "offline" | "later">("later");
+  const [offlinePaymentReference, setOfflinePaymentReference] = useState("");
+  const [onlinePaymentOpened, setOnlinePaymentOpened] = useState(false);
 
   const { data, isLoading, error } = useQuery<ProposalPublicData>({
     queryKey: ["/api/proposals", token],
@@ -114,6 +126,7 @@ export default function ProposalApplyPage() {
   });
 
   const proposal = data?.proposal;
+  const payment = data?.payment;
   const tenant = data?.tenant;
 
   const checklist = useMemo(() => {
@@ -154,7 +167,23 @@ export default function ProposalApplyPage() {
 
   const applyMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/proposals/${token}/apply`, { ...form, documents });
+      const submissionDocuments = documents.map((doc) => (
+        doc.type === "payment_proof"
+          ? {
+              ...doc,
+              notes: [
+                paymentChoice === "offline" ? "Offline payment proof uploaded by customer" : "Payment proof uploaded by customer",
+                offlinePaymentReference ? `Reference: ${offlinePaymentReference}` : "",
+              ].filter(Boolean).join(". "),
+            }
+          : doc
+      ));
+      const res = await apiRequest("POST", `/api/proposals/${token}/apply`, {
+        ...form,
+        paymentChoice,
+        offlinePaymentReference,
+        documents: submissionDocuments,
+      });
       return res.json() as Promise<{ success: boolean; referenceId: string; caseNumber: string; tenantSlug: string | null }>;
     },
     onSuccess: (r) => {
@@ -243,7 +272,9 @@ export default function ProposalApplyPage() {
       return res.json() as Promise<{ invoiceToken: string; url: string; amountCents: number; currency: string }>;
     },
     onSuccess: (r) => {
-      window.location.href = `/pay/invoice/${r.invoiceToken}`;
+      setOnlinePaymentOpened(true);
+      const opened = window.open(r.url || `/pay/invoice/${r.invoiceToken}`, "_blank", "noopener,noreferrer");
+      if (!opened) window.location.href = r.url || `/pay/invoice/${r.invoiceToken}`;
     },
     onError: (e: any) => {
       toast({ title: "Could not open payment", description: e?.message, variant: "destructive" });
@@ -404,12 +435,13 @@ export default function ProposalApplyPage() {
   const missingRequired = checklist.filter((doc) => doc.required && !uploadedTypes.has(doc.type));
   const canSubmit = form.applicantName.trim().length > 0 && !passportExpired && !applyMutation.isPending;
   const steps = [
-    { id: 1, label: "Details" },
+    { id: 1, label: "Customer" },
     { id: 2, label: "Passport" },
     { id: 3, label: "Documents" },
-    { id: 4, label: "Review" },
+    { id: 4, label: "Payment" },
+    { id: 5, label: "Submit" },
   ];
-  const goNext = () => setStep((s) => Math.min(4, s + 1));
+  const goNext = () => setStep((s) => Math.min(5, s + 1));
   const goBack = () => setStep((s) => Math.max(1, s - 1));
   const removeDocument = (key: string) => {
     setDocuments((items) => items.filter((item) => item.key !== key));
@@ -474,7 +506,7 @@ export default function ProposalApplyPage() {
 
         <Card>
           <CardContent className="pt-6">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               {steps.map((item) => {
                 const active = step === item.id;
                 const done = step > item.id;
@@ -498,7 +530,7 @@ export default function ProposalApplyPage() {
                     </span>
                     <span className="min-w-0">
                       <span className="block text-sm font-semibold">{item.label}</span>
-                      <span className="block text-xs text-muted-foreground">Step {item.id} of 4</span>
+                      <span className="block text-xs text-muted-foreground">Step {item.id} of 5</span>
                     </span>
                   </button>
                 );
@@ -511,10 +543,29 @@ export default function ProposalApplyPage() {
           <CardContent className="pt-6">
             {step === 1 && (
               <div>
-                <h2 className="text-lg font-semibold mb-1">Applicant details</h2>
+                <h2 className="text-lg font-semibold mb-1">Customer and proposal details</h2>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Start with the contact and travel details your agency will use for this application.
+                  These details are pre-filled from your agency proposal. You can correct customer contact details before submitting.
                 </p>
+
+                <div className="mb-5 grid gap-3 lg:grid-cols-3">
+                  <div className="rounded-lg border bg-muted/20 p-4">
+                    <div className="text-xs uppercase tracking-wide text-muted-foreground">Destination country</div>
+                    <div className="mt-1 text-lg font-semibold">{proposal!.destinationCountry}</div>
+                  </div>
+                  <div className="rounded-lg border bg-muted/20 p-4">
+                    <div className="text-xs uppercase tracking-wide text-muted-foreground">Visa type</div>
+                    <div className="mt-1 text-lg font-semibold">{proposal!.visaType}</div>
+                  </div>
+                  <div className="rounded-lg border bg-muted/20 p-4">
+                    <div className="text-xs uppercase tracking-wide text-muted-foreground">Proposal amount</div>
+                    <div className="mt-1 text-lg font-semibold">
+                      {proposal!.estimateAmountCents && proposal!.estimateAmountCents > 0
+                        ? formatEstimate(proposal!.estimateAmountCents, proposal!.currency)
+                        : "No fee added"}
+                    </div>
+                  </div>
+                </div>
 
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div className="sm:col-span-2">
@@ -843,6 +894,194 @@ export default function ProposalApplyPage() {
 
             {step === 4 && (
               <div>
+                <h2 className="text-lg font-semibold mb-1">Payment</h2>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Review the proposal fee and choose online or offline payment. You can still submit after uploading offline proof.
+                </p>
+
+                <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+                  <div
+                    className="rounded-lg border p-4"
+                    style={{ borderColor: `${primary}40`, backgroundColor: `${primary}08` }}
+                  >
+                    <div className="mb-2 text-sm text-muted-foreground">Proposal fee</div>
+                    <div className="text-3xl font-bold">
+                      {payment?.amountCents && payment.amountCents > 0
+                        ? formatEstimate(payment.amountCents, payment.currency)
+                        : "No payment due"}
+                    </div>
+                    <div className="mt-3 rounded-md bg-background/70 p-3 text-sm">
+                      <div className="flex justify-between gap-3">
+                        <span className="text-muted-foreground">Destination</span>
+                        <span className="font-medium">{proposal!.destinationCountry}</span>
+                      </div>
+                      <div className="mt-2 flex justify-between gap-3">
+                        <span className="text-muted-foreground">Visa type</span>
+                        <span className="font-medium">{proposal!.visaType}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={() => setPaymentChoice("online")}
+                      className="w-full rounded-lg border p-4 text-left transition-colors hover:bg-muted/40"
+                      style={{ borderColor: paymentChoice === "online" ? primary : undefined }}
+                      data-testid="button-payment-choice-online"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="font-semibold">Online payment</div>
+                          <div className="text-sm text-muted-foreground">Pay through the secure payment gateway.</div>
+                        </div>
+                        <CreditCard className="h-5 w-5" style={{ color: primary }} />
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPaymentChoice("offline")}
+                      className="w-full rounded-lg border p-4 text-left transition-colors hover:bg-muted/40"
+                      style={{ borderColor: paymentChoice === "offline" ? primary : undefined }}
+                      data-testid="button-payment-choice-offline"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="font-semibold">Offline payment</div>
+                          <div className="text-sm text-muted-foreground">Use bank transfer or UPI, then upload payment proof.</div>
+                        </div>
+                        <Upload className="h-5 w-5" style={{ color: primary }} />
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {paymentChoice === "online" && (
+                  <div className="mt-4 rounded-lg border p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <div className="font-semibold">Pay online</div>
+                        <p className="text-sm text-muted-foreground">
+                          This opens the secure payment page in a new tab. Return here and complete final submit after payment.
+                        </p>
+                        {onlinePaymentOpened && (
+                          <p className="mt-2 text-sm text-emerald-700 dark:text-emerald-300">
+                            Payment page opened. Continue to final submit when ready.
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        onClick={() => initiatePaymentMutation.mutate()}
+                        disabled={!payment?.amountCents || payment.amountCents <= 0 || initiatePaymentMutation.isPending}
+                        style={{ backgroundColor: primary }}
+                        data-testid="button-pay-online-proposal"
+                      >
+                        {initiatePaymentMutation.isPending ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <CreditCard className="mr-2 h-4 w-4" />
+                        )}
+                        Pay online
+                      </Button>
+                    </div>
+                    {!payment?.gatewayConfigured && (
+                      <div className="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                        Online gateway may not be fully configured by the agency. Use offline payment if this fails.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {paymentChoice === "offline" && (
+                  <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                    <div className="rounded-lg border p-4">
+                      <div className="font-semibold">Agency payment details</div>
+                      {payment?.paymentInstructions && (
+                        <p className="mt-2 whitespace-pre-wrap rounded-md bg-muted/40 p-3 text-sm">{payment.paymentInstructions}</p>
+                      )}
+                      {payment?.bankDetails && (
+                        <div className="mt-3">
+                          <div className="text-sm font-medium">Bank details</div>
+                          <pre className="mt-1 whitespace-pre-wrap rounded-md bg-muted/40 p-3 text-sm font-sans">{payment.bankDetails}</pre>
+                        </div>
+                      )}
+                      {(payment?.upiId || payment?.upiQrFileUrl) && (
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                          {payment.upiId && (
+                            <div>
+                              <div className="text-sm font-medium">UPI ID</div>
+                              <div className="mt-1 rounded-md bg-muted/40 p-3 font-mono text-sm">{payment.upiId}</div>
+                            </div>
+                          )}
+                          {payment.upiQrFileUrl && (
+                            <div>
+                              <div className="text-sm font-medium">UPI QR</div>
+                              <img
+                                src={payment.upiQrFileUrl}
+                                alt="UPI QR"
+                                className="mt-1 h-36 w-36 rounded-md border bg-white object-contain p-2"
+                                data-testid="img-proposal-upi-qr"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {!payment?.paymentInstructions && !payment?.bankDetails && !payment?.upiId && !payment?.upiQrFileUrl && (
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          Offline payment details are not configured yet. Contact the agency before transferring.
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="rounded-lg border p-4">
+                      <div className="font-semibold">Upload payment proof</div>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Add transaction ID, UPI reference, receipt, or screenshot.
+                      </p>
+                      <div className="mt-3 space-y-3">
+                        <div>
+                          <Label htmlFor="offline-payment-reference">Payment reference</Label>
+                          <Input
+                            id="offline-payment-reference"
+                            value={offlinePaymentReference}
+                            onChange={(e) => setOfflinePaymentReference(e.target.value)}
+                            placeholder="Transaction ID / UPI reference"
+                            data-testid="input-offline-payment-reference"
+                          />
+                        </div>
+                        <Input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) await addDocument(file, "payment_proof", "Offline payment proof", null, "Offline payment proof uploaded by customer");
+                            e.currentTarget.value = "";
+                          }}
+                          data-testid="input-offline-payment-proof"
+                        />
+                        {uploadForType("payment_proof").map((doc) => (
+                          <div key={doc.key} className="flex items-center justify-between gap-3 rounded-md bg-muted/40 px-3 py-2 text-sm">
+                            <span className="truncate">{doc.fileName}</span>
+                            <button
+                              type="button"
+                              className="rounded p-1 text-muted-foreground hover:bg-background hover:text-foreground"
+                              onClick={() => removeDocument(doc.key)}
+                              aria-label={`Remove ${doc.fileName}`}
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {step === 5 && (
+              <div>
                 <h2 className="text-lg font-semibold mb-1">Review and submit</h2>
                 <p className="text-sm text-muted-foreground mb-4">
                   Check the details once. After submission, your agency receives the application and uploads.
@@ -892,7 +1131,11 @@ export default function ProposalApplyPage() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Checklist documents</span>
-                        <span className="font-medium">{documents.filter((doc) => !["passport", "old_passport"].includes(doc.type)).length}</span>
+                        <span className="font-medium">{documents.filter((doc) => !["passport", "old_passport", "payment_proof"].includes(doc.type)).length}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Payment proof</span>
+                        <span className="font-medium">{uploadForType("payment_proof").length}</span>
                       </div>
                     </div>
                     {missingRequired.length > 0 && (
@@ -903,7 +1146,7 @@ export default function ProposalApplyPage() {
                   </div>
                 </div>
 
-                {proposal!.estimateAmountCents && proposal!.estimateAmountCents > 0 && (
+                {payment?.amountCents && payment.amountCents > 0 && (
                   <div
                     className="mt-4 rounded-lg border p-4"
                     style={{ borderColor: `${primary}40`, backgroundColor: `${primary}08` }}
@@ -920,9 +1163,9 @@ export default function ProposalApplyPage() {
                         <p className="text-sm text-muted-foreground">
                           Estimate amount:{" "}
                           <span className="font-semibold text-foreground">
-                            {formatEstimate(proposal!.estimateAmountCents, proposal!.currency)}
+                            {formatEstimate(payment.amountCents, payment.currency)}
                           </span>
-                          . The secure payment button appears immediately after you submit these details.
+                          . Payment choice: {paymentChoice === "offline" ? "Offline" : paymentChoice === "online" ? "Online" : "Pay later"}.
                         </p>
                       </div>
                     </div>
@@ -942,7 +1185,7 @@ export default function ProposalApplyPage() {
                     Back
                   </Button>
                 )}
-                {step < 4 ? (
+                {step < 5 ? (
                   <Button
                     onClick={goNext}
                     style={{ backgroundColor: primary }}
