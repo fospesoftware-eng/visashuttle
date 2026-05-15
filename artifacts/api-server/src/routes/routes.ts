@@ -1522,7 +1522,21 @@ export async function registerRoutes(
   }
 
   async function getEffectiveDocumentChecklist(tenantId: string, country: string, visaType: string) {
-    const override = await storage.getTenantDocumentChecklist(tenantId, country, visaType);
+    let override: Awaited<ReturnType<typeof storage.getTenantDocumentChecklist>> | undefined;
+    try {
+      override = await storage.getTenantDocumentChecklist(tenantId, country, visaType);
+    } catch (error) {
+      // Public proposal links must stay usable even if an older Replit DB has
+      // not had the per-agency checklist table pushed yet. In that case we
+      // simply fall through to the global template/default checklist.
+      console.warn("[checklists] agency override unavailable; falling back", {
+        tenantId,
+        country,
+        visaType,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      override = undefined;
+    }
     if (override) {
       return {
         source: "agency" as const,
