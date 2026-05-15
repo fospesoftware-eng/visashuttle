@@ -284,16 +284,6 @@ const features = [
 
 const planCategories = [
   {
-    name: "Agency CRM",
-    icon: Building2,
-    badge: "Best for visa teams",
-    color: "from-[#4055FF] to-[#9033F5]",
-    description: "Run leads, customers, proposals, documents, payments, and applications in one branded workspace.",
-    plans: ["Starter · $49/mo", "Professional · $149/mo", "Enterprise · Custom"],
-    cta: "Start agency workspace",
-    href: "/agency-register",
-  },
-  {
     name: "Business API",
     icon: Code2,
     badge: "Pay as you go",
@@ -301,6 +291,16 @@ const planCategories = [
     description: "Add Visa Shuttle AI into your website, CRM, booking engine, or partner portal without changing your current system.",
     plans: ["Deep Check API · $1.99/call", "Requirements API · $0.25/call", "Reseller Keys · Usage wallet"],
     cta: "Start API wallet",
+    href: "/agency-register",
+  },
+  {
+    name: "Agency CRM",
+    icon: Building2,
+    badge: "Best for visa teams",
+    color: "from-[#4055FF] to-[#9033F5]",
+    description: "Run leads, customers, proposals, documents, payments, and applications in one branded workspace.",
+    plans: ["Starter · $49/mo", "Professional · $149/mo", "Enterprise · Custom"],
+    cta: "Start agency workspace",
     href: "/agency-register",
     highlight: true,
   },
@@ -389,7 +389,7 @@ export default function BusinessPage() {
     <div className="min-h-screen bg-background overflow-x-hidden">
 
       {/* ── HERO ── */}
-      <section className="relative overflow-hidden py-20 md:py-32">
+      <section className="relative overflow-hidden pt-10 pb-16 md:pt-14 md:pb-24">
         {/* Ambient orbs */}
         <div className="pointer-events-none absolute inset-0 -z-10">
           <div className="absolute -top-32 -left-32 h-[520px] w-[520px] rounded-full bg-[#4055FF]/10 blur-[100px]" />
