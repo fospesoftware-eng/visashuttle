@@ -34,6 +34,7 @@ import {
   tenantPaymentGatewayConfig as tenantPaymentGatewayConfigTable,
   tenantSmsConfig as tenantSmsConfigTable,
   tenantDocumentChecklists as tenantDocumentChecklistsTable,
+  proposals as proposalsTable,
 } from "@workspace/db";
 import { and, eq, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -1944,6 +1945,86 @@ export class MemStorage implements IStorage {
 
 // HybridStorage: uses MemStorage for agency/seed data, PostgreSQL for B2C user data
 class HybridStorage extends MemStorage {
+  async getProposalsByTenantId(tenantId: string): Promise<Proposal[]> {
+    try {
+      return await db
+        .select()
+        .from(proposalsTable)
+        .where(eq(proposalsTable.tenantId, tenantId))
+        .orderBy(desc(proposalsTable.createdAt));
+    } catch (error) {
+      if (isMissingRelationError(error)) return super.getProposalsByTenantId(tenantId);
+      throw error;
+    }
+  }
+
+  async getProposal(id: string): Promise<Proposal | undefined> {
+    try {
+      const rows = await db.select().from(proposalsTable).where(eq(proposalsTable.id, id)).limit(1);
+      return rows[0] ?? undefined;
+    } catch (error) {
+      if (isMissingRelationError(error)) return super.getProposal(id);
+      throw error;
+    }
+  }
+
+  async getProposalByToken(token: string): Promise<Proposal | undefined> {
+    try {
+      if (!token) return undefined;
+      const rows = await db.select().from(proposalsTable).where(eq(proposalsTable.token, token)).limit(1);
+      return rows[0] ?? undefined;
+    } catch (error) {
+      if (isMissingRelationError(error)) return super.getProposalByToken(token);
+      throw error;
+    }
+  }
+
+  async createProposal(data: InsertProposal): Promise<Proposal> {
+    try {
+      const rows = await db.insert(proposalsTable).values(data).returning();
+      return rows[0];
+    } catch (error) {
+      if (isMissingRelationError(error)) return super.createProposal(data);
+      throw error;
+    }
+  }
+
+  async updateProposal(id: string, data: Partial<Proposal>): Promise<Proposal | undefined> {
+    try {
+      const rows = await db
+        .update(proposalsTable)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(proposalsTable.id, id))
+        .returning();
+      return rows[0] ?? undefined;
+    } catch (error) {
+      if (isMissingRelationError(error)) return super.updateProposal(id, data);
+      throw error;
+    }
+  }
+
+  async deleteProposal(id: string): Promise<boolean> {
+    try {
+      const rows = await db
+        .delete(proposalsTable)
+        .where(eq(proposalsTable.id, id))
+        .returning({ id: proposalsTable.id });
+      return rows.length > 0;
+    } catch (error) {
+      if (isMissingRelationError(error)) return super.deleteProposal(id);
+      throw error;
+    }
+  }
+
+  async getAllProposals(): Promise<Proposal[]> {
+    try {
+      return await db.select().from(proposalsTable).orderBy(desc(proposalsTable.createdAt));
+    } catch (error) {
+      if (isMissingRelationError(error)) return super.getAllProposals();
+      throw error;
+    }
+  }
+
   async getTenantDocumentChecklists(tenantId: string): Promise<TenantDocumentChecklist[]> {
     try {
       const rows = await db.select().from(tenantDocumentChecklistsTable).where(eq(tenantDocumentChecklistsTable.tenantId, tenantId));
