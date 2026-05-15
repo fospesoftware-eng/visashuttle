@@ -10,7 +10,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -71,6 +70,7 @@ interface ProposalPublicData {
   proposal: {
     id: string;
     token: string;
+    publicId: string;
     customerName: string;
     customerEmail: string | null;
     customerPhone: string | null;
@@ -118,6 +118,7 @@ export default function ProposalApplyPage() {
   const [paymentChoice, setPaymentChoice] = useState<"online" | "offline" | "later">("later");
   const [offlinePaymentReference, setOfflinePaymentReference] = useState("");
   const [onlinePaymentOpened, setOnlinePaymentOpened] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
 
   const { data, isLoading, error } = useQuery<ProposalPublicData>({
     queryKey: ["/api/proposals", token],
@@ -128,6 +129,7 @@ export default function ProposalApplyPage() {
   const proposal = data?.proposal;
   const payment = data?.payment;
   const tenant = data?.tenant;
+  const draftKey = token ? `proposal-draft:${token}` : "";
 
   const checklist = useMemo(() => {
     if (!proposal) return [];
@@ -165,6 +167,44 @@ export default function ProposalApplyPage() {
     }));
   }, [proposal?.id]); // eslint-disable-line
 
+  useEffect(() => {
+    if (!draftKey || draftRestored) return;
+    setDraftRestored(true);
+    try {
+      const raw = window.localStorage.getItem(draftKey);
+      if (!raw) return;
+      const draft = JSON.parse(raw);
+      if (draft.form) setForm((f) => ({ ...f, ...draft.form }));
+      if (Array.isArray(draft.documents)) setDocuments(draft.documents);
+      if (draft.passportFileName) setPassportFileName(draft.passportFileName);
+      if (draft.paymentChoice) setPaymentChoice(draft.paymentChoice);
+      if (draft.offlinePaymentReference) setOfflinePaymentReference(draft.offlinePaymentReference);
+    } catch {
+      window.localStorage.removeItem(draftKey);
+    }
+  }, [draftKey, draftRestored]);
+
+  const saveDraft = () => {
+    if (!draftKey) return;
+    try {
+      window.localStorage.setItem(draftKey, JSON.stringify({
+        form,
+        documents,
+        passportFileName,
+        paymentChoice,
+        offlinePaymentReference,
+        savedAt: new Date().toISOString(),
+      }));
+      toast({ title: "Draft saved", description: "You can return to this proposal link and continue later." });
+    } catch {
+      toast({
+        title: "Could not save draft",
+        description: "Your browser storage may be full. Try removing large uploads before saving.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const applyMutation = useMutation({
     mutationFn: async () => {
       const submissionDocuments = documents.map((doc) => (
@@ -187,6 +227,7 @@ export default function ProposalApplyPage() {
       return res.json() as Promise<{ success: boolean; referenceId: string; caseNumber: string; tenantSlug: string | null }>;
     },
     onSuccess: (r) => {
+      if (draftKey) window.localStorage.removeItem(draftKey);
       setSubmitted({ referenceId: r.referenceId, tenantSlug: r.tenantSlug });
     },
     onError: (e: any) => {
@@ -489,6 +530,9 @@ export default function ProposalApplyPage() {
             <Badge variant="outline" className="mb-3" style={{ borderColor: `${primary}50`, color: primary }}>
               Personalised application
             </Badge>
+            <Badge variant="secondary" className="mb-3 ml-2" data-testid="text-proposal-public-id">
+              Proposal ID: {proposal!.publicId}
+            </Badge>
             <h1 className="text-2xl sm:text-3xl font-bold mb-2" data-testid="text-proposal-title">
               {proposal!.destinationCountry} {proposal!.visaType}
             </h1>
@@ -548,7 +592,11 @@ export default function ProposalApplyPage() {
                   These details are pre-filled from your agency proposal. You can correct customer contact details before submitting.
                 </p>
 
-                <div className="mb-5 grid gap-3 lg:grid-cols-3">
+                <div className="mb-5 grid gap-3 lg:grid-cols-4">
+                  <div className="rounded-lg border bg-muted/20 p-4">
+                    <div className="text-xs uppercase tracking-wide text-muted-foreground">Proposal ID</div>
+                    <div className="mt-1 break-all text-lg font-semibold">{proposal!.publicId}</div>
+                  </div>
                   <div className="rounded-lg border bg-muted/20 p-4">
                     <div className="text-xs uppercase tracking-wide text-muted-foreground">Destination country</div>
                     <div className="mt-1 text-lg font-semibold">{proposal!.destinationCountry}</div>
@@ -569,32 +617,12 @@ export default function ProposalApplyPage() {
 
                 <div className="grid sm:grid-cols-2 gap-3">
                   <div className="sm:col-span-2">
-                    <Label htmlFor="apply-name">Full name (as on passport) <span className="text-red-500">*</span></Label>
+                    <Label htmlFor="apply-name">Customer name <span className="text-red-500">*</span></Label>
                     <Input
                       id="apply-name"
                       value={form.applicantName}
                       onChange={(e) => setForm({ ...form, applicantName: e.target.value })}
                       data-testid="input-applicant-name"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="apply-dob">Date of birth</Label>
-                    <Input
-                      id="apply-dob"
-                      type="date"
-                      value={form.applicantDob}
-                      onChange={(e) => setForm({ ...form, applicantDob: e.target.value })}
-                      data-testid="input-dob"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="apply-travel">Planned travel date</Label>
-                    <Input
-                      id="apply-travel"
-                      type="date"
-                      value={form.travelDate}
-                      onChange={(e) => setForm({ ...form, travelDate: e.target.value })}
-                      data-testid="input-travel-date"
                     />
                   </div>
                   <div>
@@ -616,17 +644,6 @@ export default function ProposalApplyPage() {
                       onChange={(e) => setForm({ ...form, phone: e.target.value })}
                       placeholder="+1 234 567 8900"
                       data-testid="input-phone"
-                    />
-                  </div>
-                  <div className="sm:col-span-2">
-                    <Label htmlFor="apply-notes">Anything we should know?</Label>
-                    <Textarea
-                      id="apply-notes"
-                      value={form.notes}
-                      onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                      rows={3}
-                      placeholder="Past visa rejections, urgent travel dates, special requirements..."
-                      data-testid="input-applicant-notes"
                     />
                   </div>
                 </div>
@@ -1180,6 +1197,9 @@ export default function ProposalApplyPage() {
                 Your data is sent securely to {tenant!.name} only.
               </div>
               <div className="flex flex-col-reverse gap-2 sm:flex-row">
+                <Button variant="outline" onClick={saveDraft} data-testid="button-save-proposal-draft">
+                  Save draft
+                </Button>
                 {step > 1 && (
                   <Button variant="outline" onClick={goBack} data-testid="button-step-back">
                     Back

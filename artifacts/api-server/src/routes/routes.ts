@@ -1778,6 +1778,26 @@ export async function registerRoutes(
 
   // --- Public proposal endpoints (no auth — token IS the credential) ---
 
+  const formatProposalPublicId = (token: string) => `VS-${token}`;
+
+  app.get("/api/proposals/lookup/:proposalId", async (req, res) => {
+    const raw = String(req.params.proposalId ?? "").trim();
+    const token = raw.toLowerCase().startsWith("vs-") ? raw.slice(3) : raw;
+    const proposal = await storage.getProposalByToken(token);
+    if (!proposal) return res.status(404).json({ error: "Proposal not found." });
+    if (proposal.status === "revoked") return res.status(410).json({ error: "This proposal has been revoked." });
+    if (proposal.expiresAt && proposal.expiresAt.getTime() < Date.now()) {
+      return res.status(410).json({ error: "This proposal has expired." });
+    }
+    res.json({
+      publicId: formatProposalPublicId(proposal.token),
+      url: `/p/${proposal.token}`,
+      status: proposal.status,
+      destinationCountry: proposal.destinationCountry,
+      visaType: proposal.visaType,
+    });
+  });
+
   // Returns the proposal + minimal tenant branding so the public apply page
   // can render the right colors and logo. Marks the proposal as "viewed" on
   // the first hit so the agency can see when the customer opened the link.
@@ -1818,6 +1838,7 @@ export async function registerRoutes(
       proposal: {
         id: proposal.id,
         token: proposal.token,
+        publicId: formatProposalPublicId(proposal.token),
         customerName: proposal.customerName,
         customerEmail: proposal.customerEmail,
         customerPhone: proposal.customerPhone,

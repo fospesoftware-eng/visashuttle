@@ -637,7 +637,7 @@ function ApplicationSettingsTab({ tenantId }: { tenantId?: string }) {
 function PaymentsTab({ tenantId }: { tenantId?: string }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { data: cfg, isLoading } = useQuery<any>({
+  const { data: cfg, isLoading: gatewayLoading } = useQuery<any>({
     queryKey: ["/api/tenants", tenantId, "payment-gateway-config"],
     queryFn: async () => {
       const res = await fetch(`/api/tenants/${tenantId}/payment-gateway-config`, { credentials: "include" });
@@ -646,10 +646,25 @@ function PaymentsTab({ tenantId }: { tenantId?: string }) {
     },
     enabled: !!tenantId,
   });
+  const { data: invoiceSettings, isLoading: offlineLoading } = useQuery<any | null>({
+    queryKey: ["/api/tenants", tenantId, "invoice-settings"],
+    queryFn: async () => {
+      const res = await fetch(`/api/tenants/${tenantId}/invoice-settings`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load offline payment settings");
+      return res.json();
+    },
+    enabled: !!tenantId,
+  });
 
   const [form, setForm] = useState({
     enabled: false, mode: "test" as "test" | "live", apiVersion: "2023-08-01",
     testClientId: "", testClientSecret: "", liveClientId: "", liveClientSecret: "", webhookSecret: "",
+  });
+  const [offlineForm, setOfflineForm] = useState({
+    paymentInstructions: "",
+    bankDetails: "",
+    upiId: "",
+    upiQrFileUrl: "",
   });
   const [showSecret, setShowSecret] = useState({ test: false, live: false, webhook: false });
 
@@ -667,6 +682,17 @@ function PaymentsTab({ tenantId }: { tenantId?: string }) {
       });
     }
   }, [cfg]);
+
+  useEffect(() => {
+    if (invoiceSettings) {
+      setOfflineForm({
+        paymentInstructions: invoiceSettings.paymentInstructions || "",
+        bankDetails: invoiceSettings.bankDetails || "",
+        upiId: invoiceSettings.upiId || "",
+        upiQrFileUrl: invoiceSettings.upiQrFileUrl || "",
+      });
+    }
+  }, [invoiceSettings]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -692,7 +718,25 @@ function PaymentsTab({ tenantId }: { tenantId?: string }) {
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  if (isLoading) {
+  const saveOfflineMutation = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        paymentInstructions: offlineForm.paymentInstructions.trim() || null,
+        bankDetails: offlineForm.bankDetails.trim() || null,
+        upiId: offlineForm.upiId.trim() || null,
+        upiQrFileUrl: offlineForm.upiQrFileUrl || null,
+      };
+      const res = await apiRequest("PUT", `/api/tenants/${tenantId}/invoice-settings`, payload);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "invoice-settings"] });
+      toast({ title: "Saved", description: "Offline payment methods updated." });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  if (gatewayLoading || offlineLoading) {
     return <Card><CardContent className="p-8 text-center text-muted-foreground">Loading...</CardContent></Card>;
   }
 
@@ -700,6 +744,89 @@ function PaymentsTab({ tenantId }: { tenantId?: string }) {
 
   return (
     <div className="space-y-6 max-w-3xl">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <CreditCard className="w-4 h-4" />
+            Offline Payment Methods
+          </CardTitle>
+          <CardDescription>
+            These bank and UPI details are shown on customer proposal links when they choose offline payment.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label>Payment Instructions</Label>
+            <Textarea
+              value={offlineForm.paymentInstructions}
+              onChange={(e) => setOfflineForm({ ...offlineForm, paymentInstructions: e.target.value })}
+              placeholder="Example: Upload payment receipt after bank transfer or UPI payment."
+              rows={3}
+              data-testid="input-offline-payment-instructions"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Bank Information</Label>
+            <Textarea
+              value={offlineForm.bankDetails}
+              onChange={(e) => setOfflineForm({ ...offlineForm, bankDetails: e.target.value })}
+              placeholder={"Bank name\nAccount holder\nAccount number\nIFSC / SWIFT"}
+              rows={5}
+              data-testid="input-offline-bank-details"
+            />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>UPI ID</Label>
+              <Input
+                value={offlineForm.upiId}
+                onChange={(e) => setOfflineForm({ ...offlineForm, upiId: e.target.value.trim() })}
+                placeholder="agency@upi"
+                data-testid="input-offline-upi-id"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>UPI QR</Label>
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (file.size > 2 * 1024 * 1024) {
+                    toast({ title: "QR too large", description: "Please upload a QR image under 2 MB.", variant: "destructive" });
+                    return;
+                  }
+                  const reader = new FileReader();
+                  reader.onload = () => setOfflineForm((f) => ({ ...f, upiQrFileUrl: String(reader.result || "") }));
+                  reader.readAsDataURL(file);
+                }}
+                data-testid="input-offline-upi-qr"
+              />
+              {offlineForm.upiQrFileUrl && (
+                <div className="flex items-center gap-3">
+                  <img src={offlineForm.upiQrFileUrl} alt="UPI QR preview" className="h-20 w-20 rounded-md border bg-white object-contain p-1" />
+                  <Button variant="outline" size="sm" onClick={() => setOfflineForm({ ...offlineForm, upiQrFileUrl: "" })}>
+                    Remove QR
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button
+              onClick={() => saveOfflineMutation.mutate()}
+              disabled={saveOfflineMutation.isPending}
+              className="gap-2"
+              data-testid="button-save-offline-payments"
+            >
+              {saveOfflineMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              Save Offline Payment Methods
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
