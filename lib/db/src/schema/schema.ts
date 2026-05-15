@@ -126,12 +126,14 @@ export const proposals = pgTable("proposals", {
   appliedCaseId: varchar("applied_case_id"),
   appliedAt: timestamp("applied_at"),
   viewedAt: timestamp("viewed_at"),
+  customerDraftData: jsonb("customer_draft_data"),
+  customerDraftSavedAt: timestamp("customer_draft_saved_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const insertProposalSchema = createInsertSchema(proposals).omit({
-  id: true, createdAt: true, updatedAt: true, appliedCaseId: true, appliedAt: true, viewedAt: true,
+  id: true, createdAt: true, updatedAt: true, appliedCaseId: true, appliedAt: true, viewedAt: true, customerDraftData: true, customerDraftSavedAt: true,
 });
 export type InsertProposal = z.infer<typeof insertProposalSchema>;
 export type Proposal = typeof proposals.$inferSelect;

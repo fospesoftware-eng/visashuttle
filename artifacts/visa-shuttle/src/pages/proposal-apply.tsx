@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Loader2, CheckCircle2, AlertCircle, ClipboardList, Building2,
   Mail, Phone, FileText, ArrowRight, ShieldCheck, CreditCard,
@@ -82,6 +82,15 @@ interface ProposalPublicData {
     status: string;
     appliedCaseId: string | null;
     expiresAt: string | null;
+    customerDraftData?: {
+      form?: Record<string, unknown>;
+      documents?: ProposalDocumentUpload[];
+      passportFileName?: string;
+      paymentChoice?: "online" | "offline" | "later";
+      offlinePaymentReference?: string;
+      savedAt?: string;
+    } | null;
+    customerDraftSavedAt?: string | null;
   };
   payment?: {
     amountCents: number | null;
@@ -110,6 +119,7 @@ interface ProposalPublicData {
 export default function ProposalApplyPage() {
   const { token } = useParams<{ token: string }>();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [submitted, setSubmitted] = useState<{ referenceId: string; tenantSlug: string | null } | null>(null);
   const [step, setStep] = useState(1);
   const [documents, setDocuments] = useState<ProposalDocumentUpload[]>([]);
@@ -129,7 +139,6 @@ export default function ProposalApplyPage() {
   const proposal = data?.proposal;
   const payment = data?.payment;
   const tenant = data?.tenant;
-  const draftKey = token ? `proposal-draft:${token}` : "";
 
   const checklist = useMemo(() => {
     if (!proposal) return [];
@@ -168,42 +177,43 @@ export default function ProposalApplyPage() {
   }, [proposal?.id]); // eslint-disable-line
 
   useEffect(() => {
-    if (!draftKey || draftRestored) return;
+    if (!proposal || draftRestored) return;
     setDraftRestored(true);
-    try {
-      const raw = window.localStorage.getItem(draftKey);
-      if (!raw) return;
-      const draft = JSON.parse(raw);
-      if (draft.form) setForm((f) => ({ ...f, ...draft.form }));
-      if (Array.isArray(draft.documents)) setDocuments(draft.documents);
-      if (draft.passportFileName) setPassportFileName(draft.passportFileName);
-      if (draft.paymentChoice) setPaymentChoice(draft.paymentChoice);
-      if (draft.offlinePaymentReference) setOfflinePaymentReference(draft.offlinePaymentReference);
-    } catch {
-      window.localStorage.removeItem(draftKey);
-    }
-  }, [draftKey, draftRestored]);
+    const draft = proposal.customerDraftData;
+    if (!draft) return;
+    if (draft.form) setForm((f) => ({ ...f, ...draft.form }));
+    if (Array.isArray(draft.documents)) setDocuments(draft.documents);
+    if (draft.passportFileName) setPassportFileName(draft.passportFileName);
+    if (draft.paymentChoice) setPaymentChoice(draft.paymentChoice);
+    if (draft.offlinePaymentReference) setOfflinePaymentReference(draft.offlinePaymentReference);
+    toast({ title: "Draft restored", description: "Your previously saved proposal draft was loaded from the database." });
+  }, [proposal?.id, draftRestored]);
 
-  const saveDraft = () => {
-    if (!draftKey) return;
-    try {
-      window.localStorage.setItem(draftKey, JSON.stringify({
-        form,
-        documents,
-        passportFileName,
-        paymentChoice,
-        offlinePaymentReference,
-        savedAt: new Date().toISOString(),
-      }));
-      toast({ title: "Draft saved", description: "You can return to this proposal link and continue later." });
-    } catch {
+  const saveDraftMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PUT", `/api/proposals/${token}/draft`, {
+        draft: {
+          form,
+          documents,
+          passportFileName,
+          paymentChoice,
+          offlinePaymentReference,
+        },
+      });
+      return res.json() as Promise<{ success: boolean; savedAt: string }>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals", token] });
+      toast({ title: "Draft saved", description: "Your proposal draft is saved in the database and can be continued later." });
+    },
+    onError: (e: any) => {
       toast({
         title: "Could not save draft",
-        description: "Your browser storage may be full. Try removing large uploads before saving.",
+        description: e?.message ?? "Please try again.",
         variant: "destructive",
       });
-    }
-  };
+    },
+  });
 
   const applyMutation = useMutation({
     mutationFn: async () => {
@@ -227,7 +237,7 @@ export default function ProposalApplyPage() {
       return res.json() as Promise<{ success: boolean; referenceId: string; caseNumber: string; tenantSlug: string | null }>;
     },
     onSuccess: (r) => {
-      if (draftKey) window.localStorage.removeItem(draftKey);
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals", token] });
       setSubmitted({ referenceId: r.referenceId, tenantSlug: r.tenantSlug });
     },
     onError: (e: any) => {
@@ -1199,7 +1209,13 @@ export default function ProposalApplyPage() {
                 Your data is sent securely to {tenant!.name} only.
               </div>
               <div className="flex flex-col-reverse gap-2 sm:flex-row">
-                <Button variant="outline" onClick={saveDraft} data-testid="button-save-proposal-draft">
+                <Button
+                  variant="outline"
+                  onClick={() => saveDraftMutation.mutate()}
+                  disabled={saveDraftMutation.isPending}
+                  data-testid="button-save-proposal-draft"
+                >
+                  {saveDraftMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                   Save draft
                 </Button>
                 {step > 1 && (

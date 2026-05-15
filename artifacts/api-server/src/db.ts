@@ -5,7 +5,10 @@ import * as schema from "@workspace/db";
 export const hasDatabase = Boolean(process.env.DATABASE_URL);
 
 if (!hasDatabase) {
-  console.warn("[DB] DATABASE_URL is not set. Falling back to in-memory storage.");
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("[DB] DATABASE_URL is required in production so application data is persisted.");
+  }
+  console.warn("[DB] DATABASE_URL is not set. Falling back to in-memory storage for local development only.");
 }
 
 export const pool = hasDatabase

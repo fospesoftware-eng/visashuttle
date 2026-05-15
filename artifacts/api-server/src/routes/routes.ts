@@ -19,6 +19,26 @@ type DocumentRequirement = {
   required: boolean;
 };
 
+function sanitizeProposalDraftPayload(raw: unknown) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const draft = raw as Record<string, unknown>;
+  const documents = Array.isArray(draft.documents) ? draft.documents.slice(0, 30) : [];
+  for (const item of documents) {
+    if (!item || typeof item !== "object") continue;
+    const fileUrl = (item as any).fileUrl;
+    if (typeof fileUrl === "string" && fileUrl.startsWith("data:") && fileUrl.length > 11 * 1024 * 1024) {
+      throw new Error("One of the draft uploads is too large. Please upload files under 8 MB.");
+    }
+  }
+  return {
+    form: draft.form && typeof draft.form === "object" && !Array.isArray(draft.form) ? draft.form : {},
+    documents,
+    passportFileName: typeof draft.passportFileName === "string" ? draft.passportFileName.slice(0, 240) : "",
+    paymentChoice: ["online", "offline", "later"].includes(String(draft.paymentChoice)) ? draft.paymentChoice : "later",
+    offlinePaymentReference: typeof draft.offlinePaymentReference === "string" ? draft.offlinePaymentReference.slice(0, 500) : "",
+  };
+}
+
 // ── Rate limiters ─────────────────────────────────────────────────────────
 // Brute-force defence on credential endpoints. Limits are per-IP and reset
 // each window. They're intentionally permissive enough not to break a real
@@ -1850,6 +1870,8 @@ export async function registerRoutes(
         status: proposal.status === "sent" ? "viewed" : proposal.status,
         appliedCaseId: proposal.appliedCaseId,
         expiresAt: proposal.expiresAt,
+        customerDraftData: proposal.customerDraftData ?? null,
+        customerDraftSavedAt: proposal.customerDraftSavedAt ?? null,
       },
       payment: {
         amountCents: proposal.estimateAmountCents,
@@ -1874,6 +1896,33 @@ export async function registerRoutes(
       checklist: documentChecklist.checklist,
       checklistSource: documentChecklist.source,
     });
+  });
+
+  app.put("/api/proposals/:token/draft", async (req, res) => {
+    try {
+      const proposal = await storage.getProposalByToken(req.params.token);
+      if (!proposal) return res.status(404).json({ error: "Invalid proposal link." });
+      if (proposal.status === "revoked") return res.status(410).json({ error: "This proposal has been revoked." });
+      if (proposal.appliedCaseId) return res.status(409).json({ error: "This proposal has already been submitted." });
+      if (proposal.expiresAt && proposal.expiresAt.getTime() < Date.now()) {
+        return res.status(410).json({ error: "This proposal has expired." });
+      }
+      const draft = sanitizeProposalDraftPayload(req.body?.draft);
+      if (!draft) return res.status(400).json({ error: "Draft data is required." });
+      const savedAt = new Date();
+      const updated = await storage.updateProposal(proposal.id, {
+        customerDraftData: { ...draft, savedAt: savedAt.toISOString() },
+        customerDraftSavedAt: savedAt,
+      } as any);
+      res.json({
+        success: true,
+        savedAt,
+        draft: updated?.customerDraftData ?? { ...draft, savedAt: savedAt.toISOString() },
+      });
+    } catch (err: any) {
+      const message = err?.message ?? "Could not save proposal draft.";
+      res.status(message.includes("too large") ? 413 : 500).json({ error: message });
+    }
   });
 
   app.post("/api/proposals/:token/passport/scan", async (req, res) => {
@@ -2093,6 +2142,8 @@ export async function registerRoutes(
       status: "applied",
       appliedCaseId: newCase.id,
       appliedAt: new Date(),
+      customerDraftData: null,
+      customerDraftSavedAt: null,
       // If the customer corrected their email/phone on the form, save it back
       // on the proposal so the agency sees what the customer actually entered.
       customerEmail: email?.trim() || proposal.customerEmail,

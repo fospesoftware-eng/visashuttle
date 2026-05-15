@@ -67,6 +67,10 @@ function isMissingRelationError(error: unknown): boolean {
   return isMissingRelationError(err.cause);
 }
 
+function shouldUseMemoryFallback(error: unknown): boolean {
+  return process.env.NODE_ENV !== "production" && isMissingRelationError(error);
+}
+
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
@@ -841,6 +845,8 @@ export class MemStorage implements IStorage {
       appliedCaseId: null,
       appliedAt: null,
       viewedAt: null,
+      customerDraftData: null,
+      customerDraftSavedAt: null,
       createdAt: now,
       updatedAt: now,
     };
@@ -1954,7 +1960,9 @@ export class MemStorage implements IStorage {
   }
 }
 
-// HybridStorage: uses MemStorage for agency/seed data, PostgreSQL for B2C user data
+// HybridStorage: uses PostgreSQL for DB-backed production data. Local
+// development can still fall back to seeded in-memory data if a newly added
+// optional table has not been pushed yet.
 class HybridStorage extends MemStorage {
   async getProposalsByTenantId(tenantId: string): Promise<Proposal[]> {
     try {
@@ -1964,7 +1972,7 @@ class HybridStorage extends MemStorage {
         .where(eq(proposalsTable.tenantId, tenantId))
         .orderBy(desc(proposalsTable.createdAt));
     } catch (error) {
-      if (isMissingRelationError(error)) return super.getProposalsByTenantId(tenantId);
+      if (shouldUseMemoryFallback(error)) return super.getProposalsByTenantId(tenantId);
       throw error;
     }
   }
@@ -1974,7 +1982,7 @@ class HybridStorage extends MemStorage {
       const rows = await db.select().from(proposalsTable).where(eq(proposalsTable.id, id)).limit(1);
       return rows[0] ?? undefined;
     } catch (error) {
-      if (isMissingRelationError(error)) return super.getProposal(id);
+      if (shouldUseMemoryFallback(error)) return super.getProposal(id);
       throw error;
     }
   }
@@ -1985,7 +1993,7 @@ class HybridStorage extends MemStorage {
       const rows = await db.select().from(proposalsTable).where(eq(proposalsTable.token, token)).limit(1);
       return rows[0] ?? undefined;
     } catch (error) {
-      if (isMissingRelationError(error)) return super.getProposalByToken(token);
+      if (shouldUseMemoryFallback(error)) return super.getProposalByToken(token);
       throw error;
     }
   }
@@ -1995,7 +2003,7 @@ class HybridStorage extends MemStorage {
       const rows = await db.insert(proposalsTable).values(data).returning();
       return rows[0];
     } catch (error) {
-      if (isMissingRelationError(error)) return super.createProposal(data);
+      if (shouldUseMemoryFallback(error)) return super.createProposal(data);
       throw error;
     }
   }
@@ -2009,7 +2017,7 @@ class HybridStorage extends MemStorage {
         .returning();
       return rows[0] ?? undefined;
     } catch (error) {
-      if (isMissingRelationError(error)) return super.updateProposal(id, data);
+      if (shouldUseMemoryFallback(error)) return super.updateProposal(id, data);
       throw error;
     }
   }
@@ -2022,7 +2030,7 @@ class HybridStorage extends MemStorage {
         .returning({ id: proposalsTable.id });
       return rows.length > 0;
     } catch (error) {
-      if (isMissingRelationError(error)) return super.deleteProposal(id);
+      if (shouldUseMemoryFallback(error)) return super.deleteProposal(id);
       throw error;
     }
   }
@@ -2031,7 +2039,7 @@ class HybridStorage extends MemStorage {
     try {
       return await db.select().from(proposalsTable).orderBy(desc(proposalsTable.createdAt));
     } catch (error) {
-      if (isMissingRelationError(error)) return super.getAllProposals();
+      if (shouldUseMemoryFallback(error)) return super.getAllProposals();
       throw error;
     }
   }
@@ -2039,9 +2047,9 @@ class HybridStorage extends MemStorage {
   async getTenantDocumentChecklists(tenantId: string): Promise<TenantDocumentChecklist[]> {
     try {
       const rows = await db.select().from(tenantDocumentChecklistsTable).where(eq(tenantDocumentChecklistsTable.tenantId, tenantId));
-      return rows.sort((a, b) => a.country.localeCompare(b.country) || a.visaType.localeCompare(b.visaType));
+      return rows.sort((a: TenantDocumentChecklist, b: TenantDocumentChecklist) => a.country.localeCompare(b.country) || a.visaType.localeCompare(b.visaType));
     } catch (error) {
-      if (isMissingRelationError(error)) return super.getTenantDocumentChecklists(tenantId);
+      if (shouldUseMemoryFallback(error)) return super.getTenantDocumentChecklists(tenantId);
       throw error;
     }
   }
@@ -2055,7 +2063,7 @@ class HybridStorage extends MemStorage {
       )).limit(1);
       return rows[0] ?? undefined;
     } catch (error) {
-      if (isMissingRelationError(error)) return super.getTenantDocumentChecklist(tenantId, country, visaType);
+      if (shouldUseMemoryFallback(error)) return super.getTenantDocumentChecklist(tenantId, country, visaType);
       throw error;
     }
   }
@@ -2078,7 +2086,7 @@ class HybridStorage extends MemStorage {
       }).returning();
       return rows[0];
     } catch (error) {
-      if (isMissingRelationError(error)) return super.upsertTenantDocumentChecklist(tenantId, country, visaType, requirements);
+      if (shouldUseMemoryFallback(error)) return super.upsertTenantDocumentChecklist(tenantId, country, visaType, requirements);
       throw error;
     }
   }
@@ -2092,7 +2100,7 @@ class HybridStorage extends MemStorage {
       )).returning({ id: tenantDocumentChecklistsTable.id });
       return rows.length > 0;
     } catch (error) {
-      if (isMissingRelationError(error)) return super.deleteTenantDocumentChecklist(tenantId, country, visaType);
+      if (shouldUseMemoryFallback(error)) return super.deleteTenantDocumentChecklist(tenantId, country, visaType);
       throw error;
     }
   }
@@ -2136,25 +2144,21 @@ class HybridStorage extends MemStorage {
     }
   }
 
-  // B2C Users — persisted to DB, with in-memory fallback for seeded demo/test accounts
+  // B2C Users — persisted to DB. Demo/test accounts are seeded into DB on
+  // startup; once a database exists, never fall back to memory for these users.
   async getB2cUser(id: string): Promise<B2cUser | undefined> {
     const rows = await db.select().from(b2cUsers).where(eq(b2cUsers.id, id)).limit(1);
-    if (rows[0]) return rows[0];
-    // Fallback to in-memory seeded users (demo/test accounts)
-    return super.getB2cUser(id);
+    return rows[0];
   }
 
   async getB2cUserByEmail(email: string): Promise<B2cUser | undefined> {
     const rows = await db.select().from(b2cUsers).where(eq(b2cUsers.email, email.toLowerCase())).limit(1);
-    if (rows[0]) return rows[0];
-    // Fallback to in-memory seeded users (demo/test accounts)
-    return super.getB2cUserByEmail(email);
+    return rows[0];
   }
 
   async getB2cUserByPhone(phone: string): Promise<B2cUser | undefined> {
     const rows = await db.select().from(b2cUsers).where(eq(b2cUsers.phone, phone)).limit(1);
-    if (rows[0]) return rows[0];
-    return super.getB2cUserByPhone(phone);
+    return rows[0];
   }
 
   async createB2cUser(user: InsertB2cUser): Promise<B2cUser> {
@@ -2166,23 +2170,17 @@ class HybridStorage extends MemStorage {
   }
 
   async getAllB2cUsers(): Promise<B2cUser[]> {
-    const rows = await db.select().from(b2cUsers).orderBy(desc(b2cUsers.createdAt));
-    const memoryUsers = await super.getAllB2cUsers();
-    const existingIds = new Set(rows.map(user => user.id));
-    const fallbackUsers = memoryUsers.filter(user => !existingIds.has(user.id));
-    return [...rows, ...fallbackUsers];
+    return db.select().from(b2cUsers).orderBy(desc(b2cUsers.createdAt));
   }
 
   async updateB2cUser(id: string, data: Partial<Omit<B2cUser, 'id' | 'createdAt'>>): Promise<B2cUser | undefined> {
     const rows = await db.update(b2cUsers).set(data).where(eq(b2cUsers.id, id)).returning();
-    if (rows[0]) return rows[0];
-    return super.updateB2cUser(id, data);
+    return rows[0];
   }
 
   async deleteB2cUser(id: string): Promise<boolean> {
     const rows = await db.delete(b2cUsers).where(eq(b2cUsers.id, id)).returning({ id: b2cUsers.id });
-    if (rows.length > 0) return true;
-    return super.deleteB2cUser(id);
+    return rows.length > 0;
   }
 
   // Visa Checks — persisted to DB
@@ -2228,7 +2226,7 @@ class HybridStorage extends MemStorage {
       const rows = await db.select().from(smsConfigTable).limit(1);
       return rows[0];
     } catch (error) {
-      if (isMissingRelationError(error)) {
+      if (shouldUseMemoryFallback(error)) {
         console.warn("[DB] sms_config table is missing. Using in-memory SMS config fallback.");
         return super.getSmsConfig();
       }
@@ -2251,7 +2249,7 @@ class HybridStorage extends MemStorage {
       }).returning();
       return rows[0];
     } catch (error) {
-      if (isMissingRelationError(error)) {
+      if (shouldUseMemoryFallback(error)) {
         console.warn("[DB] sms_config table is missing. Saving SMS config in memory only.");
         return super.upsertSmsConfig(data);
       }
@@ -2265,7 +2263,7 @@ class HybridStorage extends MemStorage {
       const rows = await db.select().from(platformAiConfigTable).limit(1);
       return rows[0];
     } catch (error) {
-      if (isMissingRelationError(error)) {
+      if (shouldUseMemoryFallback(error)) {
         console.warn("[DB] platform_ai_config table is missing. Using in-memory AI config fallback.");
         return super.getPlatformAiConfig();
       }
@@ -2288,7 +2286,7 @@ class HybridStorage extends MemStorage {
       }).returning();
       return rows[0];
     } catch (error) {
-      if (isMissingRelationError(error)) {
+      if (shouldUseMemoryFallback(error)) {
         console.warn("[DB] platform_ai_config table is missing. Saving AI config in memory only.");
         return super.upsertPlatformAiConfig(data);
       }
@@ -2302,7 +2300,7 @@ class HybridStorage extends MemStorage {
       const rows = await db.select().from(paymentGatewayConfigTable).limit(1);
       return rows[0];
     } catch (error) {
-      if (isMissingRelationError(error)) {
+      if (shouldUseMemoryFallback(error)) {
         console.warn("[DB] payment_gateway_config table is missing. Using in-memory payment config fallback.");
         return super.getPaymentGatewayConfig();
       }
@@ -2327,7 +2325,7 @@ class HybridStorage extends MemStorage {
       }).returning();
       return rows[0];
     } catch (error) {
-      if (isMissingRelationError(error)) {
+      if (shouldUseMemoryFallback(error)) {
         console.warn("[DB] payment_gateway_config table is missing. Saving payment config in memory only.");
         return super.upsertPaymentGatewayConfig(data);
       }
