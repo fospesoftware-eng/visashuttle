@@ -1,7 +1,8 @@
 import { Link } from "wouter";
 import { 
-  Plane, Shield, Zap, FileCheck, Brain, Users, 
-  CheckCircle, ArrowRight, Globe, Clock, Star, Code2, WalletCards, KeyRound, Activity
+  Shield, Zap, FileCheck, Brain, Users, 
+  CheckCircle, ArrowRight, Globe, Star, Code2, WalletCards, KeyRound, Activity,
+  Building2, Sparkles, Receipt, Layers3, BadgeCheck, BarChart3
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -46,6 +47,13 @@ const stats = [
   { value: "24/7", label: "Support" }
 ];
 
+const workflow = [
+  { label: "Lead capture", value: "Portal + forms", icon: Users },
+  { label: "AI document review", value: "Auto gaps", icon: Brain },
+  { label: "Proposal to payment", value: "One journey", icon: Receipt },
+  { label: "Visa operations", value: "Tracked status", icon: BarChart3 },
+];
+
 const testimonials = [
   {
     quote: "Visa Shuttle transformed our agency. We process 3x more applications with the same team.",
@@ -80,68 +88,239 @@ const apiPlans = [
   { name: "Reseller Keys", price: "Usage wallet", icon: KeyRound, description: "Issue scoped keys and monitor usage across branches or partner brands." },
 ];
 
+const planCategories = [
+  {
+    name: "Agency CRM",
+    icon: Building2,
+    badge: "Best for visa teams",
+    description: "Run leads, customers, proposals, documents, payments, and applications in one branded agency workspace.",
+    plans: ["Starter", "Professional", "Enterprise"],
+    cta: "Start agency workspace",
+    href: "/agency-register",
+  },
+  {
+    name: "Business API",
+    icon: Code2,
+    badge: "Pay as you go",
+    description: "Add Visa Shuttle AI into your website, CRM, booking engine, or partner portal without changing your current system.",
+    plans: ["Deep Check API", "Requirements API", "Reseller Keys"],
+    cta: "Start API wallet",
+    href: "/agency-register",
+  },
+  {
+    name: "Enterprise Network",
+    icon: Layers3,
+    badge: "Custom rollout",
+    description: "For large brands, multi-branch agencies, franchises, and reseller networks that need custom controls.",
+    plans: ["Custom pricing", "Dedicated support", "SLA"],
+    cta: "Contact sales",
+    href: "/agency-register",
+  },
+];
+
+const pricingPlans = [
+  {
+    category: "Agency CRM",
+    name: "Starter",
+    price: "$49",
+    period: "/mo",
+    description: "For small agencies moving away from spreadsheets.",
+    features: ["Up to 50 cases/month", "2 team members", "Basic document checks", "Email support"],
+    cta: "Get Started Free",
+    variant: "outline" as const,
+  },
+  {
+    category: "Agency CRM",
+    name: "Professional",
+    price: "$149",
+    period: "/mo",
+    description: "For growing agencies that need AI checks and customer portals.",
+    features: ["Up to 200 cases/month", "10 team members", "AI document analysis", "Customer portal", "Priority support"],
+    cta: "Start Free Trial",
+    variant: "default" as const,
+    popular: true,
+  },
+  {
+    category: "API",
+    name: "Business API",
+    price: "Pay as you go",
+    period: "",
+    description: "For businesses that want standalone visa intelligence APIs.",
+    features: ["Deep Check API", "Visa requirements API", "Scoped API keys", "Usage wallet", "Reseller ready"],
+    cta: "Start API Wallet",
+    variant: "default" as const,
+    highlighted: true,
+  },
+  {
+    category: "Enterprise",
+    name: "Enterprise",
+    price: "Custom",
+    period: "",
+    description: "For large operations with branches, custom controls, or reseller networks.",
+    features: ["Unlimited cases", "Unlimited team members", "Custom AI training", "API access", "Dedicated support", "SLA guarantee"],
+    cta: "Contact Sales",
+    variant: "outline" as const,
+  },
+];
+
 export default function BusinessPage() {
   return (
     <div className="min-h-screen bg-background">
-      <section className="relative overflow-hidden py-20 md:py-32">
+      <section className="relative overflow-hidden py-16 md:py-24">
         <div className="absolute inset-0 gradient-subtle" />
-        <div className="absolute top-20 left-10 w-72 h-72 bg-primary/20 rounded-full blur-3xl" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-secondary/20 rounded-full blur-3xl" />
+        <div className="absolute left-[-10%] top-16 h-72 w-72 rounded-full bg-primary/15 blur-3xl" />
+        <div className="absolute bottom-8 right-[-8%] h-80 w-80 rounded-full bg-secondary/20 blur-3xl" />
         
-        <div className="relative max-w-7xl mx-auto px-4 text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
-            <Plane className="w-4 h-4" />
-            AI-Powered Visa Processing Platform
+        <div className="relative mx-auto grid max-w-7xl gap-12 px-4 lg:grid-cols-[1.02fr_0.98fr] lg:items-center">
+          <div>
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border bg-background/80 px-4 py-2 text-sm font-medium text-primary shadow-sm backdrop-blur">
+              <Sparkles className="h-4 w-4" />
+              AI visa operating system for agencies and API businesses
+            </div>
+            
+            <h1 className="mb-6 max-w-3xl text-4xl font-bold leading-tight md:text-6xl">
+              Grow your visa business with
+              <span className="gradient-text block">AI, portals, and APIs</span>
+            </h1>
+            
+            <p className="mb-8 max-w-2xl text-lg text-muted-foreground md:text-xl">
+              Visa Shuttle helps agencies convert leads, collect documents, run AI checks, collect fees, and manage applications. Businesses can also use standalone pay-as-you-go APIs inside their own products.
+            </p>
+            
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Link href="/agency-register">
+                <Button size="lg" className="gap-2 text-base" data-testid="button-hero-cta">
+                  Start Business Account
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+              <a href="#plans">
+                <Button size="lg" variant="outline" className="gap-2 text-base" data-testid="button-view-plans">
+                  Compare Plans
+                  <Layers3 className="h-4 w-4" />
+                </Button>
+              </a>
+            </div>
+
+            <div className="mt-10 grid grid-cols-2 gap-4 md:grid-cols-4">
+              {stats.map((stat) => (
+                <div key={stat.label} className="rounded-xl border bg-background/75 p-4 shadow-sm backdrop-blur">
+                  <p className="text-2xl font-bold gradient-text" data-testid={`stat-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}>
+                    {stat.value}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">{stat.label}</p>
+                </div>
+              ))}
+            </div>
           </div>
-          
-          <h1 className="text-4xl md:text-6xl font-bold mb-6 leading-tight">
-            Streamline Your
-            <span className="gradient-text block">Visa Processing</span>
-          </h1>
-          
-          <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
-            The complete platform for travel agencies to manage visa applications, 
-            automate document checks, and delight customers with real-time tracking.
-          </p>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/agency-register">
-              <Button size="lg" className="gap-2 text-base" data-testid="button-hero-cta">
-                Start Free Trial
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-            </Link>
-            <Button size="lg" variant="outline" className="gap-2 text-base" data-testid="button-demo">
-              <Clock className="w-4 h-4" />
-              Watch Demo
-            </Button>
-          </div>
-          
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mt-16 pt-8 border-t">
-            {stats.map((stat) => (
-              <div key={stat.label} className="text-center">
-                <p className="text-3xl font-bold gradient-text" data-testid={`stat-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}>
-                  {stat.value}
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">{stat.label}</p>
+
+          <div className="relative">
+            <div className="rounded-2xl border bg-card/95 p-4 shadow-xl">
+              <div className="rounded-xl border bg-muted/30 p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Today in your agency</p>
+                    <p className="text-2xl font-bold">32 active visa journeys</p>
+                  </div>
+                  <div className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                    AI ready
+                  </div>
+                </div>
+                <div className="mt-5 grid gap-3">
+                  {workflow.map((item) => (
+                    <div key={item.label} className="flex items-center gap-3 rounded-lg bg-background p-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <item.icon className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium">{item.label}</p>
+                        <p className="text-sm text-muted-foreground">{item.value}</p>
+                      </div>
+                      <CheckCircle className="h-5 w-5 text-primary" />
+                    </div>
+                  ))}
+                </div>
               </div>
+              <div className="mt-4 grid grid-cols-3 gap-3">
+                <div className="rounded-xl border bg-background p-4">
+                  <p className="text-xs text-muted-foreground">Docs checked</p>
+                  <p className="mt-1 text-xl font-bold">186</p>
+                </div>
+                <div className="rounded-xl border bg-background p-4">
+                  <p className="text-xs text-muted-foreground">Fees ready</p>
+                  <p className="mt-1 text-xl font-bold">14</p>
+                </div>
+                <div className="rounded-xl border bg-background p-4">
+                  <p className="text-xs text-muted-foreground">API calls</p>
+                  <p className="mt-1 text-xl font-bold">2.8k</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="models" className="py-16 md:py-24">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              Choose how you want to grow
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Use Visa Shuttle as a full agency platform, as standalone APIs, or as a custom enterprise network.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {planCategories.map((category) => (
+              <Card key={category.name} className="group hover-elevate" data-testid={`card-business-model-${category.name.toLowerCase().replace(/\s+/g, '-')}`}>
+                <CardContent className="p-6">
+                  <div className="mb-5 flex items-center justify-between gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <category.icon className="h-6 w-6" />
+                    </div>
+                    <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+                      {category.badge}
+                    </span>
+                  </div>
+                  <h3 className="mb-2 text-xl font-semibold">{category.name}</h3>
+                  <p className="mb-5 text-sm leading-6 text-muted-foreground">{category.description}</p>
+                  <div className="mb-6 flex flex-wrap gap-2">
+                    {category.plans.map((plan) => (
+                      <span key={plan} className="rounded-full border px-3 py-1 text-xs text-muted-foreground">
+                        {plan}
+                      </span>
+                    ))}
+                  </div>
+                  <Link href={category.href}>
+                    <Button variant={category.name === "Business API" ? "default" : "outline"} className="w-full gap-2">
+                      {category.cta}
+                      <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
             ))}
           </div>
         </div>
       </section>
 
-      <section id="features" className="py-20 md:py-32 bg-muted/30">
+      <section id="features" className="py-16 md:py-24 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Everything You Need to Process Visas
-            </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Powerful features designed specifically for travel agencies handling visa applications at scale.
-            </p>
-          </div>
-          
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
+            <div>
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary">
+                <BadgeCheck className="h-4 w-4" />
+                Built for visa operations
+              </div>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">
+                Everything a modern visa team needs
+              </h2>
+              <p className="text-lg text-muted-foreground">
+                Convert inquiries faster, reduce document mistakes, and give customers a polished self-service experience from proposal to final status.
+              </p>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
             {features.map((feature) => (
               <Card key={feature.title} className="hover-elevate" data-testid={`card-feature-${feature.title.toLowerCase().replace(/\s+/g, '-')}`}>
                 <CardContent className="p-6">
@@ -153,11 +332,12 @@ export default function BusinessPage() {
                 </CardContent>
               </Card>
             ))}
+            </div>
           </div>
         </div>
       </section>
 
-      <section id="business-api" className="py-20 md:py-32 bg-background">
+      <section id="business-api" className="py-16 md:py-24 bg-background">
         <div className="max-w-7xl mx-auto px-4">
           <div className="grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
             <div>
@@ -195,7 +375,7 @@ export default function BusinessPage() {
               </div>
             </div>
 
-            <div className="rounded-2xl border bg-card p-4 shadow-sm">
+            <div className="rounded-2xl border bg-card p-4 shadow-lg">
               <div className="grid gap-4">
                 <div className="rounded-xl border bg-muted/30 p-5">
                   <div className="flex items-center justify-between gap-4">
@@ -252,7 +432,70 @@ export default function BusinessPage() {
         </div>
       </section>
 
-      <section id="testimonials" className="py-20 md:py-32">
+      <section id="plans" className="py-16 md:py-24 bg-muted/30">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="mb-12 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary">
+                <WalletCards className="h-4 w-4" />
+                Categorized plans
+              </div>
+              <h2 className="text-3xl md:text-4xl font-bold mb-3">
+                Pick the business plan that matches your model
+              </h2>
+              <p className="max-w-2xl text-lg text-muted-foreground">
+                Start with agency CRM, connect APIs when you need them, or build a larger enterprise rollout.
+              </p>
+            </div>
+            <Link href="/agency-register">
+              <Button size="lg" className="gap-2">
+                Create Business Account
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+          
+          <div className="grid gap-6 lg:grid-cols-4">
+            {pricingPlans.map((plan) => (
+              <Card
+                key={plan.name}
+                className={`relative hover-elevate ${plan.popular || plan.highlighted ? "border-primary shadow-md" : ""}`}
+                data-testid={`card-pricing-${plan.name.toLowerCase().replace(/\s+/g, '-')}`}
+              >
+                {(plan.popular || plan.highlighted) && (
+                  <div className="absolute -top-3 left-5 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground">
+                    {plan.popular ? "Most Popular" : "Standalone API"}
+                  </div>
+                )}
+                <CardContent className="flex h-full flex-col p-6">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-normal text-primary">{plan.category}</p>
+                  <h3 className="text-xl font-semibold mb-2">{plan.name}</h3>
+                  <p className="min-h-[48px] text-sm text-muted-foreground">{plan.description}</p>
+                  <p className="my-6 text-3xl font-bold">
+                    {plan.price}
+                    {plan.period && <span className="text-base font-normal text-muted-foreground">{plan.period}</span>}
+                  </p>
+                  <ul className="mb-6 flex-1 space-y-3">
+                    {plan.features.map((feature) => (
+                      <li key={feature} className="flex items-center gap-2 text-sm">
+                        <CheckCircle className="h-4 w-4 flex-shrink-0 text-primary" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link href="/agency-register">
+                    <Button variant={plan.variant} className="w-full" data-testid={`button-pricing-${plan.name.toLowerCase().replace(/\s+/g, '-')}`}>
+                      {plan.cta}
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="testimonials" className="py-16 md:py-24">
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
@@ -289,87 +532,18 @@ export default function BusinessPage() {
         </div>
       </section>
 
-      <section id="pricing" className="py-20 md:py-32 bg-muted/30">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Simple, Transparent Pricing
-            </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Choose the plan that fits your agency. All plans include a 14-day free trial.
-            </p>
-          </div>
-          
-          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            <Card className="hover-elevate" data-testid="card-pricing-starter">
-              <CardContent className="p-6">
-                <h3 className="text-lg font-semibold mb-2">Starter</h3>
-                <p className="text-muted-foreground text-sm mb-4">For small agencies getting started</p>
-                <p className="text-4xl font-bold mb-6">$49<span className="text-lg font-normal text-muted-foreground">/mo</span></p>
-                <ul className="space-y-3 mb-6">
-                  {["Up to 50 cases/month", "2 team members", "Basic document checks", "Email support"].map((feature) => (
-                    <li key={feature} className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="w-4 h-4 text-primary flex-shrink-0" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-                <Link href="/agency-register"><Button variant="outline" className="w-full" data-testid="button-pricing-starter">Get Started Free</Button></Link>
-              </CardContent>
-            </Card>
-            
-            <Card className="relative border-primary hover-elevate" data-testid="card-pricing-professional">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-primary text-primary-foreground text-xs font-medium rounded-full">
-                Most Popular
-              </div>
-              <CardContent className="p-6">
-                <h3 className="text-lg font-semibold mb-2">Professional</h3>
-                <p className="text-muted-foreground text-sm mb-4">For growing agencies</p>
-                <p className="text-4xl font-bold mb-6">$149<span className="text-lg font-normal text-muted-foreground">/mo</span></p>
-                <ul className="space-y-3 mb-6">
-                  {["Up to 200 cases/month", "10 team members", "AI document analysis", "Customer portal", "Priority support"].map((feature) => (
-                    <li key={feature} className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="w-4 h-4 text-primary flex-shrink-0" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-                <Link href="/agency-register"><Button className="w-full" data-testid="button-pricing-professional">Start Free Trial</Button></Link>
-              </CardContent>
-            </Card>
-            
-            <Card className="hover-elevate" data-testid="card-pricing-enterprise">
-              <CardContent className="p-6">
-                <h3 className="text-lg font-semibold mb-2">Enterprise</h3>
-                <p className="text-muted-foreground text-sm mb-4">For large organizations</p>
-                <p className="text-4xl font-bold mb-6">Custom</p>
-                <ul className="space-y-3 mb-6">
-                  {["Unlimited cases", "Unlimited team members", "Custom AI training", "API access", "Dedicated support", "SLA guarantee"].map((feature) => (
-                    <li key={feature} className="flex items-center gap-2 text-sm">
-                      <CheckCircle className="w-4 h-4 text-primary flex-shrink-0" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-                <Button variant="outline" className="w-full" data-testid="button-pricing-enterprise">Contact Sales</Button>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      <section className="py-20 md:py-32 gradient-bg text-white">
+      <section className="py-16 md:py-24 gradient-bg text-white">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Ready to Transform Your Visa Processing?
+            Ready to turn visa demand into a smarter business?
           </h2>
           <p className="text-lg opacity-90 mb-8 max-w-2xl mx-auto">
-            Join 500+ travel agencies already using Visa Shuttle to streamline their operations.
+            Launch the agency workspace, connect the Business API, or start with both from one Visa Shuttle account.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/agency-register">
               <Button size="lg" variant="secondary" className="gap-2 text-base" data-testid="button-cta-final">
-                Start Your Free Trial
+                Start Business Account
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>
