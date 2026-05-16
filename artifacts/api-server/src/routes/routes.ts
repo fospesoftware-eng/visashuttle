@@ -283,7 +283,7 @@ const SITE_PASSWORD = process.env.SITE_PASSWORD;
 // in prod makes the `if (DEMO_B2C_OTP)` branches in b2c/otp/{send,verify} fall
 // through to the real provider.
 const DEMO_B2C_OTP = process.env.NODE_ENV === "production" ? null : "1234";
-const MIN_B2C_APPLICANT_AGE = 18;
+const MIN_B2C_APPLICANT_AGE = 16;
 const MAX_B2C_APPLICANT_AGE = 120;
 
 function calculateAge(dateOfBirth: string): number | null {
@@ -309,7 +309,7 @@ function validateB2cApplicantDob(dateOfBirth: unknown, required = false): string
   const age = calculateAge(dateOfBirth);
   if (age === null || age < 0 || age > MAX_B2C_APPLICANT_AGE) return "Please enter a valid date of birth";
   if (age < MIN_B2C_APPLICANT_AGE) {
-    return "B2C visa checks are for adult applicants aged 18 or above. Minors and infants should be assessed under a parent or guardian.";
+    return "B2C visa checks are for applicants aged 16 or above. Younger applicants and infants should be assessed under a parent or guardian.";
   }
   return null;
 }

@@ -29,6 +29,6 @@ export function validateAdultApplicantDob(dateOfBirth: string): string | null {
 
   const age = getApplicantAge(dateOfBirth);
   if (age === null || age < 0 || age > 120) return "Please enter a valid date of birth.";
-  if (age < 18) return "B2C visa checks are for adult applicants aged 18 or above. Minors and infants should be assessed under a parent or guardian.";
+  if (age < 16) return "B2C visa checks are for applicants aged 16 or above. Younger applicants and infants should be assessed under a parent or guardian.";
   return null;
 }
