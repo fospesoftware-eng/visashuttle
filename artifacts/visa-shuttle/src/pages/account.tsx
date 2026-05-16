@@ -16,6 +16,7 @@ import { useB2cAuth } from "@/hooks/use-b2c-auth";
 import { COUNTRIES as OB_COUNTRIES } from "@/shared/destinations";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { MIN_DOB_ISO, TODAY_ISO, getApplicantAge, validateAdultApplicantDob } from "@/lib/applicant-age";
 
 interface VisaCheck {
   id: string;
@@ -69,6 +70,7 @@ interface OnboardingForm { fullName: string; nationality: string; countryOfResid
 function OnboardingModal({ onDone }: { onDone: () => void }) {
   const { toast } = useToast();
   const [form, setForm] = useState<OnboardingForm>({ fullName: "", nationality: "", countryOfResidence: "", dateOfBirth: "", gender: "" });
+  const dobError = validateAdultApplicantDob(form.dateOfBirth);
 
   const mutation = useMutation({
     mutationFn: async (data: OnboardingForm) => {
@@ -82,7 +84,7 @@ function OnboardingModal({ onDone }: { onDone: () => void }) {
     onError: () => toast({ title: "Save failed", description: "Please try again.", variant: "destructive" }),
   });
 
-  const canSubmit = form.fullName.trim() && form.nationality && form.countryOfResidence && form.dateOfBirth && form.gender;
+  const canSubmit = form.fullName.trim() && form.nationality && form.countryOfResidence && !dobError && form.gender;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -134,10 +136,17 @@ function OnboardingModal({ onDone }: { onDone: () => void }) {
             <Input
               type="date"
               value={form.dateOfBirth}
+              min={MIN_DOB_ISO}
+              max={TODAY_ISO}
               onChange={e => setForm(f => ({ ...f, dateOfBirth: e.target.value }))}
               className="border-slate-200 bg-slate-50"
               data-testid="onboarding-dob"
             />
+            {form.dateOfBirth && (
+              <p className={`mt-1 text-xs ${dobError ? "text-red-600" : "text-slate-500"}`}>
+                {dobError ?? `Age: ${getApplicantAge(form.dateOfBirth)} years`}
+              </p>
+            )}
           </div>
 
           <div>

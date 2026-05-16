@@ -12,6 +12,7 @@ import { SearchableSelect, MultiSearchableSelect } from "@/components/searchable
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { MIN_DOB_ISO, TODAY_ISO, getApplicantAge, validateAdultApplicantDob } from "@/lib/applicant-age";
 
 import { COUNTRIES } from "@/shared/destinations";
 
@@ -180,6 +181,7 @@ export default function SavedProfilePage() {
   function set(field: keyof ProfileForm) {
     return (value: string | boolean) => setForm(f => ({ ...f, [field]: value }));
   }
+  const dobError = form.dateOfBirth ? validateAdultApplicantDob(form.dateOfBirth) : null;
 
   if (authLoading || !user) return null;
 
@@ -218,7 +220,14 @@ export default function SavedProfilePage() {
           </div>
         </Card>
 
-        <form onSubmit={e => { e.preventDefault(); mutation.mutate(form); }} className="space-y-4">
+        <form onSubmit={e => {
+          e.preventDefault();
+          if (dobError) {
+            toast({ title: "Invalid date of birth", description: dobError, variant: "destructive" });
+            return;
+          }
+          mutation.mutate(form);
+        }} className="space-y-4">
           {/* Personal Details */}
           <Card className="bg-white border-slate-100 shadow-sm">
             <CardHeader className="pb-2 pt-4 px-5">
@@ -236,7 +245,12 @@ export default function SavedProfilePage() {
               <SearchableSelect label="Passport Country" value={form.passportCountry} onChange={set("passportCountry") as (v: string) => void} options={COUNTRIES} placeholder="Search country..." />
               <div>
                 <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Date of Birth</Label>
-                <Input type="date" value={form.dateOfBirth} onChange={e => set("dateOfBirth")(e.target.value)} className="border-slate-200 bg-slate-50" data-testid="input-dob" />
+                <Input type="date" value={form.dateOfBirth} min={MIN_DOB_ISO} max={TODAY_ISO} onChange={e => set("dateOfBirth")(e.target.value)} className="border-slate-200 bg-slate-50" data-testid="input-dob" />
+                {form.dateOfBirth && (
+                  <p className={`mt-1 text-xs ${dobError ? "text-red-600" : "text-slate-500"}`}>
+                    {dobError ?? `Age: ${getApplicantAge(form.dateOfBirth)} years`}
+                  </p>
+                )}
               </div>
               <Sel label="Gender" val={form.gender} onChange={set("gender") as (v: string) => void} opts={GENDER_OPTS} />
               <Sel label="Marital Status" val={form.maritalStatus} onChange={set("maritalStatus") as (v: string) => void} opts={MARITAL_OPTS} />

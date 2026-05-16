@@ -283,6 +283,36 @@ const SITE_PASSWORD = process.env.SITE_PASSWORD;
 // in prod makes the `if (DEMO_B2C_OTP)` branches in b2c/otp/{send,verify} fall
 // through to the real provider.
 const DEMO_B2C_OTP = process.env.NODE_ENV === "production" ? null : "1234";
+const MIN_B2C_APPLICANT_AGE = 18;
+const MAX_B2C_APPLICANT_AGE = 120;
+
+function calculateAge(dateOfBirth: string): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) return null;
+  const birth = new Date(`${dateOfBirth}T00:00:00Z`);
+  if (Number.isNaN(birth.getTime())) return null;
+  if (birth.toISOString().slice(0, 10) !== dateOfBirth) return null;
+
+  const today = new Date();
+  let age = today.getUTCFullYear() - birth.getUTCFullYear();
+  const monthDelta = today.getUTCMonth() - birth.getUTCMonth();
+  if (monthDelta < 0 || (monthDelta === 0 && today.getUTCDate() < birth.getUTCDate())) age--;
+  return age;
+}
+
+function validateB2cApplicantDob(dateOfBirth: unknown, required = false): string | null {
+  if (!dateOfBirth) return required ? "Date of birth is required" : null;
+  if (typeof dateOfBirth !== "string") return "Date of birth must be a valid date";
+
+  const todayIso = new Date().toISOString().slice(0, 10);
+  if (dateOfBirth > todayIso) return "Date of birth cannot be in the future";
+
+  const age = calculateAge(dateOfBirth);
+  if (age === null || age < 0 || age > MAX_B2C_APPLICANT_AGE) return "Please enter a valid date of birth";
+  if (age < MIN_B2C_APPLICANT_AGE) {
+    return "B2C visa checks are for adult applicants aged 18 or above. Minors and infants should be assessed under a parent or guardian.";
+  }
+  return null;
+}
 
 function maskKey(key: string): string {
   if (key.length <= 8) return "••••••••";
@@ -5071,6 +5101,8 @@ export async function registerRoutes(
     if (!formData || !formData.nationality || !formData.destinationCountry || !formData.visaType) {
       return res.status(400).json({ error: "Required fields missing: nationality, destinationCountry, visaType" });
     }
+    const dobError = validateB2cApplicantDob(formData.dateOfBirth);
+    if (dobError) return res.status(400).json({ error: dobError });
 
     try {
       // ── Visa-free / VOA / Resident short-circuit ───────────────────────────
@@ -5180,6 +5212,8 @@ export async function registerRoutes(
     if (!formData || !formData.nationality || !formData.destinationCountry || !formData.visaType) {
       return res.status(400).json({ error: "Required fields missing: nationality, destinationCountry, visaType" });
     }
+    const dobError = validateB2cApplicantDob(formData.dateOfBirth, true);
+    if (dobError) return res.status(400).json({ error: dobError });
 
     try {
       const aiConfig = await storage.getPlatformAiConfig();
@@ -5707,6 +5741,8 @@ export async function registerRoutes(
 
   app.put("/api/b2c/profile", requireB2cAuth, async (req, res) => {
     const userId = req.session.b2cUserId!;
+    const dobError = validateB2cApplicantDob(req.body?.dateOfBirth);
+    if (dobError) return res.status(400).json({ error: dobError });
     const profile = await storage.upsertSavedProfile(userId, { ...req.body, userId });
     res.json(profile);
   });

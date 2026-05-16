@@ -22,6 +22,7 @@ import { useB2cAuth } from "@/hooks/use-b2c-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { MIN_DOB_ISO, TODAY_ISO, validateAdultApplicantDob } from "@/lib/applicant-age";
 
 import { COUNTRIES, VISA_TYPES } from "@/shared/destinations";
 
@@ -143,10 +144,7 @@ function DocToggle({ label, val, onChange, tooltip }: any) {
 const BLANK: Record<string, string> = {};
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
-const TODAY = new Date().toISOString().split("T")[0];
 const TOMORROW = new Date(Date.now() + 86_400_000).toISOString().split("T")[0];
-const MIN_DOB = new Date(new Date().setFullYear(new Date().getFullYear() - 120))
-  .toISOString().split("T")[0];
 
 function getAge(dob: string): number | null {
   if (!dob) return null;
@@ -660,7 +658,7 @@ export default function DeepCheckPage() {
 
   // Per-step required-field check
   const STEP_REQUIRED: Record<number, { key: string; label: string }[]> = {
-    1: [{ key: "nationality", label: "Nationality" }],
+    1: [{ key: "nationality", label: "Nationality" }, { key: "dateOfBirth", label: "Date of Birth" }],
     2: [
       { key: "destinationCountry", label: "Destination Country" },
       { key: "visaType", label: "Visa Type" },
@@ -673,7 +671,9 @@ export default function DeepCheckPage() {
 
   const canAdvance = (): boolean => {
     const required = STEP_REQUIRED[step] ?? [];
-    return required.every(r => !!form[r.key]);
+    if (!required.every(r => !!form[r.key])) return false;
+    if (step === 1 && validateAdultApplicantDob(form.dateOfBirth)) return false;
+    return true;
   };
 
   const getMissingLabels = (): string => {
@@ -683,9 +683,10 @@ export default function DeepCheckPage() {
 
   const nextStep = () => {
     if (!canAdvance()) {
+      const dobError = step === 1 ? validateAdultApplicantDob(form.dateOfBirth) : null;
       toast({
-        title: "Required fields missing",
-        description: `Please fill in: ${getMissingLabels()}`,
+        title: dobError ? "Invalid date of birth" : "Required fields missing",
+        description: dobError ?? `Please fill in: ${getMissingLabels()}`,
         variant: "destructive",
       });
       return;
@@ -697,6 +698,11 @@ export default function DeepCheckPage() {
   const handleSubmit = async () => {
     if (!form.nationality || !form.destinationCountry || !form.visaType) {
       toast({ title: "Required fields missing", description: "Please fill in at least nationality, destination, and visa type.", variant: "destructive" });
+      return;
+    }
+    const dobError = validateAdultApplicantDob(form.dateOfBirth);
+    if (dobError) {
+      toast({ title: "Invalid date of birth", description: dobError, variant: "destructive" });
       return;
     }
     if (!consentChecked) { setConsentError("Please agree to the Terms & Conditions before running the check"); return; }
@@ -949,7 +955,7 @@ export default function DeepCheckPage() {
                       return <span className="ml-2 text-xs text-muted-foreground">Age: {age} years</span>;
                     })()}
                   </Label>
-                  <Input type="date" value={form.dateOfBirth || ""} min={MIN_DOB} max={TODAY}
+                  <Input type="date" value={form.dateOfBirth || ""} min={MIN_DOB_ISO} max={TODAY_ISO}
                     onChange={e => set("dateOfBirth")(e.target.value)} />
                   {form.dateOfBirth && (() => {
                     const age = getAge(form.dateOfBirth);
@@ -1102,7 +1108,7 @@ export default function DeepCheckPage() {
                   <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Planned Travel Date</Label>
                   <Input type="date" value={form.plannedTravelDate || ""} min={TOMORROW}
                     onChange={e => set("plannedTravelDate")(e.target.value)} />
-                  {form.plannedTravelDate && form.plannedTravelDate < TODAY && (
+                  {form.plannedTravelDate && form.plannedTravelDate < TODAY_ISO && (
                     <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
                       <AlertTriangle className="w-3 h-3" /> Travel date cannot be in the past.
                     </p>
