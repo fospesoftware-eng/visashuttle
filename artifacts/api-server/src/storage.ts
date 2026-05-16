@@ -1964,6 +1964,22 @@ export class MemStorage implements IStorage {
 // development can still fall back to seeded in-memory data if a newly added
 // optional table has not been pushed yet.
 class HybridStorage extends MemStorage {
+  private async ensureDemoB2cEntitlements(user: B2cUser | undefined): Promise<B2cUser | undefined> {
+    if (!user || user.email !== "demo@visashuttle.com") return user;
+    if (user.subscriptionPlan === "pro" && user.checkLimit >= 5 && user.deepCheckAccess) return user;
+
+    const checkLimit = Math.max(user.checkLimit || 0, 5);
+    const rows = await db.update(b2cUsers)
+      .set({
+        subscriptionPlan: "pro",
+        checkLimit,
+        deepCheckAccess: true,
+      })
+      .where(eq(b2cUsers.id, user.id))
+      .returning();
+    return rows[0] ?? { ...user, subscriptionPlan: "pro", checkLimit, deepCheckAccess: true };
+  }
+
   async getProposalsByTenantId(tenantId: string): Promise<Proposal[]> {
     try {
       return await db
@@ -2161,12 +2177,12 @@ class HybridStorage extends MemStorage {
   // startup; once a database exists, never fall back to memory for these users.
   async getB2cUser(id: string): Promise<B2cUser | undefined> {
     const rows = await db.select().from(b2cUsers).where(eq(b2cUsers.id, id)).limit(1);
-    return rows[0];
+    return this.ensureDemoB2cEntitlements(rows[0]);
   }
 
   async getB2cUserByEmail(email: string): Promise<B2cUser | undefined> {
     const rows = await db.select().from(b2cUsers).where(eq(b2cUsers.email, email.toLowerCase())).limit(1);
-    return rows[0];
+    return this.ensureDemoB2cEntitlements(rows[0]);
   }
 
   async getB2cUserByPhone(phone: string): Promise<B2cUser | undefined> {
