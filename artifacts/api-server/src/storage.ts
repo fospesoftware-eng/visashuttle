@@ -651,8 +651,8 @@ export class MemStorage implements IStorage {
       phoneVerified: false,
       freeChecksUsed: 0,
       subscriptionPlan: "free",
-      checkLimit: 1,
-      deepCheckAccess: false,
+      checkLimit: 5,
+      deepCheckAccess: true,
       stripeCustomerId: null,
       createdAt: new Date(),
     };
@@ -2117,8 +2117,8 @@ class HybridStorage extends MemStorage {
         phoneVerified: false,
         freeChecksUsed: 0,
         subscriptionPlan: "free" as const,
-        checkLimit: 1,
-        deepCheckAccess: false,
+        checkLimit: 5,
+        deepCheckAccess: true,
         stripeCustomerId: null,
       },
       {
@@ -2140,6 +2140,19 @@ class HybridStorage extends MemStorage {
       const existing = await db.select({ id: b2cUsers.id }).from(b2cUsers).where(eq(b2cUsers.email, account.email)).limit(1);
       if (!existing[0]) {
         await db.insert(b2cUsers).values(account);
+      } else if (account.email === "demo@visashuttle.com") {
+        await db.update(b2cUsers)
+          .set({
+            password: account.password,
+            fullName: account.fullName,
+            phoneVerified: account.phoneVerified,
+            freeChecksUsed: account.freeChecksUsed,
+            subscriptionPlan: account.subscriptionPlan,
+            checkLimit: account.checkLimit,
+            deepCheckAccess: account.deepCheckAccess,
+            stripeCustomerId: account.stripeCustomerId,
+          })
+          .where(eq(b2cUsers.id, existing[0].id));
       }
     }
   }
