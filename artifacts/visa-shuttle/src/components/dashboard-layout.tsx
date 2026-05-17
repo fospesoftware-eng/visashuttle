@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Compass, PlaneTakeoff, ScanSearch, Luggage, ScrollText,
-  Ticket, SlidersHorizontal, LogOut, Menu, X, ChevronRight, Shield, Crown
+  Ticket, SlidersHorizontal, LogOut, Menu, X, ChevronRight, Shield, Crown, ShieldAlert
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { icon: Compass, label: "Dashboard", href: "/account" },
   { icon: PlaneTakeoff, label: "Basic Check", href: "/check" },
   { icon: ScanSearch, label: "Deep Check", href: "/deep-check", premium: true },
+  { icon: ShieldAlert, label: "Visa Tools", href: "/visa-tools" },
   { icon: Luggage, label: "Saved Profile", href: "/saved-profile" },
   { icon: ScrollText, label: "Check History", href: "/history" },
   { icon: Ticket, label: "Pricing", href: "/pricing" },

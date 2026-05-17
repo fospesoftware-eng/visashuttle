@@ -17,6 +17,7 @@ export default function SignInPage() {
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const nextPath = new URLSearchParams(window.location.search).get("next");
+  const message = new URLSearchParams(window.location.search).get("message");
   const safeNextPath = nextPath?.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/account";
 
   async function handleSubmit(e: React.FormEvent) {
@@ -63,6 +64,12 @@ export default function SignInPage() {
               <h2 className="text-2xl font-bold mb-1">Sign in to your account</h2>
               <p className="text-muted-foreground">Welcome back! Enter your details below.</p>
             </div>
+
+            {message && (
+              <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
+                {message}
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1.5">

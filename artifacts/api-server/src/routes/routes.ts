@@ -4439,6 +4439,178 @@ export async function registerRoutes(
     next();
   }
 
+  const visaToolRateLimit = new Map<string, number[]>();
+  const VISA_TOOL_TYPES = new Set([
+    "fake_visa",
+    "fake_employment_offer",
+    "fake_agency",
+    "fake_visa_scheme",
+  ]);
+  const VISA_TOOL_LABELS: Record<string, string> = {
+    fake_visa: "Fake Visa Detector",
+    fake_employment_offer: "Fake Employment Offer Letter Detector",
+    fake_agency: "Fake Agency Detector",
+    fake_visa_scheme: "Fake Visa Schemes",
+  };
+  const VISA_TOOL_ALLOWED_MIME = new Set(["application/pdf", "image/jpeg", "image/png"]);
+  const VISA_TOOL_MAX_FILE_BYTES = 8 * 1024 * 1024;
+
+  function enforceVisaToolRateLimit(userId: string): boolean {
+    const now = Date.now();
+    const windowMs = 60 * 60 * 1000;
+    const recent = (visaToolRateLimit.get(userId) ?? []).filter((t) => now - t < windowMs);
+    if (recent.length >= 20) {
+      visaToolRateLimit.set(userId, recent);
+      return false;
+    }
+    recent.push(now);
+    visaToolRateLimit.set(userId, recent);
+    return true;
+  }
+
+  function extractJsonObject(text: string): string | null {
+    const start = text.indexOf("{");
+    if (start === -1) return null;
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i];
+      if (escape) { escape = false; continue; }
+      if (ch === "\\" && inString) { escape = true; continue; }
+      if (ch === "\"") { inString = !inString; continue; }
+      if (inString) continue;
+      if (ch === "{") depth++;
+      if (ch === "}") {
+        depth--;
+        if (depth === 0) return text.slice(start, i + 1);
+      }
+    }
+    return null;
+  }
+
+  function clampRiskScore(value: unknown): number {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 50;
+    return Math.max(0, Math.min(100, Math.round(n)));
+  }
+
+  function normalizeRiskLevel(value: unknown, score: number): string {
+    const raw = String(value || "").toLowerCase();
+    if (raw.includes("critical")) return "Critical";
+    if (raw.includes("high")) return "High";
+    if (raw.includes("medium")) return "Medium";
+    if (raw.includes("low")) return "Low";
+    if (score >= 85) return "Critical";
+    if (score >= 65) return "High";
+    if (score >= 35) return "Medium";
+    return "Low";
+  }
+
+  function summarizeVisaToolInput(toolType: string, fields: Record<string, unknown>, manualText: string): string {
+    const pairs = Object.entries(fields || {})
+      .filter(([, value]) => value !== undefined && value !== null && String(value).trim())
+      .slice(0, 8)
+      .map(([key, value]) => `${key}: ${String(value).slice(0, 80)}`);
+    const text = manualText?.trim() ? `Manual text: ${manualText.trim().slice(0, 180)}` : "";
+    return [VISA_TOOL_LABELS[toolType] || toolType, ...pairs, text].filter(Boolean).join(" | ").slice(0, 1200);
+  }
+
+  async function runVisaToolClaudeAnalysis(payload: {
+    toolType: string;
+    fields: Record<string, unknown>;
+    manualText: string;
+    file?: { name: string; type: string; size: number; base64: string } | null;
+  }) {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const model = process.env.ANTHROPIC_MODEL || "claude-opus-4-5";
+    if (!apiKey) throw new Error("Anthropic API key not configured");
+
+    const promptPayload = {
+      tool_type: payload.toolType,
+      country: payload.fields.country || payload.fields.destinationCountry || "",
+      visa_type: payload.fields.visaType || "",
+      user_inputs: payload.fields,
+      document_text: payload.manualText || "",
+      file_metadata: payload.file ? {
+        name: payload.file.name,
+        type: payload.file.type,
+        size: payload.file.size,
+        malware_scan_status: "placeholder_not_scanned",
+        storage_policy: "private_user_document_reference_only",
+      } : null,
+      analysis_required: [
+        "risk_score",
+        "risk_level",
+        "red_flags",
+        "positive_indicators",
+        "explanation",
+        "recommended_next_steps",
+        "disclaimer",
+      ],
+    };
+
+    const content: any[] = [{
+      type: "text",
+      text: [
+        "Analyze this Visa Shuttle fraud-risk check request. Return strict JSON only, matching the expected schema.",
+        "Never say the document, agency, offer, or scheme is 100% fake or 100% genuine. Use risk-based language only.",
+        JSON.stringify(promptPayload, null, 2),
+      ].join("\n\n"),
+    }];
+
+    if (payload.file?.base64) {
+      if (payload.file.type === "application/pdf") {
+        content.push({
+          type: "document",
+          source: { type: "base64", media_type: "application/pdf", data: payload.file.base64 },
+          title: payload.file.name || "Uploaded PDF",
+        });
+      } else {
+        content.push({
+          type: "image",
+          source: { type: "base64", media_type: payload.file.type, data: payload.file.base64 },
+        });
+      }
+    }
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: 4096,
+        system: "You are a visa fraud risk analysis assistant for Visa Shuttle. You do not provide legal confirmation. You analyze submitted text/documents for fraud indicators, inconsistencies, missing details, suspicious claims, formatting issues, and risk signals. Always return strict JSON only.",
+        messages: [{ role: "user", content }],
+      }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Claude Visa Tools error: ${response.status} ${text}`);
+    }
+    const data = await response.json() as any;
+    const text = data.content?.find((part: any) => part.type === "text")?.text || "";
+    const jsonText = extractJsonObject(text);
+    if (!jsonText) throw new Error("Claude did not return valid JSON");
+    const parsed = JSON.parse(jsonText);
+    const riskScore = clampRiskScore(parsed.risk_score);
+    return {
+      risk_score: riskScore,
+      risk_level: normalizeRiskLevel(parsed.risk_level, riskScore),
+      summary: String(parsed.summary || "AI-assisted fraud risk analysis completed."),
+      red_flags: Array.isArray(parsed.red_flags) ? parsed.red_flags.map(String).slice(0, 12) : [],
+      positive_indicators: Array.isArray(parsed.positive_indicators) ? parsed.positive_indicators.map(String).slice(0, 12) : [],
+      explanation: String(parsed.explanation || ""),
+      recommended_next_steps: Array.isArray(parsed.recommended_next_steps) ? parsed.recommended_next_steps.map(String).slice(0, 10) : [],
+      disclaimer: "This is an AI-assisted risk analysis only. Please verify with official government, employer, or registered agency sources.",
+    };
+  }
+
   // ── OTP Send ─────────────────────────────────────────────────────────────
   app.post("/api/b2c/otp/send", otpRequestRateLimiter, async (req, res) => {
     const { phone, email } = req.body;
@@ -5258,7 +5430,126 @@ export async function registerRoutes(
     res.json(check);
   });
 
+  // === B2C Visa Tools Routes ===
+
+  app.get("/api/b2c/visa-tools/checks", requireB2cAuth, async (req, res) => {
+    const userId = req.session.b2cUserId!;
+    const checks = await storage.getVisaToolChecksByUserId(userId);
+    res.json(checks);
+  });
+
+  app.get("/api/b2c/visa-tools/checks/:id", requireB2cAuth, async (req, res) => {
+    const userId = req.session.b2cUserId!;
+    const check = await storage.getVisaToolCheck(req.params.id);
+    if (!check || check.userId !== userId) {
+      return res.status(404).json({ error: "Visa tool check not found" });
+    }
+    res.json(check);
+  });
+
+  app.post("/api/b2c/visa-tools/analyze", requireB2cAuth, async (req, res) => {
+    const userId = req.session.b2cUserId!;
+    if (!enforceVisaToolRateLimit(userId)) {
+      return res.status(429).json({ error: "Visa Tools usage limit reached. Please try again later." });
+    }
+
+    const toolType = String(req.body.toolType || "");
+    if (!VISA_TOOL_TYPES.has(toolType)) {
+      return res.status(400).json({ error: "Invalid Visa Tools check type" });
+    }
+
+    const fields = req.body.fields && typeof req.body.fields === "object" && !Array.isArray(req.body.fields)
+      ? req.body.fields as Record<string, unknown>
+      : {};
+    const manualText = typeof req.body.manualText === "string" ? req.body.manualText.slice(0, 12000) : "";
+    const file = req.body.file && typeof req.body.file === "object" ? req.body.file as any : null;
+
+    if (!manualText.trim() && !file?.base64 && Object.values(fields).every((v) => !String(v ?? "").trim())) {
+      return res.status(400).json({ error: "Please enter details or upload a document to analyze." });
+    }
+
+    let safeFile: { name: string; type: string; size: number; base64: string } | null = null;
+    if (file?.base64) {
+      const mimeType = String(file.type || "");
+      const size = Number(file.size || 0);
+      const base64 = String(file.base64 || "").replace(/^data:[^;]+;base64,/, "");
+      if (!VISA_TOOL_ALLOWED_MIME.has(mimeType)) {
+        return res.status(400).json({ error: "Only PDF, JPG and PNG files are supported." });
+      }
+      if (!Number.isFinite(size) || size <= 0 || size > VISA_TOOL_MAX_FILE_BYTES) {
+        return res.status(400).json({ error: "File must be under 8 MB." });
+      }
+      safeFile = {
+        name: String(file.name || "uploaded-document").slice(0, 240),
+        type: mimeType,
+        size,
+        base64,
+      };
+    }
+
+    try {
+      const result = await runVisaToolClaudeAnalysis({ toolType, fields, manualText, file: safeFile });
+      const inputSummary = summarizeVisaToolInput(toolType, fields, manualText);
+      const country = String(fields.country || fields.destinationCountry || "").slice(0, 120) || null;
+      const uploadedFileUrl = safeFile
+        ? `private://visa-tool-checks/${userId}/${Date.now()}-${safeFile.name.replace(/[^\w.\-]+/g, "_")}`
+        : null;
+      const check = await storage.createVisaToolCheck({
+        userId,
+        toolType,
+        country,
+        inputSummary,
+        uploadedFileUrl,
+        riskScore: result.risk_score,
+        riskLevel: result.risk_level,
+        claudeResponseJson: {
+          ...result,
+          tool_label: VISA_TOOL_LABELS[toolType],
+          security: {
+            file_type_validated: !!safeFile,
+            file_size_validated: !!safeFile,
+            malware_scan: "placeholder_pending",
+            public_document_access: false,
+          },
+        } as any,
+      });
+      res.json({ check, result: check.claudeResponseJson });
+    } catch (err: any) {
+      console.error("[Visa Tools] Error:", err);
+      const message = err?.message === "Anthropic API key not configured"
+        ? "Visa Tools AI service is not configured. Please set ANTHROPIC_API_KEY."
+        : "Failed to analyze this item. Please try again.";
+      res.status(500).json({ error: message });
+    }
+  });
+
   // === Admin Routes ===
+
+  app.get("/api/admin/visa-tools/stats", requireAdminAuth, async (_req, res) => {
+    const checks = await storage.getAllVisaToolChecks();
+    const suspicious = checks.filter((check) => {
+      const score = check.riskScore ?? 0;
+      const level = String(check.riskLevel || "").toLowerCase();
+      return score >= 65 || level === "high" || level === "critical";
+    });
+    const usageByTool = checks.reduce<Record<string, number>>((acc, check) => {
+      const label = VISA_TOOL_LABELS[check.toolType] || check.toolType;
+      acc[label] = (acc[label] || 0) + 1;
+      return acc;
+    }, {});
+    const riskBreakdown = checks.reduce<Record<string, number>>((acc, check) => {
+      const level = check.riskLevel || "Unknown";
+      acc[level] = (acc[level] || 0) + 1;
+      return acc;
+    }, {});
+    res.json({
+      totalChecks: checks.length,
+      suspiciousCases: suspicious.length,
+      usageByTool,
+      riskBreakdown,
+      recentChecks: checks.slice(0, 20),
+    });
+  });
 
   // Platform stats
   // Weekly activity breakdown for admin dashboard chart

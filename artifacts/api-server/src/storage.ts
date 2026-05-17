@@ -17,6 +17,7 @@ import {
   type OTPCode, type InsertOTPCode,
   type B2cUser, type InsertB2cUser,
   type VisaCheck, type InsertVisaCheck,
+  type VisaToolCheck, type InsertVisaToolCheck,
   type SavedProfile, type InsertSavedProfile,
   type SmsConfig, type InsertSmsConfig,
   type PlatformAiConfig, type InsertPlatformAiConfig,
@@ -28,7 +29,7 @@ import {
   type Invoice, type InsertInvoice,
   type InvoiceItem, type InsertInvoiceItem,
   type Payment, type InsertPayment,
-  b2cUsers, visaChecks, savedProfiles, smsConfig as smsConfigTable,
+  b2cUsers, visaChecks, visaToolChecks, savedProfiles, smsConfig as smsConfigTable,
   platformAiConfig as platformAiConfigTable,
   paymentGatewayConfig as paymentGatewayConfigTable,
   tenantPaymentGatewayConfig as tenantPaymentGatewayConfigTable,
@@ -196,6 +197,12 @@ export interface IStorage {
   getVisaChecksByUserId(userId: string): Promise<VisaCheck[]>;
   getVisaCheck(id: string): Promise<VisaCheck | undefined>;
 
+  // Visa Tools
+  createVisaToolCheck(check: InsertVisaToolCheck): Promise<VisaToolCheck>;
+  getVisaToolChecksByUserId(userId: string): Promise<VisaToolCheck[]>;
+  getVisaToolCheck(id: string): Promise<VisaToolCheck | undefined>;
+  getAllVisaToolChecks(): Promise<VisaToolCheck[]>;
+
   // Saved Profiles
   getSavedProfile(userId: string): Promise<SavedProfile | undefined>;
   upsertSavedProfile(userId: string, data: Partial<InsertSavedProfile>): Promise<SavedProfile>;
@@ -266,6 +273,7 @@ export class MemStorage implements IStorage {
   private otpCodes: Map<string, OTPCode>;
   private b2cUsersMap: Map<string, B2cUser>;
   private visaChecksMap: Map<string, VisaCheck>;
+  private visaToolChecksMap: Map<string, VisaToolCheck>;
   private savedProfilesMap: Map<string, SavedProfile>;
   private smsConfigRecord?: SmsConfig;
   private platformAiConfigRecord?: PlatformAiConfig;
@@ -296,6 +304,7 @@ export class MemStorage implements IStorage {
     this.otpCodes = new Map();
     this.b2cUsersMap = new Map();
     this.visaChecksMap = new Map();
+    this.visaToolChecksMap = new Map();
     this.savedProfilesMap = new Map();
     
     this.seedData();
@@ -1813,6 +1822,38 @@ export class MemStorage implements IStorage {
     return this.visaChecksMap.get(id);
   }
 
+  async createVisaToolCheck(check: InsertVisaToolCheck): Promise<VisaToolCheck> {
+    const id = randomUUID();
+    const newCheck: VisaToolCheck = {
+      ...check,
+      id,
+      country: check.country ?? null,
+      inputSummary: check.inputSummary ?? null,
+      uploadedFileUrl: check.uploadedFileUrl ?? null,
+      riskScore: check.riskScore ?? null,
+      riskLevel: check.riskLevel ?? null,
+      claudeResponseJson: check.claudeResponseJson ?? null,
+      createdAt: new Date(),
+    };
+    this.visaToolChecksMap.set(id, newCheck);
+    return newCheck;
+  }
+
+  async getVisaToolChecksByUserId(userId: string): Promise<VisaToolCheck[]> {
+    return Array.from(this.visaToolChecksMap.values())
+      .filter((c) => c.userId === userId)
+      .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+  }
+
+  async getVisaToolCheck(id: string): Promise<VisaToolCheck | undefined> {
+    return this.visaToolChecksMap.get(id);
+  }
+
+  async getAllVisaToolChecks(): Promise<VisaToolCheck[]> {
+    return Array.from(this.visaToolChecksMap.values())
+      .sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+  }
+
   // Saved Profiles — one profile per user (keyed by userId)
   async getSavedProfile(userId: string): Promise<SavedProfile | undefined> {
     for (const p of this.savedProfilesMap.values()) {
@@ -2225,6 +2266,24 @@ class HybridStorage extends MemStorage {
   async getVisaCheck(id: string): Promise<VisaCheck | undefined> {
     const rows = await db.select().from(visaChecks).where(eq(visaChecks.id, id)).limit(1);
     return rows[0];
+  }
+
+  async createVisaToolCheck(check: InsertVisaToolCheck): Promise<VisaToolCheck> {
+    const rows = await db.insert(visaToolChecks).values(check).returning();
+    return rows[0];
+  }
+
+  async getVisaToolChecksByUserId(userId: string): Promise<VisaToolCheck[]> {
+    return db.select().from(visaToolChecks).where(eq(visaToolChecks.userId, userId)).orderBy(desc(visaToolChecks.createdAt));
+  }
+
+  async getVisaToolCheck(id: string): Promise<VisaToolCheck | undefined> {
+    const rows = await db.select().from(visaToolChecks).where(eq(visaToolChecks.id, id)).limit(1);
+    return rows[0];
+  }
+
+  async getAllVisaToolChecks(): Promise<VisaToolCheck[]> {
+    return db.select().from(visaToolChecks).orderBy(desc(visaToolChecks.createdAt));
   }
 
   // Saved Profiles — persisted to DB

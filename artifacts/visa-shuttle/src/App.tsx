@@ -27,6 +27,7 @@ import DeepCheckPage from "@/pages/deep-check";
 import DeepCheckPaymentPage from "@/pages/deep-check-payment";
 import SavedProfilePage from "@/pages/saved-profile";
 import SettingsPage from "@/pages/settings";
+import VisaToolsPage from "@/pages/visa-tools";
 
 import VisaCheckPage from "@/pages/visa-check";
 import VisaCheckPublicPage from "@/pages/visa-check-public";
@@ -63,6 +64,7 @@ import AdminTenantsPage from "@/pages/admin/tenants";
 import AdminUsersPage from "@/pages/admin/users";
 import AdminVKBPage from "@/pages/admin/vkb";
 import AdminAIPage from "@/pages/admin/ai";
+import AdminVisaToolsPage from "@/pages/admin/visa-tools";
 import AdminAuditPage from "@/pages/admin/audit";
 import AdminSettingsPage from "@/pages/admin/settings";
 import AdminOperationsPage from "@/pages/admin/operations";
@@ -126,6 +128,7 @@ function Router() {
       <Route path="/payment/deep-check" component={DeepCheckPaymentPage} />
       <Route path="/saved-profile" component={SavedProfilePage} />
       <Route path="/settings" component={SettingsPage} />
+      <Route path="/visa-tools" component={VisaToolsPage} />
       <Route path="/visa-check/results" component={VisaCheckPublicResultPage} />
       <Route path="/visa-check" component={VisaCheckPublicPage} />
       <Route path="/login" component={LoginPage} />
@@ -226,6 +229,7 @@ function Router() {
       <Route path="/admin/tenants" component={AdminTenantsPage} />
       <Route path="/admin/vkb" component={AdminVKBPage} />
       <Route path="/admin/ai" component={AdminAIPage} />
+      <Route path="/admin/visa-tools" component={AdminVisaToolsPage} />
       <Route path="/admin/users" component={AdminUsersPage} />
       <Route path="/admin/operations" component={AdminOperationsPage} />
       <Route path="/admin/finance" component={AdminFinancePage} />
@@ -257,6 +261,7 @@ const PRODUCT_SHELL_PREFIXES = [
   "/history",
   "/saved-profile",
   "/settings",
+  "/visa-tools",
   "/app",
   "/customer",
   "/admin",

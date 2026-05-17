@@ -513,6 +513,24 @@ export const insertVisaCheckSchema = createInsertSchema(visaChecks).omit({ id: t
 export type InsertVisaCheck = z.infer<typeof insertVisaCheckSchema>;
 export type VisaCheck = typeof visaChecks.$inferSelect;
 
+// Visa Tools fraud-risk checks (B2C signed-in users)
+export const visaToolChecks = pgTable("visa_tool_checks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  toolType: text("tool_type").notNull(),
+  country: text("country"),
+  inputSummary: text("input_summary"),
+  uploadedFileUrl: text("uploaded_file_url"),
+  riskScore: integer("risk_score"),
+  riskLevel: text("risk_level"),
+  claudeResponseJson: jsonb("claude_response_json"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertVisaToolCheckSchema = createInsertSchema(visaToolChecks).omit({ id: true, createdAt: true });
+export type InsertVisaToolCheck = z.infer<typeof insertVisaToolCheckSchema>;
+export type VisaToolCheck = typeof visaToolChecks.$inferSelect;
+
 // Saved Traveler Profiles (B2C)
 export const savedProfiles = pgTable("saved_profiles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
