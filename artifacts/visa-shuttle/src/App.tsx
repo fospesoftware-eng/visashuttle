@@ -13,6 +13,7 @@ import { SiteFooter } from "@/components/site-footer";
 import NotFound from "@/pages/not-found";
 import HomePage from "@/pages/home";
 import BusinessPage from "@/pages/business";
+import AgencyCrmPage from "@/pages/agency-crm";
 import LoginPage from "@/pages/login";
 import SignupPage from "@/pages/signup";
 import JoinPage from "@/pages/join";
@@ -112,6 +113,7 @@ function Router() {
     <Switch>
       <Route path="/" component={HomePage} />
       <Route path="/business" component={BusinessPage} />
+      <Route path="/agency-crm" component={AgencyCrmPage} />
       <Route path="/join" component={JoinPage} />
       <Route path="/sign-in" component={SignInPage} />
       <Route path="/check" component={CheckPage} />
