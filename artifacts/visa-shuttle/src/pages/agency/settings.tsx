@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Building2, Users, Bell, CreditCard, Save, Palette, Eye, EyeOff, Loader2, Check, ExternalLink, Copy, Globe, Link2, Plus, Trash2, ChevronRight, UserCheck, UserX, Zap, Crown, Shield, ArrowUpRight, MessageSquare, Send, AlertCircle, ClipboardList, RotateCcw } from "lucide-react";
+import { Building2, Users, Bell, CreditCard, Save, Palette, Eye, EyeOff, Loader2, Check, ExternalLink, Copy, Globe, Link2, Plus, Trash2, ChevronRight, UserCheck, UserX, Zap, Crown, Shield, ArrowUpRight, MessageSquare, Send, AlertCircle, ClipboardList, RotateCcw, Settings, ReceiptText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1552,9 +1552,18 @@ export default function AgencySettingsPage() {
               <Globe className="w-4 h-4 mr-2" />
               Portal & Links
             </TabsTrigger>
-            <TabsTrigger value="general" data-testid="tab-general" className="shrink-0 justify-start rounded-lg px-3 py-2.5 lg:w-full">General</TabsTrigger>
-            <TabsTrigger value="notifications" data-testid="tab-notifications" className="shrink-0 justify-start rounded-lg px-3 py-2.5 lg:w-full">Notifications</TabsTrigger>
-            <TabsTrigger value="team" data-testid="tab-team" className="shrink-0 justify-start rounded-lg px-3 py-2.5 lg:w-full">Team</TabsTrigger>
+            <TabsTrigger value="general" data-testid="tab-general" className="shrink-0 justify-start gap-2 rounded-lg px-3 py-2.5 lg:w-full">
+              <Settings className="w-4 h-4 mr-2" />
+              General
+            </TabsTrigger>
+            <TabsTrigger value="notifications" data-testid="tab-notifications" className="shrink-0 justify-start gap-2 rounded-lg px-3 py-2.5 lg:w-full">
+              <Bell className="w-4 h-4 mr-2" />
+              Notifications
+            </TabsTrigger>
+            <TabsTrigger value="team" data-testid="tab-team" className="shrink-0 justify-start gap-2 rounded-lg px-3 py-2.5 lg:w-full">
+              <Users className="w-4 h-4 mr-2" />
+              Team
+            </TabsTrigger>
             <TabsTrigger value="application" data-testid="tab-application-settings" className="shrink-0 justify-start gap-2 rounded-lg px-3 py-2.5 lg:w-full">
               <ClipboardList className="w-4 h-4 mr-2" />
               Application
@@ -1567,8 +1576,14 @@ export default function AgencySettingsPage() {
               <MessageSquare className="w-4 h-4 mr-2" />
               SMS
             </TabsTrigger>
-            <TabsTrigger value="billing" data-testid="tab-billing" className="shrink-0 justify-start rounded-lg px-3 py-2.5 lg:w-full">Billing</TabsTrigger>
-            <TabsTrigger value="subscription" data-testid="tab-subscription" className="shrink-0 justify-start rounded-lg px-3 py-2.5 lg:w-full">Subscription</TabsTrigger>
+            <TabsTrigger value="billing" data-testid="tab-billing" className="shrink-0 justify-start gap-2 rounded-lg px-3 py-2.5 lg:w-full">
+              <ReceiptText className="w-4 h-4 mr-2" />
+              Billing
+            </TabsTrigger>
+            <TabsTrigger value="subscription" data-testid="tab-subscription" className="shrink-0 justify-start gap-2 rounded-lg px-3 py-2.5 lg:w-full">
+              <Crown className="w-4 h-4 mr-2" />
+              Subscription
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="branding" className="mt-0 space-y-6">
