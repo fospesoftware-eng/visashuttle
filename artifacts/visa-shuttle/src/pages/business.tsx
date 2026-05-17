@@ -302,9 +302,9 @@ const planCategories = [
     badge: "Best for visa teams",
     color: "from-[#4055FF] to-[#9033F5]",
     description: "Run leads, customers, proposals, documents, payments, and applications in one branded workspace.",
-    plans: ["Starter · $49/mo", "Professional · $149/mo", "Enterprise · Custom"],
-    cta: "Start agency workspace",
-    href: "/agency-register",
+    plans: ["Lite · ₹1,999/mo", "Go · ₹3,999/mo", "Power · ₹7,999/mo"],
+    cta: "View CRM plans",
+    href: "/business/agency-crm",
     highlight: true,
   },
   {

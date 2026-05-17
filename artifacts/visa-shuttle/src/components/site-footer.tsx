@@ -10,7 +10,7 @@ export function SiteFooter() {
           <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm text-muted-foreground">
             <Link href="/pricing" className="hover:text-foreground transition-colors">Pricing</Link>
             <Link href="/business" className="hover:text-foreground transition-colors">For Business</Link>
-            <Link href="/agency-crm" className="hover:text-foreground transition-colors">Agency CRM</Link>
+            <Link href="/business/agency-crm" className="hover:text-foreground transition-colors">Agency CRM</Link>
             <a href="/#contact" className="hover:text-foreground transition-colors">Contact</a>
             <Link href="/privacy-policy" className="hover:text-foreground transition-colors">Privacy & Cookies</Link>
             <Link href="/terms-and-conditions" className="hover:text-foreground transition-colors">Terms</Link>

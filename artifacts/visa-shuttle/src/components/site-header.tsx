@@ -17,7 +17,6 @@ export function SiteHeader() {
     { label: "Visa Check", href: "/visa-check" },
     { label: "Pricing", href: "/pricing" },
     { label: "For Business", href: "/business" },
-    { label: "Agency CRM", href: "/agency-crm" },
     { label: "Help", href: "/help" },
     { label: "Contact", href: "/#contact", anchor: true },
   ];

@@ -112,8 +112,8 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={HomePage} />
+      <Route path="/business/agency-crm" component={AgencyCrmPage} />
       <Route path="/business" component={BusinessPage} />
-      <Route path="/agency-crm" component={AgencyCrmPage} />
       <Route path="/join" component={JoinPage} />
       <Route path="/sign-in" component={SignInPage} />
       <Route path="/check" component={CheckPage} />
