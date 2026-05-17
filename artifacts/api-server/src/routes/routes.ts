@@ -1416,8 +1416,8 @@ export async function registerRoutes(
     // Plan limit enforcement
     const tenantForLeads = await storage.getTenant(tenantId);
     if (tenantForLeads) {
-      const planLeadLimits: Record<string, number> = { starter: 50, professional: 500, enterprise: 9999 };
-      const leadLimit = planLeadLimits[tenantForLeads.plan ?? "starter"] ?? 50;
+      const planLeadLimits: Record<string, number> = { lite: 100, go: 500, power: 9999, starter: 100, professional: 500, enterprise: 9999 };
+      const leadLimit = planLeadLimits[tenantForLeads.plan ?? "lite"] ?? 100;
       const existingLeads = await storage.getLeadsByTenantId(tenantId);
       if (existingLeads.length >= leadLimit) {
         return res.status(403).json({ error: `Lead limit reached for your ${tenantForLeads.plan} plan (${leadLimit}). Please upgrade.` });
@@ -2076,8 +2076,8 @@ export async function registerRoutes(
     // can't bypass their plan by funnelling cases through proposal links.
     const tenant = await storage.getTenant(proposal.tenantId);
     if (tenant) {
-      const planCaseLimits: Record<string, number> = { starter: 30, professional: 200, enterprise: 9999 };
-      const caseLimit = planCaseLimits[tenant.plan ?? "starter"] ?? 30;
+      const planCaseLimits: Record<string, number> = { lite: 100, go: 500, power: 9999, starter: 100, professional: 500, enterprise: 9999 };
+      const caseLimit = planCaseLimits[tenant.plan ?? "lite"] ?? 100;
       const allCases = await storage.getCasesByTenantId(tenant.id);
       const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
       const casesThisMonth = allCases.filter(c => c.createdAt && new Date(c.createdAt) >= startOfMonth).length;
@@ -3671,8 +3671,8 @@ export async function registerRoutes(
     // Plan limit enforcement (cases per month)
     const tenantForCases = await storage.getTenant(req.params.tenantId);
     if (tenantForCases) {
-      const planCaseLimits: Record<string, number> = { starter: 30, professional: 200, enterprise: 9999 };
-      const caseLimit = planCaseLimits[tenantForCases.plan ?? "starter"] ?? 30;
+      const planCaseLimits: Record<string, number> = { lite: 100, go: 500, power: 9999, starter: 100, professional: 500, enterprise: 9999 };
+      const caseLimit = planCaseLimits[tenantForCases.plan ?? "lite"] ?? 100;
       const allCases = await storage.getCasesByTenantId(req.params.tenantId);
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -5560,9 +5560,12 @@ export async function registerRoutes(
   // ============================================================
   const PLAN_PRICING_USD: Record<string, number> = {
     free: 0,
-    starter: 49,
-    professional: 149,
-    enterprise: 499,
+    lite: 24,
+    go: 48,
+    power: 96,
+    starter: 24,
+    professional: 48,
+    enterprise: 96,
   };
   function planPrice(plan: string | null | undefined): number {
     return PLAN_PRICING_USD[plan ?? ""] ?? 0;
@@ -5739,9 +5742,9 @@ export async function registerRoutes(
       totalCases: allCases.length,
       activityToday: activityLogs.filter(l => l.createdAt && new Date(l.createdAt) >= today).length,
       planBreakdown: {
-        starter: tenants.filter(t => t.plan === "starter").length,
-        professional: tenants.filter(t => t.plan === "professional").length,
-        enterprise: tenants.filter(t => t.plan === "enterprise").length,
+        lite: tenants.filter(t => t.plan === "lite" || t.plan === "starter").length,
+        go: tenants.filter(t => t.plan === "go" || t.plan === "professional").length,
+        power: tenants.filter(t => t.plan === "power" || t.plan === "enterprise").length,
       },
       // NEW analytics
       window: { days, from: startNow.toISOString(), to: endExclusive.toISOString() },
@@ -5784,7 +5787,7 @@ export async function registerRoutes(
     const tenant = await storage.createTenant({
       name,
       slug,
-      plan: plan ?? "starter",
+      plan: plan ?? "lite",
       status: status ?? "active",
       contactEmail: email ?? null,
       logoUrl: null,
@@ -6174,7 +6177,7 @@ export async function registerRoutes(
     const tenant = await storage.createTenant({
       name: agencyName.trim(),
       slug: cleanSlug,
-      plan: "starter",
+      plan: "lite",
       status: "active",
       contactEmail: contactEmail || email,
       contactPhone: contactPhone || null,
@@ -6196,7 +6199,7 @@ export async function registerRoutes(
       action: "agency.registered",
       entityType: "tenant",
       entityId: tenant.id,
-      details: { agencyName: tenant.name, plan: "starter" },
+      details: { agencyName: tenant.name, plan: "lite" },
     });
     req.session.userId = user.id;
     req.session.userRole = user.role;
@@ -6255,8 +6258,8 @@ export async function registerRoutes(
     const tenant = await storage.getTenant(tenantId);
     const currentStaff = await storage.getUsersByTenantId(tenantId);
     const staffCount = currentStaff.filter(u => ["agency_owner", "agency_staff", "agency_manager"].includes(u.role)).length;
-    const limits: Record<string, number> = { starter: 3, professional: 10, enterprise: 999 };
-    const limit = limits[tenant?.plan ?? "starter"] ?? 3;
+    const limits: Record<string, number> = { lite: 3, go: 5, power: 10, starter: 3, professional: 5, enterprise: 10 };
+    const limit = limits[tenant?.plan ?? "lite"] ?? 3;
     if (staffCount >= limit) {
       return res.status(403).json({ error: `Your ${tenant?.plan} plan allows up to ${limit} staff members. Upgrade to add more.` });
     }
@@ -6472,12 +6475,15 @@ export async function registerRoutes(
       return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
     }).length;
     const PLAN_LIMITS: Record<string, { staff: number; casesPerMonth: number; leads: number; label: string }> = {
-      starter: { staff: 3, casesPerMonth: 30, leads: 50, label: "Starter" },
-      professional: { staff: 10, casesPerMonth: 200, leads: 500, label: "Professional" },
-      enterprise: { staff: 999, casesPerMonth: 9999, leads: 9999, label: "Enterprise" },
+      lite: { staff: 3, casesPerMonth: 100, leads: 100, label: "Lite" },
+      go: { staff: 5, casesPerMonth: 500, leads: 500, label: "Go" },
+      power: { staff: 10, casesPerMonth: 9999, leads: 9999, label: "Power" },
+      starter: { staff: 3, casesPerMonth: 100, leads: 100, label: "Lite" },
+      professional: { staff: 5, casesPerMonth: 500, leads: 500, label: "Go" },
+      enterprise: { staff: 10, casesPerMonth: 9999, leads: 9999, label: "Power" },
     };
-    const plan = tenant?.plan ?? "starter";
-    const limits = PLAN_LIMITS[plan] ?? PLAN_LIMITS.starter;
+    const plan = tenant?.plan ?? "lite";
+    const limits = PLAN_LIMITS[plan] ?? PLAN_LIMITS.lite;
     res.json({
       plan,
       planLabel: limits.label,
@@ -6493,11 +6499,11 @@ export async function registerRoutes(
         leads: limits.leads,
       },
       features: {
-        whiteLabel: plan !== "starter",
-        removesPoweredBy: plan === "enterprise",
-        customDomain: plan === "enterprise",
-        advancedAnalytics: plan !== "starter",
-        prioritySupport: plan === "enterprise",
+        whiteLabel: plan !== "lite" && plan !== "starter",
+        removesPoweredBy: plan === "go" || plan === "power" || plan === "professional" || plan === "enterprise",
+        customDomain: plan === "power" || plan === "enterprise",
+        advancedAnalytics: plan !== "lite" && plan !== "starter",
+        prioritySupport: plan === "power" || plan === "enterprise",
       },
     });
   });

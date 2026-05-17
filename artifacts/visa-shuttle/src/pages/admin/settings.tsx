@@ -1099,7 +1099,7 @@ export default function AdminSettingsPage() {
     defaultAIQuota: 5000,
     defaultStorageQuota: 10,
     defaultCaseLimit: 500,
-    defaultPlan: "starter",
+    defaultPlan: "lite",
     sessionTimeout: 60,
     passwordMinLength: 8,
     requireMFA: false,
@@ -1296,9 +1296,9 @@ export default function AdminSettingsPage() {
                   <Select value={s.defaultPlan} onValueChange={v => set("defaultPlan", v)}>
                     <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="starter">Starter</SelectItem>
-                      <SelectItem value="professional">Professional</SelectItem>
-                      <SelectItem value="enterprise">Enterprise</SelectItem>
+                      <SelectItem value="lite">Lite</SelectItem>
+                      <SelectItem value="go">Go</SelectItem>
+                      <SelectItem value="power">Power</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

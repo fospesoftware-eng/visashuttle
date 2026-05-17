@@ -137,6 +137,18 @@ const adminSubscriptionPatchSchema = z.object({
   notes: z.string().max(2000).nullable().optional(),
 });
 
+function defaultPlanPrice(plan: string) {
+  const prices: Record<string, number> = {
+    lite: 199900,
+    go: 399900,
+    power: 799900,
+    starter: 199900,
+    professional: 399900,
+    enterprise: 799900,
+  };
+  return prices[plan] ?? prices.lite;
+}
+
 const customizerEstimateSchema = z.object({
   prompt: z.string().trim().min(10).max(5000),
   imageBase64: z.string().max(7_500_000).optional(),
@@ -524,9 +536,9 @@ export function registerPlatformExtensions(app: Express, helpers: ExtensionsHelp
       .where(eq(tenantSubscriptions.tenantId, tenantId)).limit(1);
     if (existing) return existing;
     const [tenantRow] = await db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
-    const plan = tenantRow?.plan ?? "starter";
+    const plan = tenantRow?.plan ?? "lite";
     const [created] = await db.insert(tenantSubscriptions).values({
-      tenantId, plan, status: "trialing", monthlyPriceCents: 0, currency: "INR",
+      tenantId, plan, status: "trialing", monthlyPriceCents: defaultPlanPrice(plan), currency: "INR",
     } as any).returning();
     return created;
   }

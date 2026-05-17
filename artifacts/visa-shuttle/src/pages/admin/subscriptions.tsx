@@ -51,7 +51,7 @@ function fmtMoney(cents: number, ccy: string) {
 export default function AdminSubscriptionsPage() {
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<SubRow | Orphan | null>(null);
-  const [form, setForm] = useState({ plan: "starter", status: "trialing", monthlyPriceCents: 0, currency: "INR", notes: "" });
+  const [form, setForm] = useState({ plan: "lite", status: "trialing", monthlyPriceCents: 199900, currency: "INR", notes: "" });
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -92,12 +92,13 @@ export default function AdminSubscriptionsPage() {
     setEditing(row);
     if ("sub" in row && row.sub) {
       setForm({
-        plan: row.sub.plan, status: row.sub.status,
+        plan: normalizePlan(row.sub.plan), status: row.sub.status,
         monthlyPriceCents: row.sub.monthlyPriceCents, currency: row.sub.currency,
         notes: row.sub.notes ?? "",
       });
     } else {
-      setForm({ plan: row.plan, status: "trialing", monthlyPriceCents: 0, currency: "INR", notes: "" });
+      const plan = normalizePlan(row.plan);
+      setForm({ plan, status: "trialing", monthlyPriceCents: planPrice(plan), currency: "INR", notes: "" });
     }
   }
 
@@ -207,12 +208,12 @@ export default function AdminSubscriptionsPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Plan</Label>
-                <Select value={form.plan} onValueChange={v => setForm({ ...form, plan: v })}>
+                <Select value={form.plan} onValueChange={v => setForm({ ...form, plan: v, monthlyPriceCents: planPrice(v), currency: "INR" })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="starter">Starter</SelectItem>
-                    <SelectItem value="professional">Professional</SelectItem>
-                    <SelectItem value="enterprise">Enterprise</SelectItem>
+                    <SelectItem value="lite">Lite</SelectItem>
+                    <SelectItem value="go">Go</SelectItem>
+                    <SelectItem value="power">Power</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -269,4 +270,16 @@ export default function AdminSubscriptionsPage() {
       </Dialog>
     </DashboardLayout>
   );
+}
+
+function planPrice(plan: string) {
+  const prices: Record<string, number> = { lite: 199900, go: 399900, power: 799900 };
+  return prices[plan] ?? prices.lite;
+}
+
+function normalizePlan(plan?: string | null) {
+  if (plan === "professional") return "go";
+  if (plan === "enterprise") return "power";
+  if (plan === "go" || plan === "power") return plan;
+  return "lite";
 }

@@ -21,6 +21,9 @@ import {
 type Period = 7 | 30 | 90;
 
 const PLAN_COLORS: Record<string, string> = {
+  lite: "hsl(220, 9%, 60%)",
+  go: "hsl(258, 78%, 62%)",
+  power: "hsl(240, 80%, 60%)",
   starter: "hsl(220, 9%, 60%)",
   professional: "hsl(258, 78%, 62%)",
   enterprise: "hsl(240, 80%, 60%)",
@@ -204,7 +207,7 @@ export default function AdminDashboard() {
 
   const planChartData = useMemo(() => {
     const pb = stats?.planBreakdown ?? {};
-    return ["starter", "professional", "enterprise"]
+    return ["lite", "go", "power"]
       .filter((p) => (pb[p] ?? 0) > 0)
       .map((p) => ({ name: p[0].toUpperCase() + p.slice(1), value: pb[p], plan: p }));
   }, [stats]);
@@ -588,8 +591,8 @@ export default function AdminDashboard() {
                       <div className="flex items-center gap-3 min-w-0">
                         <span className="text-xs font-mono text-muted-foreground w-5">{idx + 1}</span>
                         <div className="w-9 h-9 rounded-md flex items-center justify-center shrink-0"
-                             style={{ backgroundColor: `${PLAN_COLORS[t.plan] ?? PLAN_COLORS.starter}20` }}>
-                          <Building2 className="w-4 h-4" style={{ color: PLAN_COLORS[t.plan] ?? PLAN_COLORS.starter }} />
+                             style={{ backgroundColor: `${PLAN_COLORS[t.plan] ?? PLAN_COLORS.lite}20` }}>
+                          <Building2 className="w-4 h-4" style={{ color: PLAN_COLORS[t.plan] ?? PLAN_COLORS.lite }} />
                         </div>
                         <div className="min-w-0">
                           <p className="font-medium text-sm truncate">{t.name}</p>

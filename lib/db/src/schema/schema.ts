@@ -44,7 +44,7 @@ export const tenants = pgTable("tenants", {
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   logoUrl: text("logo_url"),
-  plan: text("plan").notNull().default("starter"), // starter, professional, enterprise
+  plan: text("plan").notNull().default("lite"), // lite, go, power
   status: text("status").notNull().default("active"), // active, suspended, pending
   // White-label branding
   primaryColor: text("primary_color").default("#00B4D8"),
@@ -1034,7 +1034,7 @@ export type SubscriptionStatus = typeof SUBSCRIPTION_STATUSES[number];
 export const tenantSubscriptions = pgTable("tenant_subscriptions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().unique(),
-  plan: text("plan").notNull().default("starter"), // starter | professional | enterprise (mirrors tenants.plan)
+  plan: text("plan").notNull().default("lite"), // lite | go | power (mirrors tenants.plan)
   status: text("status").notNull().default("trialing"),
   monthlyPriceCents: integer("monthly_price_cents").notNull().default(0),
   currency: text("currency").notNull().default("INR"),

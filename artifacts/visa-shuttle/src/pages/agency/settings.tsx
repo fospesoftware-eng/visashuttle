@@ -1214,26 +1214,26 @@ function SmsTab({ tenantId }: { tenantId?: string }) {
 // ─── Billing Tab Component ─────────────────────────────────────────────────────
 
 const PLAN_DETAILS = {
-  starter: {
-    label: "Starter",
-    price: "Free",
+  lite: {
+    label: "Lite",
+    price: "₹1,999/mo",
     color: "bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700",
     icon: Zap,
-    features: ["Up to 3 staff members", "30 cases per month", "50 leads", "White-label portal", "Basic analytics"],
+    features: ["Up to 3 users", "100 applications / month", "Lead management", "Proposal management", "Auto passport scanner", "AI visa check", "Invoicing", "Offline payment collection"],
   },
-  professional: {
-    label: "Professional",
-    price: "$149/mo",
+  go: {
+    label: "Go",
+    price: "₹3,999/mo",
     color: "bg-violet-50 dark:bg-violet-950/30 border-violet-200 dark:border-violet-800",
     icon: Crown,
-    features: ["Up to 10 staff members", "200 cases per month", "500 leads", "White-label portal", "Advanced analytics", "Remove 'Powered by'"],
+    features: ["Up to 5 users", "500 applications / month", "Agency visa landing page", "SMS notifications", "Online payment collection", "UPI QR payments", "Remove Powered by branding"],
   },
-  enterprise: {
-    label: "Enterprise",
-    price: "$399/mo",
+  power: {
+    label: "Power",
+    price: "₹7,999/mo",
     color: "bg-primary/5 border-primary/20",
     icon: Shield,
-    features: ["Unlimited staff", "Unlimited cases", "Unlimited leads", "Custom domain", "Priority support", "SLA guarantee"],
+    features: ["Up to 10 users", "Unlimited applications", "Fully featured agency website", "Custom domain support", "WhatsApp integration", "Dedicated support executive", "1 hour custom development monthly"],
   },
 };
 
@@ -1257,8 +1257,8 @@ function BillingTab({ tenantId }: { tenantId?: string }) {
     enabled: !!tenantId,
   });
 
-  const plan = usageData?.plan ?? "starter";
-  const details = PLAN_DETAILS[plan as keyof typeof PLAN_DETAILS] ?? PLAN_DETAILS.starter;
+  const plan = normalizeAgencyPlan(usageData?.plan);
+  const details = PLAN_DETAILS[plan];
   const PlanIcon = details.icon;
 
   const usageItems = usageData ? [
@@ -1305,7 +1305,7 @@ function BillingTab({ tenantId }: { tenantId?: string }) {
                     <p className="text-sm text-muted-foreground">{details.price}</p>
                   </div>
                 </div>
-                {plan !== "enterprise" && (
+                {plan !== "power" && (
                   <Button
                     size="sm"
                     className="gap-1.5 shrink-0"
@@ -1377,7 +1377,7 @@ function BillingTab({ tenantId }: { tenantId?: string }) {
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3">
-            {(Object.entries(PLAN_DETAILS) as [string, typeof PLAN_DETAILS.starter][]).map(([key, p]) => {
+            {(Object.entries(PLAN_DETAILS) as [keyof typeof PLAN_DETAILS, typeof PLAN_DETAILS.lite][]).map(([key, p]) => {
               const Icon = p.icon;
               const isCurrent = key === plan;
               return (
@@ -1400,7 +1400,7 @@ function BillingTab({ tenantId }: { tenantId?: string }) {
                       </li>
                     ))}
                   </ul>
-                  {!isCurrent && key !== "starter" && (
+                  {!isCurrent && key !== "lite" && (
                     <Button
                       size="sm"
                       className="w-full mt-4 gap-1.5"
@@ -1419,6 +1419,13 @@ function BillingTab({ tenantId }: { tenantId?: string }) {
       </Card>
     </div>
   );
+}
+
+function normalizeAgencyPlan(plan?: string | null): keyof typeof PLAN_DETAILS {
+  if (plan === "professional") return "go";
+  if (plan === "enterprise") return "power";
+  if (plan === "go" || plan === "power") return plan;
+  return "lite";
 }
 
 // ─── Main Settings Page ────────────────────────────────────────────────────────
@@ -2243,6 +2250,8 @@ function SubscriptionTab({ tenantId }: { tenantId?: string }) {
     return <Skeleton className="h-48" />;
   }
   const { subscription: sub, invoices } = subQuery.data;
+  const subPlan = normalizeAgencyPlan(sub.plan);
+  const subPlanLabel = PLAN_DETAILS[subPlan].label;
   const fmt = (cents: number, ccy: string) => {
     const v = (cents / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     return ccy === "INR" ? `₹${v}` : `${ccy} ${v}`;
@@ -2270,7 +2279,7 @@ function SubscriptionTab({ tenantId }: { tenantId?: string }) {
           <div className="grid gap-4 md:grid-cols-3">
             <div>
               <p className="text-xs text-muted-foreground">Plan</p>
-              <p className="font-semibold capitalize">{sub.plan}</p>
+              <p className="font-semibold">{subPlanLabel}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Status</p>

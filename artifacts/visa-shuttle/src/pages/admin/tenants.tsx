@@ -29,6 +29,9 @@ import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 
 const PLAN_COLORS: Record<string, string> = {
+  lite: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+  go: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
+  power: "bg-primary/10 text-primary",
   starter: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
   professional: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
   enterprise: "bg-primary/10 text-primary",
@@ -41,7 +44,7 @@ export default function AdminTenantsPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editTenant, setEditTenant] = useState<any>(null);
   const [deleteTenantId, setDeleteTenantId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", email: "", plan: "starter", status: "active" });
+  const [form, setForm] = useState({ name: "", email: "", plan: "lite", status: "active" });
 
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -56,7 +59,7 @@ export default function AdminTenantsPage() {
       qc.invalidateQueries({ queryKey: ["/api/admin/tenants"] });
       qc.invalidateQueries({ queryKey: ["/api/admin/stats"] });
       setIsCreateOpen(false);
-      setForm({ name: "", email: "", plan: "starter", status: "active" });
+      setForm({ name: "", email: "", plan: "lite", status: "active" });
       toast({ title: "Agency created", description: "The agency has been created and is ready to use." });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -147,9 +150,9 @@ export default function AdminTenantsPage() {
             <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Plans</SelectItem>
-              <SelectItem value="starter">Starter</SelectItem>
-              <SelectItem value="professional">Professional</SelectItem>
-              <SelectItem value="enterprise">Enterprise</SelectItem>
+              <SelectItem value="lite">Lite</SelectItem>
+              <SelectItem value="go">Go</SelectItem>
+              <SelectItem value="power">Power</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -203,7 +206,7 @@ export default function AdminTenantsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setEditTenant({ ...tenant })}>
+                            <DropdownMenuItem onClick={() => setEditTenant({ ...tenant, plan: normalizeAgencyPlan(tenant.plan) })}>
                               <Edit2 className="w-4 h-4 mr-2" />Edit Details
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
@@ -265,9 +268,9 @@ export default function AdminTenantsPage() {
                 <Select value={form.plan} onValueChange={v => setForm({ ...form, plan: v })}>
                   <SelectTrigger data-testid="select-tenant-plan"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="starter">Starter</SelectItem>
-                    <SelectItem value="professional">Professional</SelectItem>
-                    <SelectItem value="enterprise">Enterprise</SelectItem>
+                    <SelectItem value="lite">Lite</SelectItem>
+                    <SelectItem value="go">Go</SelectItem>
+                    <SelectItem value="power">Power</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -319,9 +322,9 @@ export default function AdminTenantsPage() {
                   <Select value={editTenant.plan} onValueChange={v => setEditTenant({ ...editTenant, plan: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="starter">Starter</SelectItem>
-                      <SelectItem value="professional">Professional</SelectItem>
-                      <SelectItem value="enterprise">Enterprise</SelectItem>
+                      <SelectItem value="lite">Lite</SelectItem>
+                      <SelectItem value="go">Go</SelectItem>
+                      <SelectItem value="power">Power</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -373,4 +376,11 @@ export default function AdminTenantsPage() {
       </AlertDialog>
     </DashboardLayout>
   );
+}
+
+function normalizeAgencyPlan(plan?: string | null) {
+  if (plan === "professional") return "go";
+  if (plan === "enterprise") return "power";
+  if (plan === "go" || plan === "power") return plan;
+  return "lite";
 }
