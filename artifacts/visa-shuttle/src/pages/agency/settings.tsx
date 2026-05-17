@@ -1536,42 +1536,42 @@ export default function AgencySettingsPage() {
 
   return (
     <DashboardLayout type="agency">
-      <div className="space-y-6 max-w-4xl">
+      <div className="space-y-6 max-w-6xl">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Settings</h1>
           <p className="text-muted-foreground">Manage your agency settings and preferences.</p>
         </div>
 
-        <Tabs defaultValue={typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "subscription" ? "subscription" : "branding"} className="space-y-4">
-          <TabsList className="h-auto flex-wrap justify-start">
-            <TabsTrigger value="branding" data-testid="tab-branding">
+        <Tabs defaultValue={typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tab") === "subscription" ? "subscription" : "branding"} className="grid gap-6 lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start">
+          <TabsList className="h-auto justify-start overflow-x-auto rounded-xl border bg-card p-2 shadow-sm lg:sticky lg:top-20 lg:flex lg:flex-col lg:items-stretch lg:overflow-visible">
+            <TabsTrigger value="branding" data-testid="tab-branding" className="shrink-0 justify-start gap-2 rounded-lg px-3 py-2.5 lg:w-full">
               <Palette className="w-4 h-4 mr-2" />
               Branding
             </TabsTrigger>
-            <TabsTrigger value="portal" data-testid="tab-portal">
+            <TabsTrigger value="portal" data-testid="tab-portal" className="shrink-0 justify-start gap-2 rounded-lg px-3 py-2.5 lg:w-full">
               <Globe className="w-4 h-4 mr-2" />
               Portal & Links
             </TabsTrigger>
-            <TabsTrigger value="general" data-testid="tab-general">General</TabsTrigger>
-            <TabsTrigger value="notifications" data-testid="tab-notifications">Notifications</TabsTrigger>
-            <TabsTrigger value="team" data-testid="tab-team">Team</TabsTrigger>
-            <TabsTrigger value="application" data-testid="tab-application-settings">
+            <TabsTrigger value="general" data-testid="tab-general" className="shrink-0 justify-start rounded-lg px-3 py-2.5 lg:w-full">General</TabsTrigger>
+            <TabsTrigger value="notifications" data-testid="tab-notifications" className="shrink-0 justify-start rounded-lg px-3 py-2.5 lg:w-full">Notifications</TabsTrigger>
+            <TabsTrigger value="team" data-testid="tab-team" className="shrink-0 justify-start rounded-lg px-3 py-2.5 lg:w-full">Team</TabsTrigger>
+            <TabsTrigger value="application" data-testid="tab-application-settings" className="shrink-0 justify-start gap-2 rounded-lg px-3 py-2.5 lg:w-full">
               <ClipboardList className="w-4 h-4 mr-2" />
               Application
             </TabsTrigger>
-            <TabsTrigger value="payments" data-testid="tab-payments">
+            <TabsTrigger value="payments" data-testid="tab-payments" className="shrink-0 justify-start gap-2 rounded-lg px-3 py-2.5 lg:w-full">
               <CreditCard className="w-4 h-4 mr-2" />
               Payments
             </TabsTrigger>
-            <TabsTrigger value="sms" data-testid="tab-sms">
+            <TabsTrigger value="sms" data-testid="tab-sms" className="shrink-0 justify-start gap-2 rounded-lg px-3 py-2.5 lg:w-full">
               <MessageSquare className="w-4 h-4 mr-2" />
               SMS
             </TabsTrigger>
-            <TabsTrigger value="billing" data-testid="tab-billing">Billing</TabsTrigger>
-            <TabsTrigger value="subscription" data-testid="tab-subscription">Subscription</TabsTrigger>
+            <TabsTrigger value="billing" data-testid="tab-billing" className="shrink-0 justify-start rounded-lg px-3 py-2.5 lg:w-full">Billing</TabsTrigger>
+            <TabsTrigger value="subscription" data-testid="tab-subscription" className="shrink-0 justify-start rounded-lg px-3 py-2.5 lg:w-full">Subscription</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="branding" className="space-y-6">
+          <TabsContent value="branding" className="mt-0 space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
