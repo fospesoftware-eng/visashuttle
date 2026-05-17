@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "wouter";
 import {
   ArrowRight,
@@ -8,6 +9,7 @@ import {
   CheckCircle,
   CreditCard,
   Crown,
+  ChevronDown,
   FileCheck,
   Globe,
   Headphones,
@@ -23,17 +25,41 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+const CURRENCIES = [
+  { code: "USD", symbol: "$", rate: 1, flag: "🇺🇸" },
+  { code: "GBP", symbol: "£", rate: 0.79, flag: "🇬🇧" },
+  { code: "EUR", symbol: "€", rate: 0.92, flag: "🇪🇺" },
+  { code: "INR", symbol: "₹", rate: 83, flag: "🇮🇳" },
+  { code: "AED", symbol: "AED ", rate: 3.67, flag: "🇦🇪" },
+] as const;
+
+type CurrencyCode = typeof CURRENCIES[number]["code"];
+
+function convertPrice(usdAmount: number, curr: typeof CURRENCIES[number]): string {
+  const val = usdAmount * curr.rate;
+  if (curr.code === "INR") return `${curr.symbol}${Math.round(val).toLocaleString("en-IN")}`;
+  return `${curr.symbol}${Math.round(val)}`;
+}
+
+const additionalUserUsd = 6;
 
 const plans = [
   {
     name: "Lite",
     eyebrow: "Startup agencies",
-    price: "₹1,999",
+    usdPrice: 24,
     period: "/ month",
     summary: "Perfect for small visa agencies and startup consultants.",
     icon: Sparkles,
-    gradient: "from-slate-900 to-slate-700",
-    accent: "bg-slate-900",
+    gradient: "from-[#4055FF] to-[#00B4D8]",
+    buttonGradient: "linear-gradient(135deg,#4055FF,#00B4D8)",
     features: [
       "Up to 3 users",
       "Up to 100 applications / month",
@@ -51,12 +77,12 @@ const plans = [
   {
     name: "Go",
     eyebrow: "Growing agencies",
-    price: "₹3,999",
+    usdPrice: 48,
     period: "/ month",
     summary: "Designed for growing agencies managing higher application volumes.",
     icon: Zap,
     gradient: "from-[#4055FF] to-[#9033F5]",
-    accent: "bg-[#4055FF]",
+    buttonGradient: "linear-gradient(135deg,#4055FF,#9033F5)",
     recommended: true,
     features: [
       "Everything in Lite",
@@ -72,12 +98,12 @@ const plans = [
   {
     name: "Power",
     eyebrow: "Professional firms",
-    price: "₹7,999",
+    usdPrice: 96,
     period: "/ month",
     summary: "Built for professional immigration firms and high-volume agencies.",
     icon: Crown,
     gradient: "from-[#FF2060] to-[#9033F5]",
-    accent: "bg-[#FF2060]",
+    buttonGradient: "linear-gradient(135deg,#FF2060,#9033F5)",
     features: [
       "Everything in Lite and Go",
       "Up to 10 users",
@@ -139,6 +165,9 @@ function FeatureValue({ value }: { value: boolean | string }) {
 }
 
 export default function AgencyCrmPage() {
+  const [currencyCode, setCurrencyCode] = useState<CurrencyCode>("USD");
+  const curr = CURRENCIES.find((c) => c.code === currencyCode)!;
+
   return (
     <main className="min-h-screen bg-background">
       <section className="relative overflow-hidden border-b">
@@ -168,7 +197,9 @@ export default function AgencyCrmPage() {
                 </Button>
               </Link>
             </div>
-            <p className="mt-4 text-sm text-muted-foreground">All prices are exclusive of GST. Additional users: ₹500 / user / month.</p>
+            <p className="mt-4 text-sm text-muted-foreground">
+              All prices are exclusive of GST. Additional users: {convertPrice(additionalUserUsd, curr)} / user / month.
+            </p>
           </div>
 
           <div className="relative">
@@ -194,17 +225,17 @@ export default function AgencyCrmPage() {
                   );
                 })}
               </div>
-              <div className="mt-4 rounded-xl bg-slate-950 p-5 text-white">
+              <div className="mt-4 rounded-xl border border-[#4055FF]/15 bg-gradient-to-br from-[#4055FF]/10 via-background to-[#FF2060]/10 p-5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-white/60">Recommended plan</p>
+                    <p className="text-sm text-muted-foreground">Recommended plan</p>
                     <p className="text-2xl font-black">Go</p>
                   </div>
-                  <Badge className="border-0 bg-white text-slate-950">Best value</Badge>
+                  <Badge className="border-0 bg-[#4055FF] text-white">Best value</Badge>
                 </div>
-                <div className="mt-5 grid grid-cols-3 gap-2 text-center text-xs">
+                <div className="mt-5 grid grid-cols-3 gap-2 text-center text-xs text-foreground">
                   {["CRM", "Payments", "SMS"].map((item) => (
-                    <div key={item} className="rounded-lg bg-white/10 px-2 py-3 font-semibold">{item}</div>
+                    <div key={item} className="rounded-lg border bg-background/70 px-2 py-3 font-semibold">{item}</div>
                   ))}
                 </div>
               </div>
@@ -214,13 +245,38 @@ export default function AgencyCrmPage() {
       </section>
 
       <section className="mx-auto max-w-7xl px-4 py-14 md:py-18">
-        <div className="mb-9 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div className="mb-9 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">Plans</p>
             <h2 className="mt-2 text-3xl font-black tracking-tight md:text-4xl">Choose the CRM plan that fits your agency</h2>
           </div>
-          <div className="rounded-full border bg-muted/40 px-4 py-2 text-sm font-medium text-muted-foreground">
-            Additional users: ₹500 / user / month
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center md:flex-col md:items-end">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="h-11 justify-between gap-3 rounded-full bg-background px-4 shadow-sm">
+                  <span className="flex items-center gap-2">
+                    <span>{curr.flag}</span>
+                    <span>{curr.code}</span>
+                  </span>
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {CURRENCIES.map((currency) => (
+                  <DropdownMenuItem
+                    key={currency.code}
+                    className="gap-2"
+                    onClick={() => setCurrencyCode(currency.code)}
+                  >
+                    <span>{currency.flag}</span>
+                    <span>{currency.code}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <div className="rounded-full border bg-muted/40 px-4 py-2 text-sm font-medium text-muted-foreground">
+              Additional users: {convertPrice(additionalUserUsd, curr)} / user / month
+            </div>
           </div>
         </div>
 
@@ -239,11 +295,11 @@ export default function AgencyCrmPage() {
                 <h3 className="mt-2 text-3xl font-black">{plan.name}</h3>
                 <p className="mt-2 min-h-[48px] text-sm leading-6 text-muted-foreground">{plan.summary}</p>
                 <div className="mt-6 flex items-end gap-1">
-                  <span className="text-4xl font-black tracking-tight">{plan.price}</span>
+                  <span className="text-4xl font-black tracking-tight">{convertPrice(plan.usdPrice, curr)}</span>
                   <span className="pb-1 text-sm font-medium text-muted-foreground">{plan.period}</span>
                 </div>
                 <Link href="/agency-register">
-                  <Button className="mt-6 w-full gap-2 border-0 text-white hover:opacity-90" style={{ background: plan.recommended ? "linear-gradient(135deg,#4055FF,#9033F5)" : "linear-gradient(135deg,#111827,#374151)" }}>
+                  <Button className="mt-6 w-full gap-2 border-0 text-white hover:opacity-90" style={{ background: plan.buttonGradient }}>
                     Get {plan.name}
                     <ArrowRight className="h-4 w-4" />
                   </Button>
@@ -319,19 +375,19 @@ export default function AgencyCrmPage() {
       </section>
 
       <section className="px-4 pb-16">
-        <div className="mx-auto max-w-7xl overflow-hidden rounded-2xl bg-slate-950 p-6 text-white md:p-8">
+        <div className="mx-auto max-w-7xl overflow-hidden rounded-2xl border border-[#4055FF]/15 bg-gradient-to-br from-[#4055FF]/10 via-background to-[#FF2060]/10 p-6 shadow-xl shadow-[#4055FF]/5 md:p-8">
           <div className="grid gap-8 md:grid-cols-[1fr_auto] md:items-center">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-white/50">Ready for agencies</p>
+              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">Ready for agencies</p>
               <h2 className="mt-2 text-3xl font-black tracking-tight">Start with Lite, scale to Power when your volume grows.</h2>
-              <div className="mt-5 flex flex-wrap gap-3 text-sm text-white/70">
+              <div className="mt-5 flex flex-wrap gap-3 text-sm text-muted-foreground">
                 <span className="inline-flex items-center gap-2"><ReceiptText className="h-4 w-4" /> Invoicing</span>
                 <span className="inline-flex items-center gap-2"><CreditCard className="h-4 w-4" /> Payments</span>
                 <span className="inline-flex items-center gap-2"><Headphones className="h-4 w-4" /> Support</span>
               </div>
             </div>
             <Link href="/agency-register">
-              <Button size="lg" className="gap-2 bg-white text-slate-950 hover:bg-white/90">
+              <Button size="lg" className="gap-2 border-0 text-white hover:opacity-90" style={{ background: "linear-gradient(135deg,#4055FF,#9033F5,#FF2060)" }}>
                 Create agency account
                 <ArrowRight className="h-4 w-4" />
               </Button>
