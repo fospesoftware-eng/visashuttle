@@ -6164,12 +6164,38 @@ export async function registerRoutes(
 
   // === Agency Self-Registration ===
   app.post("/api/agency-register", async (req, res) => {
-    const { agencyName, slug, email, password, name, contactEmail, contactPhone } = req.body;
-    if (!agencyName || !slug || !email || !password || !name) {
-      return res.status(400).json({ error: "agencyName, slug, email, password, and name are required" });
+    const {
+      agencyName,
+      slug,
+      email,
+      password,
+      name,
+      contactEmail,
+      contactPhone,
+      activities,
+      address,
+      country,
+      pinCode,
+      state,
+      district,
+      plan,
+      paymentMode,
+    } = req.body;
+    if (!agencyName || !slug || !email || !password || !name || !contactPhone || !address || !country) {
+      return res.status(400).json({ error: "Agency name, slug, email, password, admin name, mobile, address, and country are required" });
+    }
+    const selectedPlan = ["lite", "go", "power"].includes(String(plan)) ? String(plan) : "lite";
+    const selectedActivities = Array.isArray(activities)
+      ? activities.map((a) => String(a).trim()).filter(Boolean).slice(0, 12)
+      : [];
+    if (selectedActivities.length === 0) {
+      return res.status(400).json({ error: "Select at least one agency activity" });
     }
     const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
     if (!cleanSlug) return res.status(400).json({ error: "Invalid slug" });
+    if (String(country).toLowerCase() === "india" && !String(pinCode || "").trim()) {
+      return res.status(400).json({ error: "PIN code is required for Indian agencies" });
+    }
     const existing = await storage.getTenantBySlug(cleanSlug);
     if (existing) return res.status(409).json({ error: "That agency URL is already taken" });
     const existingUser = await storage.getUserByEmail(email.toLowerCase().trim());
@@ -6177,10 +6203,16 @@ export async function registerRoutes(
     const tenant = await storage.createTenant({
       name: agencyName.trim(),
       slug: cleanSlug,
-      plan: "lite",
+      plan: selectedPlan,
       status: "active",
       contactEmail: contactEmail || email,
       contactPhone: contactPhone || null,
+      activities: selectedActivities,
+      address: String(address).trim(),
+      country: String(country).trim(),
+      pinCode: pinCode ? String(pinCode).trim() : null,
+      state: state ? String(state).trim() : null,
+      district: district ? String(district).trim() : null,
       showPoweredBy: true,
       authMethod: "otp",
     });
@@ -6199,7 +6231,7 @@ export async function registerRoutes(
       action: "agency.registered",
       entityType: "tenant",
       entityId: tenant.id,
-      details: { agencyName: tenant.name, plan: "lite" },
+      details: { agencyName: tenant.name, plan: selectedPlan, paymentMode: paymentMode === "offline" ? "offline" : "online", activities: selectedActivities },
     });
     req.session.userId = user.id;
     req.session.userRole = user.role;

@@ -52,6 +52,12 @@ export const tenants = pgTable("tenants", {
   accentColor: text("accent_color").default("#0096C7"),
   contactEmail: text("contact_email"),
   contactPhone: text("contact_phone"),
+  activities: text("activities").array().default(sql`'{}'::text[]`),
+  address: text("address"),
+  country: text("country"),
+  pinCode: text("pin_code"),
+  state: text("state"),
+  district: text("district"),
   whatsappNumber: text("whatsapp_number"),
   showPoweredBy: boolean("show_powered_by").default(true),
   authMethod: text("auth_method").default("otp"), // otp, magic_link
