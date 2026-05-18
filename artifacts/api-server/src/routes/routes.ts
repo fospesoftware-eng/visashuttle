@@ -6238,7 +6238,7 @@ export async function registerRoutes(
     req.session.userTenantId = tenant.id;
     req.session.save(() => {
       const { password: _, ...safeUser } = user;
-      res.status(201).json({ tenant, user: safeUser });
+      res.status(201).json({ tenant, user: safeUser, tenantSlug: tenant.slug });
     });
   });
 

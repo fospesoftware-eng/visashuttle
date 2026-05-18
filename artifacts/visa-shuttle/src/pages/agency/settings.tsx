@@ -1461,8 +1461,11 @@ export default function AgencySettingsPage() {
     trigger?.click();
   };
 
-  // Get tenant slug from localStorage (set during login) or default to demo-agency
-  const tenantSlug = localStorage.getItem("agency_tenant_slug") || "demo-agency";
+  // Use the authenticated tenant first. Never fall back to the demo agency for
+  // signed-in agency settings, otherwise a fresh signup can briefly edit/view
+  // the seeded demo workspace before /api/auth/me finishes refreshing.
+  const storedTenantSlug = typeof window !== "undefined" ? localStorage.getItem("agency_tenant_slug") : null;
+  const tenantSlug = authData?.tenantSlug || storedTenantSlug || "";
 
   // Fetch tenant data using dynamic slug
   const { data: tenant, isLoading } = useQuery<Tenant>({
@@ -1471,7 +1474,8 @@ export default function AgencySettingsPage() {
       const res = await fetch(`/api/tenants/by-slug/${tenantSlug}`);
       if (!res.ok) throw new Error("Failed to load tenant");
       return res.json();
-    }
+    },
+    enabled: !!tenantSlug,
   });
   const agencyPhoneCode = defaultPhoneCodeFrom((tenant as any)?.baseCountry ?? (tenant as any)?.country ?? tenant?.contactPhone);
 

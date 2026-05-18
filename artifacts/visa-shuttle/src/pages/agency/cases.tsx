@@ -91,7 +91,7 @@ export default function CasesPage({
 
   const { data: authData } = useCurrentUser();
   const tenantId = authData?.user?.tenantId;
-  const agencySlug = authData?.tenantSlug || localStorage.getItem("agency_tenant_slug") || "demo-agency";
+  const agencySlug = authData?.tenantSlug || (typeof window !== "undefined" ? localStorage.getItem("agency_tenant_slug") : "") || "";
 
   const { data: cases = [], isLoading } = useQuery<Case[]>({
     queryKey: ["/api/tenants", tenantId, "cases"],
@@ -104,10 +104,15 @@ export default function CasesPage({
   });
 
   const getCustomerLink = (referenceId: string) =>
-    `${window.location.origin}/w/${agencySlug}/login?ref=${referenceId}`;
+    agencySlug ? `${window.location.origin}/w/${agencySlug}/login?ref=${referenceId}` : "";
 
   const copyCustomerLink = (referenceId: string, caseId: string) => {
-    navigator.clipboard.writeText(getCustomerLink(referenceId));
+    const link = getCustomerLink(referenceId);
+    if (!link) {
+      toast({ title: "Agency link unavailable", description: "Please refresh after your agency session finishes loading.", variant: "destructive" });
+      return;
+    }
+    navigator.clipboard.writeText(link);
     setCopiedId(caseId);
     toast({ title: "Link copied!", description: "Customer portal link copied to clipboard." });
     setTimeout(() => setCopiedId(null), 2000);

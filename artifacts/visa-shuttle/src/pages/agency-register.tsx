@@ -241,8 +241,14 @@ export default function AgencyRegisterPage() {
         paymentMode: agencyForm.paymentMode,
       });
       const data = await res.json();
+      queryClient.setQueryData(["/api/auth/me"], {
+        authenticated: true,
+        user: data.user,
+        tenant: data.tenant,
+        tenantSlug: data.tenantSlug || data.tenant?.slug,
+      });
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-      localStorage.setItem("agency_tenant_slug", agencyForm.slug);
+      localStorage.setItem("agency_tenant_slug", data.tenantSlug || data.tenant?.slug || agencyForm.slug);
 
       if (agencyForm.paymentMode === "online") {
         try {

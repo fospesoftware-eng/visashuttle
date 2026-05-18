@@ -614,7 +614,7 @@ export default function CaseDetailPage() {
     && new URLSearchParams(window.location.search).get("submitted") === "1";
 
   const { data: authData } = useCurrentUser();
-  const agencySlug = authData?.tenantSlug || localStorage.getItem("agency_tenant_slug") || "demo-agency";
+  const agencySlug = authData?.tenantSlug || (typeof window !== "undefined" ? localStorage.getItem("agency_tenant_slug") : "") || "";
 
   const { data: caseData, isLoading: caseLoading } = useQuery<Case>({
     queryKey: ["/api/cases", id],
