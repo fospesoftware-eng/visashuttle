@@ -33,16 +33,30 @@ import {
   tenants as tenantsTable,
   leads as leadsTable,
   cases as casesTable,
+  appointments as appointmentsTable,
+  caseCoTravellers as caseCoTravellersTable,
+  documents as documentsTable,
+  messages as messagesTable,
+  visaTemplates as visaTemplatesTable,
   activityLogs as activityLogsTable,
+  customerAccounts as customerAccountsTable,
+  customerTenantLinks as customerTenantLinksTable,
+  passports as passportsTable,
+  otpCodes as otpCodesTable,
   b2cUsers, visaChecks, visaToolChecks, savedProfiles, smsConfig as smsConfigTable,
   platformAiConfig as platformAiConfigTable,
   paymentGatewayConfig as paymentGatewayConfigTable,
   tenantPaymentGatewayConfig as tenantPaymentGatewayConfigTable,
   tenantSmsConfig as tenantSmsConfigTable,
+  feeTemplates as feeTemplatesTable,
+  invoiceSettings as invoiceSettingsTable,
+  invoices as invoicesTable,
+  invoiceItems as invoiceItemsTable,
+  payments as paymentsTable,
   tenantDocumentChecklists as tenantDocumentChecklistsTable,
   proposals as proposalsTable,
 } from "@workspace/db";
-import { and, eq, desc } from "drizzle-orm";
+import { and, eq, desc, asc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
 import { db, hasDatabase } from "./db";
@@ -2178,6 +2192,468 @@ class HybridStorage extends MemStorage {
   async createActivityLog(log: InsertActivityLog): Promise<ActivityLog> {
     const rows = await db.insert(activityLogsTable).values(log).returning();
     return rows[0];
+  }
+
+  async getAllInvoices(): Promise<Invoice[]> {
+    return db.select().from(invoicesTable).orderBy(desc(invoicesTable.createdAt));
+  }
+
+  async getAllPayments(): Promise<Payment[]> {
+    return db.select().from(paymentsTable).orderBy(desc(paymentsTable.paidAt));
+  }
+
+  async getAppointmentsByCaseId(caseId: string): Promise<Appointment[]> {
+    return db.select().from(appointmentsTable).where(eq(appointmentsTable.caseId, caseId)).orderBy(asc(appointmentsTable.scheduledAt));
+  }
+
+  async getAppointmentsByTenantId(tenantId: string): Promise<Appointment[]> {
+    return db.select().from(appointmentsTable).where(eq(appointmentsTable.tenantId, tenantId)).orderBy(asc(appointmentsTable.scheduledAt));
+  }
+
+  async getAppointment(id: string): Promise<Appointment | undefined> {
+    const rows = await db.select().from(appointmentsTable).where(eq(appointmentsTable.id, id)).limit(1);
+    return rows[0];
+  }
+
+  async createAppointment(data: InsertAppointment): Promise<Appointment> {
+    const rows = await db.insert(appointmentsTable).values(data).returning();
+    return rows[0];
+  }
+
+  async updateAppointment(id: string, data: Partial<InsertAppointment>): Promise<Appointment | undefined> {
+    const { caseId: _ignoredCaseId, tenantId: _ignoredTenantId, ...safe } = data as any;
+    const rows = await db.update(appointmentsTable)
+      .set({ ...safe, updatedAt: new Date() } as any)
+      .where(eq(appointmentsTable.id, id))
+      .returning();
+    return rows[0];
+  }
+
+  async deleteAppointment(id: string): Promise<boolean> {
+    const rows = await db.delete(appointmentsTable).where(eq(appointmentsTable.id, id)).returning({ id: appointmentsTable.id });
+    return rows.length > 0;
+  }
+
+  async getCoTravellersByCaseId(caseId: string): Promise<CaseCoTraveller[]> {
+    return db.select().from(caseCoTravellersTable).where(eq(caseCoTravellersTable.caseId, caseId)).orderBy(asc(caseCoTravellersTable.createdAt));
+  }
+
+  async getCoTraveller(id: string): Promise<CaseCoTraveller | undefined> {
+    const rows = await db.select().from(caseCoTravellersTable).where(eq(caseCoTravellersTable.id, id)).limit(1);
+    return rows[0];
+  }
+
+  async createCoTraveller(data: InsertCaseCoTraveller): Promise<CaseCoTraveller> {
+    const rows = await db.insert(caseCoTravellersTable).values(data).returning();
+    return rows[0];
+  }
+
+  async updateCoTraveller(id: string, data: Partial<InsertCaseCoTraveller>): Promise<CaseCoTraveller | undefined> {
+    const rows = await db.update(caseCoTravellersTable)
+      .set(data as any)
+      .where(eq(caseCoTravellersTable.id, id))
+      .returning();
+    return rows[0];
+  }
+
+  async deleteCoTraveller(id: string): Promise<boolean> {
+    const rows = await db.delete(caseCoTravellersTable).where(eq(caseCoTravellersTable.id, id)).returning({ id: caseCoTravellersTable.id });
+    return rows.length > 0;
+  }
+
+  async getDocumentsByCaseId(caseId: string): Promise<Document[]> {
+    return db.select().from(documentsTable).where(eq(documentsTable.caseId, caseId)).orderBy(desc(documentsTable.uploadedAt));
+  }
+
+  async getDocumentsByTenantId(tenantId: string): Promise<Document[]> {
+    return db.select().from(documentsTable).where(eq(documentsTable.tenantId, tenantId)).orderBy(desc(documentsTable.uploadedAt));
+  }
+
+  async getDocument(id: string): Promise<Document | undefined> {
+    const rows = await db.select().from(documentsTable).where(eq(documentsTable.id, id)).limit(1);
+    return rows[0];
+  }
+
+  async createDocument(data: InsertDocument): Promise<Document> {
+    const rows = await db.insert(documentsTable).values(data).returning();
+    return rows[0];
+  }
+
+  async updateDocument(id: string, data: Partial<InsertDocument>): Promise<Document | undefined> {
+    const rows = await db.update(documentsTable)
+      .set(data as any)
+      .where(eq(documentsTable.id, id))
+      .returning();
+    return rows[0];
+  }
+
+  async getMessagesByCaseId(caseId: string): Promise<Message[]> {
+    return db.select().from(messagesTable).where(eq(messagesTable.caseId, caseId)).orderBy(asc(messagesTable.createdAt));
+  }
+
+  async createMessage(data: InsertMessage): Promise<Message> {
+    const rows = await db.insert(messagesTable).values(data).returning();
+    return rows[0];
+  }
+
+  async getAllVisaTemplates(): Promise<VisaTemplate[]> {
+    return db.select().from(visaTemplatesTable).orderBy(asc(visaTemplatesTable.country), asc(visaTemplatesTable.visaType));
+  }
+
+  async getVisaTemplate(id: string): Promise<VisaTemplate | undefined> {
+    const rows = await db.select().from(visaTemplatesTable).where(eq(visaTemplatesTable.id, id)).limit(1);
+    return rows[0];
+  }
+
+  async createVisaTemplate(data: InsertVisaTemplate): Promise<VisaTemplate> {
+    const rows = await db.insert(visaTemplatesTable).values(data).returning();
+    return rows[0];
+  }
+
+  async updateVisaTemplate(id: string, data: Partial<InsertVisaTemplate>): Promise<VisaTemplate | undefined> {
+    const rows = await db.update(visaTemplatesTable)
+      .set({ ...data, updatedAt: new Date() } as any)
+      .where(eq(visaTemplatesTable.id, id))
+      .returning();
+    return rows[0];
+  }
+
+  async deleteVisaTemplate(id: string): Promise<boolean> {
+    const rows = await db.delete(visaTemplatesTable).where(eq(visaTemplatesTable.id, id)).returning({ id: visaTemplatesTable.id });
+    return rows.length > 0;
+  }
+
+  async getCustomerAccount(id: string): Promise<CustomerAccount | undefined> {
+    const rows = await db.select().from(customerAccountsTable).where(eq(customerAccountsTable.id, id)).limit(1);
+    return rows[0];
+  }
+
+  async getCustomerAccountByEmail(email: string): Promise<CustomerAccount | undefined> {
+    const rows = await db.select().from(customerAccountsTable).where(eq(customerAccountsTable.email, email.toLowerCase().trim())).limit(1);
+    return rows[0];
+  }
+
+  async getCustomerAccountByPhone(phone: string): Promise<CustomerAccount | undefined> {
+    const normalized = normalizePhone(phone);
+    if (!normalized) return undefined;
+    const rows = await db.select().from(customerAccountsTable);
+    return rows.find((account) => normalizePhone(account.phone) === normalized);
+  }
+
+  async createCustomerAccount(data: InsertCustomerAccount): Promise<CustomerAccount> {
+    const rows = await db.insert(customerAccountsTable).values({
+      ...data,
+      email: data.email.toLowerCase().trim(),
+    }).returning();
+    return rows[0];
+  }
+
+  async updateCustomerAccount(id: string, data: Partial<InsertCustomerAccount>): Promise<CustomerAccount | undefined> {
+    const rows = await db.update(customerAccountsTable)
+      .set(data as any)
+      .where(eq(customerAccountsTable.id, id))
+      .returning();
+    return rows[0];
+  }
+
+  async getCustomerTenantLink(customerAccountId: string, tenantId: string): Promise<CustomerTenantLink | undefined> {
+    const rows = await db.select().from(customerTenantLinksTable)
+      .where(and(eq(customerTenantLinksTable.customerAccountId, customerAccountId), eq(customerTenantLinksTable.tenantId, tenantId)))
+      .limit(1);
+    return rows[0];
+  }
+
+  async createCustomerTenantLink(data: InsertCustomerTenantLink): Promise<CustomerTenantLink> {
+    const rows = await db.insert(customerTenantLinksTable).values(data).returning();
+    return rows[0];
+  }
+
+  async getCustomerTenantLinks(customerAccountId: string): Promise<CustomerTenantLink[]> {
+    return db.select().from(customerTenantLinksTable).where(eq(customerTenantLinksTable.customerAccountId, customerAccountId)).orderBy(desc(customerTenantLinksTable.createdAt));
+  }
+
+  async getCustomersByTenantId(tenantId: string): Promise<CustomerAccount[]> {
+    const links = await db.select().from(customerTenantLinksTable).where(eq(customerTenantLinksTable.tenantId, tenantId)).orderBy(desc(customerTenantLinksTable.createdAt));
+    const seen = new Set<string>();
+    const customers: CustomerAccount[] = [];
+    for (const link of links) {
+      if (seen.has(link.customerAccountId)) continue;
+      seen.add(link.customerAccountId);
+      const customer = await this.getCustomerAccount(link.customerAccountId);
+      if (customer) customers.push(customer);
+    }
+    return customers;
+  }
+
+  async getPassportsByCustomerId(customerAccountId: string, tenantId: string): Promise<Passport[]> {
+    return db.select().from(passportsTable)
+      .where(and(eq(passportsTable.customerAccountId, customerAccountId), eq(passportsTable.tenantId, tenantId)))
+      .orderBy(desc(passportsTable.isPrimary), desc(passportsTable.updatedAt));
+  }
+
+  async getPassportsByTenantId(tenantId: string): Promise<Passport[]> {
+    return db.select().from(passportsTable).where(eq(passportsTable.tenantId, tenantId)).orderBy(desc(passportsTable.updatedAt));
+  }
+
+  async getPassport(id: string): Promise<Passport | undefined> {
+    const rows = await db.select().from(passportsTable).where(eq(passportsTable.id, id)).limit(1);
+    return rows[0];
+  }
+
+  async createPassport(data: InsertPassport): Promise<Passport> {
+    const rows = await db.insert(passportsTable).values(data).returning();
+    return rows[0];
+  }
+
+  async updatePassport(id: string, data: Partial<InsertPassport>): Promise<Passport | undefined> {
+    const existing = await this.getPassport(id);
+    if (!existing) return undefined;
+    const { customerAccountId: _ignoredCustomer, tenantId: _ignoredTenant, ...safe } = data as any;
+    const rows = await db.update(passportsTable)
+      .set({ ...safe, updatedAt: new Date() } as any)
+      .where(eq(passportsTable.id, id))
+      .returning();
+    return rows[0];
+  }
+
+  async deletePassport(id: string): Promise<boolean> {
+    const rows = await db.delete(passportsTable).where(eq(passportsTable.id, id)).returning({ id: passportsTable.id });
+    return rows.length > 0;
+  }
+
+  async createOTPCode(data: InsertOTPCode): Promise<OTPCode> {
+    const rows = await db.insert(otpCodesTable).values(data).returning();
+    return rows[0];
+  }
+
+  async getActiveOTPCode(email: string, tenantId: string): Promise<OTPCode | undefined> {
+    const now = new Date();
+    const rows = await db.select().from(otpCodesTable)
+      .where(and(eq(otpCodesTable.email, email.toLowerCase().trim()), eq(otpCodesTable.tenantId, tenantId)))
+      .orderBy(desc(otpCodesTable.createdAt));
+    return rows.find((otp) => otp.expiresAt > now && !otp.usedAt && (otp.attempts || 0) < 5);
+  }
+
+  async getActiveOTPCodeByPhone(phone: string, tenantId: string): Promise<OTPCode | undefined> {
+    const normalized = normalizePhone(phone);
+    if (!normalized) return undefined;
+    const now = new Date();
+    const rows = await db.select().from(otpCodesTable)
+      .where(eq(otpCodesTable.tenantId, tenantId))
+      .orderBy(desc(otpCodesTable.createdAt));
+    return rows.find((otp) => normalizePhone(otp.phone) === normalized && otp.expiresAt > now && !otp.usedAt && (otp.attempts || 0) < 5);
+  }
+
+  async markOTPUsed(id: string): Promise<void> {
+    await db.update(otpCodesTable).set({ usedAt: new Date() }).where(eq(otpCodesTable.id, id));
+  }
+
+  async incrementOTPAttempts(id: string): Promise<void> {
+    const otp = (await db.select().from(otpCodesTable).where(eq(otpCodesTable.id, id)).limit(1))[0];
+    if (!otp) return;
+    await db.update(otpCodesTable)
+      .set({ attempts: (otp.attempts || 0) + 1 })
+      .where(eq(otpCodesTable.id, id));
+  }
+
+  async getTenantPaymentGatewayConfig(tenantId: string): Promise<TenantPaymentGatewayConfig | undefined> {
+    const rows = await db.select().from(tenantPaymentGatewayConfigTable).where(eq(tenantPaymentGatewayConfigTable.tenantId, tenantId)).limit(1);
+    return rows[0];
+  }
+
+  async upsertTenantPaymentGatewayConfig(tenantId: string, data: Partial<InsertTenantPaymentGatewayConfig>): Promise<TenantPaymentGatewayConfig> {
+    const existing = await this.getTenantPaymentGatewayConfig(tenantId);
+    if (existing) {
+      const rows = await db.update(tenantPaymentGatewayConfigTable)
+        .set({ ...data, tenantId, updatedAt: new Date() } as any)
+        .where(eq(tenantPaymentGatewayConfigTable.id, existing.id))
+        .returning();
+      return rows[0];
+    }
+    const rows = await db.insert(tenantPaymentGatewayConfigTable).values({ ...data, tenantId } as InsertTenantPaymentGatewayConfig).returning();
+    return rows[0];
+  }
+
+  async getTenantSmsConfig(tenantId: string): Promise<TenantSmsConfig | undefined> {
+    const rows = await db.select().from(tenantSmsConfigTable).where(eq(tenantSmsConfigTable.tenantId, tenantId)).limit(1);
+    return rows[0];
+  }
+
+  async upsertTenantSmsConfig(tenantId: string, data: Partial<InsertTenantSmsConfig>): Promise<TenantSmsConfig> {
+    const existing = await this.getTenantSmsConfig(tenantId);
+    if (existing) {
+      const rows = await db.update(tenantSmsConfigTable)
+        .set({ ...data, tenantId, updatedAt: new Date() } as any)
+        .where(eq(tenantSmsConfigTable.id, existing.id))
+        .returning();
+      return rows[0];
+    }
+    const rows = await db.insert(tenantSmsConfigTable).values({ ...data, tenantId } as InsertTenantSmsConfig).returning();
+    return rows[0];
+  }
+
+  async getFeeTemplatesByTenantId(tenantId: string): Promise<FeeTemplate[]> {
+    return db.select().from(feeTemplatesTable).where(eq(feeTemplatesTable.tenantId, tenantId)).orderBy(asc(feeTemplatesTable.name));
+  }
+
+  async getFeeTemplate(id: string): Promise<FeeTemplate | undefined> {
+    const rows = await db.select().from(feeTemplatesTable).where(eq(feeTemplatesTable.id, id)).limit(1);
+    return rows[0];
+  }
+
+  async createFeeTemplate(data: InsertFeeTemplate): Promise<FeeTemplate> {
+    const rows = await db.insert(feeTemplatesTable).values(data).returning();
+    return rows[0];
+  }
+
+  async updateFeeTemplate(id: string, data: Partial<InsertFeeTemplate>): Promise<FeeTemplate | undefined> {
+    const rows = await db.update(feeTemplatesTable)
+      .set({ ...data, updatedAt: new Date() } as any)
+      .where(eq(feeTemplatesTable.id, id))
+      .returning();
+    return rows[0];
+  }
+
+  async deleteFeeTemplate(id: string): Promise<boolean> {
+    const rows = await db.delete(feeTemplatesTable).where(eq(feeTemplatesTable.id, id)).returning({ id: feeTemplatesTable.id });
+    return rows.length > 0;
+  }
+
+  async getInvoiceSettings(tenantId: string): Promise<InvoiceSettings | undefined> {
+    const rows = await db.select().from(invoiceSettingsTable).where(eq(invoiceSettingsTable.tenantId, tenantId)).limit(1);
+    return rows[0];
+  }
+
+  async upsertInvoiceSettings(tenantId: string, data: Partial<InsertInvoiceSettings>): Promise<InvoiceSettings> {
+    const existing = await this.getInvoiceSettings(tenantId);
+    if (existing) {
+      const rows = await db.update(invoiceSettingsTable)
+        .set({ ...data, tenantId, updatedAt: new Date() } as any)
+        .where(eq(invoiceSettingsTable.id, existing.id))
+        .returning();
+      return rows[0];
+    }
+    const rows = await db.insert(invoiceSettingsTable).values({ ...data, tenantId } as InsertInvoiceSettings).returning();
+    return rows[0];
+  }
+
+  async getInvoicesByTenantId(tenantId: string): Promise<Invoice[]> {
+    return db.select().from(invoicesTable).where(eq(invoicesTable.tenantId, tenantId)).orderBy(desc(invoicesTable.createdAt));
+  }
+
+  async getInvoicesByCaseId(caseId: string): Promise<Invoice[]> {
+    return db.select().from(invoicesTable).where(eq(invoicesTable.caseId, caseId)).orderBy(desc(invoicesTable.createdAt));
+  }
+
+  async getInvoice(id: string): Promise<Invoice | undefined> {
+    const rows = await db.select().from(invoicesTable).where(eq(invoicesTable.id, id)).limit(1);
+    return rows[0];
+  }
+
+  async getInvoiceByPublicToken(token: string): Promise<Invoice | undefined> {
+    if (!token) return undefined;
+    const rows = await db.select().from(invoicesTable).where(eq(invoicesTable.publicToken, token)).limit(1);
+    return rows[0];
+  }
+
+  async createInvoice(data: InsertInvoice, items: Omit<InsertInvoiceItem, "invoiceId">[]): Promise<Invoice> {
+    const subtotal = items.reduce((sum, item) => sum + (item.amount ?? ((item.unitPrice ?? 0) * (item.quantity ?? 1))), 0);
+    const total = subtotal + (data.taxAmount ?? 0);
+    const invoiceRows = await db.insert(invoicesTable).values({
+      ...data,
+      subtotal: data.subtotal ?? subtotal,
+      total: data.total ?? total,
+    } as InsertInvoice).returning();
+    const invoice = invoiceRows[0];
+    if (items.length) {
+      await db.insert(invoiceItemsTable).values(items.map((item, index) => ({
+        ...item,
+        invoiceId: invoice.id,
+        amount: item.amount ?? ((item.unitPrice ?? 0) * (item.quantity ?? 1)),
+        sortOrder: item.sortOrder ?? index,
+      })));
+    }
+    return invoice;
+  }
+
+  async updateInvoice(id: string, data: Partial<InsertInvoice>): Promise<Invoice | undefined> {
+    const rows = await db.update(invoicesTable)
+      .set({ ...data, updatedAt: new Date() } as any)
+      .where(eq(invoicesTable.id, id))
+      .returning();
+    return rows[0];
+  }
+
+  async deleteInvoice(id: string): Promise<boolean> {
+    await db.delete(invoiceItemsTable).where(eq(invoiceItemsTable.invoiceId, id));
+    await db.delete(paymentsTable).where(eq(paymentsTable.invoiceId, id));
+    const rows = await db.delete(invoicesTable).where(eq(invoicesTable.id, id)).returning({ id: invoicesTable.id });
+    return rows.length > 0;
+  }
+
+  async replaceInvoiceItems(invoiceId: string, items: Omit<InsertInvoiceItem, "invoiceId">[]): Promise<InvoiceItem[]> {
+    await db.delete(invoiceItemsTable).where(eq(invoiceItemsTable.invoiceId, invoiceId));
+    const rows = items.length
+      ? await db.insert(invoiceItemsTable).values(items.map((item, index) => ({
+          ...item,
+          invoiceId,
+          amount: item.amount ?? ((item.unitPrice ?? 0) * (item.quantity ?? 1)),
+          sortOrder: item.sortOrder ?? index,
+        }))).returning()
+      : [];
+    const invoice = await this.getInvoice(invoiceId);
+    if (invoice) {
+      const subtotal = rows.reduce((sum, item) => sum + item.amount, 0);
+      await db.update(invoicesTable)
+        .set({ subtotal, total: subtotal + (invoice.taxAmount ?? 0), updatedAt: new Date() } as any)
+        .where(eq(invoicesTable.id, invoiceId));
+    }
+    return rows;
+  }
+
+  async getInvoiceItems(invoiceId: string): Promise<InvoiceItem[]> {
+    return db.select().from(invoiceItemsTable).where(eq(invoiceItemsTable.invoiceId, invoiceId)).orderBy(asc(invoiceItemsTable.sortOrder));
+  }
+
+  async getPayment(id: string): Promise<Payment | undefined> {
+    const rows = await db.select().from(paymentsTable).where(eq(paymentsTable.id, id)).limit(1);
+    return rows[0];
+  }
+
+  async getPaymentsByInvoiceId(invoiceId: string): Promise<Payment[]> {
+    return db.select().from(paymentsTable).where(eq(paymentsTable.invoiceId, invoiceId)).orderBy(desc(paymentsTable.paidAt));
+  }
+
+  async getPaymentsByTenantId(tenantId: string): Promise<Payment[]> {
+    return db.select().from(paymentsTable).where(eq(paymentsTable.tenantId, tenantId)).orderBy(desc(paymentsTable.paidAt));
+  }
+
+  private async recalculateInvoicePaymentStatus(invoiceId: string): Promise<void> {
+    const invoice = await this.getInvoice(invoiceId);
+    if (!invoice) return;
+    const payments = await this.getPaymentsByInvoiceId(invoiceId);
+    const paidAmount = payments.reduce((sum, payment) => sum + payment.amount, 0);
+    let status = invoice.status;
+    if (paidAmount >= invoice.total && invoice.total > 0) status = "paid";
+    else if (paidAmount > 0) status = "partial";
+    else if (invoice.status === "paid" || invoice.status === "partial") status = "sent";
+    await db.update(invoicesTable)
+      .set({ paidAmount, status, updatedAt: new Date() } as any)
+      .where(eq(invoicesTable.id, invoiceId));
+  }
+
+  async createPayment(data: InsertPayment): Promise<Payment> {
+    const rows = await db.insert(paymentsTable).values(data).returning();
+    await this.recalculateInvoicePaymentStatus(data.invoiceId);
+    return rows[0];
+  }
+
+  async deletePayment(id: string): Promise<boolean> {
+    const payment = await this.getPayment(id);
+    if (!payment) return false;
+    const rows = await db.delete(paymentsTable).where(eq(paymentsTable.id, id)).returning({ id: paymentsTable.id });
+    if (rows.length) await this.recalculateInvoicePaymentStatus(payment.invoiceId);
+    return rows.length > 0;
   }
 
   private async ensureDemoB2cEntitlements(user: B2cUser | undefined): Promise<B2cUser | undefined> {
