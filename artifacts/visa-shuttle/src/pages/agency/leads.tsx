@@ -322,6 +322,7 @@ export default function LeadsPage() {
   const [convertLead, setConvertLead] = useState<Lead | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [activeDragLead, setActiveDragLead] = useState<Lead | null>(null);
+  const [stageFilter, setStageFilter] = useState<"all" | string>("all");
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -478,12 +479,17 @@ export default function LeadsPage() {
     onError: (e: Error) => toast({ title: "Could not convert", description: e.message, variant: "destructive" }),
   });
 
-  const filteredLeads = leads.filter((lead) =>
+  const searchFilteredLeads = leads.filter((lead) =>
     lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     lead.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
+  const filteredLeads = stageFilter === "all"
+    ? searchFilteredLeads
+    : searchFilteredLeads.filter((lead) => lead.stage === stageFilter);
+  const visibleStages = stageFilter === "all" ? stages : [stageFilter];
 
   const getLeadsByStage = (stage: string) => filteredLeads.filter((lead) => lead.stage === stage);
+  const getStageCount = (stage: string) => searchFilteredLeads.filter((lead) => lead.stage === stage).length;
 
   const handleSubmit = () => {
     if (!form.name || !form.email) {
@@ -737,18 +743,33 @@ export default function LeadsPage() {
 
         {/* Summary bar */}
         <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7">
-          <div className="flex items-center justify-between gap-2 rounded-lg border bg-background px-3 py-2 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setStageFilter("all")}
+            className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left shadow-sm transition hover:border-primary/40 hover:bg-primary/5 ${
+              stageFilter === "all" ? "border-primary bg-primary/10 ring-2 ring-primary/10" : "bg-background"
+            }`}
+            data-testid="button-lead-status-all"
+          >
             <span className="text-muted-foreground">Total leads:</span>
-            <span className="font-semibold">{leads.length}</span>
-          </div>
+            <span className="font-semibold">{searchFilteredLeads.length}</span>
+          </button>
           {stages.map((s) => (
-            <div key={s} className="flex items-center justify-between gap-2 rounded-lg border bg-background px-3 py-2 shadow-sm">
+            <button
+              key={s}
+              type="button"
+              onClick={() => setStageFilter(s)}
+              className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left shadow-sm transition hover:border-primary/40 hover:bg-primary/5 ${
+                stageFilter === s ? "border-primary bg-primary/10 ring-2 ring-primary/10" : "bg-background"
+              }`}
+              data-testid={`button-lead-status-${s}`}
+            >
               <span className="flex min-w-0 items-center gap-2">
                 <span className={`w-2 h-2 rounded-full ${STAGE_DOT[s]}`} />
                 <span className="truncate capitalize text-muted-foreground">{s.replace("_", " ")}</span>
               </span>
-              <span className="font-medium">{getLeadsByStage(s).length}</span>
-            </div>
+              <span className="font-medium">{getStageCount(s)}</span>
+            </button>
           ))}
         </div>
 
@@ -772,8 +793,18 @@ export default function LeadsPage() {
         ) : (
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={() => setActiveDragLead(null)}>
             <div className="-mx-2 overflow-x-auto px-2 pb-4">
+              {stageFilter !== "all" && (
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <span className="text-sm text-muted-foreground">
+                    Showing <span className="font-semibold capitalize text-foreground">{stageFilter.replace("_", " ")}</span> leads
+                  </span>
+                  <Button variant="outline" size="sm" onClick={() => setStageFilter("all")}>
+                    Show all statuses
+                  </Button>
+                </div>
+              )}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:flex lg:min-w-max">
-                {stages.map((stage) => (
+                {visibleStages.map((stage) => (
                   <DroppableStage key={stage} stage={stage} className="overflow-visible lg:w-[304px] lg:flex-none">
                     <Card className={`${STAGE_COLORS[stage]} h-full overflow-visible border border-border/50 shadow-sm`} data-testid={`column-${stage}`}>
                       <CardHeader className="pb-3 pt-4 px-4">
@@ -848,6 +879,15 @@ export default function LeadsPage() {
             description="Start adding leads to track your sales pipeline."
             actionLabel="Add First Lead"
             onAction={() => setIsAddOpen(true)}
+          />
+        )}
+        {!isLoading && leads.length > 0 && filteredLeads.length === 0 && (
+          <EmptyState
+            icon={Search}
+            title="No leads match this status"
+            description="Try another status or clear your search."
+            actionLabel="Show All Statuses"
+            onAction={() => setStageFilter("all")}
           />
         )}
       </div>
