@@ -29,6 +29,11 @@ import {
   type Invoice, type InsertInvoice,
   type InvoiceItem, type InsertInvoiceItem,
   type Payment, type InsertPayment,
+  users as usersTable,
+  tenants as tenantsTable,
+  leads as leadsTable,
+  cases as casesTable,
+  activityLogs as activityLogsTable,
   b2cUsers, visaChecks, visaToolChecks, savedProfiles, smsConfig as smsConfigTable,
   platformAiConfig as platformAiConfigTable,
   paymentGatewayConfig as paymentGatewayConfigTable,
@@ -2017,6 +2022,164 @@ export class MemStorage implements IStorage {
 // development can still fall back to seeded in-memory data if a newly added
 // optional table has not been pushed yet.
 class HybridStorage extends MemStorage {
+  async getUser(id: string): Promise<User | undefined> {
+    const rows = await db.select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
+    return rows[0];
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const rows = await db.select().from(usersTable).where(eq(usersTable.email, email.toLowerCase().trim())).limit(1);
+    return rows[0];
+  }
+
+  async getUsersByTenantId(tenantId: string): Promise<User[]> {
+    return db.select().from(usersTable).where(eq(usersTable.tenantId, tenantId)).orderBy(desc(usersTable.createdAt));
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return db.select().from(usersTable).orderBy(desc(usersTable.createdAt));
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const rows = await db.insert(usersTable).values({
+      ...user,
+      email: user.email.toLowerCase().trim(),
+    }).returning();
+    return rows[0];
+  }
+
+  async updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined> {
+    const rows = await db.update(usersTable).set(data).where(eq(usersTable.id, id)).returning();
+    return rows[0];
+  }
+
+  async deleteUser(id: string): Promise<boolean> {
+    const rows = await db.delete(usersTable).where(eq(usersTable.id, id)).returning({ id: usersTable.id });
+    return rows.length > 0;
+  }
+
+  async getTenant(id: string): Promise<Tenant | undefined> {
+    const rows = await db.select().from(tenantsTable).where(eq(tenantsTable.id, id)).limit(1);
+    return rows[0];
+  }
+
+  async getTenantBySlug(slug: string): Promise<Tenant | undefined> {
+    const rows = await db.select().from(tenantsTable).where(eq(tenantsTable.slug, slug)).limit(1);
+    return rows[0];
+  }
+
+  async getAllTenants(): Promise<Tenant[]> {
+    return db.select().from(tenantsTable).orderBy(desc(tenantsTable.createdAt));
+  }
+
+  async createTenant(tenant: InsertTenant): Promise<Tenant> {
+    const rows = await db.insert(tenantsTable).values(tenant).returning();
+    return rows[0];
+  }
+
+  async updateTenant(id: string, data: Partial<InsertTenant>): Promise<Tenant | undefined> {
+    const rows = await db.update(tenantsTable).set(data).where(eq(tenantsTable.id, id)).returning();
+    return rows[0];
+  }
+
+  async deleteTenant(id: string): Promise<boolean> {
+    const rows = await db.delete(tenantsTable).where(eq(tenantsTable.id, id)).returning({ id: tenantsTable.id });
+    return rows.length > 0;
+  }
+
+  async getLeadsByTenantId(tenantId: string): Promise<Lead[]> {
+    return db.select().from(leadsTable).where(eq(leadsTable.tenantId, tenantId)).orderBy(desc(leadsTable.updatedAt));
+  }
+
+  async getLead(id: string): Promise<Lead | undefined> {
+    const rows = await db.select().from(leadsTable).where(eq(leadsTable.id, id)).limit(1);
+    return rows[0];
+  }
+
+  async createLead(lead: InsertLead): Promise<Lead> {
+    const rows = await db.insert(leadsTable).values(lead).returning();
+    return rows[0];
+  }
+
+  async updateLead(id: string, data: Partial<InsertLead>): Promise<Lead | undefined> {
+    const rows = await db.update(leadsTable)
+      .set({ ...data, updatedAt: new Date() } as any)
+      .where(eq(leadsTable.id, id))
+      .returning();
+    return rows[0];
+  }
+
+  async deleteLead(id: string): Promise<boolean> {
+    const rows = await db.delete(leadsTable).where(eq(leadsTable.id, id)).returning({ id: leadsTable.id });
+    return rows.length > 0;
+  }
+
+  async getAllLeads(): Promise<Lead[]> {
+    return db.select().from(leadsTable).orderBy(desc(leadsTable.createdAt));
+  }
+
+  async getCasesByTenantId(tenantId: string): Promise<Case[]> {
+    return db.select().from(casesTable).where(eq(casesTable.tenantId, tenantId)).orderBy(desc(casesTable.updatedAt));
+  }
+
+  async getAllCases(): Promise<Case[]> {
+    return db.select().from(casesTable).orderBy(desc(casesTable.createdAt));
+  }
+
+  async getCasesByCustomerId(customerId: string): Promise<Case[]> {
+    return db.select().from(casesTable).where(eq(casesTable.customerId, customerId)).orderBy(desc(casesTable.createdAt));
+  }
+
+  async getCasesByCustomerAccountId(customerAccountId: string, tenantId: string): Promise<Case[]> {
+    return db.select().from(casesTable)
+      .where(and(eq(casesTable.customerAccountId, customerAccountId), eq(casesTable.tenantId, tenantId)))
+      .orderBy(desc(casesTable.createdAt));
+  }
+
+  async getCasesByTenantAndVisaStage(tenantId: string, stage: string): Promise<Case[]> {
+    return db.select().from(casesTable)
+      .where(and(eq(casesTable.tenantId, tenantId), eq(casesTable.visaStage, stage)))
+      .orderBy(desc(casesTable.updatedAt));
+  }
+
+  async getCaseByReferenceId(referenceId: string, tenantId: string): Promise<Case | undefined> {
+    const rows = await db.select().from(casesTable)
+      .where(and(eq(casesTable.referenceId, referenceId), eq(casesTable.tenantId, tenantId)))
+      .limit(1);
+    return rows[0];
+  }
+
+  async getCase(id: string): Promise<Case | undefined> {
+    const rows = await db.select().from(casesTable).where(eq(casesTable.id, id)).limit(1);
+    return rows[0];
+  }
+
+  async createCase(caseData: InsertCase): Promise<Case> {
+    const rows = await db.insert(casesTable).values(caseData).returning();
+    return rows[0];
+  }
+
+  async updateCase(id: string, data: Partial<InsertCase>): Promise<Case | undefined> {
+    const rows = await db.update(casesTable)
+      .set({ ...data, updatedAt: new Date() } as any)
+      .where(eq(casesTable.id, id))
+      .returning();
+    return rows[0];
+  }
+
+  async getActivityLogsByTenantId(tenantId: string): Promise<ActivityLog[]> {
+    return db.select().from(activityLogsTable).where(eq(activityLogsTable.tenantId, tenantId)).orderBy(desc(activityLogsTable.createdAt));
+  }
+
+  async getAllActivityLogs(): Promise<ActivityLog[]> {
+    return db.select().from(activityLogsTable).orderBy(desc(activityLogsTable.createdAt));
+  }
+
+  async createActivityLog(log: InsertActivityLog): Promise<ActivityLog> {
+    const rows = await db.insert(activityLogsTable).values(log).returning();
+    return rows[0];
+  }
+
   private async ensureDemoB2cEntitlements(user: B2cUser | undefined): Promise<B2cUser | undefined> {
     if (!user || user.email !== "demo@visashuttle.com") return user;
     if (user.subscriptionPlan === "pro" && user.checkLimit >= 5 && user.deepCheckAccess) return user;
