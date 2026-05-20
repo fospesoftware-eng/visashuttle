@@ -53,6 +53,7 @@ interface EmailConfigResponse {
   agentAlias: string;
   senderAddress: string;
   senderName: string;
+  bounceAddress: string;
   replyToAddress: string;
   sendMailToken: string;
   enabled: boolean;
@@ -254,6 +255,7 @@ function TransactionalEmailCard() {
     agentAlias: "448141e4788dab46",
     senderAddress: "notifications@visashuttle.com",
     senderName: "Visa Shuttle",
+    bounceAddress: "",
     replyToAddress: "",
     sendMailToken: "",
     enabled: false,
@@ -271,6 +273,7 @@ function TransactionalEmailCard() {
         agentAlias: cfg.agentAlias || "448141e4788dab46",
         senderAddress: cfg.senderAddress || "notifications@visashuttle.com",
         senderName: cfg.senderName || "Visa Shuttle",
+        bounceAddress: cfg.bounceAddress || "",
         replyToAddress: cfg.replyToAddress || "",
         sendMailToken: cfg.sendMailToken || "",
         enabled: !!cfg.enabled,
@@ -318,7 +321,8 @@ function TransactionalEmailCard() {
       }
       if (!res.ok) {
         const status = data?.providerStatus ? `Provider status ${data.providerStatus}. ` : "";
-        throw new Error(`${status}${data?.error || data?.message || `Email test failed with HTTP ${res.status}`}`);
+        const detail = data?.providerDetail ? ` Detail: ${String(data.providerDetail).slice(0, 260)}` : "";
+        throw new Error(`${status}${data?.error || data?.message || text || `Email test failed with HTTP ${res.status}`}${detail}`);
       }
       return data;
     },
@@ -375,6 +379,11 @@ function TransactionalEmailCard() {
           <div className="space-y-1.5">
             <Label>Sender Name</Label>
             <Input value={form.senderName} onChange={e => setForm(f => ({ ...f, senderName: e.target.value }))} placeholder="Visa Shuttle" data-testid="input-zepto-sender-name" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Bounce Address</Label>
+            <Input type="email" value={form.bounceAddress} onChange={e => setForm(f => ({ ...f, bounceAddress: e.target.value }))} placeholder="bounce_xxxxx@zptmail.com" data-testid="input-zepto-bounce-address" />
+            <p className="text-xs text-muted-foreground">Use the bounce address shown in the same ZeptoMail Mail Agent, if Zepto requires it.</p>
           </div>
           <div className="space-y-1.5">
             <Label>Reply-To Address</Label>

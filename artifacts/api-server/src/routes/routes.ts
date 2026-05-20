@@ -174,7 +174,7 @@ async function sendTransactionalEmail(opts: {
   html?: string;
   replyTo?: string | null;
   attachments?: Array<{ filename: string; content: string; mimeType?: string }>;
-}): Promise<{ ok: boolean; provider?: string; error?: string; status?: number }> {
+}): Promise<{ ok: boolean; provider?: string; error?: string; status?: number; detail?: string }> {
   const cfg = await storage.getZeptoMailConfig().catch(() => undefined);
   const token = normalizeZeptoMailToken(cfg?.sendMailToken || "");
   if (!cfg?.enabled || !token) return { ok: false, provider: "zeptomail", error: "ZeptoMail is not configured" };
@@ -185,6 +185,7 @@ async function sendTransactionalEmail(opts: {
     to: [{ email_address: { address: opts.to, name: opts.toName || opts.to } }],
     subject: opts.subject,
   };
+  if (cfg.bounceAddress) payload.bounce_address = cfg.bounceAddress;
   if (opts.html) payload.htmlbody = opts.html;
   if (opts.text) payload.textbody = opts.text;
   const replyTo = opts.replyTo || cfg.replyToAddress;
@@ -210,7 +211,7 @@ async function sendTransactionalEmail(opts: {
     const detail = await resp.text().catch(() => "");
     const message = cleanProviderError(detail) || `ZeptoMail HTTP ${resp.status}`;
     console.warn("[email] ZeptoMail rejected:", resp.status, message.slice(0, 300));
-    return { ok: false, provider: "zeptomail", status: resp.status, error: message };
+    return { ok: false, provider: "zeptomail", status: resp.status, error: message, detail: detail.slice(0, 1000) };
   }
   return { ok: true, provider: "zeptomail", status: resp.status };
 }
@@ -4843,6 +4844,7 @@ export async function registerRoutes(
       agentAlias: cfg?.agentAlias || "448141e4788dab46",
       senderAddress: normalizeZeptoMailSender(cfg?.senderAddress),
       senderName: cfg?.senderName || "Visa Shuttle",
+      bounceAddress: cfg?.bounceAddress || "",
       replyToAddress: cfg?.replyToAddress || "",
       sendMailToken: cfg?.sendMailToken ? maskKey(cfg.sendMailToken) : "",
       enabled: !!cfg?.enabled,
@@ -4852,13 +4854,14 @@ export async function registerRoutes(
   });
 
   app.post("/api/admin/email-config", requireAdminAuth, async (req, res) => {
-    const { domain, host, agentAlias, senderAddress, senderName, replyToAddress, sendMailToken, enabled } = req.body;
+    const { domain, host, agentAlias, senderAddress, senderName, bounceAddress, replyToAddress, sendMailToken, enabled } = req.body;
     const patch: Record<string, any> = { provider: "zeptomail" };
     if (domain !== undefined) patch.domain = String(domain || "visashuttle.com").trim();
     if (host !== undefined) patch.host = normalizeZeptoMailHost(String(host || "api.zeptomail.com"));
     if (agentAlias !== undefined) patch.agentAlias = String(agentAlias || "").trim() || null;
     if (senderAddress !== undefined) patch.senderAddress = normalizeZeptoMailSender(String(senderAddress || DEFAULT_ZEPTOMAIL_SENDER));
     if (senderName !== undefined) patch.senderName = String(senderName || "Visa Shuttle").trim();
+    if (bounceAddress !== undefined) patch.bounceAddress = String(bounceAddress || "").trim() || null;
     if (replyToAddress !== undefined) patch.replyToAddress = String(replyToAddress || "").trim() || null;
     if (sendMailToken !== undefined && !String(sendMailToken).includes("•")) patch.sendMailToken = normalizeZeptoMailToken(String(sendMailToken || "")) || null;
     if (enabled !== undefined) patch.enabled = !!enabled;
@@ -4870,6 +4873,7 @@ export async function registerRoutes(
       agentAlias: updated.agentAlias,
       senderAddress: updated.senderAddress,
       senderName: updated.senderName,
+      bounceAddress: updated.bounceAddress || "",
       replyToAddress: updated.replyToAddress || "",
       sendMailToken: updated.sendMailToken ? maskKey(updated.sendMailToken) : "",
       enabled: updated.enabled,
@@ -4895,9 +4899,12 @@ export async function registerRoutes(
         html: "<p>This is a transactional email test from <strong>Visa Shuttle</strong>.</p>",
       });
       if (!result.ok) return res.status(502).json({
-        error: result.error || "Email provider rejected the request",
+        error: result.error
+          ? `ZeptoMail rejected the test email: ${result.error}`
+          : `ZeptoMail rejected the test email with provider HTTP ${result.status || 502}. Check the Send Mail token, verified sender, bounce address, and Mail Agent domain.`,
         provider: result.provider || "zeptomail",
         providerStatus: result.status || null,
+        providerDetail: result.detail || null,
       });
       res.json({ success: true, provider: result.provider, providerStatus: result.status, message: `Test email sent to ${to}` });
     } catch (error: any) {

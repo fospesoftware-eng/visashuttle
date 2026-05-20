@@ -91,6 +91,15 @@ function isMissingRelationError(error: unknown): boolean {
   return isMissingRelationError(err.cause);
 }
 
+function isMissingColumnError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const err = error as { code?: string; message?: string; cause?: unknown };
+  if (err.code === "42703") return true;
+  const message = err.message ?? "";
+  if (message.includes("42703") || message.includes("column") && message.includes("does not exist")) return true;
+  return isMissingColumnError(err.cause);
+}
+
 function shouldUseMemoryFallback(error: unknown): boolean {
   return process.env.NODE_ENV !== "production" && isMissingRelationError(error);
 }
@@ -1992,6 +2001,7 @@ export class MemStorage implements IStorage {
       agentAlias: data.agentAlias !== undefined ? data.agentAlias : existing?.agentAlias ?? "448141e4788dab46",
       senderAddress: data.senderAddress !== undefined ? data.senderAddress : existing?.senderAddress ?? "notifications@visashuttle.com",
       senderName: data.senderName !== undefined ? data.senderName : existing?.senderName ?? "Visa Shuttle",
+      bounceAddress: data.bounceAddress !== undefined ? data.bounceAddress : existing?.bounceAddress ?? null,
       replyToAddress: data.replyToAddress !== undefined ? data.replyToAddress : existing?.replyToAddress ?? null,
       sendMailToken: data.sendMailToken !== undefined ? data.sendMailToken : existing?.sendMailToken ?? null,
       enabled: data.enabled !== undefined ? !!data.enabled : existing?.enabled ?? false,
@@ -3148,12 +3158,14 @@ class HybridStorage extends MemStorage {
         agent_alias text DEFAULT '448141e4788dab46',
         sender_address text NOT NULL DEFAULT 'notifications@visashuttle.com',
         sender_name text NOT NULL DEFAULT 'Visa Shuttle',
+        bounce_address text,
         reply_to_address text,
         send_mail_token text,
         enabled boolean NOT NULL DEFAULT false,
         updated_at timestamp DEFAULT now()
       )
-    `);
+	    `);
+    await db.execute(sql`ALTER TABLE zeptomail_config ADD COLUMN IF NOT EXISTS bounce_address text`);
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS email_templates (
         id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -3176,9 +3188,10 @@ class HybridStorage extends MemStorage {
       const rows = await db.select().from(zeptoMailConfigTable).limit(1);
       return rows[0];
     } catch (error) {
-      if (isMissingRelationError(error)) {
+      if (isMissingRelationError(error) || isMissingColumnError(error)) {
         await this.ensureEmailConfigTables();
-        return undefined;
+        const rows = await db.select().from(zeptoMailConfigTable).limit(1);
+        return rows[0];
       }
       if (shouldUseMemoryFallback(error)) {
         console.warn("[DB] zeptomail_config table is missing. Using in-memory email config fallback.");
@@ -3208,7 +3221,7 @@ class HybridStorage extends MemStorage {
       } as InsertZeptoMailConfig).returning();
       return rows[0];
     } catch (error) {
-      if (isMissingRelationError(error)) {
+      if (isMissingRelationError(error) || isMissingColumnError(error)) {
         await this.ensureEmailConfigTables();
         const rows = await db.insert(zeptoMailConfigTable).values({
           provider: "zeptomail",
