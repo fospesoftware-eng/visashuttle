@@ -290,9 +290,16 @@ function TransactionalEmailCard() {
   });
 
   const testMutation = useMutation({
-    mutationFn: (to: string) => apiRequest("POST", "/api/admin/email-config/test", { to }),
-    onSuccess: async (res: any) => {
-      const data = typeof res?.json === "function" ? await res.json() : res;
+    mutationFn: async (to: string) => {
+      const res = await apiRequest("POST", "/api/admin/email-config/test", { to });
+      const text = await res.text();
+      try {
+        return text ? JSON.parse(text) : {};
+      } catch {
+        throw new Error(text.startsWith("<") ? "Server returned an HTML page instead of JSON. Please refresh after deploy and try again." : text);
+      }
+    },
+    onSuccess: (data: any) => {
       toast({ title: "Test email sent", description: data?.message || `Sent to ${testEmail}` });
     },
     onError: (err: any) => {

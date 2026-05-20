@@ -107,6 +107,26 @@ function renderEmailTemplateText(template: string, variables: Record<string, unk
   });
 }
 
+function cleanProviderError(detail: string): string {
+  const text = String(detail || "").trim();
+  if (!text) return "";
+  if (text.startsWith("<")) {
+    return text
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[\s\S]*?<\/style>/gi, "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 500);
+  }
+  try {
+    const parsed = JSON.parse(text);
+    return parsed?.message || parsed?.error || parsed?.data?.message || text.slice(0, 500);
+  } catch {
+    return text.slice(0, 500);
+  }
+}
+
 async function sendTransactionalEmail(opts: {
   to: string;
   toName?: string | null;
@@ -148,8 +168,9 @@ async function sendTransactionalEmail(opts: {
   });
   if (!resp.ok) {
     const detail = await resp.text().catch(() => "");
-    console.warn("[email] ZeptoMail rejected:", resp.status, detail.slice(0, 300));
-    return { ok: false, provider: "zeptomail", status: resp.status, error: detail || `ZeptoMail HTTP ${resp.status}` };
+    const message = cleanProviderError(detail) || `ZeptoMail HTTP ${resp.status}`;
+    console.warn("[email] ZeptoMail rejected:", resp.status, message.slice(0, 300));
+    return { ok: false, provider: "zeptomail", status: resp.status, error: message };
   }
   return { ok: true, provider: "zeptomail", status: resp.status };
 }
@@ -4818,16 +4839,20 @@ export async function registerRoutes(
   });
 
   app.post("/api/admin/email-config/test", requireAdminAuth, async (req, res) => {
-    const to = String(req.body?.to || "").trim();
-    if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return res.status(400).json({ error: "A valid test email is required" });
-    const result = await sendTransactionalEmail({
-      to,
-      subject: "Visa Shuttle ZeptoMail test",
-      text: "This is a transactional email test from Visa Shuttle.",
-      html: "<p>This is a transactional email test from <strong>Visa Shuttle</strong>.</p>",
-    });
-    if (!result.ok) return res.status(502).json({ error: result.error || "Email provider rejected the request" });
-    res.json({ success: true, message: `Test email sent to ${to}` });
+    try {
+      const to = String(req.body?.to || "").trim();
+      if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return res.status(400).json({ error: "A valid test email is required" });
+      const result = await sendTransactionalEmail({
+        to,
+        subject: "Visa Shuttle ZeptoMail test",
+        text: "This is a transactional email test from Visa Shuttle.",
+        html: "<p>This is a transactional email test from <strong>Visa Shuttle</strong>.</p>",
+      });
+      if (!result.ok) return res.status(502).json({ error: result.error || "Email provider rejected the request" });
+      res.json({ success: true, message: `Test email sent to ${to}` });
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || "Failed to send test email" });
+    }
   });
 
   async function ensureDefaultB2cEmailTemplates() {
