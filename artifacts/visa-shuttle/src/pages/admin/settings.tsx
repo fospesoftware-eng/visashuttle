@@ -300,7 +300,8 @@ function TransactionalEmailCard() {
       }
     },
     onSuccess: (data: any) => {
-      toast({ title: "Test email sent", description: data?.message || `Sent to ${testEmail}` });
+      const status = data?.providerStatus ? ` · Provider status ${data.providerStatus}` : "";
+      toast({ title: "Test email sent", description: `${data?.message || `Sent to ${testEmail}`}${status}` });
     },
     onError: (err: any) => {
       toast({ title: "Test failed", description: err.message || "Could not send test email", variant: "destructive" });

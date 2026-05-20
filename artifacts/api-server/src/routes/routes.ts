@@ -127,6 +127,14 @@ function cleanProviderError(detail: string): string {
   }
 }
 
+function normalizeZeptoMailToken(token: string): string {
+  return String(token || "")
+    .trim()
+    .replace(/^authorization\s*:\s*/i, "")
+    .replace(/^zoho-enczapikey\s+/i, "")
+    .trim();
+}
+
 async function sendTransactionalEmail(opts: {
   to: string;
   toName?: string | null;
@@ -137,7 +145,7 @@ async function sendTransactionalEmail(opts: {
   attachments?: Array<{ filename: string; content: string; mimeType?: string }>;
 }): Promise<{ ok: boolean; provider?: string; error?: string; status?: number }> {
   const cfg = await storage.getZeptoMailConfig().catch(() => undefined);
-  const token = cfg?.sendMailToken;
+  const token = normalizeZeptoMailToken(cfg?.sendMailToken || "");
   if (!cfg?.enabled || !token) return { ok: false, provider: "zeptomail", error: "ZeptoMail is not configured" };
   const host = (cfg.host || "api.zeptomail.com").replace(/^https?:\/\//, "").replace(/\/+$/, "");
   const senderAddress = cfg.senderAddress || `support@${cfg.domain || "visashuttle.com"}`;
@@ -161,7 +169,8 @@ async function sendTransactionalEmail(opts: {
   const resp = await fetch(`https://${host}/v1.1/email`, {
     method: "POST",
     headers: {
-      Authorization: `Zoho-enczapikey ${token}`,
+      Accept: "application/json",
+      Authorization: `zoho-enczapikey ${token}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
@@ -4820,7 +4829,7 @@ export async function registerRoutes(
     if (senderAddress !== undefined) patch.senderAddress = String(senderAddress || "support@visashuttle.com").trim();
     if (senderName !== undefined) patch.senderName = String(senderName || "Visa Shuttle").trim();
     if (replyToAddress !== undefined) patch.replyToAddress = String(replyToAddress || "").trim() || null;
-    if (sendMailToken !== undefined && !String(sendMailToken).includes("•")) patch.sendMailToken = String(sendMailToken || "").trim() || null;
+    if (sendMailToken !== undefined && !String(sendMailToken).includes("•")) patch.sendMailToken = normalizeZeptoMailToken(String(sendMailToken || "")) || null;
     if (enabled !== undefined) patch.enabled = !!enabled;
     const updated = await storage.upsertZeptoMailConfig(patch);
     res.json({
@@ -4842,14 +4851,24 @@ export async function registerRoutes(
     try {
       const to = String(req.body?.to || "").trim();
       if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return res.status(400).json({ error: "A valid test email is required" });
+      const cfg = await storage.getZeptoMailConfig();
+      if (!cfg?.enabled) return res.status(400).json({ error: "ZeptoMail is disabled. Enable transactional email and save settings first." });
+      if (!normalizeZeptoMailToken(cfg?.sendMailToken || "")) return res.status(400).json({ error: "ZeptoMail Send Mail token is missing. Paste the token and save settings first." });
+      if (!cfg?.senderAddress || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cfg.senderAddress)) {
+        return res.status(400).json({ error: "Sender address is invalid. Use a verified sender such as support@visashuttle.com." });
+      }
       const result = await sendTransactionalEmail({
         to,
         subject: "Visa Shuttle ZeptoMail test",
         text: "This is a transactional email test from Visa Shuttle.",
         html: "<p>This is a transactional email test from <strong>Visa Shuttle</strong>.</p>",
       });
-      if (!result.ok) return res.status(502).json({ error: result.error || "Email provider rejected the request" });
-      res.json({ success: true, message: `Test email sent to ${to}` });
+      if (!result.ok) return res.status(502).json({
+        error: result.error || "Email provider rejected the request",
+        provider: result.provider || "zeptomail",
+        providerStatus: result.status || null,
+      });
+      res.json({ success: true, provider: result.provider, providerStatus: result.status, message: `Test email sent to ${to}` });
     } catch (error: any) {
       res.status(500).json({ error: error?.message || "Failed to send test email" });
     }
