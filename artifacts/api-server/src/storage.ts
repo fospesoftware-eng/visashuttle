@@ -60,7 +60,7 @@ import {
   tenantDocumentChecklists as tenantDocumentChecklistsTable,
   proposals as proposalsTable,
 } from "@workspace/db";
-import { and, eq, desc, asc } from "drizzle-orm";
+import { and, eq, desc, asc, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
 import { db, hasDatabase } from "./db";
@@ -3138,11 +3138,48 @@ class HybridStorage extends MemStorage {
     }
   }
 
+  private async ensureEmailConfigTables(): Promise<void> {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS zeptomail_config (
+        id serial PRIMARY KEY,
+        provider text NOT NULL DEFAULT 'zeptomail',
+        domain text NOT NULL DEFAULT 'visashuttle.com',
+        host text NOT NULL DEFAULT 'api.zeptomail.com',
+        agent_alias text DEFAULT '448141e4788dab46',
+        sender_address text NOT NULL DEFAULT 'support@visashuttle.com',
+        sender_name text NOT NULL DEFAULT 'Visa Shuttle',
+        reply_to_address text,
+        send_mail_token text,
+        enabled boolean NOT NULL DEFAULT false,
+        updated_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS email_templates (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        audience text NOT NULL DEFAULT 'b2c',
+        template_key text NOT NULL,
+        name text NOT NULL,
+        subject text NOT NULL,
+        html_body text NOT NULL,
+        text_body text,
+        variables jsonb,
+        enabled boolean NOT NULL DEFAULT true,
+        updated_at timestamp DEFAULT now(),
+        created_at timestamp DEFAULT now()
+      )
+    `);
+  }
+
   async getZeptoMailConfig(): Promise<ZeptoMailConfig | undefined> {
     try {
       const rows = await db.select().from(zeptoMailConfigTable).limit(1);
       return rows[0];
     } catch (error) {
+      if (isMissingRelationError(error)) {
+        await this.ensureEmailConfigTables();
+        return undefined;
+      }
       if (shouldUseMemoryFallback(error)) {
         console.warn("[DB] zeptomail_config table is missing. Using in-memory email config fallback.");
         return super.getZeptoMailConfig();
@@ -3171,6 +3208,19 @@ class HybridStorage extends MemStorage {
       } as InsertZeptoMailConfig).returning();
       return rows[0];
     } catch (error) {
+      if (isMissingRelationError(error)) {
+        await this.ensureEmailConfigTables();
+        const rows = await db.insert(zeptoMailConfigTable).values({
+          provider: "zeptomail",
+          domain: "visashuttle.com",
+          host: "api.zeptomail.com",
+          agentAlias: "448141e4788dab46",
+          senderAddress: "support@visashuttle.com",
+          senderName: "Visa Shuttle",
+          ...data,
+        } as InsertZeptoMailConfig).returning();
+        return rows[0];
+      }
       if (shouldUseMemoryFallback(error)) {
         console.warn("[DB] zeptomail_config table is missing. Saving email config in memory only.");
         return super.upsertZeptoMailConfig(data);
@@ -3185,6 +3235,10 @@ class HybridStorage extends MemStorage {
         .where(eq(emailTemplatesTable.audience, audience))
         .orderBy(asc(emailTemplatesTable.name));
     } catch (error) {
+      if (isMissingRelationError(error)) {
+        await this.ensureEmailConfigTables();
+        return [];
+      }
       if (shouldUseMemoryFallback(error)) return super.getEmailTemplates(audience);
       throw error;
     }
@@ -3195,6 +3249,10 @@ class HybridStorage extends MemStorage {
       const rows = await db.select().from(emailTemplatesTable).where(eq(emailTemplatesTable.id, id)).limit(1);
       return rows[0];
     } catch (error) {
+      if (isMissingRelationError(error)) {
+        await this.ensureEmailConfigTables();
+        return undefined;
+      }
       if (shouldUseMemoryFallback(error)) return super.getEmailTemplate(id);
       throw error;
     }
@@ -3207,6 +3265,10 @@ class HybridStorage extends MemStorage {
         .limit(1);
       return rows[0];
     } catch (error) {
+      if (isMissingRelationError(error)) {
+        await this.ensureEmailConfigTables();
+        return undefined;
+      }
       if (shouldUseMemoryFallback(error)) return super.getEmailTemplateByKey(audience, templateKey);
       throw error;
     }
@@ -3217,6 +3279,11 @@ class HybridStorage extends MemStorage {
       const rows = await db.insert(emailTemplatesTable).values(data).returning();
       return rows[0];
     } catch (error) {
+      if (isMissingRelationError(error)) {
+        await this.ensureEmailConfigTables();
+        const rows = await db.insert(emailTemplatesTable).values(data).returning();
+        return rows[0];
+      }
       if (shouldUseMemoryFallback(error)) return super.createEmailTemplate(data);
       throw error;
     }
