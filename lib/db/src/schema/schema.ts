@@ -640,7 +640,7 @@ export const zeptoMailConfig = pgTable("zeptomail_config", {
   domain: text("domain").notNull().default("visashuttle.com"),
   host: text("host").notNull().default("api.zeptomail.com"),
   agentAlias: text("agent_alias").default("448141e4788dab46"),
-  senderAddress: text("sender_address").notNull().default("support@visashuttle.com"),
+  senderAddress: text("sender_address").notNull().default("notifications@visashuttle.com"),
   senderName: text("sender_name").notNull().default("Visa Shuttle"),
   replyToAddress: text("reply_to_address"),
   sendMailToken: text("send_mail_token"),

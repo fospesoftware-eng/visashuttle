@@ -121,10 +121,30 @@ function cleanProviderError(detail: string): string {
   }
   try {
     const parsed = JSON.parse(text);
-    return parsed?.message || parsed?.error || parsed?.data?.message || text.slice(0, 500);
+    const candidates = [
+      parsed?.message,
+      parsed?.error?.message,
+      parsed?.error,
+      parsed?.data?.message,
+      parsed?.data?.error?.message,
+      parsed?.data?.error,
+      parsed?.details?.[0]?.message,
+      parsed?.data?.details?.[0]?.message,
+    ];
+    const message = candidates.find((value) => typeof value === "string" && value.trim());
+    if (message) return message.trim().slice(0, 500);
+    return text.slice(0, 500);
   } catch {
     return text.slice(0, 500);
   }
+}
+
+const DEFAULT_ZEPTOMAIL_SENDER = "notifications@visashuttle.com";
+
+function normalizeZeptoMailSender(sender?: string | null): string {
+  const value = String(sender || "").trim().toLowerCase();
+  if (!value || value === "support@visashuttle.com") return DEFAULT_ZEPTOMAIL_SENDER;
+  return value;
 }
 
 function normalizeZeptoMailToken(token: string): string {
@@ -148,7 +168,7 @@ async function sendTransactionalEmail(opts: {
   const token = normalizeZeptoMailToken(cfg?.sendMailToken || "");
   if (!cfg?.enabled || !token) return { ok: false, provider: "zeptomail", error: "ZeptoMail is not configured" };
   const host = (cfg.host || "api.zeptomail.com").replace(/^https?:\/\//, "").replace(/\/+$/, "");
-  const senderAddress = cfg.senderAddress || `support@${cfg.domain || "visashuttle.com"}`;
+  const senderAddress = normalizeZeptoMailSender(cfg.senderAddress);
   const payload: Record<string, unknown> = {
     from: { address: senderAddress, name: cfg.senderName || "Visa Shuttle" },
     to: [{ email_address: { address: opts.to, name: opts.toName || opts.to } }],
@@ -4810,7 +4830,7 @@ export async function registerRoutes(
       domain: cfg?.domain || "visashuttle.com",
       host: cfg?.host || "api.zeptomail.com",
       agentAlias: cfg?.agentAlias || "448141e4788dab46",
-      senderAddress: cfg?.senderAddress || "support@visashuttle.com",
+      senderAddress: normalizeZeptoMailSender(cfg?.senderAddress),
       senderName: cfg?.senderName || "Visa Shuttle",
       replyToAddress: cfg?.replyToAddress || "",
       sendMailToken: cfg?.sendMailToken ? maskKey(cfg.sendMailToken) : "",
@@ -4826,7 +4846,7 @@ export async function registerRoutes(
     if (domain !== undefined) patch.domain = String(domain || "visashuttle.com").trim();
     if (host !== undefined) patch.host = String(host || "api.zeptomail.com").trim().replace(/^https?:\/\//, "").replace(/\/+$/, "");
     if (agentAlias !== undefined) patch.agentAlias = String(agentAlias || "").trim() || null;
-    if (senderAddress !== undefined) patch.senderAddress = String(senderAddress || "support@visashuttle.com").trim();
+    if (senderAddress !== undefined) patch.senderAddress = normalizeZeptoMailSender(String(senderAddress || DEFAULT_ZEPTOMAIL_SENDER));
     if (senderName !== undefined) patch.senderName = String(senderName || "Visa Shuttle").trim();
     if (replyToAddress !== undefined) patch.replyToAddress = String(replyToAddress || "").trim() || null;
     if (sendMailToken !== undefined && !String(sendMailToken).includes("•")) patch.sendMailToken = normalizeZeptoMailToken(String(sendMailToken || "")) || null;
@@ -4855,7 +4875,7 @@ export async function registerRoutes(
       if (!cfg?.enabled) return res.status(400).json({ error: "ZeptoMail is disabled. Enable transactional email and save settings first." });
       if (!normalizeZeptoMailToken(cfg?.sendMailToken || "")) return res.status(400).json({ error: "ZeptoMail Send Mail token is missing. Paste the token and save settings first." });
       if (!cfg?.senderAddress || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cfg.senderAddress)) {
-        return res.status(400).json({ error: "Sender address is invalid. Use a verified sender such as support@visashuttle.com." });
+        return res.status(400).json({ error: "Sender address is invalid. Use the verified sender notifications@visashuttle.com." });
       }
       const result = await sendTransactionalEmail({
         to,

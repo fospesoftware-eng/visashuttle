@@ -252,7 +252,7 @@ function TransactionalEmailCard() {
     domain: "visashuttle.com",
     host: "api.zeptomail.com",
     agentAlias: "448141e4788dab46",
-    senderAddress: "support@visashuttle.com",
+    senderAddress: "notifications@visashuttle.com",
     senderName: "Visa Shuttle",
     replyToAddress: "",
     sendMailToken: "",
@@ -269,7 +269,7 @@ function TransactionalEmailCard() {
         domain: cfg.domain || "visashuttle.com",
         host: cfg.host || "api.zeptomail.com",
         agentAlias: cfg.agentAlias || "448141e4788dab46",
-        senderAddress: cfg.senderAddress || "support@visashuttle.com",
+        senderAddress: cfg.senderAddress || "notifications@visashuttle.com",
         senderName: cfg.senderName || "Visa Shuttle",
         replyToAddress: cfg.replyToAddress || "",
         sendMailToken: cfg.sendMailToken || "",
@@ -347,7 +347,7 @@ function TransactionalEmailCard() {
           </div>
           <div className="space-y-1.5">
             <Label>Sender Address</Label>
-            <Input type="email" value={form.senderAddress} onChange={e => setForm(f => ({ ...f, senderAddress: e.target.value }))} placeholder="support@visashuttle.com" data-testid="input-zepto-sender-address" />
+            <Input type="email" value={form.senderAddress} onChange={e => setForm(f => ({ ...f, senderAddress: e.target.value }))} placeholder="notifications@visashuttle.com" data-testid="input-zepto-sender-address" />
           </div>
           <div className="space-y-1.5">
             <Label>Sender Name</Label>
@@ -355,7 +355,7 @@ function TransactionalEmailCard() {
           </div>
           <div className="space-y-1.5">
             <Label>Reply-To Address</Label>
-            <Input type="email" value={form.replyToAddress} onChange={e => setForm(f => ({ ...f, replyToAddress: e.target.value }))} placeholder="support@visashuttle.com" data-testid="input-zepto-reply-to" />
+            <Input type="email" value={form.replyToAddress} onChange={e => setForm(f => ({ ...f, replyToAddress: e.target.value }))} placeholder="notifications@visashuttle.com" data-testid="input-zepto-reply-to" />
           </div>
         </div>
 
@@ -375,7 +375,7 @@ function TransactionalEmailCard() {
             </button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Used server-side as <span className="font-mono">Authorization: Zoho-enczapikey &lt;token&gt;</span>. Tokens are masked after saving.
+            Used server-side as <span className="font-mono">Authorization: zoho-enczapikey &lt;token&gt;</span>. Tokens are masked after saving.
           </p>
         </div>
 
