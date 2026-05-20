@@ -147,6 +147,17 @@ function normalizeZeptoMailSender(sender?: string | null): string {
   return value;
 }
 
+function normalizeZeptoMailHost(host?: string | null): string {
+  const value = String(host || "").trim();
+  if (!value) return "api.zeptomail.com";
+  try {
+    const parsed = new URL(value.startsWith("http") ? value : `https://${value}`);
+    return parsed.hostname || "api.zeptomail.com";
+  } catch {
+    return value.replace(/^https?:\/\//, "").replace(/\/.*$/, "").trim() || "api.zeptomail.com";
+  }
+}
+
 function normalizeZeptoMailToken(token: string): string {
   return String(token || "")
     .trim()
@@ -167,7 +178,7 @@ async function sendTransactionalEmail(opts: {
   const cfg = await storage.getZeptoMailConfig().catch(() => undefined);
   const token = normalizeZeptoMailToken(cfg?.sendMailToken || "");
   if (!cfg?.enabled || !token) return { ok: false, provider: "zeptomail", error: "ZeptoMail is not configured" };
-  const host = (cfg.host || "api.zeptomail.com").replace(/^https?:\/\//, "").replace(/\/+$/, "");
+  const host = normalizeZeptoMailHost(cfg.host);
   const senderAddress = normalizeZeptoMailSender(cfg.senderAddress);
   const payload: Record<string, unknown> = {
     from: { address: senderAddress, name: cfg.senderName || "Visa Shuttle" },
@@ -4844,7 +4855,7 @@ export async function registerRoutes(
     const { domain, host, agentAlias, senderAddress, senderName, replyToAddress, sendMailToken, enabled } = req.body;
     const patch: Record<string, any> = { provider: "zeptomail" };
     if (domain !== undefined) patch.domain = String(domain || "visashuttle.com").trim();
-    if (host !== undefined) patch.host = String(host || "api.zeptomail.com").trim().replace(/^https?:\/\//, "").replace(/\/+$/, "");
+    if (host !== undefined) patch.host = normalizeZeptoMailHost(String(host || "api.zeptomail.com"));
     if (agentAlias !== undefined) patch.agentAlias = String(agentAlias || "").trim() || null;
     if (senderAddress !== undefined) patch.senderAddress = normalizeZeptoMailSender(String(senderAddress || DEFAULT_ZEPTOMAIL_SENDER));
     if (senderName !== undefined) patch.senderName = String(senderName || "Visa Shuttle").trim();

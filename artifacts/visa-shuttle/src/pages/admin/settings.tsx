@@ -291,13 +291,36 @@ function TransactionalEmailCard() {
 
   const testMutation = useMutation({
     mutationFn: async (to: string) => {
-      const res = await apiRequest("POST", "/api/admin/email-config/test", { to });
+      const res = await fetch("/api/admin/email-config/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ to }),
+      });
+      const contentType = res.headers.get("content-type") || "";
       const text = await res.text();
-      try {
-        return text ? JSON.parse(text) : {};
-      } catch {
-        throw new Error(text.startsWith("<") ? "Server returned an HTML page instead of JSON. Please refresh after deploy and try again." : text);
+      const looksLikeHtml = text.trim().startsWith("<") || contentType.includes("text/html");
+      if (looksLikeHtml) {
+        const plain = text
+          .replace(/<script[\s\S]*?<\/script>/gi, " ")
+          .replace(/<style[\s\S]*?<\/style>/gi, " ")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 220);
+        throw new Error(`Email test API returned HTML instead of JSON. ${plain || "Please pull latest, restart the app, and try again."}`);
       }
+      let data: any = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        throw new Error(text || "Email test returned an invalid response.");
+      }
+      if (!res.ok) {
+        const status = data?.providerStatus ? `Provider status ${data.providerStatus}. ` : "";
+        throw new Error(`${status}${data?.error || data?.message || `Email test failed with HTTP ${res.status}`}`);
+      }
+      return data;
     },
     onSuccess: (data: any) => {
       const status = data?.providerStatus ? ` · Provider status ${data.providerStatus}` : "";
