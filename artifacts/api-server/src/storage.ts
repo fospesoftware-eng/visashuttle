@@ -2888,8 +2888,38 @@ class HybridStorage extends MemStorage {
     }
   }
 
-  // Seed demo users into PostgreSQL on startup so they persist reliably
+  // Seed platform + demo users into PostgreSQL on startup so production always
+  // has a recoverable SaaS admin account and demo B2C accounts persist.
+  async seedPlatformUsersToDb(): Promise<void> {
+    const adminEmail = "admin@visashuttle.com";
+    const adminPassword = bcrypt.hashSync("Admin@12345", 10);
+    const existing = await db.select().from(usersTable).where(eq(usersTable.email, adminEmail)).limit(1);
+    if (!existing[0]) {
+      await db.insert(usersTable).values({
+        id: "user-admin",
+        email: adminEmail,
+        password: adminPassword,
+        name: "System Admin",
+        role: "saas_admin",
+        tenantId: null,
+        avatarUrl: null,
+        permissions: [],
+      });
+      return;
+    }
+    const admin = existing[0];
+    await db.update(usersTable)
+      .set({
+        password: adminPassword,
+        role: "saas_admin",
+        tenantId: null,
+        permissions: [],
+      } as any)
+      .where(eq(usersTable.id, admin.id));
+  }
+
   async seedDemoUsersToDb(): Promise<void> {
+    await this.seedPlatformUsersToDb();
     const demoAccounts = [
       {
         id: "b2c-demo",
