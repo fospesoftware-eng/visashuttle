@@ -106,7 +106,7 @@ function TeamTab({ tenantId, currentUserId }: { tenantId?: string; currentUserId
       queryClient.invalidateQueries({ queryKey: ["/api/tenants", tenantId, "usage"] });
       setIsInviteOpen(false);
       setInviteForm({ name: "", email: "", role: "agency_staff", permissions: DEFAULT_PERMISSIONS_BY_ROLE.agency_staff });
-      // The server tries Resend first; if email succeeded we say so, otherwise
+      // The server tries the globally configured ZeptoMail provider; if email succeeded we say so, otherwise
       // we still surface the temp password so the owner can share it manually.
       if (data.emailSent) {
         toast({
@@ -185,7 +185,7 @@ function TeamTab({ tenantId, currentUserId }: { tenantId?: string; currentUserId
               <DialogHeader>
                 <DialogTitle>Add Team Member</DialogTitle>
                 <DialogDescription>
-                  Pick a role and tick the areas they should be able to access. We'll email them their login details when Resend is configured, otherwise the temporary password will be shown to you so you can share it.
+                  Pick a role and tick the areas they should be able to access. We'll email them their login details when ZeptoMail is configured, otherwise the temporary password will be shown to you so you can share it.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 mt-2">

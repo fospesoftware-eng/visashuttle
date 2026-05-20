@@ -21,6 +21,8 @@ import {
   type SavedProfile, type InsertSavedProfile,
   type SmsConfig, type InsertSmsConfig,
   type PlatformAiConfig, type InsertPlatformAiConfig,
+  type ZeptoMailConfig, type InsertZeptoMailConfig,
+  type EmailTemplate, type InsertEmailTemplate,
   type PaymentGatewayConfig, type InsertPaymentGatewayConfig,
   type TenantPaymentGatewayConfig, type InsertTenantPaymentGatewayConfig,
   type TenantSmsConfig, type InsertTenantSmsConfig,
@@ -45,6 +47,8 @@ import {
   otpCodes as otpCodesTable,
   b2cUsers, visaChecks, visaToolChecks, savedProfiles, smsConfig as smsConfigTable,
   platformAiConfig as platformAiConfigTable,
+  zeptoMailConfig as zeptoMailConfigTable,
+  emailTemplates as emailTemplatesTable,
   paymentGatewayConfig as paymentGatewayConfigTable,
   tenantPaymentGatewayConfig as tenantPaymentGatewayConfigTable,
   tenantSmsConfig as tenantSmsConfigTable,
@@ -234,6 +238,16 @@ export interface IStorage {
   getPlatformAiConfig(): Promise<PlatformAiConfig | undefined>;
   upsertPlatformAiConfig(data: Partial<InsertPlatformAiConfig>): Promise<PlatformAiConfig>;
 
+  // Platform Email Config + B2C Templates
+  getZeptoMailConfig(): Promise<ZeptoMailConfig | undefined>;
+  upsertZeptoMailConfig(data: Partial<InsertZeptoMailConfig>): Promise<ZeptoMailConfig>;
+  getEmailTemplates(audience?: string): Promise<EmailTemplate[]>;
+  getEmailTemplate(id: string): Promise<EmailTemplate | undefined>;
+  getEmailTemplateByKey(audience: string, templateKey: string): Promise<EmailTemplate | undefined>;
+  createEmailTemplate(data: InsertEmailTemplate): Promise<EmailTemplate>;
+  updateEmailTemplate(id: string, data: Partial<InsertEmailTemplate>): Promise<EmailTemplate | undefined>;
+  deleteEmailTemplate(id: string): Promise<boolean>;
+
   // Payment Gateway Config
   getPaymentGatewayConfig(): Promise<PaymentGatewayConfig | undefined>;
   upsertPaymentGatewayConfig(data: Partial<InsertPaymentGatewayConfig>): Promise<PaymentGatewayConfig>;
@@ -296,6 +310,8 @@ export class MemStorage implements IStorage {
   private savedProfilesMap: Map<string, SavedProfile>;
   private smsConfigRecord?: SmsConfig;
   private platformAiConfigRecord?: PlatformAiConfig;
+  private zeptoMailConfigRecord?: ZeptoMailConfig;
+  private emailTemplatesMap: Map<string, EmailTemplate> = new Map();
   private paymentGatewayConfigRecord?: PaymentGatewayConfig;
   private tenantPaymentGatewayConfigByTenant: Map<string, TenantPaymentGatewayConfig> = new Map();
   private tenantSmsConfigByTenant: Map<string, TenantSmsConfig> = new Map();
@@ -1965,6 +1981,65 @@ export class MemStorage implements IStorage {
     };
     return this.platformAiConfigRecord;
   }
+  async getZeptoMailConfig(): Promise<ZeptoMailConfig | undefined> { return this.zeptoMailConfigRecord; }
+  async upsertZeptoMailConfig(data: Partial<InsertZeptoMailConfig>): Promise<ZeptoMailConfig> {
+    const existing = this.zeptoMailConfigRecord;
+    this.zeptoMailConfigRecord = {
+      id: existing?.id ?? 1,
+      provider: data.provider !== undefined ? data.provider : existing?.provider ?? "zeptomail",
+      domain: data.domain !== undefined ? data.domain : existing?.domain ?? "visashuttle.com",
+      host: data.host !== undefined ? data.host : existing?.host ?? "api.zeptomail.com",
+      agentAlias: data.agentAlias !== undefined ? data.agentAlias : existing?.agentAlias ?? "448141e4788dab46",
+      senderAddress: data.senderAddress !== undefined ? data.senderAddress : existing?.senderAddress ?? "support@visashuttle.com",
+      senderName: data.senderName !== undefined ? data.senderName : existing?.senderName ?? "Visa Shuttle",
+      replyToAddress: data.replyToAddress !== undefined ? data.replyToAddress : existing?.replyToAddress ?? null,
+      sendMailToken: data.sendMailToken !== undefined ? data.sendMailToken : existing?.sendMailToken ?? null,
+      enabled: data.enabled !== undefined ? !!data.enabled : existing?.enabled ?? false,
+      updatedAt: new Date(),
+    };
+    return this.zeptoMailConfigRecord;
+  }
+  async getEmailTemplates(audience = "b2c"): Promise<EmailTemplate[]> {
+    return Array.from(this.emailTemplatesMap.values())
+      .filter((template) => template.audience === audience)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+  async getEmailTemplate(id: string): Promise<EmailTemplate | undefined> {
+    return this.emailTemplatesMap.get(id);
+  }
+  async getEmailTemplateByKey(audience: string, templateKey: string): Promise<EmailTemplate | undefined> {
+    return Array.from(this.emailTemplatesMap.values()).find(
+      (template) => template.audience === audience && template.templateKey === templateKey
+    );
+  }
+  async createEmailTemplate(data: InsertEmailTemplate): Promise<EmailTemplate> {
+    const now = new Date();
+    const template: EmailTemplate = {
+      id: randomUUID(),
+      audience: data.audience ?? "b2c",
+      templateKey: data.templateKey,
+      name: data.name,
+      subject: data.subject,
+      htmlBody: data.htmlBody,
+      textBody: data.textBody ?? null,
+      variables: data.variables ?? null,
+      enabled: data.enabled ?? true,
+      updatedAt: now,
+      createdAt: now,
+    };
+    this.emailTemplatesMap.set(template.id, template);
+    return template;
+  }
+  async updateEmailTemplate(id: string, data: Partial<InsertEmailTemplate>): Promise<EmailTemplate | undefined> {
+    const existing = this.emailTemplatesMap.get(id);
+    if (!existing) return undefined;
+    const updated = { ...existing, ...data, id, updatedAt: new Date() } as EmailTemplate;
+    this.emailTemplatesMap.set(id, updated);
+    return updated;
+  }
+  async deleteEmailTemplate(id: string): Promise<boolean> {
+    return this.emailTemplatesMap.delete(id);
+  }
   async getTenantPaymentGatewayConfig(tenantId: string): Promise<TenantPaymentGatewayConfig | undefined> {
     return this.tenantPaymentGatewayConfigByTenant.get(tenantId);
   }
@@ -3029,6 +3104,115 @@ class HybridStorage extends MemStorage {
         console.warn("[DB] platform_ai_config table is missing. Saving AI config in memory only.");
         return super.upsertPlatformAiConfig(data);
       }
+      throw error;
+    }
+  }
+
+  async getZeptoMailConfig(): Promise<ZeptoMailConfig | undefined> {
+    try {
+      const rows = await db.select().from(zeptoMailConfigTable).limit(1);
+      return rows[0];
+    } catch (error) {
+      if (shouldUseMemoryFallback(error)) {
+        console.warn("[DB] zeptomail_config table is missing. Using in-memory email config fallback.");
+        return super.getZeptoMailConfig();
+      }
+      throw error;
+    }
+  }
+
+  async upsertZeptoMailConfig(data: Partial<InsertZeptoMailConfig>): Promise<ZeptoMailConfig> {
+    try {
+      const existing = await this.getZeptoMailConfig();
+      if (existing) {
+        const rows = await db.update(zeptoMailConfigTable)
+          .set({ ...data, updatedAt: new Date() } as any)
+          .returning();
+        return rows[0];
+      }
+      const rows = await db.insert(zeptoMailConfigTable).values({
+        provider: "zeptomail",
+        domain: "visashuttle.com",
+        host: "api.zeptomail.com",
+        agentAlias: "448141e4788dab46",
+        senderAddress: "support@visashuttle.com",
+        senderName: "Visa Shuttle",
+        ...data,
+      } as InsertZeptoMailConfig).returning();
+      return rows[0];
+    } catch (error) {
+      if (shouldUseMemoryFallback(error)) {
+        console.warn("[DB] zeptomail_config table is missing. Saving email config in memory only.");
+        return super.upsertZeptoMailConfig(data);
+      }
+      throw error;
+    }
+  }
+
+  async getEmailTemplates(audience = "b2c"): Promise<EmailTemplate[]> {
+    try {
+      return db.select().from(emailTemplatesTable)
+        .where(eq(emailTemplatesTable.audience, audience))
+        .orderBy(asc(emailTemplatesTable.name));
+    } catch (error) {
+      if (shouldUseMemoryFallback(error)) return super.getEmailTemplates(audience);
+      throw error;
+    }
+  }
+
+  async getEmailTemplate(id: string): Promise<EmailTemplate | undefined> {
+    try {
+      const rows = await db.select().from(emailTemplatesTable).where(eq(emailTemplatesTable.id, id)).limit(1);
+      return rows[0];
+    } catch (error) {
+      if (shouldUseMemoryFallback(error)) return super.getEmailTemplate(id);
+      throw error;
+    }
+  }
+
+  async getEmailTemplateByKey(audience: string, templateKey: string): Promise<EmailTemplate | undefined> {
+    try {
+      const rows = await db.select().from(emailTemplatesTable)
+        .where(and(eq(emailTemplatesTable.audience, audience), eq(emailTemplatesTable.templateKey, templateKey)))
+        .limit(1);
+      return rows[0];
+    } catch (error) {
+      if (shouldUseMemoryFallback(error)) return super.getEmailTemplateByKey(audience, templateKey);
+      throw error;
+    }
+  }
+
+  async createEmailTemplate(data: InsertEmailTemplate): Promise<EmailTemplate> {
+    try {
+      const rows = await db.insert(emailTemplatesTable).values(data).returning();
+      return rows[0];
+    } catch (error) {
+      if (shouldUseMemoryFallback(error)) return super.createEmailTemplate(data);
+      throw error;
+    }
+  }
+
+  async updateEmailTemplate(id: string, data: Partial<InsertEmailTemplate>): Promise<EmailTemplate | undefined> {
+    try {
+      const rows = await db.update(emailTemplatesTable)
+        .set({ ...data, updatedAt: new Date() } as any)
+        .where(eq(emailTemplatesTable.id, id))
+        .returning();
+      return rows[0];
+    } catch (error) {
+      if (shouldUseMemoryFallback(error)) return super.updateEmailTemplate(id, data);
+      throw error;
+    }
+  }
+
+  async deleteEmailTemplate(id: string): Promise<boolean> {
+    try {
+      const rows = await db.delete(emailTemplatesTable)
+        .where(eq(emailTemplatesTable.id, id))
+        .returning({ id: emailTemplatesTable.id });
+      return rows.length > 0;
+    } catch (error) {
+      if (shouldUseMemoryFallback(error)) return super.deleteEmailTemplate(id);
       throw error;
     }
   }

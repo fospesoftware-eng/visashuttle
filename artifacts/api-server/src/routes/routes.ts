@@ -90,6 +90,7 @@ import {
   insertInvoiceSettingsSchema,
   insertPaymentSchema,
   type InsertCustomerAccount,
+  type InsertEmailTemplate,
   AGENCY_PERMISSIONS,
 } from "@workspace/db";
 
@@ -99,11 +100,63 @@ function normalizePhoneDigits(input: string): string {
   return input.replace(/[^\d]/g, "");
 }
 
+function renderEmailTemplateText(template: string, variables: Record<string, unknown>): string {
+  return String(template ?? "").replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_match, key) => {
+    const value = variables[key];
+    return value === undefined || value === null ? "" : String(value);
+  });
+}
+
+async function sendTransactionalEmail(opts: {
+  to: string;
+  toName?: string | null;
+  subject: string;
+  text?: string;
+  html?: string;
+  replyTo?: string | null;
+  attachments?: Array<{ filename: string; content: string; mimeType?: string }>;
+}): Promise<{ ok: boolean; provider?: string; error?: string; status?: number }> {
+  const cfg = await storage.getZeptoMailConfig().catch(() => undefined);
+  const token = cfg?.sendMailToken;
+  if (!cfg?.enabled || !token) return { ok: false, provider: "zeptomail", error: "ZeptoMail is not configured" };
+  const host = (cfg.host || "api.zeptomail.com").replace(/^https?:\/\//, "").replace(/\/+$/, "");
+  const senderAddress = cfg.senderAddress || `support@${cfg.domain || "visashuttle.com"}`;
+  const payload: Record<string, unknown> = {
+    from: { address: senderAddress, name: cfg.senderName || "Visa Shuttle" },
+    to: [{ email_address: { address: opts.to, name: opts.toName || opts.to } }],
+    subject: opts.subject,
+  };
+  if (opts.html) payload.htmlbody = opts.html;
+  if (opts.text) payload.textbody = opts.text;
+  const replyTo = opts.replyTo || cfg.replyToAddress;
+  if (replyTo) payload.reply_to = [{ address: replyTo }];
+  if (opts.attachments?.length) {
+    payload.attachments = opts.attachments.map((attachment) => ({
+      name: attachment.filename,
+      content: attachment.content,
+      mime_type: attachment.mimeType || "application/pdf",
+    }));
+  }
+
+  const resp = await fetch(`https://${host}/v1.1/email`, {
+    method: "POST",
+    headers: {
+      Authorization: `Zoho-enczapikey ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!resp.ok) {
+    const detail = await resp.text().catch(() => "");
+    console.warn("[email] ZeptoMail rejected:", resp.status, detail.slice(0, 300));
+    return { ok: false, provider: "zeptomail", status: resp.status, error: detail || `ZeptoMail HTTP ${resp.status}` };
+  }
+  return { ok: true, provider: "zeptomail", status: resp.status };
+}
+
 // Send a staff-invitation email containing the agency dashboard URL + the
-// freshly generated temporary password. We use Resend when RESEND_API_KEY is
-// configured (same provider as the invoice emailer) and fall back to a
-// "not sent — show the password to the agent" response otherwise so the owner
-// can still hand the credentials to the new member out-of-band.
+// freshly generated temporary password. ZeptoMail is configured globally by
+// SaaS admin and shared across B2C + B2B agency workflows.
 async function sendStaffInviteEmail(opts: {
   to: string;
   name: string;
@@ -111,9 +164,6 @@ async function sendStaffInviteEmail(opts: {
   tempPassword: string;
   loginUrl: string;
 }): Promise<{ ok: boolean; error?: string }> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return { ok: false, error: "RESEND_API_KEY not configured" };
-  const fromAddress = process.env.RESEND_FROM ?? "onboarding@resend.dev";
   const subject = `You've been added to ${opts.tenantName} on VisaShuttle`;
   const text =
     `Hi ${opts.name},\n\n` +
@@ -123,25 +173,8 @@ async function sendStaffInviteEmail(opts: {
     `Password: ${opts.tempPassword}\n\n` +
     `For your security, please change your password after the first login.\n\n` +
     `— VisaShuttle`;
-  try {
-    const resp = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ from: fromAddress, to: [opts.to], subject, text }),
-    });
-    if (!resp.ok) {
-      const detail = await resp.text().catch(() => "");
-      console.warn("[staff-invite] Resend rejected:", resp.status, detail.slice(0, 200));
-      return { ok: false, error: `Resend HTTP ${resp.status}` };
-    }
-    return { ok: true };
-  } catch (err) {
-    console.warn("[staff-invite] Resend network error:", err);
-    return { ok: false, error: "Network error contacting email provider" };
-  }
+  const result = await sendTransactionalEmail({ to: opts.to, toName: opts.name, subject, text });
+  return result.ok ? { ok: true } : { ok: false, error: result.error };
 }
 
 // Resolve the team member who should own a new lead/case. Falls back to the
@@ -3984,29 +4017,21 @@ export async function registerRoutes(
         `Thank you,\n${settings?.companyName ?? "Your agency"}`;
       const body = String(req.body?.body ?? defaultBody);
 
-      const apiKey = process.env.RESEND_API_KEY;
-      if (apiKey) {
-        const fromAddress = process.env.RESEND_FROM ?? settings?.companyEmail ?? "onboarding@resend.dev";
-        try {
-          const [coTravellers, documents] = await Promise.all([
-            storage.getCoTravellersByCaseId(c.id).catch(() => []),
-            storage.getDocumentsByCaseId(c.id).catch(() => []),
-          ]);
-          const pdfBuf = await renderCasePdfBuffer(c, coTravellers as any[], documents as any[], settings);
-          const resp = await fetch("https://api.resend.com/emails", {
-            method: "POST",
-            headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              from: fromAddress,
-              to: [to],
-              subject,
-              text: body,
-              attachments: [{ filename: `${c.caseNumber}.pdf`, content: pdfBuf.toString("base64") }],
-            }),
-          });
-          if (resp.ok) return res.json({ ok: true, sent: true, to, attached: true });
-        } catch { /* fall through */ }
-      }
+      try {
+        const [coTravellers, documents] = await Promise.all([
+          storage.getCoTravellersByCaseId(c.id).catch(() => []),
+          storage.getDocumentsByCaseId(c.id).catch(() => []),
+        ]);
+        const pdfBuf = await renderCasePdfBuffer(c, coTravellers as any[], documents as any[], settings);
+        const emailResult = await sendTransactionalEmail({
+          to,
+          subject,
+          text: body,
+          replyTo: settings?.companyEmail,
+          attachments: [{ filename: `${c.caseNumber}.pdf`, content: pdfBuf.toString("base64"), mimeType: "application/pdf" }],
+        });
+        if (emailResult.ok) return res.json({ ok: true, sent: true, provider: emailResult.provider, to, attached: true });
+      } catch { /* fall through */ }
 
       const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       res.json({
@@ -4745,6 +4770,145 @@ export async function registerRoutes(
       usingDb: !!updated.anthropicApiKey,
       usingEnvFallback: !updated.anthropicApiKey && !!process.env.ANTHROPIC_API_KEY,
     });
+  });
+
+  // ── Admin: ZeptoMail Transactional Email Config ─────────────────────────
+  app.get("/api/admin/email-config", requireAdminAuth, async (_req, res) => {
+    const cfg = await storage.getZeptoMailConfig();
+    res.json({
+      provider: cfg?.provider || "zeptomail",
+      domain: cfg?.domain || "visashuttle.com",
+      host: cfg?.host || "api.zeptomail.com",
+      agentAlias: cfg?.agentAlias || "448141e4788dab46",
+      senderAddress: cfg?.senderAddress || "support@visashuttle.com",
+      senderName: cfg?.senderName || "Visa Shuttle",
+      replyToAddress: cfg?.replyToAddress || "",
+      sendMailToken: cfg?.sendMailToken ? maskKey(cfg.sendMailToken) : "",
+      enabled: !!cfg?.enabled,
+      hasSendMailToken: !!cfg?.sendMailToken,
+      ready: !!(cfg?.enabled && cfg?.sendMailToken && cfg?.senderAddress),
+    });
+  });
+
+  app.post("/api/admin/email-config", requireAdminAuth, async (req, res) => {
+    const { domain, host, agentAlias, senderAddress, senderName, replyToAddress, sendMailToken, enabled } = req.body;
+    const patch: Record<string, any> = { provider: "zeptomail" };
+    if (domain !== undefined) patch.domain = String(domain || "visashuttle.com").trim();
+    if (host !== undefined) patch.host = String(host || "api.zeptomail.com").trim().replace(/^https?:\/\//, "").replace(/\/+$/, "");
+    if (agentAlias !== undefined) patch.agentAlias = String(agentAlias || "").trim() || null;
+    if (senderAddress !== undefined) patch.senderAddress = String(senderAddress || "support@visashuttle.com").trim();
+    if (senderName !== undefined) patch.senderName = String(senderName || "Visa Shuttle").trim();
+    if (replyToAddress !== undefined) patch.replyToAddress = String(replyToAddress || "").trim() || null;
+    if (sendMailToken !== undefined && !String(sendMailToken).includes("•")) patch.sendMailToken = String(sendMailToken || "").trim() || null;
+    if (enabled !== undefined) patch.enabled = !!enabled;
+    const updated = await storage.upsertZeptoMailConfig(patch);
+    res.json({
+      success: true,
+      domain: updated.domain,
+      host: updated.host,
+      agentAlias: updated.agentAlias,
+      senderAddress: updated.senderAddress,
+      senderName: updated.senderName,
+      replyToAddress: updated.replyToAddress || "",
+      sendMailToken: updated.sendMailToken ? maskKey(updated.sendMailToken) : "",
+      enabled: updated.enabled,
+      hasSendMailToken: !!updated.sendMailToken,
+      ready: !!(updated.enabled && updated.sendMailToken && updated.senderAddress),
+    });
+  });
+
+  app.post("/api/admin/email-config/test", requireAdminAuth, async (req, res) => {
+    const to = String(req.body?.to || "").trim();
+    if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return res.status(400).json({ error: "A valid test email is required" });
+    const result = await sendTransactionalEmail({
+      to,
+      subject: "Visa Shuttle ZeptoMail test",
+      text: "This is a transactional email test from Visa Shuttle.",
+      html: "<p>This is a transactional email test from <strong>Visa Shuttle</strong>.</p>",
+    });
+    if (!result.ok) return res.status(502).json({ error: result.error || "Email provider rejected the request" });
+    res.json({ success: true, message: `Test email sent to ${to}` });
+  });
+
+  async function ensureDefaultB2cEmailTemplates() {
+    const defaults: InsertEmailTemplate[] = [
+      {
+        audience: "b2c",
+        templateKey: "welcome",
+        name: "B2C Welcome",
+        subject: "Welcome to Visa Shuttle, {{fullName}}",
+        htmlBody: "<p>Hi {{fullName}},</p><p>Welcome to Visa Shuttle. Your account is ready and you can start checking visa eligibility from your dashboard.</p><p>Thanks,<br/>Visa Shuttle</p>",
+        textBody: "Hi {{fullName}},\n\nWelcome to Visa Shuttle. Your account is ready and you can start checking visa eligibility from your dashboard.\n\nThanks,\nVisa Shuttle",
+        variables: ["fullName", "email"],
+        enabled: true,
+      },
+      {
+        audience: "b2c",
+        templateKey: "deep_check_activated",
+        name: "Deep Check Activated",
+        subject: "Your Deep Check is active",
+        htmlBody: "<p>Hi {{fullName}},</p><p>Your Deep Check access has been activated successfully. You can now run detailed AI visa analysis from your dashboard.</p><p>Thanks,<br/>Visa Shuttle</p>",
+        textBody: "Hi {{fullName}},\n\nYour Deep Check access has been activated successfully. You can now run detailed AI visa analysis from your dashboard.\n\nThanks,\nVisa Shuttle",
+        variables: ["fullName", "email"],
+        enabled: true,
+      },
+      {
+        audience: "b2c",
+        templateKey: "visa_check_completed",
+        name: "Visa Check Completed",
+        subject: "Your {{checkType}} visa check result is ready",
+        htmlBody: "<p>Hi {{fullName}},</p><p>Your {{checkType}} visa check is ready. Sign in to view your score, recommendations, and next steps.</p><p>Thanks,<br/>Visa Shuttle</p>",
+        textBody: "Hi {{fullName}},\n\nYour {{checkType}} visa check is ready. Sign in to view your score, recommendations, and next steps.\n\nThanks,\nVisa Shuttle",
+        variables: ["fullName", "checkType", "score"],
+        enabled: true,
+      },
+    ];
+    for (const template of defaults) {
+      const existing = await storage.getEmailTemplateByKey(template.audience || "b2c", template.templateKey);
+      if (!existing) await storage.createEmailTemplate(template);
+    }
+  }
+
+  app.get("/api/admin/email-templates", requireAdminAuth, async (_req, res) => {
+    await ensureDefaultB2cEmailTemplates();
+    res.json(await storage.getEmailTemplates("b2c"));
+  });
+
+  app.post("/api/admin/email-templates", requireAdminAuth, async (req, res) => {
+    const { templateKey, name, subject, htmlBody, textBody, variables, enabled } = req.body;
+    if (!templateKey || !name || !subject || !htmlBody) {
+      return res.status(400).json({ error: "Template key, name, subject, and HTML body are required" });
+    }
+    const existing = await storage.getEmailTemplateByKey("b2c", String(templateKey).trim());
+    if (existing) return res.status(409).json({ error: "A B2C template with this key already exists" });
+    const template = await storage.createEmailTemplate({
+      audience: "b2c",
+      templateKey: String(templateKey).trim(),
+      name: String(name).trim(),
+      subject: String(subject),
+      htmlBody: String(htmlBody),
+      textBody: textBody ? String(textBody) : null,
+      variables: Array.isArray(variables) ? variables.map(String) : [],
+      enabled: enabled !== false,
+    });
+    res.status(201).json(template);
+  });
+
+  app.patch("/api/admin/email-templates/:id", requireAdminAuth, async (req, res) => {
+    const patch: Record<string, any> = {};
+    for (const key of ["templateKey", "name", "subject", "htmlBody", "textBody", "enabled"] as const) {
+      if (req.body[key] !== undefined) patch[key] = req.body[key];
+    }
+    if (req.body.variables !== undefined) patch.variables = Array.isArray(req.body.variables) ? req.body.variables.map(String) : [];
+    const updated = await storage.updateEmailTemplate(req.params.id, patch);
+    if (!updated) return res.status(404).json({ error: "Template not found" });
+    res.json(updated);
+  });
+
+  app.delete("/api/admin/email-templates/:id", requireAdminAuth, async (req, res) => {
+    const deleted = await storage.deleteEmailTemplate(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Template not found" });
+    res.json({ success: true });
   });
 
   // ── Admin: Payment Gateway Config ────────────────────────────────────────
@@ -6791,38 +6955,21 @@ export async function registerRoutes(
         `Thank you,\n${settings?.companyName ?? "Your agency"}`;
       const body = String(req.body?.body ?? defaultBody);
 
-      const apiKey = process.env.RESEND_API_KEY;
-      if (apiKey) {
-        const fromAddress = process.env.RESEND_FROM ?? settings?.companyEmail ?? "onboarding@resend.dev";
-        try {
-          const items = await storage.getInvoiceItems(inv.id);
-          const pdfBuf = await renderInvoicePdfBuffer(inv, items, settings);
-          const resp = await fetch("https://api.resend.com/emails", {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${apiKey}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              from: fromAddress,
-              to: [to],
-              subject,
-              text: body,
-              attachments: [
-                {
-                  filename: `${inv.invoiceNumber}.pdf`,
-                  content: pdfBuf.toString("base64"),
-                },
-              ],
-            }),
-          });
-          if (resp.ok) {
-            return res.json({ ok: true, sent: true, to, attached: true });
-          }
-          // fall through to fallback
-        } catch {
-          // fall through to fallback
+      try {
+        const items = await storage.getInvoiceItems(inv.id);
+        const pdfBuf = await renderInvoicePdfBuffer(inv, items, settings);
+        const emailResult = await sendTransactionalEmail({
+          to,
+          subject,
+          text: body,
+          replyTo: settings?.companyEmail,
+          attachments: [{ filename: `${inv.invoiceNumber}.pdf`, content: pdfBuf.toString("base64"), mimeType: "application/pdf" }],
+        });
+        if (emailResult.ok) {
+          return res.json({ ok: true, sent: true, provider: emailResult.provider, to, attached: true });
         }
+      } catch {
+        // fall through to fallback
       }
 
       // Fallback: hand the agency a mailto: link they can open in their email client.

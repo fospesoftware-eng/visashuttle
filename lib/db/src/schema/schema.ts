@@ -630,6 +630,49 @@ export const insertPlatformAiConfigSchema = createInsertSchema(platformAiConfig)
 export type InsertPlatformAiConfig = z.infer<typeof insertPlatformAiConfigSchema>;
 export type PlatformAiConfig = typeof platformAiConfig.$inferSelect;
 
+// ── Platform Transactional Email Config (ZeptoMail) ──────────────────────────
+// Global SaaS-admin controlled transactional email credentials. This provider
+// is shared by B2C and B2B agency workflows so email deliverability and sender
+// identity remain centrally governed.
+export const zeptoMailConfig = pgTable("zeptomail_config", {
+  id: serial("id").primaryKey(),
+  provider: text("provider").notNull().default("zeptomail"),
+  domain: text("domain").notNull().default("visashuttle.com"),
+  host: text("host").notNull().default("api.zeptomail.com"),
+  agentAlias: text("agent_alias").default("448141e4788dab46"),
+  senderAddress: text("sender_address").notNull().default("support@visashuttle.com"),
+  senderName: text("sender_name").notNull().default("Visa Shuttle"),
+  replyToAddress: text("reply_to_address"),
+  sendMailToken: text("send_mail_token"),
+  enabled: boolean("enabled").notNull().default(false),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertZeptoMailConfigSchema = createInsertSchema(zeptoMailConfig).omit({ id: true, updatedAt: true });
+export type InsertZeptoMailConfig = z.infer<typeof insertZeptoMailConfigSchema>;
+export type ZeptoMailConfig = typeof zeptoMailConfig.$inferSelect;
+
+// ── Platform Email Templates (B2C) ───────────────────────────────────────────
+// Editable SaaS-admin templates used by B2C transactional flows. Variables are
+// stored as a JSON array of names for rendering help and future validation.
+export const emailTemplates = pgTable("email_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  audience: text("audience").notNull().default("b2c"),
+  templateKey: text("template_key").notNull(),
+  name: text("name").notNull(),
+  subject: text("subject").notNull(),
+  htmlBody: text("html_body").notNull(),
+  textBody: text("text_body"),
+  variables: jsonb("variables"),
+  enabled: boolean("enabled").notNull().default(true),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEmailTemplateSchema = createInsertSchema(emailTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertEmailTemplate = z.infer<typeof insertEmailTemplateSchema>;
+export type EmailTemplate = typeof emailTemplates.$inferSelect;
+
 // ── Payment Gateway Config ───────────────────────────────────────────────────
 // `provider` selects which gateway is used for PLATFORM-level subscription
 // billing. Tenants/invoices keep using Cashfree fields. Adding Stripe means

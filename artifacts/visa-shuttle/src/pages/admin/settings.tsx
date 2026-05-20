@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { Globe, Mail, Shield, Database, Save, Key, Bell, Lock, MessageSquare, CheckCircle, AlertCircle, Eye, EyeOff, Send, ChevronDown, ChevronUp, CreditCard, ExternalLink } from "lucide-react";
+import { Globe, Mail, Shield, Database, Save, Key, Bell, Lock, MessageSquare, CheckCircle, AlertCircle, Eye, EyeOff, Send, ChevronDown, ChevronUp, CreditCard, ExternalLink, FileText, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -43,6 +44,34 @@ interface AiConfigResponse {
   hasAnthropicApiKey: boolean;
   usingDb: boolean;
   usingEnvFallback: boolean;
+}
+
+interface EmailConfigResponse {
+  provider: "zeptomail";
+  domain: string;
+  host: string;
+  agentAlias: string;
+  senderAddress: string;
+  senderName: string;
+  replyToAddress: string;
+  sendMailToken: string;
+  enabled: boolean;
+  hasSendMailToken: boolean;
+  ready: boolean;
+}
+
+interface EmailTemplateResponse {
+  id: string;
+  audience: string;
+  templateKey: string;
+  name: string;
+  subject: string;
+  htmlBody: string;
+  textBody: string | null;
+  variables: string[] | null;
+  enabled: boolean;
+  updatedAt: string | null;
+  createdAt: string | null;
 }
 
 interface PaymentGatewayConfigResponse {
@@ -211,6 +240,311 @@ function AiProviderCard() {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// ── Transactional Email Card ───────────────────────────────────────────────
+function TransactionalEmailCard() {
+  const { toast } = useToast();
+  const [showToken, setShowToken] = useState(false);
+  const [testEmail, setTestEmail] = useState("");
+  const [form, setForm] = useState({
+    domain: "visashuttle.com",
+    host: "api.zeptomail.com",
+    agentAlias: "448141e4788dab46",
+    senderAddress: "support@visashuttle.com",
+    senderName: "Visa Shuttle",
+    replyToAddress: "",
+    sendMailToken: "",
+    enabled: false,
+  });
+
+  const { data: cfg, isLoading } = useQuery<EmailConfigResponse>({
+    queryKey: ["/api/admin/email-config"],
+  });
+
+  useEffect(() => {
+    if (cfg) {
+      setForm({
+        domain: cfg.domain || "visashuttle.com",
+        host: cfg.host || "api.zeptomail.com",
+        agentAlias: cfg.agentAlias || "448141e4788dab46",
+        senderAddress: cfg.senderAddress || "support@visashuttle.com",
+        senderName: cfg.senderName || "Visa Shuttle",
+        replyToAddress: cfg.replyToAddress || "",
+        sendMailToken: cfg.sendMailToken || "",
+        enabled: !!cfg.enabled,
+      });
+    }
+  }, [cfg]);
+
+  const saveMutation = useMutation({
+    mutationFn: (data: typeof form) => apiRequest("POST", "/api/admin/email-config", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/email-config"] });
+      toast({ title: "Email settings saved", description: "ZeptoMail transactional email is configured globally." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Save failed", description: err.message || "Could not save email settings", variant: "destructive" });
+    },
+  });
+
+  const testMutation = useMutation({
+    mutationFn: (to: string) => apiRequest("POST", "/api/admin/email-config/test", { to }),
+    onSuccess: async (res: any) => {
+      const data = typeof res?.json === "function" ? await res.json() : res;
+      toast({ title: "Test email sent", description: data?.message || `Sent to ${testEmail}` });
+    },
+    onError: (err: any) => {
+      toast({ title: "Test failed", description: err.message || "Could not send test email", variant: "destructive" });
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Mail className="w-4 h-4" />
+              ZeptoMail Transactional Email
+            </CardTitle>
+            <CardDescription>Global email provider for B2C users and B2B agency workflows</CardDescription>
+          </div>
+          {isLoading ? (
+            <div className="w-5 h-5 border-2 border-muted border-t-foreground rounded-full animate-spin" />
+          ) : (
+            <Badge
+              variant={cfg?.ready ? "default" : "secondary"}
+              className={cfg?.ready ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : ""}
+            >
+              {cfg?.ready ? "ZeptoMail Ready" : "Not Configured"}
+            </Badge>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label>Domain / Sender Domain</Label>
+            <Input value={form.domain} onChange={e => setForm(f => ({ ...f, domain: e.target.value }))} placeholder="visashuttle.com" data-testid="input-zepto-domain" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Host</Label>
+            <Input value={form.host} onChange={e => setForm(f => ({ ...f, host: e.target.value }))} placeholder="api.zeptomail.com" className="font-mono text-sm" data-testid="input-zepto-host" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Agent Alias</Label>
+            <Input value={form.agentAlias} onChange={e => setForm(f => ({ ...f, agentAlias: e.target.value }))} placeholder="448141e4788dab46" className="font-mono text-sm" data-testid="input-zepto-agent-alias" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Sender Address</Label>
+            <Input type="email" value={form.senderAddress} onChange={e => setForm(f => ({ ...f, senderAddress: e.target.value }))} placeholder="support@visashuttle.com" data-testid="input-zepto-sender-address" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Sender Name</Label>
+            <Input value={form.senderName} onChange={e => setForm(f => ({ ...f, senderName: e.target.value }))} placeholder="Visa Shuttle" data-testid="input-zepto-sender-name" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Reply-To Address</Label>
+            <Input type="email" value={form.replyToAddress} onChange={e => setForm(f => ({ ...f, replyToAddress: e.target.value }))} placeholder="support@visashuttle.com" data-testid="input-zepto-reply-to" />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Send Mail Token 1</Label>
+          <div className="relative">
+            <Input
+              type={showToken ? "text" : "password"}
+              value={form.sendMailToken}
+              onChange={e => setForm(f => ({ ...f, sendMailToken: e.target.value }))}
+              placeholder={cfg?.hasSendMailToken ? "Token saved — enter new value to rotate" : "Paste ZeptoMail Send Mail token"}
+              className="pr-10 font-mono text-sm"
+              data-testid="input-zepto-send-mail-token"
+            />
+            <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowToken(s => !s)}>
+              {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Used server-side as <span className="font-mono">Authorization: Zoho-enczapikey &lt;token&gt;</span>. Tokens are masked after saving.
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between rounded-xl border bg-muted/30 p-3">
+          <div>
+            <p className="text-sm font-medium">Enable transactional email</p>
+            <p className="text-xs text-muted-foreground">When enabled, B2C and agency emails send through ZeptoMail globally.</p>
+          </div>
+          <Switch checked={form.enabled} onCheckedChange={enabled => setForm(f => ({ ...f, enabled }))} data-testid="switch-zepto-enabled" />
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+          <Input type="email" value={testEmail} onChange={e => setTestEmail(e.target.value)} placeholder="Send test email to..." data-testid="input-zepto-test-email" />
+          <Button variant="outline" onClick={() => testMutation.mutate(testEmail)} disabled={testMutation.isPending || !testEmail.trim()} className="gap-2" data-testid="button-test-zepto-email">
+            <Send className="w-4 h-4" />
+            Send Test
+          </Button>
+        </div>
+
+        <div className="flex justify-end">
+          <Button onClick={() => saveMutation.mutate(form)} disabled={saveMutation.isPending} className="gap-2" data-testid="button-save-zepto-email">
+            {saveMutation.isPending ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save className="w-4 h-4" />}
+            Save Email Settings
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function EmailTemplatesCard() {
+  const { toast } = useToast();
+  const emptyForm = {
+    id: "",
+    templateKey: "",
+    name: "",
+    subject: "",
+    htmlBody: "",
+    textBody: "",
+    variablesText: "",
+    enabled: true,
+  };
+  const [form, setForm] = useState(emptyForm);
+  const { data: templates = [], isLoading } = useQuery<EmailTemplateResponse[]>({
+    queryKey: ["/api/admin/email-templates"],
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        templateKey: form.templateKey.trim(),
+        name: form.name.trim(),
+        subject: form.subject,
+        htmlBody: form.htmlBody,
+        textBody: form.textBody || null,
+        variables: form.variablesText.split(",").map(v => v.trim()).filter(Boolean),
+        enabled: form.enabled,
+      };
+      if (form.id) return apiRequest("PATCH", `/api/admin/email-templates/${form.id}`, payload);
+      return apiRequest("POST", "/api/admin/email-templates", payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/email-templates"] });
+      setForm(emptyForm);
+      toast({ title: "Template saved", description: "B2C email template has been updated." });
+    },
+    onError: (err: any) => toast({ title: "Save failed", description: err.message, variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/admin/email-templates/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/email-templates"] });
+      setForm(emptyForm);
+      toast({ title: "Template deleted" });
+    },
+    onError: (err: any) => toast({ title: "Delete failed", description: err.message, variant: "destructive" }),
+  });
+
+  function editTemplate(template: EmailTemplateResponse) {
+    setForm({
+      id: template.id,
+      templateKey: template.templateKey,
+      name: template.name,
+      subject: template.subject,
+      htmlBody: template.htmlBody,
+      textBody: template.textBody || "",
+      variablesText: Array.isArray(template.variables) ? template.variables.join(", ") : "",
+      enabled: !!template.enabled,
+    });
+  }
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2"><FileText className="w-4 h-4" />B2C Email Templates</CardTitle>
+          <CardDescription>Manage transactional templates used for B2C user emails</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {isLoading && <p className="text-sm text-muted-foreground">Loading templates...</p>}
+          {templates.map(template => (
+            <button
+              key={template.id}
+              type="button"
+              onClick={() => editTemplate(template)}
+              className={`w-full rounded-xl border p-3 text-left transition hover:border-primary/50 ${form.id === template.id ? "border-primary bg-primary/5" : "bg-background"}`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-semibold text-sm">{template.name}</p>
+                <Badge variant={template.enabled ? "default" : "secondary"}>{template.enabled ? "Active" : "Off"}</Badge>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground font-mono">{template.templateKey}</p>
+              <p className="mt-1 text-xs text-muted-foreground line-clamp-1">{template.subject}</p>
+            </button>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-base">{form.id ? "Edit Template" : "New B2C Template"}</CardTitle>
+              <CardDescription>Use variables like <span className="font-mono">{"{{fullName}}"}</span> in subject and body</CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setForm(emptyForm)} className="gap-2"><Plus className="w-4 h-4" />New</Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>Template Key</Label>
+              <Input value={form.templateKey} onChange={e => setForm(f => ({ ...f, templateKey: e.target.value }))} placeholder="welcome" className="font-mono text-sm" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Name</Label>
+              <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="B2C Welcome" />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Subject</Label>
+            <Input value={form.subject} onChange={e => setForm(f => ({ ...f, subject: e.target.value }))} placeholder="Welcome to Visa Shuttle, {{fullName}}" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>HTML Body</Label>
+            <Textarea value={form.htmlBody} onChange={e => setForm(f => ({ ...f, htmlBody: e.target.value }))} rows={7} className="font-mono text-xs" placeholder="<p>Hi {{fullName}},</p>" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Text Body</Label>
+            <Textarea value={form.textBody} onChange={e => setForm(f => ({ ...f, textBody: e.target.value }))} rows={4} className="font-mono text-xs" placeholder="Plain text fallback" />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+            <div className="space-y-1.5">
+              <Label>Variables</Label>
+              <Input value={form.variablesText} onChange={e => setForm(f => ({ ...f, variablesText: e.target.value }))} placeholder="fullName, email, score" />
+            </div>
+            <div className="flex items-center gap-2 rounded-lg border px-3 py-2.5">
+              <Switch checked={form.enabled} onCheckedChange={enabled => setForm(f => ({ ...f, enabled }))} />
+              <span className="text-sm">Enabled</span>
+            </div>
+          </div>
+          <div className="flex justify-between gap-2 pt-2">
+            {form.id ? (
+              <Button variant="outline" className="gap-2 text-red-600 hover:text-red-700" onClick={() => deleteMutation.mutate(form.id)} disabled={deleteMutation.isPending}>
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </Button>
+            ) : <span />}
+            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !form.templateKey || !form.name || !form.subject || !form.htmlBody} className="gap-2">
+              <Save className="w-4 h-4" />
+              Save Template
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
@@ -1127,11 +1461,12 @@ export default function AdminSettingsPage() {
         </div>
 
         <Tabs defaultValue="general" className="space-y-4">
-          <TabsList className="grid grid-cols-5 w-full max-w-2xl">
+          <TabsList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 h-auto w-full max-w-3xl">
             <TabsTrigger value="general" data-testid="tab-general">General</TabsTrigger>
             <TabsTrigger value="security" data-testid="tab-security">Security</TabsTrigger>
             <TabsTrigger value="limits" data-testid="tab-limits">Defaults</TabsTrigger>
             <TabsTrigger value="integrations" data-testid="tab-integrations">Integrations</TabsTrigger>
+            <TabsTrigger value="email-templates">Email Templates</TabsTrigger>
             <TabsTrigger value="notifications">Alerts</TabsTrigger>
           </TabsList>
 
@@ -1249,7 +1584,7 @@ export default function AdminSettingsPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {[
-                  { label: "SendGrid API Key", hint: "Used for email delivery" },
+                  { label: "ZeptoMail Send Mail Token", hint: "Managed in Integrations → ZeptoMail Transactional Email" },
                   { label: "Stripe Secret Key", hint: "Used for subscription billing" },
                 ].map(k => (
                   <div key={k.label} className="space-y-1.5">
@@ -1314,7 +1649,12 @@ export default function AdminSettingsPage() {
           {/* ── Integrations Tab ──────────────────────────────────────────── */}
           <TabsContent value="integrations" className="space-y-4">
             <PaymentGatewayCard />
+            <TransactionalEmailCard />
             <SmsGatewayCard />
+          </TabsContent>
+
+          <TabsContent value="email-templates" className="space-y-4">
+            <EmailTemplatesCard />
           </TabsContent>
 
           {/* Notifications */}
