@@ -24,6 +24,7 @@ import {
   type ZeptoMailConfig, type InsertZeptoMailConfig,
   type EmailTemplate, type InsertEmailTemplate,
   type PaymentGatewayConfig, type InsertPaymentGatewayConfig,
+  type B2cCoupon, type InsertB2cCoupon,
   type TenantPaymentGatewayConfig, type InsertTenantPaymentGatewayConfig,
   type TenantSmsConfig, type InsertTenantSmsConfig,
   type FeeTemplate, type InsertFeeTemplate,
@@ -50,6 +51,7 @@ import {
   zeptoMailConfig as zeptoMailConfigTable,
   emailTemplates as emailTemplatesTable,
   paymentGatewayConfig as paymentGatewayConfigTable,
+  b2cCoupons as b2cCouponsTable,
   tenantPaymentGatewayConfig as tenantPaymentGatewayConfigTable,
   tenantSmsConfig as tenantSmsConfigTable,
   feeTemplates as feeTemplatesTable,
@@ -260,6 +262,12 @@ export interface IStorage {
   // Payment Gateway Config
   getPaymentGatewayConfig(): Promise<PaymentGatewayConfig | undefined>;
   upsertPaymentGatewayConfig(data: Partial<InsertPaymentGatewayConfig>): Promise<PaymentGatewayConfig>;
+  getB2cCoupons(): Promise<B2cCoupon[]>;
+  getB2cCoupon(id: string): Promise<B2cCoupon | undefined>;
+  getB2cCouponByCode(code: string): Promise<B2cCoupon | undefined>;
+  createB2cCoupon(data: InsertB2cCoupon): Promise<B2cCoupon>;
+  updateB2cCoupon(id: string, data: Partial<InsertB2cCoupon>): Promise<B2cCoupon | undefined>;
+  deleteB2cCoupon(id: string): Promise<boolean>;
 
   // Per-tenant Payment Gateway Config (Cashfree)
   getTenantPaymentGatewayConfig(tenantId: string): Promise<TenantPaymentGatewayConfig | undefined>;
@@ -322,6 +330,7 @@ export class MemStorage implements IStorage {
   private zeptoMailConfigRecord?: ZeptoMailConfig;
   private emailTemplatesMap: Map<string, EmailTemplate> = new Map();
   private paymentGatewayConfigRecord?: PaymentGatewayConfig;
+  private b2cCouponsMap: Map<string, B2cCoupon> = new Map();
   private tenantPaymentGatewayConfigByTenant: Map<string, TenantPaymentGatewayConfig> = new Map();
   private tenantSmsConfigByTenant: Map<string, TenantSmsConfig> = new Map();
   private feeTemplates: Map<string, FeeTemplate> = new Map();
@@ -2115,6 +2124,47 @@ export class MemStorage implements IStorage {
     };
     return this.paymentGatewayConfigRecord!;
   }
+
+  async getB2cCoupons(): Promise<B2cCoupon[]> {
+    return Array.from(this.b2cCouponsMap.values()).sort((a, b) => a.code.localeCompare(b.code));
+  }
+  async getB2cCoupon(id: string): Promise<B2cCoupon | undefined> {
+    return this.b2cCouponsMap.get(id);
+  }
+  async getB2cCouponByCode(code: string): Promise<B2cCoupon | undefined> {
+    const normalized = code.trim().toUpperCase();
+    return Array.from(this.b2cCouponsMap.values()).find(c => c.code === normalized);
+  }
+  async createB2cCoupon(data: InsertB2cCoupon): Promise<B2cCoupon> {
+    const now = new Date();
+    const coupon: B2cCoupon = {
+      id: randomUUID(),
+      code: data.code.trim().toUpperCase(),
+      description: data.description ?? null,
+      discountPercent: data.discountPercent,
+      active: data.active ?? true,
+      expiresAt: data.expiresAt ?? null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.b2cCouponsMap.set(coupon.id, coupon);
+    return coupon;
+  }
+  async updateB2cCoupon(id: string, data: Partial<InsertB2cCoupon>): Promise<B2cCoupon | undefined> {
+    const existing = this.b2cCouponsMap.get(id);
+    if (!existing) return undefined;
+    const updated: B2cCoupon = {
+      ...existing,
+      ...data,
+      code: data.code !== undefined ? data.code.trim().toUpperCase() : existing.code,
+      updatedAt: new Date(),
+    } as B2cCoupon;
+    this.b2cCouponsMap.set(id, updated);
+    return updated;
+  }
+  async deleteB2cCoupon(id: string): Promise<boolean> {
+    return this.b2cCouponsMap.delete(id);
+  }
 }
 
 // HybridStorage: uses PostgreSQL for DB-backed production data. Local
@@ -3362,6 +3412,117 @@ class HybridStorage extends MemStorage {
         console.warn("[DB] payment_gateway_config table is missing. Saving payment config in memory only.");
         return super.upsertPaymentGatewayConfig(data);
       }
+      throw error;
+    }
+  }
+
+  private async ensureB2cCouponTable(): Promise<void> {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS b2c_coupons (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        code text NOT NULL UNIQUE,
+        description text,
+        discount_percent integer NOT NULL DEFAULT 0,
+        active boolean NOT NULL DEFAULT true,
+        expires_at timestamp,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      )
+    `);
+  }
+
+  async getB2cCoupons(): Promise<B2cCoupon[]> {
+    try {
+      return await db.select().from(b2cCouponsTable).orderBy(asc(b2cCouponsTable.code));
+    } catch (error) {
+      if (isMissingRelationError(error)) {
+        await this.ensureB2cCouponTable();
+        return [];
+      }
+      if (shouldUseMemoryFallback(error)) return super.getB2cCoupons();
+      throw error;
+    }
+  }
+
+  async getB2cCoupon(id: string): Promise<B2cCoupon | undefined> {
+    try {
+      const rows = await db.select().from(b2cCouponsTable).where(eq(b2cCouponsTable.id, id)).limit(1);
+      return rows[0];
+    } catch (error) {
+      if (isMissingRelationError(error)) {
+        await this.ensureB2cCouponTable();
+        return undefined;
+      }
+      if (shouldUseMemoryFallback(error)) return super.getB2cCoupon(id);
+      throw error;
+    }
+  }
+
+  async getB2cCouponByCode(code: string): Promise<B2cCoupon | undefined> {
+    const normalized = code.trim().toUpperCase();
+    try {
+      const rows = await db.select().from(b2cCouponsTable).where(eq(b2cCouponsTable.code, normalized)).limit(1);
+      return rows[0];
+    } catch (error) {
+      if (isMissingRelationError(error)) {
+        await this.ensureB2cCouponTable();
+        return undefined;
+      }
+      if (shouldUseMemoryFallback(error)) return super.getB2cCouponByCode(normalized);
+      throw error;
+    }
+  }
+
+  async createB2cCoupon(data: InsertB2cCoupon): Promise<B2cCoupon> {
+    try {
+      const rows = await db.insert(b2cCouponsTable).values({
+        ...data,
+        code: data.code.trim().toUpperCase(),
+      }).returning();
+      return rows[0];
+    } catch (error) {
+      if (isMissingRelationError(error)) {
+        await this.ensureB2cCouponTable();
+        const rows = await db.insert(b2cCouponsTable).values({
+          ...data,
+          code: data.code.trim().toUpperCase(),
+        }).returning();
+        return rows[0];
+      }
+      if (shouldUseMemoryFallback(error)) return super.createB2cCoupon(data);
+      throw error;
+    }
+  }
+
+  async updateB2cCoupon(id: string, data: Partial<InsertB2cCoupon>): Promise<B2cCoupon | undefined> {
+    try {
+      const patch = {
+        ...data,
+        ...(data.code !== undefined ? { code: data.code.trim().toUpperCase() } : {}),
+        updatedAt: new Date(),
+      };
+      const rows = await db.update(b2cCouponsTable).set(patch as any).where(eq(b2cCouponsTable.id, id)).returning();
+      return rows[0];
+    } catch (error) {
+      if (isMissingRelationError(error)) {
+        await this.ensureB2cCouponTable();
+        return undefined;
+      }
+      if (shouldUseMemoryFallback(error)) return super.updateB2cCoupon(id, data);
+      throw error;
+    }
+  }
+
+  async deleteB2cCoupon(id: string): Promise<boolean> {
+    try {
+      const rows = await db.delete(b2cCouponsTable).where(eq(b2cCouponsTable.id, id)).returning({ id: b2cCouponsTable.id });
+      return rows.length > 0;
+    } catch (error) {
+      if (isMissingRelationError(error)) {
+        await this.ensureB2cCouponTable();
+        return false;
+      }
+      if (shouldUseMemoryFallback(error)) return super.deleteB2cCoupon(id);
       throw error;
     }
   }

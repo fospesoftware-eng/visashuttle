@@ -53,11 +53,27 @@ export default function DeepCheckPaymentPage() {
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState("");
   const [currency, setCurrency] = useState<B2cCurrency>(() => getStoredB2cCurrency());
+  const [couponCode, setCouponCode] = useState("");
+  const [coupon, setCoupon] = useState<null | {
+    code: string;
+    discountPercent: number;
+    discountAmount: number;
+    finalAmount: number;
+  }>(null);
+  const [couponMessage, setCouponMessage] = useState("");
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
 
   const orderId = useMemo(() => new URLSearchParams(window.location.search).get("order_id"), []);
   const isReturn = window.location.pathname.includes("/return");
   const selectedPrice = B2C_DEEP_CHECK_PRICES[currency];
   const priceLabel = formatB2cPrice(currency);
+  const checkoutAmount = coupon?.finalAmount ?? selectedPrice.amount;
+  const checkoutPriceLabel = formatB2cPrice(currency, checkoutAmount);
+
+  useEffect(() => {
+    setCoupon(null);
+    setCouponMessage("");
+  }, [currency]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -99,7 +115,7 @@ export default function DeepCheckPaymentPage() {
     setError("");
     try {
       storeB2cCurrency(currency);
-      const res = await apiRequest("POST", "/api/b2c/payments/deep-check/order", { currency });
+      const res = await apiRequest("POST", "/api/b2c/payments/deep-check/order", { currency, couponCode: coupon?.code || couponCode });
       const data = await res.json();
       if (data.alreadyActive) {
         setLocation(data.redirectUrl || "/deep-check");
@@ -119,6 +135,34 @@ export default function DeepCheckPaymentPage() {
   }
 
   if (authLoading || !user) return null;
+
+  async function applyCoupon() {
+    const code = couponCode.trim().toUpperCase();
+    if (!code) {
+      setCouponMessage("Enter a coupon code.");
+      setCoupon(null);
+      return;
+    }
+    setIsApplyingCoupon(true);
+    setCouponMessage("");
+    setError("");
+    try {
+      const res = await apiRequest("POST", "/api/b2c/payments/deep-check/coupon", { currency, couponCode: code });
+      const data = await res.json();
+      setCoupon({
+        code: data.code,
+        discountPercent: data.discountPercent,
+        discountAmount: data.discountAmount,
+        finalAmount: data.finalAmount,
+      });
+      setCouponMessage(`${data.code} applied: ${data.discountPercent}% discount.`);
+    } catch (err: any) {
+      setCoupon(null);
+      setCouponMessage(err.message || "Coupon could not be applied.");
+    } finally {
+      setIsApplyingCoupon(false);
+    }
+  }
 
   if (isSuccess) {
     return (
@@ -228,7 +272,8 @@ export default function DeepCheckPaymentPage() {
           <CardContent className="p-7 space-y-5">
             <div className="space-y-3">
               <div className="flex items-end gap-3">
-                <span className="text-4xl font-black">{priceLabel}</span>
+                <span className="text-4xl font-black">{checkoutPriceLabel}</span>
+                {coupon && <span className="text-lg font-semibold text-muted-foreground line-through mb-1">{priceLabel}</span>}
                 <span className="text-sm font-medium text-muted-foreground pb-1">per Deep Check</span>
               </div>
               <div className="flex flex-wrap items-center gap-2 rounded-2xl border bg-muted/30 p-2">
@@ -253,8 +298,43 @@ export default function DeepCheckPaymentPage() {
                 ))}
               </div>
               <p className="text-xs text-muted-foreground">
-                Checkout amount: {priceLabel} {currency !== "AED" ? currency : ""} ({selectedPrice.label})
+                Checkout amount: {checkoutPriceLabel} {currency !== "AED" ? currency : ""} ({selectedPrice.label})
               </p>
+            </div>
+            <div className="rounded-2xl border bg-background p-4 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold">Coupon Code</p>
+                  <p className="text-xs text-muted-foreground">Apply a SaaS admin coupon before payment.</p>
+                </div>
+                {coupon && <Badge className="bg-emerald-100 text-emerald-700 border-0">{coupon.discountPercent}% off</Badge>}
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Input
+                  value={couponCode}
+                  onChange={e => {
+                    setCouponCode(e.target.value.toUpperCase());
+                    setCoupon(null);
+                    setCouponMessage("");
+                  }}
+                  placeholder="Enter coupon"
+                  className="font-mono"
+                  disabled={isStarting || isReturn}
+                />
+                <Button type="button" variant="outline" onClick={applyCoupon} disabled={isApplyingCoupon || isStarting || isReturn || !couponCode.trim()}>
+                  {isApplyingCoupon ? "Applying..." : "Apply"}
+                </Button>
+              </div>
+              {couponMessage && (
+                <p className={`text-xs ${coupon ? "text-emerald-700" : "text-red-600"}`}>{couponMessage}</p>
+              )}
+              {coupon && (
+                <div className="grid grid-cols-3 gap-2 rounded-xl bg-muted/40 p-3 text-xs">
+                  <div><span className="text-muted-foreground">Original</span><p className="font-semibold">{priceLabel}</p></div>
+                  <div><span className="text-muted-foreground">Discount</span><p className="font-semibold">-{formatB2cPrice(currency, coupon.discountAmount)}</p></div>
+                  <div><span className="text-muted-foreground">Pay</span><p className="font-semibold">{checkoutPriceLabel}</p></div>
+                </div>
+              )}
             </div>
             <div className="grid sm:grid-cols-3 gap-3">
               {[
@@ -286,7 +366,7 @@ export default function DeepCheckPaymentPage() {
                 data-testid="button-start-deep-check-payment"
               >
                 {isStarting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
-                {isStarting ? "Opening Cashfree..." : `Pay ${priceLabel} with Cashfree`}
+                {isStarting ? "Opening Cashfree..." : `Pay ${checkoutPriceLabel} with Cashfree`}
               </Button>
             )}
           </CardContent>

@@ -703,6 +703,24 @@ export const insertPaymentGatewayConfigSchema = createInsertSchema(paymentGatewa
 export type InsertPaymentGatewayConfig = z.infer<typeof insertPaymentGatewayConfigSchema>;
 export type PaymentGatewayConfig = typeof paymentGatewayConfig.$inferSelect;
 
+// ── B2C Checkout Coupons ─────────────────────────────────────────────────────
+// Platform-wide coupons for B2C purchases such as Deep Check. Discounts are
+// stored as a percentage so SaaS admins can create simple promotional codes.
+export const b2cCoupons = pgTable("b2c_coupons", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(),
+  description: text("description"),
+  discountPercent: integer("discount_percent").notNull().default(0),
+  active: boolean("active").notNull().default(true),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertB2cCouponSchema = createInsertSchema(b2cCoupons).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertB2cCoupon = z.infer<typeof insertB2cCouponSchema>;
+export type B2cCoupon = typeof b2cCoupons.$inferSelect;
+
 // ── Per-Tenant Payment Gateway Config (Cashfree) ─────────────────────────────
 // Per-agency override of the global payment gateway config. When a tenant has
 // credentials configured here, agency-scoped flows should prefer these over the

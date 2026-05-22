@@ -516,6 +516,31 @@ function getB2cDeepCheckPrice(currencyInput: unknown) {
   return { currency, amount: B2C_DEEP_CHECK_PRICES[currency] };
 }
 
+function normalizeCouponCode(code: unknown): string {
+  return String(code || "").trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 32);
+}
+
+function applyCouponDiscount(amount: number, discountPercent: number) {
+  const pct = Math.max(0, Math.min(95, Math.round(Number(discountPercent) || 0)));
+  const discountAmount = Math.round((amount * pct) / 100);
+  return {
+    discountPercent: pct,
+    discountAmount,
+    finalAmount: Math.max(1, amount - discountAmount),
+  };
+}
+
+async function getValidB2cCoupon(codeInput: unknown) {
+  const code = normalizeCouponCode(codeInput);
+  if (!code) return { code: "", coupon: undefined, error: "" };
+  const coupon = await storage.getB2cCouponByCode(code);
+  if (!coupon || !coupon.active) return { code, coupon: undefined, error: "Coupon code is invalid or inactive." };
+  if (coupon.expiresAt && new Date(coupon.expiresAt).getTime() < Date.now()) {
+    return { code, coupon: undefined, error: "Coupon code has expired." };
+  }
+  return { code, coupon, error: "" };
+}
+
 async function readCashfreeBody(response: globalThis.Response) {
   const text = await response.text();
   if (!text) return {};
@@ -5009,6 +5034,60 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // ── Admin: B2C Checkout Coupons ──────────────────────────────────────────
+  const couponBodySchema = z.object({
+    code: z.string().trim().min(2).max(32),
+    description: z.string().trim().max(240).optional().nullable(),
+    discountPercent: z.coerce.number().int().min(1).max(95),
+    active: z.boolean().optional().default(true),
+    expiresAt: z.string().trim().optional().nullable(),
+  });
+
+  app.get("/api/admin/b2c-coupons", requireAdminAuth, async (_req, res) => {
+    res.json(await storage.getB2cCoupons());
+  });
+
+  app.post("/api/admin/b2c-coupons", requireAdminAuth, async (req, res) => {
+    try {
+      const parsed = couponBodySchema.parse(req.body);
+      const created = await storage.createB2cCoupon({
+        code: normalizeCouponCode(parsed.code),
+        description: parsed.description || null,
+        discountPercent: parsed.discountPercent,
+        active: parsed.active,
+        expiresAt: parsed.expiresAt ? new Date(parsed.expiresAt) : null,
+      } as any);
+      res.status(201).json(created);
+    } catch (error: any) {
+      const message = error?.issues?.[0]?.message || error?.message || "Failed to create coupon";
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.patch("/api/admin/b2c-coupons/:id", requireAdminAuth, async (req, res) => {
+    try {
+      const parsed = couponBodySchema.partial().parse(req.body);
+      const updated = await storage.updateB2cCoupon(req.params.id, {
+        ...(parsed.code !== undefined ? { code: normalizeCouponCode(parsed.code) } : {}),
+        ...(parsed.description !== undefined ? { description: parsed.description || null } : {}),
+        ...(parsed.discountPercent !== undefined ? { discountPercent: parsed.discountPercent } : {}),
+        ...(parsed.active !== undefined ? { active: parsed.active } : {}),
+        ...(parsed.expiresAt !== undefined ? { expiresAt: parsed.expiresAt ? new Date(parsed.expiresAt) : null } : {}),
+      } as any);
+      if (!updated) return res.status(404).json({ error: "Coupon not found" });
+      res.json(updated);
+    } catch (error: any) {
+      const message = error?.issues?.[0]?.message || error?.message || "Failed to update coupon";
+      res.status(400).json({ error: message });
+    }
+  });
+
+  app.delete("/api/admin/b2c-coupons/:id", requireAdminAuth, async (req, res) => {
+    const deleted = await storage.deleteB2cCoupon(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Coupon not found" });
+    res.json({ success: true });
+  });
+
   // ── Admin: Payment Gateway Config ────────────────────────────────────────
   app.get("/api/admin/payment-gateway-config", requireAdminAuth, async (_req, res) => {
     const cfg = await storage.getPaymentGatewayConfig();
@@ -5357,6 +5436,21 @@ export async function registerRoutes(
   });
 
   // ── B2C Payments: Deep Check via Cashfree ────────────────────────────────
+  app.post("/api/b2c/payments/deep-check/coupon", requireB2cAuth, async (req, res) => {
+    const price = getB2cDeepCheckPrice(req.body?.currency);
+    const { code, coupon, error } = await getValidB2cCoupon(req.body?.couponCode);
+    if (!code) return res.status(400).json({ error: "Enter a coupon code." });
+    if (error || !coupon) return res.status(404).json({ error: error || "Coupon code is invalid." });
+    const discounted = applyCouponDiscount(price.amount, coupon.discountPercent);
+    res.json({
+      code: coupon.code,
+      description: coupon.description || "",
+      currency: price.currency,
+      originalAmount: price.amount,
+      ...discounted,
+    });
+  });
+
   app.post("/api/b2c/payments/deep-check/order", requireB2cAuth, async (req, res) => {
     const user = await storage.getB2cUser(req.session.b2cUserId!);
     if (!user) return res.status(401).json({ error: "User not found" });
@@ -5378,12 +5472,16 @@ export async function registerRoutes(
     }
 
     const price = getB2cDeepCheckPrice(req.body?.currency);
+    const couponCheck = await getValidB2cCoupon(req.body?.couponCode);
+    if (couponCheck.error) return res.status(400).json({ error: couponCheck.error });
+    const discount = couponCheck.coupon ? applyCouponDiscount(price.amount, couponCheck.coupon.discountPercent) : null;
+    const checkoutAmount = discount?.finalAmount ?? price.amount;
     const orderId = `VS_DEEP_${price.currency}_${Date.now()}_${randomUUID().slice(0, 8)}`;
     const requestId = randomUUID();
     const origin = getRequestOrigin(req);
     const payload = {
       order_id: orderId,
-      order_amount: price.amount,
+      order_amount: checkoutAmount,
       order_currency: price.currency,
       order_note: "Visa Shuttle Deep Check",
       customer_details: {
@@ -5399,6 +5497,9 @@ export async function registerRoutes(
         product: "deep_check",
         user_id: user.id,
         currency: price.currency,
+        coupon_code: couponCheck.coupon?.code || "",
+        original_amount: String(price.amount),
+        discount_percent: String(discount?.discountPercent || 0),
       },
     };
 
@@ -5447,8 +5548,12 @@ export async function registerRoutes(
       orderId: data.order_id || orderId,
       paymentSessionId: data.payment_session_id,
       mode: cashfree.mode,
-      amount: price.amount,
+      amount: checkoutAmount,
       currency: price.currency,
+      originalAmount: price.amount,
+      couponCode: couponCheck.coupon?.code || "",
+      discountPercent: discount?.discountPercent || 0,
+      discountAmount: discount?.discountAmount || 0,
     });
   });
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Globe, Mail, Shield, Database, Save, Key, Bell, Lock, MessageSquare, CheckCircle, AlertCircle, Eye, EyeOff, Send, ChevronDown, ChevronUp, CreditCard, ExternalLink, FileText, Plus, Trash2 } from "lucide-react";
+import { Globe, Mail, Shield, Database, Save, Key, Bell, Lock, MessageSquare, CheckCircle, AlertCircle, Eye, EyeOff, Send, ChevronDown, ChevronUp, CreditCard, ExternalLink, FileText, Plus, Trash2, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -585,6 +585,150 @@ function EmailTemplatesCard() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+interface B2cCouponResponse {
+  id: string;
+  code: string;
+  description: string | null;
+  discountPercent: number;
+  active: boolean;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+// ── B2C Coupons Card ───────────────────────────────────────────────────────
+function B2cCouponsCard() {
+  const { toast } = useToast();
+  const emptyForm = { id: "", code: "", description: "", discountPercent: 10, active: true, expiresAt: "" };
+  const [form, setForm] = useState(emptyForm);
+
+  const { data = [], isLoading } = useQuery<B2cCouponResponse[]>({
+    queryKey: ["/api/admin/b2c-coupons"],
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        code: form.code.trim().toUpperCase(),
+        description: form.description.trim() || null,
+        discountPercent: Number(form.discountPercent),
+        active: form.active,
+        expiresAt: form.expiresAt || null,
+      };
+      if (form.id) return apiRequest("PATCH", `/api/admin/b2c-coupons/${form.id}`, payload);
+      return apiRequest("POST", "/api/admin/b2c-coupons", payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/b2c-coupons"] });
+      setForm(emptyForm);
+      toast({ title: "Coupon saved", description: "B2C checkout coupon has been updated." });
+    },
+    onError: (err: any) => toast({ title: "Save failed", description: err.message, variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/admin/b2c-coupons/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/b2c-coupons"] });
+      setForm(emptyForm);
+      toast({ title: "Coupon deleted" });
+    },
+    onError: (err: any) => toast({ title: "Delete failed", description: err.message, variant: "destructive" }),
+  });
+
+  function editCoupon(coupon: B2cCouponResponse) {
+    setForm({
+      id: coupon.id,
+      code: coupon.code,
+      description: coupon.description || "",
+      discountPercent: coupon.discountPercent,
+      active: !!coupon.active,
+      expiresAt: coupon.expiresAt ? coupon.expiresAt.slice(0, 10) : "",
+    });
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <CardTitle className="text-base flex items-center gap-2"><Tag className="w-4 h-4" />B2C Checkout Coupons</CardTitle>
+            <CardDescription>Create percentage-based coupon codes for Deep Check checkout. Max discount is 95%.</CardDescription>
+          </div>
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => setForm(emptyForm)}>
+            <Plus className="w-4 h-4" /> New
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="grid gap-5 lg:grid-cols-[1fr_1.05fr]">
+        <div className="space-y-2">
+          {isLoading && <p className="text-sm text-muted-foreground">Loading coupons...</p>}
+          {!isLoading && data.length === 0 && (
+            <div className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">No coupons yet.</div>
+          )}
+          {data.map(coupon => {
+            const expired = coupon.expiresAt && new Date(coupon.expiresAt).getTime() < Date.now();
+            return (
+              <button
+                key={coupon.id}
+                type="button"
+                onClick={() => editCoupon(coupon)}
+                className={`w-full rounded-xl border p-3 text-left transition hover:border-primary/50 ${form.id === coupon.id ? "border-primary bg-primary/5" : "bg-background"}`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-mono text-sm font-bold">{coupon.code}</p>
+                  <div className="flex items-center gap-1.5">
+                    <Badge variant={coupon.active && !expired ? "default" : "secondary"}>{coupon.active && !expired ? "Active" : expired ? "Expired" : "Off"}</Badge>
+                    <Badge variant="outline">{coupon.discountPercent}%</Badge>
+                  </div>
+                </div>
+                {coupon.description && <p className="mt-1 text-xs text-muted-foreground">{coupon.description}</p>}
+                {coupon.expiresAt && <p className="mt-1 text-xs text-muted-foreground">Expires {new Date(coupon.expiresAt).toLocaleDateString()}</p>}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="rounded-xl border p-4 space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>Coupon Code</Label>
+              <Input value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} placeholder="WELCOME10" className="font-mono" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Discount %</Label>
+              <Input type="number" min={1} max={95} value={form.discountPercent} onChange={e => setForm(f => ({ ...f, discountPercent: Number(e.target.value) }))} />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Description</Label>
+            <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Launch offer for B2C Deep Check" />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+            <div className="space-y-1.5">
+              <Label>Expiry Date</Label>
+              <Input type="date" value={form.expiresAt} onChange={e => setForm(f => ({ ...f, expiresAt: e.target.value }))} />
+            </div>
+            <div className="flex items-center gap-2 rounded-lg border px-3 py-2.5">
+              <Switch checked={form.active} onCheckedChange={active => setForm(f => ({ ...f, active }))} />
+              <span className="text-sm">Active</span>
+            </div>
+          </div>
+          <div className="flex justify-between gap-2 pt-2">
+            {form.id ? (
+              <Button variant="outline" className="gap-2 text-red-600 hover:text-red-700" onClick={() => deleteMutation.mutate(form.id)} disabled={deleteMutation.isPending}>
+                <Trash2 className="w-4 h-4" /> Delete
+              </Button>
+            ) : <span />}
+            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !form.code.trim() || Number(form.discountPercent) < 1} className="gap-2">
+              <Save className="w-4 h-4" /> Save Coupon
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -1689,6 +1833,7 @@ export default function AdminSettingsPage() {
           {/* ── Integrations Tab ──────────────────────────────────────────── */}
           <TabsContent value="integrations" className="space-y-4">
             <PaymentGatewayCard />
+            <B2cCouponsCard />
             <TransactionalEmailCard />
             <SmsGatewayCard />
           </TabsContent>
