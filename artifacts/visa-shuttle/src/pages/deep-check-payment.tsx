@@ -11,6 +11,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
   B2C_CURRENCIES,
+  B2C_CURRENCY_FLAGS,
   B2C_DEEP_CHECK_PRICES,
   type B2cCurrency,
   formatB2cPrice,
@@ -293,6 +294,7 @@ export default function DeepCheckPaymentPage() {
                     }`}
                     disabled={isStarting || isReturn}
                   >
+                    <span className="mr-1.5">{B2C_CURRENCY_FLAGS[code]}</span>
                     {code}
                   </button>
                 ))}

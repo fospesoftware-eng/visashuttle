@@ -26,6 +26,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { formatB2cPrice, getStoredB2cCurrency } from "@/lib/b2c-pricing";
 
 const BRAND_GRADIENT = "linear-gradient(135deg,#4055FF 0%,#9033F5 50%,#FF2060 100%)";
 
@@ -323,6 +324,7 @@ function StepCard({ step }: { step: Step }) {
 
 export default function HelpPage() {
   const [tab, setTab] = useState<"travelers" | "agencies">("travelers");
+  const basicCheckPrice = formatB2cPrice(getStoredB2cCurrency(), 0);
 
   useEffect(() => {
     const hash = window.location.hash.replace("#", "");
@@ -336,7 +338,17 @@ export default function HelpPage() {
     }
   };
 
-  const faqs = tab === "travelers" ? travelerFaqs : agencyFaqs;
+  const travelerFaqsWithCurrency = travelerFaqs.map((faq) =>
+    faq.q === "Is the Basic Check really free?"
+      ? { ...faq, a: `Yes. The Basic Check is ${basicCheckPrice} — no credit card needed. You only pay if you want a Deep Check. Pricing is USD 15, GBP 11, EUR 12, INR 1000, or AED 55.` }
+      : faq
+  );
+  const travelerStepsWithCurrency = travelerSteps.map((step) =>
+    step.num === 1
+      ? { ...step, bullets: [`Click "Check My Visa Chances — ${basicCheckPrice}" or "Get My Score — ${basicCheckPrice}" on the right card`, ...step.bullets.slice(1)] }
+      : step
+  );
+  const faqs = tab === "travelers" ? travelerFaqsWithCurrency : agencyFaqs;
 
   return (
     <div className="min-h-screen bg-background">
@@ -395,7 +407,7 @@ export default function HelpPage() {
           </div>
 
           <TabsContent value="travelers" className="space-y-16 sm:space-y-20">
-            {travelerSteps.map((s) => (
+            {travelerStepsWithCurrency.map((s) => (
               <StepCard key={s.num} step={s} />
             ))}
           </TabsContent>
@@ -418,7 +430,7 @@ export default function HelpPage() {
               </h3>
               <p className="text-white/85">
                 {tab === "travelers"
-                  ? "Free Basic Check — no card needed."
+                  ? `Free Basic Check at ${basicCheckPrice} — no card needed.`
                   : "Set up your branded portal in 3 simple steps."}
               </p>
             </div>
@@ -427,7 +439,7 @@ export default function HelpPage() {
                 <>
                   <Link href="/check">
                     <Button size="lg" variant="secondary" className="font-semibold">
-                      Start Basic Check ₹0
+                      Start Basic Check {basicCheckPrice}
                     </Button>
                   </Link>
                   <Link href="/pricing">

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
 import {
   B2C_CURRENCIES,
+  B2C_CURRENCY_FLAGS,
   B2C_DEEP_CHECK_PRICES,
   type B2cCurrency,
   formatB2cPrice,
@@ -19,7 +20,7 @@ const plans = [
     name: "Basic Check",
     key: "free",
     icon: Sparkles,
-    price: "₹0",
+    price: "",
     originalPrice: null,
     period: "",
     description: "Basic Check for a quick AI visa score",
@@ -73,6 +74,7 @@ export default function PricingPage() {
   const { user } = useB2cAuth();
   const [currency, setCurrency] = useState<B2cCurrency>(() => getStoredB2cCurrency());
   const deepPrice = formatB2cPrice(currency);
+  const basicPrice = formatB2cPrice(currency, 0);
   const deepCheckPath = `/payment/deep-check?currency=${currency}`;
   const deepCheckHref = user ? deepCheckPath : `/sign-in?next=${encodeURIComponent(deepCheckPath)}`;
 
@@ -94,7 +96,7 @@ export default function PricingPage() {
               Choose Your Plan
             </h1>
             <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-              Start with Basic Check at ₹0. Upgrade to Deep Check for a full embassy-style analysis at {deepPrice}.
+              Start with Basic Check at {basicPrice}. Upgrade to Deep Check for a full embassy-style analysis at {deepPrice}.
             </p>
             <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-2 rounded-2xl border bg-background p-2 shadow-sm">
               <span className="px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Currency</span>
@@ -109,6 +111,7 @@ export default function PricingPage() {
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
+                  <span className="mr-1.5">{B2C_CURRENCY_FLAGS[code]}</span>
                   {code}
                 </button>
               ))}
@@ -132,7 +135,7 @@ export default function PricingPage() {
                     <h3 className="text-xl font-bold mb-1">{plan.name}</h3>
                     <p className="text-muted-foreground text-sm mb-4">{plan.description}</p>
                     <div className="mb-6 flex items-end gap-2">
-                      <span className="text-4xl font-black">{plan.key === "pro" ? deepPrice : plan.price}</span>
+                      <span className="text-4xl font-black">{plan.key === "pro" ? deepPrice : basicPrice}</span>
                       {plan.period && <span className="text-muted-foreground text-sm mb-1">{plan.period}</span>}
                     </div>
                     {plan.key === "pro" && (
@@ -193,7 +196,7 @@ export default function PricingPage() {
           <h2 className="text-2xl font-bold text-center mb-8">Frequently Asked Questions</h2>
           <div className="space-y-4">
             {[
-              { q: "Is the Basic Check really free?", a: "Yes — every new account gets 1 Basic Check at ₹0. No credit card required." },
+              { q: "Is the Basic Check really free?", a: `Yes — every new account gets 1 Basic Check at ${basicPrice}. No credit card required.` },
               { q: "How accurate is the AI scoring?", a: "Our AI analyzes 14 key factors used by immigration authorities and provides a probability estimate. It's a guidance tool, not a legal guarantee." },
               { q: "What is the Deep Check?", a: "Deep Check asks detailed questions across 7 dimensions (personal profile, finances, travel history, home ties, and more) and returns an embassy-style risk analysis with an action plan. It also supports Family applications (spouse + children)." },
               { q: "How much does Deep Check cost?", a: "Deep Check is a one-time report purchase. Choose your currency before checkout: USD 15, GBP 11, EUR 12, INR 1000, or AED 55." },

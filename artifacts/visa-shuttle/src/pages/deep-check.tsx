@@ -304,6 +304,7 @@ export default function DeepCheckPage() {
 
   const hasAccess = user.deepCheckAccess;
   const deepCheckPrice = formatB2cPrice(getStoredB2cCurrency());
+  const basicCheckPrice = formatB2cPrice(getStoredB2cCurrency(), 0);
 
   // ===================== RESULT SCORECARD =====================
   if (result) {
@@ -619,7 +620,7 @@ export default function DeepCheckPage() {
                 </Link>
                 <Link href="/check">
                   <Button variant="ghost" className="text-white hover:bg-white/10 gap-2">
-                    <Sparkles className="w-4 h-4" /> Try Basic Check at ₹0
+                    <Sparkles className="w-4 h-4" /> Try Basic Check at {basicCheckPrice}
                   </Button>
                 </Link>
               </div>

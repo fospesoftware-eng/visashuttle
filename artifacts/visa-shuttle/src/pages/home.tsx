@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
 import { POPULAR_DESTINATIONS, VISA_TYPES } from "@/shared/destinations";
+import { formatB2cPrice, getStoredB2cCurrency } from "@/lib/b2c-pricing";
 
 // ── Large pool of country-pair visa data ──────────────────────────────────────
 type VisaScoreSample = {
@@ -217,6 +218,7 @@ export default function HomePage() {
   const [pulse, setPulse] = useState(0); // increments to trigger subtle "live" animation
   const [contactForm, setContactForm] = useState({ name: "", email: "", message: "" });
   const pulseRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const basicCheckPrice = formatB2cPrice(getStoredB2cCurrency(), 0);
 
   // Build a fresh, visitor-country-aware list on every page visit.
   useEffect(() => {
@@ -308,7 +310,7 @@ export default function HomePage() {
                   data-testid="button-hero-cta"
                 >
                   <Sparkles className="w-5 h-5" />
-                  {user ? "Run a Visa Check" : "Check My Visa Chances — ₹0"}
+                  {user ? "Run a Visa Check" : `Check My Visa Chances — ${basicCheckPrice}`}
                 </Button>
                 <Link href="/pricing">
                   <Button size="lg" variant="outline" className="gap-2 text-base" data-testid="button-pricing">
@@ -320,7 +322,7 @@ export default function HomePage() {
 
               <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                 {[
-                  { icon: CheckCircle, text: "Basic Check at ₹0 — no card needed" },
+                  { icon: CheckCircle, text: `Basic Check at ${basicCheckPrice} — no card needed` },
                   { icon: Shield, text: "Private & secure" },
                   { icon: Zap, text: "Results in seconds" },
                 ].map(({ icon: Icon, text }) => (
@@ -419,7 +421,7 @@ export default function HomePage() {
                       data-testid="button-card-cta"
                     >
                       <Sparkles className="w-4 h-4 mr-2" />
-                      {user ? "Check Your Visa" : "Get My Score — ₹0"}
+                      {user ? "Check Your Visa" : `Get My Score — ${basicCheckPrice}`}
                     </Button>
                     {!user && (
                       <p className="text-xs text-center text-muted-foreground mt-2 flex items-center justify-center gap-1">
@@ -845,7 +847,7 @@ export default function HomePage() {
                 data-testid="button-cta-final"
               >
                 <Sparkles className="w-4 h-4 mr-2" />
-                {user ? "Run a Visa Check" : "Start Basic Check ₹0"}
+                {user ? "Run a Visa Check" : `Start Basic Check ${basicCheckPrice}`}
               </Button>
             </div>
           </div>

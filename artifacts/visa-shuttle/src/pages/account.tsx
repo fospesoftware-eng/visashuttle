@@ -221,6 +221,7 @@ export default function AccountPage() {
   const checksLeftLabel = Number.isFinite(checksRemaining) ? checksRemaining : "Unlimited";
   const planLabel = user.subscriptionPlan === "pro" ? "Deep Check" : user.subscriptionPlan.charAt(0).toUpperCase() + user.subscriptionPlan.slice(1);
   const deepCheckPrice = formatB2cPrice(getStoredB2cCurrency());
+  const basicCheckPrice = formatB2cPrice(getStoredB2cCurrency(), 0);
 
   const notifications = [
     !canCheck && { type: "warn", msg: `You've used your Basic Check. Get Deep Check for ${deepCheckPrice}.` },
@@ -287,7 +288,7 @@ export default function AccountPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-slate-800 text-sm">Basic Check</p>
-                    <p className="text-xs text-slate-500">₹0 AI approval analysis</p>
+                    <p className="text-xs text-slate-500">{basicCheckPrice} AI approval analysis</p>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-blue-500 transition-colors" />
                 </CardContent>
@@ -350,7 +351,7 @@ export default function AccountPage() {
                 <CardContent className="py-10 text-center">
                   <Brain className="w-10 h-10 text-slate-300 mx-auto mb-3" />
                   <p className="font-medium text-slate-600 mb-1">No checks yet</p>
-                  <p className="text-sm text-slate-400 mb-4">Your Basic Check is ₹0 — no card needed</p>
+                  <p className="text-sm text-slate-400 mb-4">Your Basic Check is {basicCheckPrice} — no card needed</p>
                   <Link href="/check">
                     <Button size="sm" className="border-0 text-white hover:opacity-90" style={{background:"linear-gradient(135deg,#4055FF,#FF2060)"}} data-testid="button-first-check">
                       <PlaneTakeoff className="w-3.5 h-3.5 mr-1.5" />
@@ -487,7 +488,7 @@ export default function AccountPage() {
                         <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
                           <PlaneTakeoff className="w-3.5 h-3.5 text-blue-600" />
                         </div>
-                        <span className="text-xs text-slate-600 group-hover:text-slate-900">Run your Basic Check at ₹0</span>
+                        <span className="text-xs text-slate-600 group-hover:text-slate-900">Run your Basic Check at {basicCheckPrice}</span>
                         <ChevronRight className="w-3 h-3 text-slate-300 ml-auto" />
                       </div>
                     </Link>

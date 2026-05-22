@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
+import { formatB2cPrice, getStoredB2cCurrency } from "@/lib/b2c-pricing";
 
 export function SiteHeader() {
   const { user } = useB2cAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const basicCheckPrice = formatB2cPrice(getStoredB2cCurrency(), 0);
 
   const closeMobileMenu = () => setMobileMenuOpen(false);
 
@@ -54,7 +56,7 @@ export function SiteHeader() {
               </Link>
               <Link href="/join" className="hidden md:inline-flex">
                 <Button size="sm" className="border-0 text-white hover:opacity-90" style={{ background: "linear-gradient(135deg,#4055FF,#FF2060)" }} data-testid="button-join">
-                  Start Basic Check ₹0
+                  Start Basic Check {basicCheckPrice}
                 </Button>
               </Link>
             </>
@@ -114,7 +116,7 @@ export function SiteHeader() {
                   </Link>
                   <Link href="/join" onClick={closeMobileMenu}>
                     <Button className="w-full border-0 text-white hover:opacity-90" style={{ background: "linear-gradient(135deg,#4055FF,#FF2060)" }} data-testid="button-mobile-join">
-                      Start Basic Check ₹0
+                      Start Basic Check {basicCheckPrice}
                     </Button>
                   </Link>
                 </>
