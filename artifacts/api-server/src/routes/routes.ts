@@ -507,13 +507,47 @@ const B2C_DEEP_CHECK_PRICES: Record<string, number> = {
   INR: 1000,
   AED: 55,
 };
+const B2C_SUPPORTED_CURRENCIES = ["USD", "GBP", "EUR", "INR", "AED"] as const;
 
 function getB2cDeepCheckPrice(currencyInput: unknown) {
-  const currency = String(currencyInput || "INR").trim().toUpperCase();
+  const currency = String(currencyInput || "USD").trim().toUpperCase();
   if (!Object.prototype.hasOwnProperty.call(B2C_DEEP_CHECK_PRICES, currency)) {
-    return { currency: "INR", amount: B2C_DEEP_CHECK_PRICES.INR };
+    return { currency: "USD", amount: B2C_DEEP_CHECK_PRICES.USD };
   }
   return { currency, amount: B2C_DEEP_CHECK_PRICES[currency] };
+}
+
+function sanitizeB2cPlan(plan: any) {
+  return {
+    id: plan.id,
+    planKey: plan.planKey,
+    name: plan.name,
+    description: plan.description || "",
+    billingType: plan.billingType || "free",
+    prices: plan.prices && typeof plan.prices === "object" ? plan.prices : {},
+    features: Array.isArray(plan.features) ? plan.features : [],
+    conditions: plan.conditions && typeof plan.conditions === "object" ? plan.conditions : {},
+    basicCheckLimit: plan.basicCheckLimit || 0,
+    deepCheckLimit: plan.deepCheckLimit || 0,
+    visaToolsCredits: plan.visaToolsCredits || 0,
+    sortOrder: plan.sortOrder || 0,
+    active: plan.active !== false,
+    createdAt: plan.createdAt,
+    updatedAt: plan.updatedAt,
+  };
+}
+
+async function getB2cPlanPrice(planKeyInput: unknown, currencyInput: unknown) {
+  const planKey = String(planKeyInput || "deep").trim().toLowerCase();
+  const currency = B2C_SUPPORTED_CURRENCIES.includes(String(currencyInput || "").toUpperCase() as any)
+    ? String(currencyInput).trim().toUpperCase()
+    : "USD";
+  const plan = await storage.getB2cPlan(planKey);
+  if (!plan || plan.active === false) return null;
+  const prices = plan.prices && typeof plan.prices === "object" ? plan.prices as Record<string, unknown> : {};
+  const fallback = planKey === "deep" ? getB2cDeepCheckPrice(currency).amount : 0;
+  const amount = Math.max(0, Number(prices[currency] ?? fallback) || 0);
+  return { plan: sanitizeB2cPlan(plan), planKey, currency, amount };
 }
 
 function normalizeCouponCode(code: unknown): string {
@@ -5043,6 +5077,43 @@ export async function registerRoutes(
     expiresAt: z.string().trim().optional().nullable(),
   });
 
+  app.get("/api/public/b2c-plans", async (_req, res) => {
+    const plans = await storage.getB2cPlans();
+    res.json(plans.filter(plan => plan.active !== false).map(sanitizeB2cPlan));
+  });
+
+  app.get("/api/admin/b2c-plans", requireAdminAuth, async (_req, res) => {
+    const plans = await storage.getB2cPlans();
+    res.json(plans.map(sanitizeB2cPlan));
+  });
+
+  const b2cPlanBodySchema = z.object({
+    name: z.string().trim().min(1).max(80).optional(),
+    description: z.string().trim().max(240).optional().nullable(),
+    billingType: z.enum(["free", "one_time", "monthly"]).optional(),
+    prices: z.record(z.string(), z.coerce.number().min(0)).optional(),
+    features: z.array(z.string().trim().min(1).max(180)).optional(),
+    conditions: z.record(z.string(), z.any()).optional(),
+    basicCheckLimit: z.coerce.number().int().min(0).max(999999).optional(),
+    deepCheckLimit: z.coerce.number().int().min(0).max(999999).optional(),
+    visaToolsCredits: z.coerce.number().int().min(0).max(999999).optional(),
+    sortOrder: z.coerce.number().int().min(0).max(100).optional(),
+    active: z.boolean().optional(),
+  });
+
+  app.patch("/api/admin/b2c-plans/:planKey", requireAdminAuth, async (req, res) => {
+    try {
+      const planKey = String(req.params.planKey || "").trim().toLowerCase();
+      if (!["free", "deep", "pro"].includes(planKey)) return res.status(400).json({ error: "Unsupported B2C plan key" });
+      const parsed = b2cPlanBodySchema.parse(req.body);
+      const updated = await storage.upsertB2cPlan(planKey, parsed as any);
+      res.json(sanitizeB2cPlan(updated));
+    } catch (error: any) {
+      const message = error?.issues?.[0]?.message || error?.message || "Failed to update B2C plan";
+      res.status(400).json({ error: message });
+    }
+  });
+
   app.get("/api/admin/b2c-coupons", requireAdminAuth, async (_req, res) => {
     res.json(await storage.getB2cCoupons());
   });
@@ -5437,7 +5508,8 @@ export async function registerRoutes(
 
   // ── B2C Payments: Deep Check via Cashfree ────────────────────────────────
   app.post("/api/b2c/payments/deep-check/coupon", requireB2cAuth, async (req, res) => {
-    const price = getB2cDeepCheckPrice(req.body?.currency);
+    const price = await getB2cPlanPrice(req.body?.planKey || "deep", req.body?.currency);
+    if (!price || price.amount <= 0) return res.status(400).json({ error: "Selected B2C plan is not available for checkout." });
     const { code, coupon, error } = await getValidB2cCoupon(req.body?.couponCode);
     if (!code) return res.status(400).json({ error: "Enter a coupon code." });
     if (error || !coupon) return res.status(404).json({ error: error || "Coupon code is invalid." });
@@ -5447,6 +5519,7 @@ export async function registerRoutes(
       description: coupon.description || "",
       currency: price.currency,
       originalAmount: price.amount,
+      planKey: price.planKey,
       ...discounted,
     });
   });
@@ -5455,7 +5528,8 @@ export async function registerRoutes(
     const user = await storage.getB2cUser(req.session.b2cUserId!);
     if (!user) return res.status(401).json({ error: "User not found" });
 
-    if (user.deepCheckAccess) {
+    const requestedPlanKey = String(req.body?.planKey || "deep").trim().toLowerCase();
+    if (requestedPlanKey === "deep" && user.deepCheckAccess) {
       return res.json({ alreadyActive: true, redirectUrl: "/deep-check" });
     }
 
@@ -5471,19 +5545,23 @@ export async function registerRoutes(
       return res.status(400).json({ error: modeError });
     }
 
-    const price = getB2cDeepCheckPrice(req.body?.currency);
+    const price = await getB2cPlanPrice(requestedPlanKey, req.body?.currency);
+    if (!price || price.amount <= 0) {
+      return res.status(400).json({ error: "Selected B2C plan is not available for checkout." });
+    }
     const couponCheck = await getValidB2cCoupon(req.body?.couponCode);
     if (couponCheck.error) return res.status(400).json({ error: couponCheck.error });
     const discount = couponCheck.coupon ? applyCouponDiscount(price.amount, couponCheck.coupon.discountPercent) : null;
     const checkoutAmount = discount?.finalAmount ?? price.amount;
-    const orderId = `VS_DEEP_${price.currency}_${Date.now()}_${randomUUID().slice(0, 8)}`;
+    const orderPlanCode = price.planKey === "pro" ? "PRO" : "DEEP";
+    const orderId = `VS_${orderPlanCode}_${price.currency}_${Date.now()}_${randomUUID().slice(0, 8)}`;
     const requestId = randomUUID();
     const origin = getRequestOrigin(req);
     const payload = {
       order_id: orderId,
       order_amount: checkoutAmount,
       order_currency: price.currency,
-      order_note: "Visa Shuttle Deep Check",
+      order_note: `Visa Shuttle ${price.plan.name}`,
       customer_details: {
         customer_id: user.id.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 45),
         customer_email: user.email,
@@ -5494,7 +5572,8 @@ export async function registerRoutes(
         return_url: `${origin}/payment/deep-check/return?order_id=${orderId}`,
       },
       order_tags: {
-        product: "deep_check",
+        product: price.planKey === "pro" ? "b2c_pro" : "deep_check",
+        plan_key: price.planKey,
         user_id: user.id,
         currency: price.currency,
         coupon_code: couponCheck.coupon?.code || "",
@@ -5503,7 +5582,7 @@ export async function registerRoutes(
       },
     };
 
-    let response: Response;
+    let response: globalThis.Response;
     try {
       response = await fetch(`${cashfree.baseUrl}/orders`, {
         method: "POST",
@@ -5551,6 +5630,7 @@ export async function registerRoutes(
       amount: checkoutAmount,
       currency: price.currency,
       originalAmount: price.amount,
+      planKey: price.planKey,
       couponCode: couponCheck.coupon?.code || "",
       discountPercent: discount?.discountPercent || 0,
       discountAmount: discount?.discountAmount || 0,
@@ -5562,7 +5642,7 @@ export async function registerRoutes(
     if (!user) return res.status(401).json({ error: "User not found" });
 
     const orderId = req.params.orderId;
-    if (!/^VS_DEEP_[a-zA-Z0-9_-]+$/.test(orderId)) {
+    if (!/^VS_(DEEP|PRO)_[a-zA-Z0-9_-]+$/.test(orderId)) {
       return res.status(400).json({ error: "Invalid order id" });
     }
 
@@ -5572,7 +5652,7 @@ export async function registerRoutes(
       return res.status(503).json({ error: "Cashfree credentials are not configured" });
     }
 
-    let response: Response;
+    let response: globalThis.Response;
     try {
       response = await fetch(`${cashfree.baseUrl}/orders/${encodeURIComponent(orderId)}`, {
         headers: {
@@ -5599,11 +5679,18 @@ export async function registerRoutes(
     }
 
     const isPaid = data.order_status === "PAID";
+    const isProOrder = orderId.startsWith("VS_PRO_") || data?.order_tags?.plan_key === "pro";
     if (isPaid && !user.deepCheckAccess) {
+      await storage.updateB2cUser(user.id, {
+        subscriptionPlan: isProOrder ? "pro" : "deep",
+        deepCheckAccess: true,
+        checkLimit: isProOrder ? 9999 : Math.max(user.checkLimit || 1, 1),
+      });
+    } else if (isPaid && isProOrder && user.subscriptionPlan !== "pro") {
       await storage.updateB2cUser(user.id, {
         subscriptionPlan: "pro",
         deepCheckAccess: true,
-        checkLimit: Math.max(user.checkLimit || 1, 1),
+        checkLimit: 9999,
       });
     }
 

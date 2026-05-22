@@ -28,7 +28,7 @@ export default function SettingsPage() {
     toast({ title: "Settings saved", description: "Your preferences have been updated." });
   }
 
-  const planLabel = user.subscriptionPlan === "pro" ? "Deep Check" : user.subscriptionPlan === "starter" ? "Starter" : "Basic";
+  const planLabel = user.subscriptionPlan === "pro" ? "Pro" : user.subscriptionPlan === "deep" ? "Deep Check" : user.subscriptionPlan === "starter" ? "Starter" : "Free";
   const deepCheckPrice = formatB2cPrice(getStoredB2cCurrency());
 
   return (

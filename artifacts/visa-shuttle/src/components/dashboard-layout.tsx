@@ -30,7 +30,7 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
   const [location] = useLocation();
   const { user, logout, checksRemaining, canCheck, isDemo } = useB2cAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const planLabel = user?.subscriptionPlan === "pro" ? "Deep Check" : user?.subscriptionPlan || "free";
+  const planLabel = user?.subscriptionPlan === "pro" ? "Pro" : user?.subscriptionPlan === "deep" ? "Deep Check" : user?.subscriptionPlan || "free";
   const deepCheckPrice = formatB2cPrice(getStoredB2cCurrency());
 
   useEffect(() => { setSidebarOpen(false); }, [location]);
@@ -58,6 +58,7 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
             <span className={`text-xs px-2 py-0.5 rounded-full font-semibold capitalize ${
               isDemo ? "bg-amber-100 text-amber-700" :
               user.subscriptionPlan === "pro" ? "bg-purple-100 text-purple-700" :
+              user.subscriptionPlan === "deep" ? "bg-blue-100 text-blue-700" :
               user.subscriptionPlan === "starter" ? "bg-[#4055FF]/10 text-[#4055FF]" :
               "bg-slate-100 text-slate-600"
             }`}>{isDemo ? "Demo" : planLabel}</span>

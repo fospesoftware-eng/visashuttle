@@ -219,7 +219,7 @@ export default function AccountPage() {
   const profComp = profileCompletion(profile ?? null);
   const lastCheck = checks[0];
   const checksLeftLabel = Number.isFinite(checksRemaining) ? checksRemaining : "Unlimited";
-  const planLabel = user.subscriptionPlan === "pro" ? "Deep Check" : user.subscriptionPlan.charAt(0).toUpperCase() + user.subscriptionPlan.slice(1);
+  const planLabel = user.subscriptionPlan === "pro" ? "Pro" : user.subscriptionPlan === "deep" ? "Deep Check" : user.subscriptionPlan.charAt(0).toUpperCase() + user.subscriptionPlan.slice(1);
   const deepCheckPrice = formatB2cPrice(getStoredB2cCurrency());
   const basicCheckPrice = formatB2cPrice(getStoredB2cCurrency(), 0);
 

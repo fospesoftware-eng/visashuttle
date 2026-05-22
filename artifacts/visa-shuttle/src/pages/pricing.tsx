@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { useState } from "react";
-import { CheckCircle, Sparkles, Crown, ArrowRight, Info } from "lucide-react";
+import { CheckCircle, Sparkles, Crown, ArrowRight, Info, Zap } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,79 +9,39 @@ import { useB2cAuth } from "@/hooks/use-b2c-auth";
 import {
   B2C_CURRENCIES,
   B2C_CURRENCY_FLAGS,
-  B2C_DEEP_CHECK_PRICES,
   type B2cCurrency,
+  type B2cPlan,
   formatB2cPrice,
+  formatB2cPlanPrice,
   getStoredB2cCurrency,
+  normalizeB2cPlans,
   storeB2cCurrency,
 } from "@/lib/b2c-pricing";
 
-const plans = [
-  {
-    name: "Basic Check",
-    key: "free",
-    icon: Sparkles,
-    price: "",
-    originalPrice: null,
-    period: "",
-    description: "Basic Check for a quick AI visa score",
-    badge: null,
-    color: "text-slate-600",
-    bg: "bg-slate-100 dark:bg-slate-800/40",
-    border: "border",
-    features: [
-      "1 Basic Check",
-      "Approval chance percentage",
-      "Status label (High / Good / Moderate / Low)",
-      "Strengths & risk factors",
-      "Basic next steps",
-    ],
-    limitations: ["No check history", "No Deep Check", "No PDF report"],
-    cta: "Start Basic Check",
-    ctaVariant: "outline" as const,
-    href: "/join",
-  },
-  {
-    name: "Deep Check",
-    key: "pro",
-    icon: Crown,
-    price: "",
-    originalPrice: null,
-    period: "/check",
-    description: "Embassy-style deep analysis for serious applicants",
-    badge: null,
-    color: "text-purple-600",
-    bg: "bg-purple-100 dark:bg-purple-900/30",
-    border: "border-purple-300 dark:border-purple-700",
-    features: [
-      "Full embassy-style risk analysis",
-      "Deep Check with 7 profile dimensions",
-      "Individual & Family applicant support",
-      "Document gap analysis & action plan",
-      "Red flag identification",
-      "Personalized improvement plan",
-      "PDF report download",
-      "Check history & dashboard",
-      "Priority support",
-    ],
-    limitations: [],
-    cta: "Get Deep Check",
-    ctaVariant: "default" as const,
-    href: "/join",
-  },
-];
+const planVisuals: Record<string, any> = {
+  free: { icon: Sparkles, color: "text-slate-600", bg: "bg-slate-100 dark:bg-slate-800/40", border: "border", ctaVariant: "outline" as const },
+  deep: { icon: Crown, color: "text-purple-600", bg: "bg-purple-100 dark:bg-purple-900/30", border: "border-purple-300 dark:border-purple-700", ctaVariant: "default" as const },
+  pro: { icon: Zap, color: "text-blue-600", bg: "bg-blue-100 dark:bg-blue-900/30", border: "border-blue-300 dark:border-blue-700", ctaVariant: "default" as const },
+};
 
 export default function PricingPage() {
   const { user } = useB2cAuth();
   const [currency, setCurrency] = useState<B2cCurrency>(() => getStoredB2cCurrency());
-  const deepPrice = formatB2cPrice(currency);
   const basicPrice = formatB2cPrice(currency, 0);
-  const deepCheckPath = `/payment/deep-check?currency=${currency}`;
-  const deepCheckHref = user ? deepCheckPath : `/sign-in?next=${encodeURIComponent(deepCheckPath)}`;
+  const { data: planData } = useQuery<B2cPlan[]>({ queryKey: ["/api/public/b2c-plans"] });
+  const plans = normalizeB2cPlans(planData);
+  const deepPlan = plans.find(plan => plan.planKey === "deep");
+  const deepPrice = deepPlan ? formatB2cPlanPrice(deepPlan, currency) : formatB2cPrice(currency);
 
   function handleCurrencyChange(next: B2cCurrency) {
     setCurrency(next);
     storeB2cCurrency(next);
+  }
+
+  function getPlanHref(plan: B2cPlan) {
+    if (plan.planKey === "free") return user ? "/account" : "/join";
+    const path = `/payment/deep-check?plan=${plan.planKey}&currency=${currency}`;
+    return user ? path : `/sign-in?next=${encodeURIComponent(path)}`;
   }
 
   return (
@@ -118,29 +79,40 @@ export default function PricingPage() {
             </div>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid lg:grid-cols-3 gap-6">
             {plans.map((plan) => {
-              const Icon = plan.icon;
-              const isCurrentPlan = user?.subscriptionPlan === plan.key;
+              const visual = planVisuals[plan.planKey] || planVisuals.free;
+              const Icon = visual.icon;
+              const isCurrentPlan = user?.subscriptionPlan === plan.planKey || (plan.planKey === "free" && user?.subscriptionPlan === "free");
+              const planPrice = formatB2cPlanPrice(plan, currency);
+              const period = plan.billingType === "monthly" ? "/month" : plan.billingType === "one_time" ? "/check" : "";
               return (
                 <Card
                   key={plan.name}
-                  className={`relative ${plan.border} ${plan.badge ? "shadow-xl shadow-purple-500/10" : "shadow"}`}
-                  data-testid={`card-plan-${plan.key}`}
+                  className={`relative ${visual.border} ${plan.planKey === "deep" ? "shadow-xl shadow-purple-500/10" : "shadow"}`}
+                  data-testid={`card-plan-${plan.planKey}`}
                 >
+                  {plan.planKey === "deep" && (
+                    <Badge className="absolute right-5 top-5 bg-purple-100 text-purple-700 border-0">Popular</Badge>
+                  )}
                   <CardContent className="p-6 md:p-7">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${plan.bg}`}>
-                      <Icon className={`w-6 h-6 ${plan.color}`} />
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${visual.bg}`}>
+                      <Icon className={`w-6 h-6 ${visual.color}`} />
                     </div>
                     <h3 className="text-xl font-bold mb-1">{plan.name}</h3>
                     <p className="text-muted-foreground text-sm mb-4">{plan.description}</p>
                     <div className="mb-6 flex items-end gap-2">
-                      <span className="text-4xl font-black">{plan.key === "pro" ? deepPrice : basicPrice}</span>
-                      {plan.period && <span className="text-muted-foreground text-sm mb-1">{plan.period}</span>}
+                      <span className="text-4xl font-black">{plan.planKey === "free" ? basicPrice : planPrice}</span>
+                      {period && <span className="text-muted-foreground text-sm mb-1">{period}</span>}
                     </div>
-                    {plan.key === "pro" && (
+                    {plan.planKey === "pro" && (
+                      <div className="mb-5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold">
+                        10 Deep Checks + unlimited Basic checks
+                      </div>
+                    )}
+                    {plan.planKey === "deep" && (
                       <div className="mb-5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 border border-purple-200 text-purple-700 text-xs font-semibold">
-                        Fixed price in {currency}: {formatB2cPrice(currency, B2C_DEEP_CHECK_PRICES[currency].amount)}
+                        One-time report purchase
                       </div>
                     )}
 
@@ -151,26 +123,21 @@ export default function PricingPage() {
                           <span>{f}</span>
                         </div>
                       ))}
-                      {plan.limitations.map(f => (
-                        <div key={f} className="flex items-start gap-2.5 text-sm text-muted-foreground">
-                          <span className="w-4 h-4 flex-shrink-0 mt-0.5 text-center text-muted-foreground/50 font-bold">—</span>
-                          <span>{f}</span>
-                        </div>
-                      ))}
                     </div>
+                    {plan.conditions?.note && <p className="mb-5 text-xs leading-5 text-muted-foreground">{plan.conditions.note}</p>}
 
                     {isCurrentPlan ? (
                       <Button className="w-full" variant="outline" disabled>
                         Current Plan
                       </Button>
                     ) : (
-                      <Link href={plan.key === "pro" ? deepCheckHref : user ? "/account" : plan.href}>
+                      <Link href={getPlanHref(plan)}>
                         <Button
-                          className={`w-full ${plan.badge ? "bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 border-0 text-white" : ""}`}
-                          variant={plan.ctaVariant}
-                          data-testid={`button-plan-${plan.key}`}
+                          className={`w-full ${plan.planKey !== "free" ? "bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 border-0 text-white" : ""}`}
+                          variant={visual.ctaVariant}
+                          data-testid={`button-plan-${plan.planKey}`}
                         >
-                          {plan.cta}
+                          {plan.conditions?.cta || (plan.planKey === "free" ? "Start Free" : "Get Plan")}
                           <ArrowRight className="w-4 h-4 ml-2" />
                         </Button>
                       </Link>
@@ -199,7 +166,8 @@ export default function PricingPage() {
               { q: "Is the Basic Check really free?", a: `Yes — every new account gets 1 Basic Check at ${basicPrice}. No credit card required.` },
               { q: "How accurate is the AI scoring?", a: "Our AI analyzes 14 key factors used by immigration authorities and provides a probability estimate. It's a guidance tool, not a legal guarantee." },
               { q: "What is the Deep Check?", a: "Deep Check asks detailed questions across 7 dimensions (personal profile, finances, travel history, home ties, and more) and returns an embassy-style risk analysis with an action plan. It also supports Family applications (spouse + children)." },
-              { q: "How much does Deep Check cost?", a: "Deep Check is a one-time report purchase. Choose your currency before checkout: USD 15, GBP 11, EUR 12, INR 1000, or AED 55." },
+              { q: "How much does Deep Check cost?", a: `Deep Check is a one-time report purchase. Current ${currency} price: ${deepPrice}.` },
+              { q: "What is included in Pro?", a: "Pro is a monthly plan with unlimited Basic checks, 10 Deep Checks, and 1000 Visa Tools Credit." },
               { q: "Can I check for my family?", a: "Yes. The Deep Check supports Family applicants, covering the primary applicant, spouse, and children traveling together in a single assessment." },
             ].map(({ q, a }) => (
               <div key={q} className="p-5 rounded-xl bg-background border">

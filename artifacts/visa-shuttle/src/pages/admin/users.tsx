@@ -42,6 +42,7 @@ const ROLE_COLORS: Record<string, string> = {
 const PLAN_COLORS: Record<string, string> = {
   free: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
   starter: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+  deep: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
   pro: "bg-primary/10 text-primary",
 };
 
@@ -486,7 +487,7 @@ export default function AdminUsersPage() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="free">Free</SelectItem>
-                    <SelectItem value="starter">Starter</SelectItem>
+                    <SelectItem value="deep">Deep Check</SelectItem>
                     <SelectItem value="pro">Pro</SelectItem>
                   </SelectContent>
                 </Select>

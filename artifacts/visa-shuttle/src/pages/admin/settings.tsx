@@ -598,6 +598,174 @@ interface B2cCouponResponse {
   createdAt: string;
 }
 
+interface B2cPlanResponse {
+  id: string;
+  planKey: "free" | "deep" | "pro";
+  name: string;
+  description: string;
+  billingType: "free" | "one_time" | "monthly";
+  prices: Record<string, number>;
+  features: string[];
+  conditions: Record<string, any>;
+  basicCheckLimit: number;
+  deepCheckLimit: number;
+  visaToolsCredits: number;
+  sortOrder: number;
+  active: boolean;
+  updatedAt?: string | null;
+}
+
+const B2C_PLAN_CURRENCIES = ["USD", "INR", "AED", "GBP", "EUR"];
+
+// ── B2C Plans Card ─────────────────────────────────────────────────────────
+function B2cPlansCard() {
+  const { toast } = useToast();
+  const { data = [], isLoading } = useQuery<B2cPlanResponse[]>({
+    queryKey: ["/api/admin/b2c-plans"],
+  });
+  const [selectedKey, setSelectedKey] = useState<"free" | "deep" | "pro">("free");
+  const selected = data.find(plan => plan.planKey === selectedKey) || data[0];
+  const [form, setForm] = useState<B2cPlanResponse | null>(null);
+
+  useEffect(() => {
+    if (selected) setForm({ ...selected, prices: { ...selected.prices }, features: [...selected.features], conditions: { ...selected.conditions } });
+  }, [selected?.planKey, selected?.updatedAt, selected?.id]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!form) throw new Error("Select a plan first");
+      return apiRequest("PATCH", `/api/admin/b2c-plans/${form.planKey}`, {
+        name: form.name,
+        description: form.description,
+        billingType: form.billingType,
+        prices: form.prices,
+        features: form.features.filter(Boolean),
+        conditions: form.conditions,
+        basicCheckLimit: Number(form.basicCheckLimit),
+        deepCheckLimit: Number(form.deepCheckLimit),
+        visaToolsCredits: Number(form.visaToolsCredits),
+        sortOrder: Number(form.sortOrder),
+        active: !!form.active,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/b2c-plans"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/public/b2c-plans"] });
+      toast({ title: "B2C plan saved", description: "Pricing and plan conditions have been updated." });
+    },
+    onError: (err: any) => toast({ title: "Save failed", description: err.message, variant: "destructive" }),
+  });
+
+  if (isLoading) {
+    return <Card><CardContent className="p-6 text-sm text-muted-foreground">Loading B2C plans...</CardContent></Card>;
+  }
+
+  if (!form) {
+    return <Card><CardContent className="p-6 text-sm text-muted-foreground">No B2C plans found.</CardContent></Card>;
+  }
+
+  const featureText = form.features.join("\n");
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle className="text-base flex items-center gap-2"><CreditCard className="w-4 h-4" />B2C User Plans</CardTitle>
+            <CardDescription>Edit Free, Deep Check, and Pro plan pricing, credits, limits, and visible features.</CardDescription>
+          </div>
+          <div className="flex rounded-xl border bg-muted/30 p-1">
+            {data.map(plan => (
+              <button
+                key={plan.planKey}
+                type="button"
+                onClick={() => setSelectedKey(plan.planKey)}
+                className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${selectedKey === plan.planKey ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                {plan.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label>Plan Name</Label>
+            <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Billing Type</Label>
+            <Select value={form.billingType} onValueChange={(billingType: any) => setForm({ ...form, billingType })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="free">Free</SelectItem>
+                <SelectItem value="one_time">One-time</SelectItem>
+                <SelectItem value="monthly">Monthly</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <Label>Description</Label>
+          <Input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-5">
+          {B2C_PLAN_CURRENCIES.map(code => (
+            <div key={code} className="space-y-1.5">
+              <Label>{code}</Label>
+              <Input
+                type="number"
+                min={0}
+                value={form.prices?.[code] ?? 0}
+                onChange={e => setForm({ ...form, prices: { ...form.prices, [code]: Number(e.target.value) } })}
+              />
+            </div>
+          ))}
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="space-y-1.5">
+            <Label>Basic Check Limit</Label>
+            <Input type="number" min={0} value={form.basicCheckLimit} onChange={e => setForm({ ...form, basicCheckLimit: Number(e.target.value) })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Deep Check Limit</Label>
+            <Input type="number" min={0} value={form.deepCheckLimit} onChange={e => setForm({ ...form, deepCheckLimit: Number(e.target.value) })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Visa Tools Credit</Label>
+            <Input type="number" min={0} value={form.visaToolsCredits} onChange={e => setForm({ ...form, visaToolsCredits: Number(e.target.value) })} />
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <Label>Features</Label>
+          <Textarea
+            rows={8}
+            value={featureText}
+            onChange={e => setForm({ ...form, features: e.target.value.split("\n").map(line => line.trim()).filter(Boolean) })}
+            placeholder="One feature per line"
+          />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+          <div className="space-y-1.5">
+            <Label>CTA Text</Label>
+            <Input value={form.conditions?.cta || ""} onChange={e => setForm({ ...form, conditions: { ...form.conditions, cta: e.target.value } })} />
+          </div>
+          <div className="flex items-center gap-2 rounded-lg border px-3 py-2.5">
+            <Switch checked={form.active} onCheckedChange={active => setForm({ ...form, active })} />
+            <span className="text-sm">Active</span>
+          </div>
+        </div>
+        <div className="flex justify-end">
+          <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="gap-2">
+            <Save className="w-4 h-4" /> Save B2C Plan
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ── B2C Coupons Card ───────────────────────────────────────────────────────
 function B2cCouponsCard() {
   const { toast } = useToast();
@@ -1833,6 +2001,7 @@ export default function AdminSettingsPage() {
           {/* ── Integrations Tab ──────────────────────────────────────────── */}
           <TabsContent value="integrations" className="space-y-4">
             <PaymentGatewayCard />
+            <B2cPlansCard />
             <B2cCouponsCard />
             <TransactionalEmailCard />
             <SmsGatewayCard />

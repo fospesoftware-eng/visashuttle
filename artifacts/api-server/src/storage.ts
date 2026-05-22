@@ -25,6 +25,7 @@ import {
   type EmailTemplate, type InsertEmailTemplate,
   type PaymentGatewayConfig, type InsertPaymentGatewayConfig,
   type B2cCoupon, type InsertB2cCoupon,
+  type B2cPlan, type InsertB2cPlan,
   type TenantPaymentGatewayConfig, type InsertTenantPaymentGatewayConfig,
   type TenantSmsConfig, type InsertTenantSmsConfig,
   type FeeTemplate, type InsertFeeTemplate,
@@ -52,6 +53,7 @@ import {
   emailTemplates as emailTemplatesTable,
   paymentGatewayConfig as paymentGatewayConfigTable,
   b2cCoupons as b2cCouponsTable,
+  b2cPlans as b2cPlansTable,
   tenantPaymentGatewayConfig as tenantPaymentGatewayConfigTable,
   tenantSmsConfig as tenantSmsConfigTable,
   feeTemplates as feeTemplatesTable,
@@ -105,6 +107,77 @@ function isMissingColumnError(error: unknown): boolean {
 function shouldUseMemoryFallback(error: unknown): boolean {
   return process.env.NODE_ENV !== "production" && isMissingRelationError(error);
 }
+
+export const DEFAULT_B2C_PLANS: InsertB2cPlan[] = [
+  {
+    planKey: "free",
+    name: "Free",
+    description: "Start with a quick AI visa score and essential guidance.",
+    billingType: "free",
+    prices: { USD: 0, INR: 0, AED: 0, GBP: 0, EUR: 0 },
+    features: [
+      "1 Basic Check",
+      "Approval chance percentage",
+      "Status label (High / Good / Moderate / Low)",
+      "Strengths & risk factors",
+      "Basic next steps",
+      "100 Visa Tools Credit",
+    ],
+    conditions: { cta: "Start Free", checkout: false },
+    basicCheckLimit: 1,
+    deepCheckLimit: 0,
+    visaToolsCredits: 100,
+    sortOrder: 1,
+    active: true,
+  } as InsertB2cPlan,
+  {
+    planKey: "deep",
+    name: "Deep Check",
+    description: "One detailed embassy-style AI risk analysis for serious applicants.",
+    billingType: "one_time",
+    prices: { USD: 15, INR: 1000, AED: 55, GBP: 11, EUR: 12 },
+    features: [
+      "Full embassy-style risk analysis",
+      "Deep Check with 7 profile dimensions",
+      "Individual & Family applicant support",
+      "Document gap analysis & action plan",
+      "Red flag identification",
+      "Personalized improvement plan",
+      "PDF report download",
+      "Check history & dashboard",
+      "Priority support",
+      "500 Visa Tools Credit",
+    ],
+    conditions: { cta: "Get Deep Check", checkout: true },
+    basicCheckLimit: 1,
+    deepCheckLimit: 1,
+    visaToolsCredits: 500,
+    sortOrder: 2,
+    active: true,
+  } as InsertB2cPlan,
+  {
+    planKey: "pro",
+    name: "Pro",
+    description: "Monthly plan for frequent applicants and family/travel planning.",
+    billingType: "monthly",
+    prices: { USD: 35, INR: 3000, AED: 125, GBP: 26, EUR: 30 },
+    features: [
+      "Unlimited Basic checks*",
+      "10 Deep Checks",
+      "1000 Visa Tools Credit",
+    ],
+    conditions: {
+      cta: "Upgrade to Pro",
+      checkout: true,
+      note: "*Unlimited Basic checks are subject to fair usage and abuse prevention.",
+    },
+    basicCheckLimit: 9999,
+    deepCheckLimit: 10,
+    visaToolsCredits: 1000,
+    sortOrder: 3,
+    active: true,
+  } as InsertB2cPlan,
+];
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -268,6 +341,9 @@ export interface IStorage {
   createB2cCoupon(data: InsertB2cCoupon): Promise<B2cCoupon>;
   updateB2cCoupon(id: string, data: Partial<InsertB2cCoupon>): Promise<B2cCoupon | undefined>;
   deleteB2cCoupon(id: string): Promise<boolean>;
+  getB2cPlans(): Promise<B2cPlan[]>;
+  getB2cPlan(planKey: string): Promise<B2cPlan | undefined>;
+  upsertB2cPlan(planKey: string, data: Partial<InsertB2cPlan>): Promise<B2cPlan>;
 
   // Per-tenant Payment Gateway Config (Cashfree)
   getTenantPaymentGatewayConfig(tenantId: string): Promise<TenantPaymentGatewayConfig | undefined>;
@@ -331,6 +407,7 @@ export class MemStorage implements IStorage {
   private emailTemplatesMap: Map<string, EmailTemplate> = new Map();
   private paymentGatewayConfigRecord?: PaymentGatewayConfig;
   private b2cCouponsMap: Map<string, B2cCoupon> = new Map();
+  private b2cPlansMap: Map<string, B2cPlan> = new Map();
   private tenantPaymentGatewayConfigByTenant: Map<string, TenantPaymentGatewayConfig> = new Map();
   private tenantSmsConfigByTenant: Map<string, TenantSmsConfig> = new Map();
   private feeTemplates: Map<string, FeeTemplate> = new Map();
@@ -359,8 +436,33 @@ export class MemStorage implements IStorage {
     this.visaChecksMap = new Map();
     this.visaToolChecksMap = new Map();
     this.savedProfilesMap = new Map();
+    this.seedB2cPlans();
     
     this.seedData();
+  }
+
+  private seedB2cPlans() {
+    for (const plan of DEFAULT_B2C_PLANS) {
+      const now = new Date();
+      const row: B2cPlan = {
+        id: randomUUID(),
+        planKey: plan.planKey,
+        name: plan.name,
+        description: plan.description ?? null,
+        billingType: plan.billingType ?? "free",
+        prices: plan.prices as any,
+        features: plan.features as any,
+        conditions: plan.conditions as any,
+        basicCheckLimit: plan.basicCheckLimit ?? 0,
+        deepCheckLimit: plan.deepCheckLimit ?? 0,
+        visaToolsCredits: plan.visaToolsCredits ?? 0,
+        sortOrder: plan.sortOrder ?? 0,
+        active: plan.active ?? true,
+        createdAt: now,
+        updatedAt: now,
+      };
+      this.b2cPlansMap.set(row.planKey, row);
+    }
   }
 
   private seedData() {
@@ -2165,6 +2267,36 @@ export class MemStorage implements IStorage {
   async deleteB2cCoupon(id: string): Promise<boolean> {
     return this.b2cCouponsMap.delete(id);
   }
+  async getB2cPlans(): Promise<B2cPlan[]> {
+    return Array.from(this.b2cPlansMap.values()).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  }
+  async getB2cPlan(planKey: string): Promise<B2cPlan | undefined> {
+    return this.b2cPlansMap.get(planKey);
+  }
+  async upsertB2cPlan(planKey: string, data: Partial<InsertB2cPlan>): Promise<B2cPlan> {
+    const existing = this.b2cPlansMap.get(planKey);
+    const fallback = DEFAULT_B2C_PLANS.find(p => p.planKey === planKey);
+    const now = new Date();
+    const row: B2cPlan = {
+      id: existing?.id ?? randomUUID(),
+      planKey,
+      name: data.name ?? existing?.name ?? fallback?.name ?? planKey,
+      description: data.description !== undefined ? data.description : existing?.description ?? fallback?.description ?? null,
+      billingType: data.billingType ?? existing?.billingType ?? fallback?.billingType ?? "free",
+      prices: (data.prices !== undefined ? data.prices : existing?.prices ?? fallback?.prices ?? {}) as any,
+      features: (data.features !== undefined ? data.features : existing?.features ?? fallback?.features ?? []) as any,
+      conditions: (data.conditions !== undefined ? data.conditions : existing?.conditions ?? fallback?.conditions ?? {}) as any,
+      basicCheckLimit: data.basicCheckLimit ?? existing?.basicCheckLimit ?? fallback?.basicCheckLimit ?? 0,
+      deepCheckLimit: data.deepCheckLimit ?? existing?.deepCheckLimit ?? fallback?.deepCheckLimit ?? 0,
+      visaToolsCredits: data.visaToolsCredits ?? existing?.visaToolsCredits ?? fallback?.visaToolsCredits ?? 0,
+      sortOrder: data.sortOrder ?? existing?.sortOrder ?? fallback?.sortOrder ?? 0,
+      active: data.active ?? existing?.active ?? fallback?.active ?? true,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    };
+    this.b2cPlansMap.set(planKey, row);
+    return row;
+  }
 }
 
 // HybridStorage: uses PostgreSQL for DB-backed production data. Local
@@ -3523,6 +3655,111 @@ class HybridStorage extends MemStorage {
         return false;
       }
       if (shouldUseMemoryFallback(error)) return super.deleteB2cCoupon(id);
+      throw error;
+    }
+  }
+
+  private async ensureB2cPlanTable(): Promise<void> {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS b2c_plans (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        plan_key text NOT NULL UNIQUE,
+        name text NOT NULL,
+        description text,
+        billing_type text NOT NULL DEFAULT 'free',
+        prices jsonb NOT NULL DEFAULT '{}'::jsonb,
+        features jsonb NOT NULL DEFAULT '[]'::jsonb,
+        conditions jsonb NOT NULL DEFAULT '{}'::jsonb,
+        basic_check_limit integer NOT NULL DEFAULT 0,
+        deep_check_limit integer NOT NULL DEFAULT 0,
+        visa_tools_credits integer NOT NULL DEFAULT 0,
+        sort_order integer NOT NULL DEFAULT 0,
+        active boolean NOT NULL DEFAULT true,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      )
+    `);
+  }
+
+  private async seedDefaultB2cPlans(): Promise<void> {
+    await this.ensureB2cPlanTable();
+    for (const plan of DEFAULT_B2C_PLANS) {
+      await db.execute(sql`
+        INSERT INTO b2c_plans (
+          plan_key, name, description, billing_type, prices, features, conditions,
+          basic_check_limit, deep_check_limit, visa_tools_credits, sort_order, active
+        )
+        VALUES (
+          ${plan.planKey}, ${plan.name}, ${plan.description ?? null}, ${plan.billingType ?? "free"},
+          ${JSON.stringify(plan.prices ?? {})}::jsonb, ${JSON.stringify(plan.features ?? [])}::jsonb,
+          ${JSON.stringify(plan.conditions ?? {})}::jsonb, ${plan.basicCheckLimit ?? 0},
+          ${plan.deepCheckLimit ?? 0}, ${plan.visaToolsCredits ?? 0}, ${plan.sortOrder ?? 0}, ${plan.active ?? true}
+        )
+        ON CONFLICT (plan_key) DO NOTHING
+      `);
+    }
+  }
+
+  async getB2cPlans(): Promise<B2cPlan[]> {
+    try {
+      let rows = await db.select().from(b2cPlansTable).orderBy(asc(b2cPlansTable.sortOrder));
+      if (rows.length === 0) {
+        await this.seedDefaultB2cPlans();
+        rows = await db.select().from(b2cPlansTable).orderBy(asc(b2cPlansTable.sortOrder));
+      }
+      return rows;
+    } catch (error) {
+      if (isMissingRelationError(error)) {
+        await this.seedDefaultB2cPlans();
+        return await db.select().from(b2cPlansTable).orderBy(asc(b2cPlansTable.sortOrder));
+      }
+      if (shouldUseMemoryFallback(error)) return super.getB2cPlans();
+      throw error;
+    }
+  }
+
+  async getB2cPlan(planKey: string): Promise<B2cPlan | undefined> {
+    const key = planKey.trim().toLowerCase();
+    try {
+      const rows = await db.select().from(b2cPlansTable).where(eq(b2cPlansTable.planKey, key)).limit(1);
+      if (rows[0]) return rows[0];
+      await this.seedDefaultB2cPlans();
+      const seeded = await db.select().from(b2cPlansTable).where(eq(b2cPlansTable.planKey, key)).limit(1);
+      return seeded[0];
+    } catch (error) {
+      if (isMissingRelationError(error)) {
+        await this.seedDefaultB2cPlans();
+        const rows = await db.select().from(b2cPlansTable).where(eq(b2cPlansTable.planKey, key)).limit(1);
+        return rows[0];
+      }
+      if (shouldUseMemoryFallback(error)) return super.getB2cPlan(key);
+      throw error;
+    }
+  }
+
+  async upsertB2cPlan(planKey: string, data: Partial<InsertB2cPlan>): Promise<B2cPlan> {
+    const key = planKey.trim().toLowerCase();
+    try {
+      await this.ensureB2cPlanTable();
+      const existing = await this.getB2cPlan(key);
+      const patch = {
+        ...data,
+        planKey: key,
+        updatedAt: new Date(),
+      } as any;
+      if (existing) {
+        const rows = await db.update(b2cPlansTable).set(patch).where(eq(b2cPlansTable.planKey, key)).returning();
+        return rows[0];
+      }
+      const fallback = DEFAULT_B2C_PLANS.find(p => p.planKey === key);
+      const rows = await db.insert(b2cPlansTable).values({
+        ...fallback,
+        ...data,
+        planKey: key,
+      } as any).returning();
+      return rows[0];
+    } catch (error) {
+      if (shouldUseMemoryFallback(error)) return super.upsertB2cPlan(key, data);
       throw error;
     }
   }

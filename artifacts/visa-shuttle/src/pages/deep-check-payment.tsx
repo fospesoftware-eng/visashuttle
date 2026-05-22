@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { ArrowRight, CheckCircle2, CreditCard, Crown, Loader2, ShieldCheck, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DashboardLayout } from "@/components/dashboard-layout";
@@ -12,10 +14,13 @@ import { useToast } from "@/hooks/use-toast";
 import {
   B2C_CURRENCIES,
   B2C_CURRENCY_FLAGS,
-  B2C_DEEP_CHECK_PRICES,
   type B2cCurrency,
+  type B2cPlan,
   formatB2cPrice,
+  formatB2cPlanPrice,
+  getB2cPlanPrice,
   getStoredB2cCurrency,
+  normalizeB2cPlans,
   storeB2cCurrency,
 } from "@/lib/b2c-pricing";
 
@@ -65,11 +70,19 @@ export default function DeepCheckPaymentPage() {
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
 
   const orderId = useMemo(() => new URLSearchParams(window.location.search).get("order_id"), []);
+  const requestedPlanKey = useMemo(() => {
+    const key = new URLSearchParams(window.location.search).get("plan");
+    return key === "pro" ? "pro" : "deep";
+  }, []);
   const isReturn = window.location.pathname.includes("/return");
-  const selectedPrice = B2C_DEEP_CHECK_PRICES[currency];
-  const priceLabel = formatB2cPrice(currency);
-  const checkoutAmount = coupon?.finalAmount ?? selectedPrice.amount;
+  const { data: planData } = useQuery<B2cPlan[]>({ queryKey: ["/api/public/b2c-plans"] });
+  const plans = normalizeB2cPlans(planData);
+  const selectedPlan = plans.find(plan => plan.planKey === requestedPlanKey) || plans.find(plan => plan.planKey === "deep")!;
+  const selectedAmount = getB2cPlanPrice(selectedPlan, currency);
+  const priceLabel = formatB2cPlanPrice(selectedPlan, currency);
+  const checkoutAmount = coupon?.finalAmount ?? selectedAmount;
   const checkoutPriceLabel = formatB2cPrice(currency, checkoutAmount);
+  const isProPlan = selectedPlan.planKey === "pro";
 
   useEffect(() => {
     setCoupon(null);
@@ -116,7 +129,7 @@ export default function DeepCheckPaymentPage() {
     setError("");
     try {
       storeB2cCurrency(currency);
-      const res = await apiRequest("POST", "/api/b2c/payments/deep-check/order", { currency, couponCode: coupon?.code || couponCode });
+      const res = await apiRequest("POST", "/api/b2c/payments/deep-check/order", { planKey: selectedPlan.planKey, currency, couponCode: coupon?.code || couponCode });
       const data = await res.json();
       if (data.alreadyActive) {
         setLocation(data.redirectUrl || "/deep-check");
@@ -148,7 +161,7 @@ export default function DeepCheckPaymentPage() {
     setCouponMessage("");
     setError("");
     try {
-      const res = await apiRequest("POST", "/api/b2c/payments/deep-check/coupon", { currency, couponCode: code });
+      const res = await apiRequest("POST", "/api/b2c/payments/deep-check/coupon", { planKey: selectedPlan.planKey, currency, couponCode: code });
       const data = await res.json();
       setCoupon({
         code: data.code,
@@ -255,7 +268,7 @@ export default function DeepCheckPaymentPage() {
   }
 
   return (
-    <DashboardLayout title="Deep Check Payment" subtitle="Unlock embassy-style AI visa analysis">
+    <DashboardLayout title={`${selectedPlan.name} Payment`} subtitle={isProPlan ? "Activate your monthly Visa Shuttle Pro plan" : "Unlock embassy-style AI visa analysis"}>
       <div className="max-w-4xl grid lg:grid-cols-[1.2fr_0.8fr] gap-6">
         <Card className="overflow-hidden border-0 shadow-sm">
           <CardHeader className="bg-gradient-to-br from-slate-950 via-blue-950 to-purple-950 text-white p-7">
@@ -263,11 +276,11 @@ export default function DeepCheckPaymentPage() {
               <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center">
                 <Crown className="w-6 h-6 text-amber-300" />
               </div>
-              <Badge className="bg-white/10 text-white border-white/20">One-time payment</Badge>
+              <Badge className="bg-white/10 text-white border-white/20">{isProPlan ? "Monthly plan" : "One-time payment"}</Badge>
             </div>
-            <CardTitle className="text-2xl md:text-3xl mt-6">Deep Check AI Analysis</CardTitle>
+            <CardTitle className="text-2xl md:text-3xl mt-6">{selectedPlan.name}</CardTitle>
             <p className="text-blue-100 leading-relaxed">
-              Pay securely with Cashfree and unlock your Deep Check report workflow immediately after successful payment.
+              Pay securely with Cashfree and unlock {isProPlan ? "your Pro plan benefits" : "your Deep Check report workflow"} immediately after successful payment.
             </p>
           </CardHeader>
           <CardContent className="p-7 space-y-5">
@@ -275,7 +288,7 @@ export default function DeepCheckPaymentPage() {
               <div className="flex items-end gap-3">
                 <span className="text-4xl font-black">{checkoutPriceLabel}</span>
                 {coupon && <span className="text-lg font-semibold text-muted-foreground line-through mb-1">{priceLabel}</span>}
-                <span className="text-sm font-medium text-muted-foreground pb-1">per Deep Check</span>
+                <span className="text-sm font-medium text-muted-foreground pb-1">{isProPlan ? "per month" : "per Deep Check"}</span>
               </div>
               <div className="flex flex-wrap items-center gap-2 rounded-2xl border bg-muted/30 p-2">
                 <span className="px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Currency</span>
@@ -300,7 +313,7 @@ export default function DeepCheckPaymentPage() {
                 ))}
               </div>
               <p className="text-xs text-muted-foreground">
-                Checkout amount: {checkoutPriceLabel} {currency !== "AED" ? currency : ""} ({selectedPrice.label})
+                Checkout amount: {checkoutPriceLabel} {currency !== "AED" ? currency : ""} for {selectedPlan.name}
               </p>
             </div>
             <div className="rounded-2xl border bg-background p-4 space-y-3">
@@ -340,9 +353,9 @@ export default function DeepCheckPaymentPage() {
             </div>
             <div className="grid sm:grid-cols-3 gap-3">
               {[
-                { icon: Sparkles, text: "AI score and risk analysis" },
-                { icon: ShieldCheck, text: "Action plan and document gaps" },
-                { icon: CheckCircle2, text: "Deep Check access unlocked" },
+                { icon: Sparkles, text: isProPlan ? "Unlimited Basic checks*" : "AI score and risk analysis" },
+                { icon: ShieldCheck, text: isProPlan ? "10 Deep Checks included" : "Action plan and document gaps" },
+                { icon: CheckCircle2, text: `${selectedPlan.visaToolsCredits} Visa Tools Credit` },
               ].map(({ icon: Icon, text }) => (
                 <div key={text} className="rounded-xl border bg-muted/30 p-4 text-sm font-medium">
                   <Icon className="w-4 h-4 text-[#4055FF] mb-2" />

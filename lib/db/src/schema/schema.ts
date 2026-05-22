@@ -721,6 +721,32 @@ export const insertB2cCouponSchema = createInsertSchema(b2cCoupons).omit({ id: t
 export type InsertB2cCoupon = z.infer<typeof insertB2cCouponSchema>;
 export type B2cCoupon = typeof b2cCoupons.$inferSelect;
 
+// ── B2C Public Plans ────────────────────────────────────────────────────────
+// SaaS-admin editable plan catalogue used by the public pricing page and B2C
+// checkout. Prices are stored as whole display units, matching Cashfree order
+// amounts for currencies like USD/INR/AED in the current checkout flow.
+export const b2cPlans = pgTable("b2c_plans", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  planKey: text("plan_key").notNull().unique(), // free | deep | pro
+  name: text("name").notNull(),
+  description: text("description"),
+  billingType: text("billing_type").notNull().default("free"), // free | one_time | monthly
+  prices: jsonb("prices").notNull().default(sql`'{}'::jsonb`),
+  features: jsonb("features").notNull().default(sql`'[]'::jsonb`),
+  conditions: jsonb("conditions").notNull().default(sql`'{}'::jsonb`),
+  basicCheckLimit: integer("basic_check_limit").notNull().default(0),
+  deepCheckLimit: integer("deep_check_limit").notNull().default(0),
+  visaToolsCredits: integer("visa_tools_credits").notNull().default(0),
+  sortOrder: integer("sort_order").notNull().default(0),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertB2cPlanSchema = createInsertSchema(b2cPlans).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertB2cPlan = z.infer<typeof insertB2cPlanSchema>;
+export type B2cPlan = typeof b2cPlans.$inferSelect;
+
 // ── Per-Tenant Payment Gateway Config (Cashfree) ─────────────────────────────
 // Per-agency override of the global payment gateway config. When a tenant has
 // credentials configured here, agency-scoped flows should prefer these over the
