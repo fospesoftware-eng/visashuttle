@@ -87,7 +87,7 @@ const travelerSteps: Step[] = [
     body:
       "If you're serious about applying, Deep Check gives you an embassy-style risk assessment with 7 profile dimensions, a red-flag list, and a personalised action plan.",
     bullets: [
-      "₹500 / check (50% off the regular ₹1,000)",
+      "Fixed Deep Check pricing: USD 15, GBP 11, EUR 12, INR 1000, or AED 55",
       "Pay securely with Cashfree — UPI, cards, net banking",
       "Get a downloadable PDF report you can share with an agent",
       "Includes document checklist and improvement plan",
@@ -209,7 +209,7 @@ const travelerFaqs = [
   },
   {
     q: "Is the Basic Check really free?",
-    a: "Yes. The Basic Check is ₹0 — no credit card needed. You only pay if you want a Deep Check, which is ₹500 / check (50% off ₹1,000).",
+    a: "Yes. The Basic Check is ₹0 — no credit card needed. You only pay if you want a Deep Check. Pricing is USD 15, GBP 11, EUR 12, INR 1000, or AED 55.",
   },
   {
     q: "How accurate is the AI score?",

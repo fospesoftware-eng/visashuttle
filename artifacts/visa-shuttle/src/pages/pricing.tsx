@@ -1,9 +1,18 @@
 import { Link } from "wouter";
-import { CheckCircle, Sparkles, Crown, ArrowRight, Info, Tag } from "lucide-react";
+import { useState } from "react";
+import { CheckCircle, Sparkles, Crown, ArrowRight, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
+import {
+  B2C_CURRENCIES,
+  B2C_DEEP_CHECK_PRICES,
+  type B2cCurrency,
+  formatB2cPrice,
+  getStoredB2cCurrency,
+  storeB2cCurrency,
+} from "@/lib/b2c-pricing";
 
 const plans = [
   {
@@ -34,11 +43,11 @@ const plans = [
     name: "Deep Check",
     key: "pro",
     icon: Crown,
-    price: "₹500",
-    originalPrice: "₹1,000",
+    price: "",
+    originalPrice: null,
     period: "/check",
     description: "Embassy-style deep analysis for serious applicants",
-    badge: "50% Discount",
+    badge: null,
     color: "text-purple-600",
     bg: "bg-purple-100 dark:bg-purple-900/30",
     border: "border-purple-300 dark:border-purple-700",
@@ -62,7 +71,15 @@ const plans = [
 
 export default function PricingPage() {
   const { user } = useB2cAuth();
-  const deepCheckHref = user ? "/payment/deep-check" : "/sign-in?next=/payment/deep-check";
+  const [currency, setCurrency] = useState<B2cCurrency>(() => getStoredB2cCurrency());
+  const deepPrice = formatB2cPrice(currency);
+  const deepCheckPath = `/payment/deep-check?currency=${currency}`;
+  const deepCheckHref = user ? deepCheckPath : `/sign-in?next=${encodeURIComponent(deepCheckPath)}`;
+
+  function handleCurrencyChange(next: B2cCurrency) {
+    setCurrency(next);
+    storeB2cCurrency(next);
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -77,8 +94,25 @@ export default function PricingPage() {
               Choose Your Plan
             </h1>
             <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-              Start with Basic Check at ₹0. Upgrade to Deep Check for a full embassy-style analysis at ₹500 only.
+              Start with Basic Check at ₹0. Upgrade to Deep Check for a full embassy-style analysis at {deepPrice}.
             </p>
+            <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-2 rounded-2xl border bg-background p-2 shadow-sm">
+              <span className="px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Currency</span>
+              {B2C_CURRENCIES.map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => handleCurrencyChange(code)}
+                  className={`rounded-xl px-3 py-1.5 text-sm font-semibold transition ${
+                    currency === code
+                      ? "bg-slate-950 text-white dark:bg-white dark:text-slate-950"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+                >
+                  {code}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="grid md:grid-cols-2 gap-6">
@@ -91,14 +125,6 @@ export default function PricingPage() {
                   className={`relative ${plan.border} ${plan.badge ? "shadow-xl shadow-purple-500/10" : "shadow"}`}
                   data-testid={`card-plan-${plan.key}`}
                 >
-                  {plan.badge && (
-                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                      <Badge className="bg-gradient-to-r from-purple-600 to-blue-600 text-white border-0 px-4 py-1 text-xs font-semibold flex items-center gap-1.5">
-                        <Tag className="w-3 h-3" />
-                        {plan.badge}
-                      </Badge>
-                    </div>
-                  )}
                   <CardContent className="p-6 md:p-7">
                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${plan.bg}`}>
                       <Icon className={`w-6 h-6 ${plan.color}`} />
@@ -106,16 +132,12 @@ export default function PricingPage() {
                     <h3 className="text-xl font-bold mb-1">{plan.name}</h3>
                     <p className="text-muted-foreground text-sm mb-4">{plan.description}</p>
                     <div className="mb-6 flex items-end gap-2">
-                      <span className="text-4xl font-black">{plan.price}</span>
-                      {plan.originalPrice && (
-                        <span className="text-lg font-semibold text-muted-foreground line-through mb-1">{plan.originalPrice}</span>
-                      )}
+                      <span className="text-4xl font-black">{plan.key === "pro" ? deepPrice : plan.price}</span>
                       {plan.period && <span className="text-muted-foreground text-sm mb-1">{plan.period}</span>}
                     </div>
-                    {plan.originalPrice && (
-                      <div className="mb-5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
-                        <Tag className="w-3 h-3" />
-                        50% off — ₹500 only
+                    {plan.key === "pro" && (
+                      <div className="mb-5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 border border-purple-200 text-purple-700 text-xs font-semibold">
+                        Fixed price in {currency}: {formatB2cPrice(currency, B2C_DEEP_CHECK_PRICES[currency].amount)}
                       </div>
                     )}
 
@@ -174,7 +196,7 @@ export default function PricingPage() {
               { q: "Is the Basic Check really free?", a: "Yes — every new account gets 1 Basic Check at ₹0. No credit card required." },
               { q: "How accurate is the AI scoring?", a: "Our AI analyzes 14 key factors used by immigration authorities and provides a probability estimate. It's a guidance tool, not a legal guarantee." },
               { q: "What is the Deep Check?", a: "Deep Check asks detailed questions across 7 dimensions (personal profile, finances, travel history, home ties, and more) and returns an embassy-style risk analysis with an action plan. It also supports Family applications (spouse + children)." },
-              { q: "How does the ₹500 Deep Check discount work?", a: "The regular price of a Deep Check is ₹1,000 per report. For a limited time it's available at ₹500 only. No subscription required — pay only when you need it." },
+              { q: "How much does Deep Check cost?", a: "Deep Check is a one-time report purchase. Choose your currency before checkout: USD 15, GBP 11, EUR 12, INR 1000, or AED 55." },
               { q: "Can I check for my family?", a: "Yes. The Deep Check supports Family applicants, covering the primary applicant, spouse, and children traveling together in a single assessment." },
             ].map(({ q, a }) => (
               <div key={q} className="p-5 rounded-xl bg-background border">

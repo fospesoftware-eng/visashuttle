@@ -500,6 +500,22 @@ function getCashfreePhone(phone?: string | null): string {
   return "9999999999";
 }
 
+const B2C_DEEP_CHECK_PRICES: Record<string, number> = {
+  USD: 15,
+  GBP: 11,
+  EUR: 12,
+  INR: 1000,
+  AED: 55,
+};
+
+function getB2cDeepCheckPrice(currencyInput: unknown) {
+  const currency = String(currencyInput || "INR").trim().toUpperCase();
+  if (!Object.prototype.hasOwnProperty.call(B2C_DEEP_CHECK_PRICES, currency)) {
+    return { currency: "INR", amount: B2C_DEEP_CHECK_PRICES.INR };
+  }
+  return { currency, amount: B2C_DEEP_CHECK_PRICES[currency] };
+}
+
 async function readCashfreeBody(response: globalThis.Response) {
   const text = await response.text();
   if (!text) return {};
@@ -5361,13 +5377,14 @@ export async function registerRoutes(
       return res.status(400).json({ error: modeError });
     }
 
-    const orderId = `VS_DEEP_${Date.now()}_${randomUUID().slice(0, 8)}`;
+    const price = getB2cDeepCheckPrice(req.body?.currency);
+    const orderId = `VS_DEEP_${price.currency}_${Date.now()}_${randomUUID().slice(0, 8)}`;
     const requestId = randomUUID();
     const origin = getRequestOrigin(req);
     const payload = {
       order_id: orderId,
-      order_amount: 500,
-      order_currency: "INR",
+      order_amount: price.amount,
+      order_currency: price.currency,
       order_note: "Visa Shuttle Deep Check",
       customer_details: {
         customer_id: user.id.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 45),
@@ -5381,6 +5398,7 @@ export async function registerRoutes(
       order_tags: {
         product: "deep_check",
         user_id: user.id,
+        currency: price.currency,
       },
     };
 
@@ -5429,8 +5447,8 @@ export async function registerRoutes(
       orderId: data.order_id || orderId,
       paymentSessionId: data.payment_session_id,
       mode: cashfree.mode,
-      amount: 500,
-      currency: "INR",
+      amount: price.amount,
+      currency: price.currency,
     });
   });
 

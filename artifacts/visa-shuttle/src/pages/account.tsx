@@ -17,6 +17,7 @@ import { COUNTRIES as OB_COUNTRIES } from "@/shared/destinations";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { MIN_DOB_ISO, TODAY_ISO, getApplicantAge, validateAdultApplicantDob } from "@/lib/applicant-age";
+import { formatB2cPrice, getStoredB2cCurrency } from "@/lib/b2c-pricing";
 
 interface VisaCheck {
   id: string;
@@ -219,11 +220,12 @@ export default function AccountPage() {
   const lastCheck = checks[0];
   const checksLeftLabel = Number.isFinite(checksRemaining) ? checksRemaining : "Unlimited";
   const planLabel = user.subscriptionPlan === "pro" ? "Deep Check" : user.subscriptionPlan.charAt(0).toUpperCase() + user.subscriptionPlan.slice(1);
+  const deepCheckPrice = formatB2cPrice(getStoredB2cCurrency());
 
   const notifications = [
-    !canCheck && { type: "warn", msg: "You've used your Basic Check. Get Deep Check for ₹500 only." },
+    !canCheck && { type: "warn", msg: `You've used your Basic Check. Get Deep Check for ${deepCheckPrice}.` },
     profComp < 50 && { type: "info", msg: "Complete your saved profile to speed up future checks." },
-    !user.deepCheckAccess && { type: "tip", msg: "Deep Check reveals embassy-style risk analysis. 50% off now — ₹500 only." },
+    !user.deepCheckAccess && { type: "tip", msg: `Deep Check reveals embassy-style risk analysis for ${deepCheckPrice}.` },
   ].filter(Boolean) as { type: string; msg: string }[];
 
   return (
@@ -301,7 +303,7 @@ export default function AccountPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <p className="font-semibold text-slate-800 text-sm">Deep Check</p>
-                      {!user.deepCheckAccess && <Badge className="text-[10px] px-1.5 py-0 bg-amber-100 text-amber-700 border-0">₹500</Badge>}
+                      {!user.deepCheckAccess && <Badge className="text-[10px] px-1.5 py-0 bg-amber-100 text-amber-700 border-0">{deepCheckPrice}</Badge>}
                     </div>
                     <p className="text-xs text-slate-500">Embassy-style analysis</p>
                   </div>
@@ -452,7 +454,7 @@ export default function AccountPage() {
                         <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center flex-shrink-0">
                           <Crown className="w-3.5 h-3.5 text-purple-600" />
                         </div>
-                        <span className="text-xs text-slate-600 group-hover:text-slate-900">Try Deep Check — ₹500 only</span>
+                        <span className="text-xs text-slate-600 group-hover:text-slate-900">Try Deep Check — {deepCheckPrice}</span>
                         <ChevronRight className="w-3 h-3 text-slate-300 ml-auto" />
                       </div>
                     </Link>

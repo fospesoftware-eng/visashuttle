@@ -7,6 +7,7 @@ import {
 import { Logo } from "@/components/logo";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
 import { Button } from "@/components/ui/button";
+import { formatB2cPrice, getStoredB2cCurrency } from "@/lib/b2c-pricing";
 
 const NAV_ITEMS = [
   { icon: Compass, label: "Dashboard", href: "/account" },
@@ -30,6 +31,7 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
   const { user, logout, checksRemaining, canCheck, isDemo } = useB2cAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const planLabel = user?.subscriptionPlan === "pro" ? "Deep Check" : user?.subscriptionPlan || "free";
+  const deepCheckPrice = formatB2cPrice(getStoredB2cCurrency());
 
   useEffect(() => { setSidebarOpen(false); }, [location]);
 
@@ -101,7 +103,7 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
                 <Crown className="w-3.5 h-3.5 text-amber-300" />
                 <span className="text-xs font-semibold">Get Deep Check</span>
               </div>
-              <p className="text-[11px] text-blue-100 leading-snug">50% off — ₹500 only</p>
+              <p className="text-[11px] text-blue-100 leading-snug">One-time report: {deepCheckPrice}</p>
             </div>
           </Link>
         )}
@@ -164,7 +166,7 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
                 <Link href="/payment/deep-check">
                   <Button size="sm" className="hidden sm:flex gap-1.5 border-0 text-xs h-8 px-3 text-white hover:opacity-90" style={{background:"linear-gradient(135deg,#4055FF,#FF2060)"}}>
                     <Crown className="w-3 h-3" />
-                    Deep Check ₹500
+                    Deep Check {deepCheckPrice}
                   </Button>
                 </Link>
               )}

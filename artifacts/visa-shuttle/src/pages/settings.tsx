@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
 import { useToast } from "@/hooks/use-toast";
+import { formatB2cPrice, getStoredB2cCurrency } from "@/lib/b2c-pricing";
 
 export default function SettingsPage() {
   const { user, isLoading: authLoading } = useB2cAuth();
@@ -28,6 +29,7 @@ export default function SettingsPage() {
   }
 
   const planLabel = user.subscriptionPlan === "pro" ? "Deep Check" : user.subscriptionPlan === "starter" ? "Starter" : "Basic";
+  const deepCheckPrice = formatB2cPrice(getStoredB2cCurrency());
 
   return (
     <DashboardLayout title="Settings" subtitle="Manage your account and preferences">
@@ -90,7 +92,7 @@ export default function SettingsPage() {
                 </p>
               </div>
               <Button variant="outline" size="sm" onClick={() => setLocation(user.subscriptionPlan === "free" ? "/payment/deep-check" : "/pricing")}>
-                {user.subscriptionPlan === "free" ? "Deep Check ₹500" : "Manage"}
+                {user.subscriptionPlan === "free" ? `Deep Check ${deepCheckPrice}` : "Manage"}
               </Button>
             </div>
           </CardContent>

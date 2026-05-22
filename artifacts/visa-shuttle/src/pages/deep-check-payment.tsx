@@ -9,6 +9,14 @@ import { DashboardLayout } from "@/components/dashboard-layout";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import {
+  B2C_CURRENCIES,
+  B2C_DEEP_CHECK_PRICES,
+  type B2cCurrency,
+  formatB2cPrice,
+  getStoredB2cCurrency,
+  storeB2cCurrency,
+} from "@/lib/b2c-pricing";
 
 declare global {
   interface Window {
@@ -44,9 +52,12 @@ export default function DeepCheckPaymentPage() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState("");
+  const [currency, setCurrency] = useState<B2cCurrency>(() => getStoredB2cCurrency());
 
   const orderId = useMemo(() => new URLSearchParams(window.location.search).get("order_id"), []);
   const isReturn = window.location.pathname.includes("/return");
+  const selectedPrice = B2C_DEEP_CHECK_PRICES[currency];
+  const priceLabel = formatB2cPrice(currency);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -87,7 +98,8 @@ export default function DeepCheckPaymentPage() {
     setIsStarting(true);
     setError("");
     try {
-      const res = await apiRequest("POST", "/api/b2c/payments/deep-check/order");
+      storeB2cCurrency(currency);
+      const res = await apiRequest("POST", "/api/b2c/payments/deep-check/order", { currency });
       const data = await res.json();
       if (data.alreadyActive) {
         setLocation(data.redirectUrl || "/deep-check");
@@ -206,7 +218,7 @@ export default function DeepCheckPaymentPage() {
               <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center">
                 <Crown className="w-6 h-6 text-amber-300" />
               </div>
-              <Badge className="bg-amber-400/20 text-amber-200 border-amber-300/30">50% Discount</Badge>
+              <Badge className="bg-white/10 text-white border-white/20">One-time payment</Badge>
             </div>
             <CardTitle className="text-2xl md:text-3xl mt-6">Deep Check AI Analysis</CardTitle>
             <p className="text-blue-100 leading-relaxed">
@@ -214,10 +226,35 @@ export default function DeepCheckPaymentPage() {
             </p>
           </CardHeader>
           <CardContent className="p-7 space-y-5">
-            <div className="flex items-end gap-3">
-              <span className="text-4xl font-black">₹500</span>
-              <span className="text-muted-foreground line-through pb-1">₹1,000</span>
-              <span className="text-sm font-medium text-emerald-600 pb-1">Limited offer</span>
+            <div className="space-y-3">
+              <div className="flex items-end gap-3">
+                <span className="text-4xl font-black">{priceLabel}</span>
+                <span className="text-sm font-medium text-muted-foreground pb-1">per Deep Check</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 rounded-2xl border bg-muted/30 p-2">
+                <span className="px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Currency</span>
+                {B2C_CURRENCIES.map((code) => (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => {
+                      setCurrency(code);
+                      storeB2cCurrency(code);
+                    }}
+                    className={`rounded-xl px-3 py-1.5 text-sm font-semibold transition ${
+                      currency === code
+                        ? "bg-slate-950 text-white"
+                        : "text-muted-foreground hover:bg-background hover:text-foreground"
+                    }`}
+                    disabled={isStarting || isReturn}
+                  >
+                    {code}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Checkout amount: {priceLabel} {currency !== "AED" ? currency : ""} ({selectedPrice.label})
+              </p>
             </div>
             <div className="grid sm:grid-cols-3 gap-3">
               {[
@@ -249,7 +286,7 @@ export default function DeepCheckPaymentPage() {
                 data-testid="button-start-deep-check-payment"
               >
                 {isStarting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
-                {isStarting ? "Opening Cashfree..." : "Pay ₹500 with Cashfree"}
+                {isStarting ? "Opening Cashfree..." : `Pay ${priceLabel} with Cashfree`}
               </Button>
             )}
           </CardContent>

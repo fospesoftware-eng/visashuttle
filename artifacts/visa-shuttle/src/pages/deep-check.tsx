@@ -23,6 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { MIN_DOB_ISO, TODAY_ISO, validateAdultApplicantDob } from "@/lib/applicant-age";
+import { formatB2cPrice, getStoredB2cCurrency } from "@/lib/b2c-pricing";
 
 import { COUNTRIES, VISA_TYPES } from "@/shared/destinations";
 
@@ -302,6 +303,7 @@ export default function DeepCheckPage() {
   const set = (key: string) => (val: string) => setForm(prev => ({ ...prev, [key]: val }));
 
   const hasAccess = user.deepCheckAccess;
+  const deepCheckPrice = formatB2cPrice(getStoredB2cCurrency());
 
   // ===================== RESULT SCORECARD =====================
   if (result) {
@@ -603,7 +605,7 @@ export default function DeepCheckPage() {
                 <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
                   <Crown className="w-5 h-5 text-amber-400" />
                 </div>
-                <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30 font-semibold">50% Discount</Badge>
+                <Badge className="bg-white/10 text-white border-white/20 font-semibold">One-time payment</Badge>
               </div>
               <h1 className="text-3xl md:text-4xl font-bold mb-3">Deep Visa Risk Analysis</h1>
               <p className="text-blue-100 text-lg max-w-2xl leading-relaxed">
@@ -612,7 +614,7 @@ export default function DeepCheckPage() {
               <div className="mt-6 flex flex-wrap gap-3">
                 <Link href="/payment/deep-check">
                   <Button className="bg-white text-blue-900 hover:bg-blue-50 font-semibold gap-2" data-testid="button-upgrade">
-                    <Crown className="w-4 h-4 text-amber-500" /> Get Deep Check — ₹500 only <ArrowRight className="w-4 h-4" />
+                    <Crown className="w-4 h-4 text-amber-500" /> Get Deep Check — {deepCheckPrice} <ArrowRight className="w-4 h-4" />
                   </Button>
                 </Link>
                 <Link href="/check">
