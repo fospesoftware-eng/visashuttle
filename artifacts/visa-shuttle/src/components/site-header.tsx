@@ -16,7 +16,6 @@ export function SiteHeader() {
 
   const navItems = [
     { label: "How It Works", href: "/#how-it-works", anchor: true },
-    { label: "Visa Check", href: "/visa-check" },
     { label: "Pricing", href: "/pricing" },
     { label: "For Business", href: "/business" },
     { label: "Help", href: "/help" },

@@ -29,7 +29,7 @@ import SavedProfilePage from "@/pages/saved-profile";
 import SettingsPage from "@/pages/settings";
 import VisaToolsPage from "@/pages/visa-tools";
 
-import VisaCheckPage from "@/pages/visa-check";
+import VisaCheckPage, { B2cVisaCheckPage, B2cVisaCheckResultPage } from "@/pages/visa-check";
 import VisaCheckPublicPage from "@/pages/visa-check-public";
 import { VisaCheckAgencyResultPage, VisaCheckPublicResultPage } from "@/pages/visa-check-result";
 import AgencyDashboard from "@/pages/agency/dashboard";
@@ -129,6 +129,8 @@ function Router() {
       <Route path="/saved-profile" component={SavedProfilePage} />
       <Route path="/settings" component={SettingsPage} />
       <Route path="/visa-tools" component={VisaToolsPage} />
+      <Route path="/visa-tools/visa-check/results" component={B2cVisaCheckResultPage} />
+      <Route path="/visa-tools/visa-check" component={B2cVisaCheckPage} />
       <Route path="/visa-check/results" component={VisaCheckPublicResultPage} />
       <Route path="/visa-check" component={VisaCheckPublicPage} />
       <Route path="/login" component={LoginPage} />

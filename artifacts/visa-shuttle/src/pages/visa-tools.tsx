@@ -9,6 +9,7 @@ import {
   Building2,
   Download,
   FileText,
+  Globe2,
   Loader2,
   SearchCheck,
   ShieldAlert,
@@ -232,6 +233,23 @@ export default function VisaToolsPage() {
         </div>
 
         <div className="grid gap-4 lg:grid-cols-4">
+          <button
+            type="button"
+            onClick={() => setLocation("/visa-tools/visa-check")}
+            className="rounded-2xl border bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#4055FF] hover:shadow-lg"
+            data-testid="card-visa-check-tool"
+          >
+            <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#4055FF] to-[#9033F5] text-white">
+              <Globe2 className="h-5 w-5" />
+            </div>
+            <h3 className="font-bold text-slate-900">Visa Check</h3>
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              Check destination entry requirements, visa type, passport validity and route conditions in a guided flow.
+            </p>
+            <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-[#4055FF]">
+              Open Visa Check <ArrowRight className="h-3 w-3" />
+            </span>
+          </button>
           {tools.map((tool) => {
             const Icon = tool.icon;
             const active = activeTool.type === tool.type;

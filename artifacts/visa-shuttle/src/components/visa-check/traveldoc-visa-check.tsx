@@ -62,7 +62,7 @@ import {
 import { researchEntryRequirement } from "@/lib/entry-requirements-ai";
 
 type TravelDocVisaCheckProps = {
-  surface?: "public" | "dashboard";
+  surface?: "public" | "dashboard" | "b2c";
   mode?: "form" | "result";
 };
 
@@ -384,12 +384,12 @@ export function TravelDocVisaCheck({ surface = "public", mode = "form" }: Travel
     });
     if (showTransfer && transferCountry) params.set("via", transferCountry);
     if (selectedVisas.length) params.set("held", selectedVisas.map(encodeURIComponent).join(","));
-    const base = surface === "dashboard" ? "/app/visa-check" : "/visa-check";
+    const base = surface === "dashboard" ? "/app/visa-check" : surface === "b2c" ? "/visa-tools/visa-check" : "/visa-check";
     setLocation(`${base}/results?${params.toString()}`);
   }
 
   function goBackToForm() {
-    setLocation(surface === "dashboard" ? "/app/visa-check" : "/visa-check");
+    setLocation(surface === "dashboard" ? "/app/visa-check" : surface === "b2c" ? "/visa-tools/visa-check" : "/visa-check");
   }
 
   function nextStep() {
@@ -401,13 +401,13 @@ export function TravelDocVisaCheck({ surface = "public", mode = "form" }: Travel
     setCurrentStep((step) => Math.max(step - 1, 0));
   }
 
-  const shellClass = surface === "dashboard"
+  const shellClass = surface === "dashboard" || surface === "b2c"
     ? "space-y-6"
     : "mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8";
 
   return (
     <div className={shellClass}>
-      <div className={surface === "dashboard" ? "space-y-6" : "space-y-8"}>
+      <div className={surface === "dashboard" || surface === "b2c" ? "space-y-6" : "space-y-8"}>
         {surface === "public" && mode === "form" && (
           <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-end">
             <div className="space-y-4">

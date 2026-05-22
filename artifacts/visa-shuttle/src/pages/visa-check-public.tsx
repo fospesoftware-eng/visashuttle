@@ -1,5 +1,10 @@
-import { TravelDocVisaCheck } from "@/components/visa-check/traveldoc-visa-check";
+import { useEffect } from "react";
+import { useLocation } from "wouter";
 
 export default function VisaCheckPublicPage() {
-  return <TravelDocVisaCheck surface="public" mode="form" />;
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    setLocation(`/sign-in?next=${encodeURIComponent("/visa-tools/visa-check")}&message=${encodeURIComponent("Please sign in to access Visa Tools.")}`);
+  }, [setLocation]);
+  return null;
 }
