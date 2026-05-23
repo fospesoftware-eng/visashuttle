@@ -46,8 +46,9 @@ export default function PricingPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <section className="py-16 md:py-24 px-4">
-        <div className="max-w-3xl mx-auto">
+      <section className="relative overflow-hidden px-4 py-16 md:py-24">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-80 bg-[radial-gradient(circle_at_50%_0%,rgba(64,85,255,0.10),transparent_55%)]" />
+        <div className="relative mx-auto max-w-6xl">
           <div className="text-center mb-14">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-sm font-medium mb-5 border border-blue-200 dark:border-blue-800">
               <Sparkles className="w-3.5 h-3.5" />
@@ -79,7 +80,7 @@ export default function PricingPage() {
             </div>
           </div>
 
-          <div className="grid lg:grid-cols-3 gap-6">
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {plans.map((plan) => {
               const visual = planVisuals[plan.planKey] || planVisuals.free;
               const Icon = visual.icon;
@@ -89,20 +90,20 @@ export default function PricingPage() {
               return (
                 <Card
                   key={plan.name}
-                  className={`relative ${visual.border} ${plan.planKey === "deep" ? "shadow-xl shadow-purple-500/10" : "shadow"}`}
+                  className={`relative flex h-full overflow-hidden bg-background/95 backdrop-blur ${visual.border} ${plan.planKey === "deep" ? "shadow-xl shadow-purple-500/10 ring-4 ring-purple-500/5" : "shadow-sm"}`}
                   data-testid={`card-plan-${plan.planKey}`}
                 >
                   {plan.planKey === "deep" && (
                     <Badge className="absolute right-5 top-5 bg-purple-100 text-purple-700 border-0">Popular</Badge>
                   )}
-                  <CardContent className="p-6 md:p-7">
+                  <CardContent className="flex h-full w-full flex-col p-6 md:p-7">
                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${visual.bg}`}>
                       <Icon className={`w-6 h-6 ${visual.color}`} />
                     </div>
                     <h3 className="text-xl font-bold mb-1">{plan.name}</h3>
-                    <p className="text-muted-foreground text-sm mb-4">{plan.description}</p>
-                    <div className="mb-6 flex items-end gap-2">
-                      <span className="text-4xl font-black">{plan.planKey === "free" ? basicPrice : planPrice}</span>
+                    <p className="min-h-[44px] text-muted-foreground text-sm leading-6 mb-4">{plan.description}</p>
+                    <div className="mb-6 flex flex-wrap items-end gap-x-2 gap-y-1">
+                      <span className="text-4xl font-black tracking-tight">{plan.planKey === "free" ? basicPrice : planPrice}</span>
                       {period && <span className="text-muted-foreground text-sm mb-1">{period}</span>}
                     </div>
                     {plan.planKey === "pro" && (
@@ -116,7 +117,7 @@ export default function PricingPage() {
                       </div>
                     )}
 
-                    <div className="space-y-2.5 mb-6">
+                    <div className="mb-6 flex-1 space-y-2.5">
                       {plan.features.map(f => (
                         <div key={f} className="flex items-start gap-2.5 text-sm">
                           <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
@@ -148,7 +149,7 @@ export default function PricingPage() {
             })}
           </div>
 
-          <div className="mt-10 flex items-start gap-3 p-4 rounded-xl bg-muted/50 border text-sm text-muted-foreground max-w-2xl mx-auto">
+          <div className="mt-10 flex items-start gap-3 p-4 rounded-xl bg-background/90 border text-sm text-muted-foreground max-w-3xl mx-auto shadow-sm">
             <Info className="w-4 h-4 flex-shrink-0 mt-0.5 text-blue-500" />
             <span>
               Visa Shuttle provides AI-based estimation only and does not guarantee visa approval. Final decisions are made solely by the relevant embassy, consulate, or immigration authority.
@@ -159,7 +160,7 @@ export default function PricingPage() {
 
       {/* FAQ */}
       <section className="py-12 px-4 bg-muted/30 border-t">
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           <h2 className="text-2xl font-bold text-center mb-8">Frequently Asked Questions</h2>
           <div className="space-y-4">
             {[
