@@ -37,6 +37,8 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const planLabel = user?.subscriptionPlan === "pro" ? "Pro" : user?.subscriptionPlan === "deep" ? "Deep Check" : user?.subscriptionPlan || "free";
   const deepCheckPrice = formatB2cPrice(getStoredB2cCurrency());
+  const remainingVisaToolCredits = creditSummary?.remainingCredits ?? 0;
+  const hasVisaToolCredits = remainingVisaToolCredits > 0;
 
   useEffect(() => { setSidebarOpen(false); }, [location]);
 
@@ -104,15 +106,29 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
       <div className="flex-shrink-0 p-3 border-t border-slate-100">
         {user && !isDemo && (
           <Link href="/payment/visa-tools-credits">
-            <div className="mb-2 rounded-xl border border-[#4055FF]/15 bg-gradient-to-br from-[#4055FF]/5 to-white p-3 cursor-pointer transition hover:border-[#4055FF]/35">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5">
-                  <Coins className="w-3.5 h-3.5 text-[#4055FF]" />
-                  <span className="text-xs font-semibold text-slate-700">Visa Tools Credits</span>
+            <div
+              className={`mb-2 rounded-xl border p-3 cursor-pointer transition hover:-translate-y-0.5 hover:shadow-sm ${
+                hasVisaToolCredits
+                  ? "border-emerald-200 bg-gradient-to-br from-emerald-50 to-white hover:border-emerald-300"
+                  : "border-red-200 bg-gradient-to-br from-red-50 to-white hover:border-red-300"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className={`text-[10px] font-bold uppercase tracking-wider ${hasVisaToolCredits ? "text-emerald-700" : "text-red-700"}`}>
+                    Credits Remaining
+                  </p>
+                  <p className={`mt-1 text-2xl font-black leading-none ${hasVisaToolCredits ? "text-emerald-700" : "text-red-700"}`}>
+                    {remainingVisaToolCredits}
+                  </p>
                 </div>
-                <span className="text-xs font-black text-[#4055FF]">{creditSummary?.remainingCredits ?? 0}</span>
+                <div className={`rounded-lg p-2 ${hasVisaToolCredits ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
+                  <Coins className="w-4 h-4" />
+                </div>
               </div>
-              <p className="mt-1 text-[11px] leading-snug text-slate-500">100 credits per tool check · buy more</p>
+              <div className={`mt-2 text-[11px] font-semibold ${hasVisaToolCredits ? "text-emerald-700" : "text-red-700"}`}>
+                {hasVisaToolCredits ? "Ready for Visa Tools" : "Buy credits to continue"}
+              </div>
             </div>
           </Link>
         )}
