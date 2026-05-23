@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import {
   Compass, PlaneTakeoff, ScanSearch, Luggage, ScrollText,
-  Ticket, SlidersHorizontal, LogOut, Menu, X, ChevronRight, Shield, Crown, ShieldAlert
+  Ticket, SlidersHorizontal, LogOut, Menu, X, ChevronRight, Shield, Crown, ShieldAlert, Coins
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
@@ -29,6 +30,10 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children, title, subtitle }: DashboardLayoutProps) {
   const [location] = useLocation();
   const { user, logout, checksRemaining, canCheck, isDemo } = useB2cAuth();
+  const { data: creditSummary } = useQuery<{ remainingCredits: number; creditsPerCheck: number }>({
+    queryKey: ["/api/b2c/visa-tools/credits"],
+    enabled: !!user,
+  });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const planLabel = user?.subscriptionPlan === "pro" ? "Pro" : user?.subscriptionPlan === "deep" ? "Deep Check" : user?.subscriptionPlan || "free";
   const deepCheckPrice = formatB2cPrice(getStoredB2cCurrency());
@@ -97,6 +102,20 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
 
       {/* Bottom */}
       <div className="flex-shrink-0 p-3 border-t border-slate-100">
+        {user && !isDemo && (
+          <Link href="/payment/visa-tools-credits">
+            <div className="mb-2 rounded-xl border border-[#4055FF]/15 bg-gradient-to-br from-[#4055FF]/5 to-white p-3 cursor-pointer transition hover:border-[#4055FF]/35">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  <Coins className="w-3.5 h-3.5 text-[#4055FF]" />
+                  <span className="text-xs font-semibold text-slate-700">Visa Tools Credits</span>
+                </div>
+                <span className="text-xs font-black text-[#4055FF]">{creditSummary?.remainingCredits ?? 0}</span>
+              </div>
+              <p className="mt-1 text-[11px] leading-snug text-slate-500">100 credits per tool check · buy more</p>
+            </div>
+          </Link>
+        )}
         {!canCheck && user?.subscriptionPlan === "free" && !isDemo && (
           <Link href="/payment/deep-check">
             <div className="mb-2 p-3 rounded-xl text-white cursor-pointer transition-all hover:opacity-90" style={{background:"linear-gradient(135deg,#4055FF,#FF2060)"}}>

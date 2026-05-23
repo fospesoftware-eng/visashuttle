@@ -616,6 +616,7 @@ interface B2cPlanResponse {
 }
 
 const B2C_PLAN_CURRENCIES = ["USD", "INR", "AED", "GBP", "EUR"];
+const DEFAULT_EXTRA_CREDIT_PRICES: Record<string, number> = { USD: 2, INR: 170, AED: 8, GBP: 2, EUR: 2 };
 const B2C_PLAN_META: Record<string, { icon: any; accent: string; bg: string; label: string }> = {
   free: { icon: Sparkles, accent: "text-slate-700", bg: "bg-slate-100", label: "Acquisition" },
   deep: { icon: Crown, accent: "text-purple-700", bg: "bg-purple-100", label: "One-time" },
@@ -826,6 +827,41 @@ function B2cPlansCard() {
                   onChange={e => setForm({ ...form, conditions: { ...form.conditions, note: e.target.value } })}
                   placeholder="Fair usage terms, renewal notes, support conditions..."
                 />
+              </div>
+              <div className="rounded-xl border p-3 space-y-3">
+                <div>
+                  <p className="text-sm font-semibold">Additional Visa Tools Credits</p>
+                  <p className="text-xs text-muted-foreground">Used when B2C users buy extra credits. One tool usage burns 100 credits.</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Credit Unit</Label>
+                  <Input
+                    type="number"
+                    min={100}
+                    step={100}
+                    value={form.conditions?.extraCreditUnit || 100}
+                    onChange={e => setForm({ ...form, conditions: { ...form.conditions, extraCreditUnit: Number(e.target.value) } })}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {B2C_PLAN_CURRENCIES.map(code => (
+                    <div key={code} className="space-y-1">
+                      <Label className="text-xs">{code}</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={form.conditions?.extraCreditPrices?.[code] ?? DEFAULT_EXTRA_CREDIT_PRICES[code] ?? 2}
+                        onChange={e => setForm({
+                          ...form,
+                          conditions: {
+                            ...form.conditions,
+                            extraCreditPrices: { ...(form.conditions?.extraCreditPrices || {}), [code]: Number(e.target.value) },
+                          },
+                        })}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
               <div className="grid gap-2">
                 <div className="flex items-center justify-between rounded-xl border px-3 py-2.5">

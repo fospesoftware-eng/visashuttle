@@ -747,6 +747,23 @@ export const insertB2cPlanSchema = createInsertSchema(b2cPlans).omit({ id: true,
 export type InsertB2cPlan = z.infer<typeof insertB2cPlanSchema>;
 export type B2cPlan = typeof b2cPlans.$inferSelect;
 
+export const b2cCreditOrders = pgTable("b2c_credit_orders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  orderId: text("order_id").notNull().unique(),
+  credits: integer("credits").notNull().default(0),
+  amount: integer("amount").notNull().default(0),
+  currency: text("currency").notNull().default("USD"),
+  status: text("status").notNull().default("created"),
+  creditedAt: timestamp("credited_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertB2cCreditOrderSchema = createInsertSchema(b2cCreditOrders).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertB2cCreditOrder = z.infer<typeof insertB2cCreditOrderSchema>;
+export type B2cCreditOrder = typeof b2cCreditOrders.$inferSelect;
+
 // ── Per-Tenant Payment Gateway Config (Cashfree) ─────────────────────────────
 // Per-agency override of the global payment gateway config. When a tenant has
 // credentials configured here, agency-scoped flows should prefer these over the

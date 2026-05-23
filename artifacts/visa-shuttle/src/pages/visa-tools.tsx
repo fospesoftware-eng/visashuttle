@@ -146,6 +146,10 @@ export default function VisaToolsPage() {
     queryKey: ["/api/b2c/visa-tools/checks"],
     enabled: !!user,
   });
+  const { data: credits } = useQuery<{ remainingCredits: number; creditsPerCheck: number; usedCredits: number; purchasedCredits: number; includedCredits: number }>({
+    queryKey: ["/api/b2c/visa-tools/credits"],
+    enabled: !!user,
+  });
 
   const analyzeMutation = useMutation({
     mutationFn: async () => {
@@ -160,6 +164,7 @@ export default function VisaToolsPage() {
     onSuccess: (data) => {
       setResult(data.check);
       queryClient.invalidateQueries({ queryKey: ["/api/b2c/visa-tools/checks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/b2c/visa-tools/credits"] });
       toast({ title: "Analysis complete", description: "Your Visa Tools report is ready." });
     },
     onError: (err: Error) => {
@@ -224,10 +229,17 @@ export default function VisaToolsPage() {
               </p>
             </div>
             <div className="rounded-xl border bg-white/80 p-3 text-sm text-slate-600">
+              <div className="mb-3 flex items-center justify-between gap-3 rounded-lg bg-[#4055FF]/5 px-3 py-2">
+                <span className="text-xs font-semibold text-slate-600">Credits remaining</span>
+                <span className="text-sm font-black text-[#4055FF]">{credits?.remainingCredits ?? 0}</span>
+              </div>
               <div className="flex items-start gap-2">
                 <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-500" />
                 <span>This is AI-assisted analysis only, not legal or government verification.</span>
               </div>
+              <Button variant="outline" size="sm" className="mt-3 w-full" onClick={() => setLocation("/payment/visa-tools-credits")}>
+                Buy additional credits
+              </Button>
             </div>
           </div>
         </div>
@@ -322,11 +334,11 @@ export default function VisaToolsPage() {
               <Button
                 className="mt-5 gap-2 border-0 text-white hover:opacity-90"
                 style={{ background: "linear-gradient(135deg,#4055FF,#9033F5,#FF2060)" }}
-                disabled={analyzeMutation.isPending}
+                disabled={analyzeMutation.isPending || (credits?.remainingCredits ?? 0) < (credits?.creditsPerCheck ?? 100)}
                 onClick={() => analyzeMutation.mutate()}
               >
                 {analyzeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <SearchCheck className="h-4 w-4" />}
-                {analyzeMutation.isPending ? "Checking with AI..." : "Run Check"}
+                {analyzeMutation.isPending ? "Checking with AI..." : (credits?.remainingCredits ?? 0) < (credits?.creditsPerCheck ?? 100) ? "Buy credits to run check" : "Run Check"}
               </Button>
             </CardContent>
           </Card>

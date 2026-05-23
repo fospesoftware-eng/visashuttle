@@ -550,6 +550,51 @@ async function getB2cPlanPrice(planKeyInput: unknown, currencyInput: unknown) {
   return { plan: sanitizeB2cPlan(plan), planKey, currency, amount };
 }
 
+const VISA_TOOL_CREDITS_PER_CHECK = 100;
+
+function getB2cUserPlanKey(user: any) {
+  if (user?.subscriptionPlan === "pro") return "pro";
+  if (user?.subscriptionPlan === "deep" || user?.deepCheckAccess) return "deep";
+  return "free";
+}
+
+function getCreditPricingFromPlan(plan: any, currencyInput: unknown) {
+  const currency = B2C_SUPPORTED_CURRENCIES.includes(String(currencyInput || "").toUpperCase() as any)
+    ? String(currencyInput).trim().toUpperCase()
+    : "USD";
+  const conditions = plan?.conditions && typeof plan.conditions === "object" ? plan.conditions as Record<string, any> : {};
+  const unit = Math.max(100, Number(conditions.extraCreditUnit || 100) || 100);
+  const prices = conditions.extraCreditPrices && typeof conditions.extraCreditPrices === "object"
+    ? conditions.extraCreditPrices as Record<string, unknown>
+    : { USD: 2, INR: 170, AED: 8, GBP: 2, EUR: 2 };
+  const amountPerUnit = Math.max(1, Number(prices[currency] ?? prices.USD ?? 2) || 2);
+  return { currency, unit, amountPerUnit };
+}
+
+async function getB2cCreditSummary(user: any, currencyInput: unknown = "USD") {
+  const planKey = getB2cUserPlanKey(user);
+  const plan = await storage.getB2cPlan(planKey) || await storage.getB2cPlan("free");
+  const includedCredits = Number(plan?.visaToolsCredits || 0);
+  const [checks, orders] = await Promise.all([
+    storage.getVisaToolChecksByUserId(user.id),
+    storage.getB2cCreditOrdersByUserId(user.id),
+  ]);
+  const purchasedCredits = orders
+    .filter(order => order.status === "paid")
+    .reduce((sum, order) => sum + (Number(order.credits) || 0), 0);
+  const usedCredits = checks.length * VISA_TOOL_CREDITS_PER_CHECK;
+  const remainingCredits = Math.max(0, includedCredits + purchasedCredits - usedCredits);
+  return {
+    planKey,
+    includedCredits,
+    purchasedCredits,
+    usedCredits,
+    remainingCredits,
+    creditsPerCheck: VISA_TOOL_CREDITS_PER_CHECK,
+    pricing: getCreditPricingFromPlan(plan, currencyInput),
+  };
+}
+
 function normalizeCouponCode(code: unknown): string {
   return String(code || "").trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 32);
 }
@@ -5702,6 +5747,145 @@ export async function registerRoutes(
     });
   });
 
+  app.post("/api/b2c/payments/visa-tools-credits/order", requireB2cAuth, async (req, res) => {
+    const user = await storage.getB2cUser(req.session.b2cUserId!);
+    if (!user) return res.status(401).json({ error: "User not found" });
+    const plan = await storage.getB2cPlan(getB2cUserPlanKey(user)) || await storage.getB2cPlan("free");
+    const pricing = getCreditPricingFromPlan(plan, req.body?.currency);
+    const units = Math.max(1, Math.min(100, Math.floor(Number(req.body?.units || 1) || 1)));
+    const credits = units * pricing.unit;
+    const checkoutAmount = units * pricing.amountPerUnit;
+
+    const cfg = await storage.getPaymentGatewayConfig();
+    const cashfree = getCashfreeCredentials(cfg);
+    if (!cashfree.clientId || !cashfree.clientSecret) {
+      return res.status(503).json({ error: `Cashfree ${cashfree.mode} credentials are not configured. Please add them in SaaS Admin > Integrations.` });
+    }
+    const modeError = validateCashfreeMode(cashfree.mode, cashfree.clientId, cashfree.clientSecret);
+    if (modeError) return res.status(400).json({ error: modeError });
+
+    const orderId = `VS_CREDITS_${pricing.currency}_${Date.now()}_${randomUUID().slice(0, 8)}`;
+    await storage.createB2cCreditOrder({
+      userId: user.id,
+      orderId,
+      credits,
+      amount: checkoutAmount,
+      currency: pricing.currency,
+      status: "created",
+      creditedAt: null,
+    } as any);
+
+    const origin = getRequestOrigin(req);
+    const requestId = randomUUID();
+    const payload = {
+      order_id: orderId,
+      order_amount: checkoutAmount,
+      order_currency: pricing.currency,
+      order_note: `Visa Shuttle Visa Tools Credits - ${credits}`,
+      customer_details: {
+        customer_id: user.id.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 45),
+        customer_email: user.email,
+        customer_name: user.fullName,
+        customer_phone: getCashfreePhone(user.phone),
+      },
+      order_meta: {
+        return_url: `${origin}/payment/visa-tools-credits/return?order_id=${orderId}`,
+      },
+      order_tags: {
+        product: "visa_tools_credits",
+        user_id: user.id,
+        credits: String(credits),
+        units: String(units),
+      },
+    };
+
+    let response: globalThis.Response;
+    try {
+      response = await fetch(`${cashfree.baseUrl}/orders`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-version": cashfree.apiVersion,
+          "x-client-id": cashfree.clientId,
+          "x-client-secret": cashfree.clientSecret,
+          "x-request-id": requestId,
+          "x-idempotency-key": randomUUID(),
+        },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(20000),
+      });
+    } catch (err) {
+      console.error("[Cashfree] Create credit order network error:", err);
+      return res.status(503).json({ error: "Cashfree checkout is temporarily unreachable. Please try again in a few minutes." });
+    }
+
+    const data = await readCashfreeBody(response);
+    if (!response.ok) {
+      console.error("[Cashfree] Create credit order failed:", { status: response.status, requestId, response: data });
+      return res.status(response.status >= 500 ? 503 : response.status).json({
+        error: response.status >= 500 ? "Cashfree gateway is temporarily unavailable. Please try again in a few minutes." : data?.message || "Unable to create Cashfree order",
+      });
+    }
+
+    res.json({
+      orderId: data.order_id || orderId,
+      paymentSessionId: data.payment_session_id,
+      mode: cashfree.mode,
+      amount: checkoutAmount,
+      currency: pricing.currency,
+      credits,
+      units,
+      unit: pricing.unit,
+      amountPerUnit: pricing.amountPerUnit,
+    });
+  });
+
+  app.get("/api/b2c/payments/visa-tools-credits/order/:orderId", requireB2cAuth, async (req, res) => {
+    const user = await storage.getB2cUser(req.session.b2cUserId!);
+    if (!user) return res.status(401).json({ error: "User not found" });
+    const orderId = req.params.orderId;
+    if (!/^VS_CREDITS_[a-zA-Z0-9_-]+$/.test(orderId)) return res.status(400).json({ error: "Invalid order id" });
+    const localOrder = await storage.getB2cCreditOrderByOrderId(orderId);
+    if (!localOrder || localOrder.userId !== user.id) return res.status(404).json({ error: "Credit order not found" });
+
+    const cfg = await storage.getPaymentGatewayConfig();
+    const cashfree = getCashfreeCredentials(cfg);
+    if (!cashfree.clientId || !cashfree.clientSecret) return res.status(503).json({ error: "Cashfree credentials are not configured" });
+
+    let response: globalThis.Response;
+    try {
+      response = await fetch(`${cashfree.baseUrl}/orders/${encodeURIComponent(orderId)}`, {
+        headers: {
+          "x-api-version": cashfree.apiVersion,
+          "x-client-id": cashfree.clientId,
+          "x-client-secret": cashfree.clientSecret,
+          "x-request-id": randomUUID(),
+        },
+        signal: AbortSignal.timeout(20000),
+      });
+    } catch (err) {
+      console.error("[Cashfree] Verify credit order network error:", err);
+      return res.status(503).json({ error: "Cashfree checkout is temporarily unreachable. Please try again in a few minutes." });
+    }
+
+    const data = await readCashfreeBody(response);
+    if (!response.ok) {
+      console.error("[Cashfree] Verify credit order failed:", data);
+      return res.status(response.status >= 500 ? 503 : response.status).json({
+        error: response.status >= 500 ? "Cashfree gateway is temporarily unavailable. Please try again in a few minutes." : data?.message || "Unable to verify Cashfree order",
+      });
+    }
+    const isPaid = data.order_status === "PAID";
+    const order = isPaid && localOrder.status !== "paid" ? await storage.markB2cCreditOrderPaid(orderId) : localOrder;
+    res.json({
+      orderId,
+      status: data.order_status,
+      paid: isPaid,
+      credits: order?.credits ?? localOrder.credits,
+      summary: await getB2cCreditSummary(user),
+    });
+  });
+
   // === B2C Visa Check Routes ===
 
   app.post("/api/b2c/check", requireB2cAuth, async (req, res) => {
@@ -5894,6 +6078,12 @@ export async function registerRoutes(
     res.json(checks);
   });
 
+  app.get("/api/b2c/visa-tools/credits", requireB2cAuth, async (req, res) => {
+    const user = await storage.getB2cUser(req.session.b2cUserId!);
+    if (!user) return res.status(401).json({ error: "User not found" });
+    res.json(await getB2cCreditSummary(user, req.query.currency));
+  });
+
   app.get("/api/b2c/visa-tools/checks/:id", requireB2cAuth, async (req, res) => {
     const userId = req.session.b2cUserId!;
     const check = await storage.getVisaToolCheck(req.params.id);
@@ -5905,6 +6095,15 @@ export async function registerRoutes(
 
   app.post("/api/b2c/visa-tools/analyze", requireB2cAuth, async (req, res) => {
     const userId = req.session.b2cUserId!;
+    const user = await storage.getB2cUser(userId);
+    if (!user) return res.status(401).json({ error: "User not found" });
+    const creditSummary = await getB2cCreditSummary(user);
+    if (creditSummary.remainingCredits < VISA_TOOL_CREDITS_PER_CHECK) {
+      return res.status(402).json({
+        error: `You need ${VISA_TOOL_CREDITS_PER_CHECK} Visa Tools credits to run this check. Please buy additional credits.`,
+        credits: creditSummary,
+      });
+    }
     if (!enforceVisaToolRateLimit(userId)) {
       return res.status(429).json({ error: "Visa Tools usage limit reached. Please try again later." });
     }
@@ -5969,7 +6168,7 @@ export async function registerRoutes(
           },
         } as any,
       });
-      res.json({ check, result: check.claudeResponseJson });
+      res.json({ check, result: check.claudeResponseJson, credits: await getB2cCreditSummary(user) });
     } catch (err: any) {
       console.error("[Visa Tools] Error:", err);
       const message = err?.message === "Anthropic API key not configured"

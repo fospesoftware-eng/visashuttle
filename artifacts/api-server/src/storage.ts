@@ -26,6 +26,7 @@ import {
   type PaymentGatewayConfig, type InsertPaymentGatewayConfig,
   type B2cCoupon, type InsertB2cCoupon,
   type B2cPlan, type InsertB2cPlan,
+  type B2cCreditOrder, type InsertB2cCreditOrder,
   type TenantPaymentGatewayConfig, type InsertTenantPaymentGatewayConfig,
   type TenantSmsConfig, type InsertTenantSmsConfig,
   type FeeTemplate, type InsertFeeTemplate,
@@ -54,6 +55,7 @@ import {
   paymentGatewayConfig as paymentGatewayConfigTable,
   b2cCoupons as b2cCouponsTable,
   b2cPlans as b2cPlansTable,
+  b2cCreditOrders as b2cCreditOrdersTable,
   tenantPaymentGatewayConfig as tenantPaymentGatewayConfigTable,
   tenantSmsConfig as tenantSmsConfigTable,
   feeTemplates as feeTemplatesTable,
@@ -123,7 +125,12 @@ export const DEFAULT_B2C_PLANS: InsertB2cPlan[] = [
       "Basic next steps",
       "100 Visa Tools Credit",
     ],
-    conditions: { cta: "Start Free", checkout: false },
+    conditions: {
+      cta: "Start Free",
+      checkout: false,
+      extraCreditUnit: 100,
+      extraCreditPrices: { USD: 2, INR: 170, AED: 8, GBP: 2, EUR: 2 },
+    },
     basicCheckLimit: 1,
     deepCheckLimit: 0,
     visaToolsCredits: 100,
@@ -148,7 +155,12 @@ export const DEFAULT_B2C_PLANS: InsertB2cPlan[] = [
       "Priority support",
       "500 Visa Tools Credit",
     ],
-    conditions: { cta: "Get Deep Check", checkout: true },
+    conditions: {
+      cta: "Get Deep Check",
+      checkout: true,
+      extraCreditUnit: 100,
+      extraCreditPrices: { USD: 2, INR: 170, AED: 8, GBP: 2, EUR: 2 },
+    },
     basicCheckLimit: 1,
     deepCheckLimit: 1,
     visaToolsCredits: 500,
@@ -170,6 +182,8 @@ export const DEFAULT_B2C_PLANS: InsertB2cPlan[] = [
       cta: "Upgrade to Pro",
       checkout: true,
       note: "*Unlimited Basic checks are subject to fair usage and abuse prevention.",
+      extraCreditUnit: 100,
+      extraCreditPrices: { USD: 2, INR: 170, AED: 8, GBP: 2, EUR: 2 },
     },
     basicCheckLimit: 9999,
     deepCheckLimit: 10,
@@ -344,6 +358,10 @@ export interface IStorage {
   getB2cPlans(): Promise<B2cPlan[]>;
   getB2cPlan(planKey: string): Promise<B2cPlan | undefined>;
   upsertB2cPlan(planKey: string, data: Partial<InsertB2cPlan>): Promise<B2cPlan>;
+  getB2cCreditOrdersByUserId(userId: string): Promise<B2cCreditOrder[]>;
+  getB2cCreditOrderByOrderId(orderId: string): Promise<B2cCreditOrder | undefined>;
+  createB2cCreditOrder(data: InsertB2cCreditOrder): Promise<B2cCreditOrder>;
+  markB2cCreditOrderPaid(orderId: string): Promise<B2cCreditOrder | undefined>;
 
   // Per-tenant Payment Gateway Config (Cashfree)
   getTenantPaymentGatewayConfig(tenantId: string): Promise<TenantPaymentGatewayConfig | undefined>;
@@ -408,6 +426,7 @@ export class MemStorage implements IStorage {
   private paymentGatewayConfigRecord?: PaymentGatewayConfig;
   private b2cCouponsMap: Map<string, B2cCoupon> = new Map();
   private b2cPlansMap: Map<string, B2cPlan> = new Map();
+  private b2cCreditOrdersMap: Map<string, B2cCreditOrder> = new Map();
   private tenantPaymentGatewayConfigByTenant: Map<string, TenantPaymentGatewayConfig> = new Map();
   private tenantSmsConfigByTenant: Map<string, TenantSmsConfig> = new Map();
   private feeTemplates: Map<string, FeeTemplate> = new Map();
@@ -2297,6 +2316,36 @@ export class MemStorage implements IStorage {
     this.b2cPlansMap.set(planKey, row);
     return row;
   }
+  async getB2cCreditOrdersByUserId(userId: string): Promise<B2cCreditOrder[]> {
+    return Array.from(this.b2cCreditOrdersMap.values()).filter(o => o.userId === userId);
+  }
+  async getB2cCreditOrderByOrderId(orderId: string): Promise<B2cCreditOrder | undefined> {
+    return Array.from(this.b2cCreditOrdersMap.values()).find(o => o.orderId === orderId);
+  }
+  async createB2cCreditOrder(data: InsertB2cCreditOrder): Promise<B2cCreditOrder> {
+    const now = new Date();
+    const row: B2cCreditOrder = {
+      id: randomUUID(),
+      userId: data.userId,
+      orderId: data.orderId,
+      credits: data.credits ?? 0,
+      amount: data.amount ?? 0,
+      currency: data.currency ?? "USD",
+      status: data.status ?? "created",
+      creditedAt: data.creditedAt ?? null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.b2cCreditOrdersMap.set(row.id, row);
+    return row;
+  }
+  async markB2cCreditOrderPaid(orderId: string): Promise<B2cCreditOrder | undefined> {
+    const existing = await this.getB2cCreditOrderByOrderId(orderId);
+    if (!existing) return undefined;
+    const updated = { ...existing, status: "paid", creditedAt: existing.creditedAt ?? new Date(), updatedAt: new Date() } as B2cCreditOrder;
+    this.b2cCreditOrdersMap.set(existing.id, updated);
+    return updated;
+  }
 }
 
 // HybridStorage: uses PostgreSQL for DB-backed production data. Local
@@ -3760,6 +3809,82 @@ class HybridStorage extends MemStorage {
       return rows[0];
     } catch (error) {
       if (shouldUseMemoryFallback(error)) return super.upsertB2cPlan(key, data);
+      throw error;
+    }
+  }
+
+  private async ensureB2cCreditOrderTable(): Promise<void> {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS b2c_credit_orders (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id varchar NOT NULL,
+        order_id text NOT NULL UNIQUE,
+        credits integer NOT NULL DEFAULT 0,
+        amount integer NOT NULL DEFAULT 0,
+        currency text NOT NULL DEFAULT 'USD',
+        status text NOT NULL DEFAULT 'created',
+        credited_at timestamp,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      )
+    `);
+  }
+
+  async getB2cCreditOrdersByUserId(userId: string): Promise<B2cCreditOrder[]> {
+    try {
+      return await db.select().from(b2cCreditOrdersTable).where(eq(b2cCreditOrdersTable.userId, userId)).orderBy(desc(b2cCreditOrdersTable.createdAt));
+    } catch (error) {
+      if (isMissingRelationError(error)) {
+        await this.ensureB2cCreditOrderTable();
+        return [];
+      }
+      if (shouldUseMemoryFallback(error)) return super.getB2cCreditOrdersByUserId(userId);
+      throw error;
+    }
+  }
+
+  async getB2cCreditOrderByOrderId(orderId: string): Promise<B2cCreditOrder | undefined> {
+    try {
+      const rows = await db.select().from(b2cCreditOrdersTable).where(eq(b2cCreditOrdersTable.orderId, orderId)).limit(1);
+      return rows[0];
+    } catch (error) {
+      if (isMissingRelationError(error)) {
+        await this.ensureB2cCreditOrderTable();
+        return undefined;
+      }
+      if (shouldUseMemoryFallback(error)) return super.getB2cCreditOrderByOrderId(orderId);
+      throw error;
+    }
+  }
+
+  async createB2cCreditOrder(data: InsertB2cCreditOrder): Promise<B2cCreditOrder> {
+    try {
+      const rows = await db.insert(b2cCreditOrdersTable).values(data).returning();
+      return rows[0];
+    } catch (error) {
+      if (isMissingRelationError(error)) {
+        await this.ensureB2cCreditOrderTable();
+        const rows = await db.insert(b2cCreditOrdersTable).values(data).returning();
+        return rows[0];
+      }
+      if (shouldUseMemoryFallback(error)) return super.createB2cCreditOrder(data);
+      throw error;
+    }
+  }
+
+  async markB2cCreditOrderPaid(orderId: string): Promise<B2cCreditOrder | undefined> {
+    try {
+      const rows = await db.update(b2cCreditOrdersTable)
+        .set({ status: "paid", creditedAt: new Date(), updatedAt: new Date() } as any)
+        .where(eq(b2cCreditOrdersTable.orderId, orderId))
+        .returning();
+      return rows[0];
+    } catch (error) {
+      if (isMissingRelationError(error)) {
+        await this.ensureB2cCreditOrderTable();
+        return undefined;
+      }
+      if (shouldUseMemoryFallback(error)) return super.markB2cCreditOrderPaid(orderId);
       throw error;
     }
   }

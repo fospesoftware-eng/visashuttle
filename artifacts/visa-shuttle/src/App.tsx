@@ -25,6 +25,7 @@ import HistoryPage from "@/pages/history";
 import HistoryDetailPage from "@/pages/history-detail";
 import DeepCheckPage from "@/pages/deep-check";
 import DeepCheckPaymentPage from "@/pages/deep-check-payment";
+import VisaToolsCreditPaymentPage from "@/pages/visa-tools-credit-payment";
 import SavedProfilePage from "@/pages/saved-profile";
 import SettingsPage from "@/pages/settings";
 import VisaToolsPage from "@/pages/visa-tools";
@@ -126,6 +127,8 @@ function Router() {
       <Route path="/deep-check" component={DeepCheckPage} />
       <Route path="/payment/deep-check/return" component={DeepCheckPaymentPage} />
       <Route path="/payment/deep-check" component={DeepCheckPaymentPage} />
+      <Route path="/payment/visa-tools-credits/return" component={VisaToolsCreditPaymentPage} />
+      <Route path="/payment/visa-tools-credits" component={VisaToolsCreditPaymentPage} />
       <Route path="/saved-profile" component={SavedProfilePage} />
       <Route path="/settings" component={SettingsPage} />
       <Route path="/visa-tools" component={VisaToolsPage} />
