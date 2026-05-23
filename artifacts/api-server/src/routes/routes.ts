@@ -6010,6 +6010,175 @@ export async function registerRoutes(
     }
   });
 
+  // ===== B2C Deep Check PDF + Email =====
+
+  function hasDeepCheckReportAccess(user: any): boolean {
+    const plan = String(user?.subscriptionPlan || "").toLowerCase();
+    return Boolean(user?.deepCheckAccess || plan === "deep" || plan === "pro" || plan === "demo");
+  }
+
+  function asText(value: unknown, fallback = "—"): string {
+    const text = String(value ?? "").trim();
+    return text || fallback;
+  }
+
+  function asStringList(value: unknown): string[] {
+    if (!value) return [];
+    if (Array.isArray(value)) {
+      return value
+        .map((item) => {
+          if (typeof item === "string") return item;
+          if (item && typeof item === "object") {
+            const obj = item as Record<string, unknown>;
+            return [obj.factor, obj.detail, obj.mitigation, obj.action, obj.description, obj.title]
+              .map((part) => String(part ?? "").trim())
+              .filter(Boolean)
+              .join(": ");
+          }
+          return String(item ?? "");
+        })
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+    if (typeof value === "object") {
+      return Object.entries(value as Record<string, unknown>)
+        .map(([key, val]) => `${key}: ${String(val ?? "").trim()}`)
+        .filter((item) => !item.endsWith(":"));
+    }
+    return String(value).split(/\n|;/).map((item) => item.trim()).filter(Boolean);
+  }
+
+  function deepReportFilename(check: any): string {
+    const shortId = String(check?.id || "report").slice(0, 8);
+    return `visa-shuttle-deep-check-${shortId}.pdf`;
+  }
+
+  async function renderB2cDeepCheckPdfBuffer(user: any, check: any): Promise<Buffer> {
+    const PDFDocumentMod: any = await import("pdfkit");
+    const PDFDocument = PDFDocumentMod.default ?? PDFDocumentMod;
+    const { PassThrough } = await import("node:stream");
+    const stream = new PassThrough();
+    const chunks: Buffer[] = [];
+    stream.on("data", (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
+    const done = new Promise<Buffer>((resolve, reject) => {
+      stream.on("end", () => resolve(Buffer.concat(chunks)));
+      stream.on("error", reject);
+    });
+
+    const form = check?.formData || {};
+    const result = check?.aiResponse || {};
+    const score = Number(check?.approvalChance ?? result?.approvalChance ?? 0);
+    const statusLabel = asText(check?.statusLabel ?? result?.statusLabel, "Saved Result");
+    const doc = new PDFDocument({ size: "A4", margin: 48 });
+    doc.pipe(stream);
+
+    const pageWidth = doc.page.width;
+    const accent = "#4055FF";
+    const muted = "#64748b";
+    const dark = "#0f172a";
+    const lightBorder = "#e2e8f0";
+    const createdAt = check?.createdAt
+      ? new Date(check.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+      : new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
+    const ensureSpace = (height = 80) => {
+      if (doc.y + height > doc.page.height - 56) doc.addPage();
+    };
+    const sectionTitle = (title: string) => {
+      ensureSpace(50);
+      doc.moveDown(1);
+      doc.fillColor(dark).fontSize(14).font("Helvetica-Bold").text(title);
+      doc.moveDown(0.35);
+      doc.strokeColor(lightBorder).lineWidth(0.7).moveTo(48, doc.y).lineTo(pageWidth - 48, doc.y).stroke();
+      doc.moveDown(0.6);
+    };
+    const bulletList = (items: string[]) => {
+      if (!items.length) {
+        doc.fillColor(muted).fontSize(10).font("Helvetica").text("No specific items were provided by the analysis.");
+        return;
+      }
+      items.slice(0, 12).forEach((item) => {
+        ensureSpace(32);
+        doc.fillColor(accent).fontSize(10).text("•", 56, doc.y, { continued: true });
+        doc.fillColor("#334155").font("Helvetica").text(`  ${item}`, { width: pageWidth - 112 });
+        doc.moveDown(0.35);
+      });
+    };
+
+    doc.rect(0, 0, pageWidth, 7).fill(accent);
+    doc.fillColor(dark).fontSize(21).font("Helvetica-Bold").text("Visa Shuttle Deep Check Report", 48, 34);
+    doc.fillColor(muted).fontSize(10).font("Helvetica").text(`Generated: ${createdAt}`, 48, 62);
+    doc.fillColor(muted).fontSize(9).text(`Report ID: ${asText(check?.id)}`, 48, 78);
+
+    const scoreX = pageWidth - 170;
+    doc.roundedRect(scoreX, 34, 122, 74, 12).fill("#f8fafc").stroke(lightBorder);
+    doc.fillColor(accent).fontSize(26).font("Helvetica-Bold").text(`${Math.max(0, Math.min(100, score))}%`, scoreX, 48, { width: 122, align: "center" });
+    doc.fillColor("#334155").fontSize(9).font("Helvetica-Bold").text(statusLabel, scoreX + 8, 80, { width: 106, align: "center" });
+
+    doc.moveDown(3);
+    sectionTitle("Applicant & Visa Summary");
+    const summaryRows = [
+      ["Applicant", user?.fullName || form.fullName || user?.email],
+      ["Email", user?.email],
+      ["Nationality", form.nationality],
+      ["Residence", form.countryOfResidence],
+      ["Destination", form.destinationCountry],
+      ["Visa type", form.visaType],
+      ["Profile grade", result.profileGrade],
+      ["Confidence", result.confidenceLevel],
+    ];
+    const leftX = 48;
+    const rightX = 300;
+    summaryRows.forEach(([label, value], index) => {
+      const x = index % 2 === 0 ? leftX : rightX;
+      if (index % 2 === 0 && index > 0) doc.moveDown(0.8);
+      const y = doc.y;
+      doc.fillColor("#94a3b8").fontSize(8).font("Helvetica-Bold").text(String(label).toUpperCase(), x, y);
+      doc.fillColor(dark).fontSize(10).font("Helvetica").text(asText(value), x, y + 12, { width: 220 });
+      if (index % 2 === 1) doc.y = y + 31;
+    });
+
+    if (result.summary) {
+      sectionTitle("AI Summary");
+      doc.fillColor("#334155").fontSize(10.5).font("Helvetica").text(asText(result.summary), { width: pageWidth - 96, lineGap: 3 });
+    }
+
+    if (result.dimensionScores && typeof result.dimensionScores === "object") {
+      sectionTitle("Profile Dimensions");
+      Object.entries(result.dimensionScores as Record<string, unknown>).forEach(([key, value]) => {
+        ensureSpace(24);
+        const pct = Math.max(0, Math.min(100, Number(value) || 0));
+        const label = key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
+        doc.fillColor("#334155").fontSize(9).font("Helvetica").text(label, 48, doc.y, { width: 170 });
+        doc.roundedRect(220, doc.y + 2, 220, 7, 4).fill("#e2e8f0");
+        doc.roundedRect(220, doc.y - 7, 220 * (pct / 100), 7, 4).fill(accent);
+        doc.fillColor(dark).fontSize(9).font("Helvetica-Bold").text(`${pct}%`, 455, doc.y - 10, { width: 50, align: "right" });
+        doc.moveDown(0.55);
+      });
+    }
+
+    sectionTitle("Strengths");
+    bulletList(asStringList(result.strengths || result.positiveIndicators));
+
+    sectionTitle("Risk Factors");
+    bulletList(asStringList(result.riskDetails || result.riskFactors || result.redFlags));
+
+    sectionTitle("Document Guidance");
+    bulletList(asStringList(result.missingDocuments || result.documentGaps || result.requiredDocuments));
+
+    sectionTitle("Action Plan");
+    bulletList(asStringList(result.actionPlan || result.recommendedNextSteps));
+
+    sectionTitle("Important Disclaimer");
+    doc.fillColor("#475569").fontSize(9.5).font("Helvetica").text(
+      "This PDF is an AI-assisted visa risk analysis generated by Visa Shuttle. It is informational only and does not guarantee approval. Final visa decisions are made only by embassies, consulates, and immigration authorities.",
+      { width: pageWidth - 96, lineGap: 3 },
+    );
+
+    doc.end();
+    return done;
+  }
+
   // === Deep Check Route (Claude-powered) ===
   app.post("/api/b2c/deep-check", requireB2cAuth, async (req, res) => {
     const userId = req.session.b2cUserId!;
@@ -6068,6 +6237,86 @@ export async function registerRoutes(
       return res.status(404).json({ error: "Check not found" });
     }
     res.json(check);
+  });
+
+  app.get("/api/b2c/deep-checks/:id/pdf", requireB2cAuth, async (req, res) => {
+    try {
+      const userId = req.session.b2cUserId!;
+      const user = await storage.getB2cUser(userId);
+      if (!user) return res.status(401).json({ error: "User not found" });
+      if (!hasDeepCheckReportAccess(user)) {
+        return res.status(403).json({ error: "PDF reports are available for Deep Check and Pro users" });
+      }
+
+      const check = await storage.getVisaCheck(req.params.id);
+      if (!check || check.userId !== userId || check.checkType !== "deep") {
+        return res.status(404).json({ error: "Deep Check report not found" });
+      }
+
+      const pdfBuf = await renderB2cDeepCheckPdfBuffer(user, check);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${deepReportFilename(check)}"`);
+      res.send(pdfBuf);
+    } catch (err: any) {
+      console.error("[Deep Check PDF] Error:", err);
+      res.status(500).json({ error: err?.message || "Failed to generate Deep Check PDF" });
+    }
+  });
+
+  app.post("/api/b2c/deep-checks/:id/email", requireB2cAuth, async (req, res) => {
+    try {
+      const userId = req.session.b2cUserId!;
+      const user = await storage.getB2cUser(userId);
+      if (!user) return res.status(401).json({ error: "User not found" });
+      if (!hasDeepCheckReportAccess(user)) {
+        return res.status(403).json({ error: "Email reports are available for Deep Check and Pro users" });
+      }
+
+      const check = await storage.getVisaCheck(req.params.id);
+      if (!check || check.userId !== userId || check.checkType !== "deep") {
+        return res.status(404).json({ error: "Deep Check report not found" });
+      }
+
+      const to = String(req.body?.to || user.email || "").trim();
+      if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+        return res.status(400).json({ error: "A valid recipient email is required" });
+      }
+
+      const form = (check.formData || {}) as Record<string, any>;
+      const aiResponse = (check.aiResponse || {}) as Record<string, any>;
+      const pdfBuf = await renderB2cDeepCheckPdfBuffer(user, check);
+      const subject = `Your Visa Shuttle Deep Check report`;
+      const route = [form.nationality, form.destinationCountry].filter(Boolean).join(" to ");
+      const text =
+        `Hi ${user.fullName || "there"},\n\n` +
+        `Your Visa Shuttle Deep Check report${route ? ` for ${route}` : ""} is attached.\n\n` +
+        `Approval estimate: ${check.approvalChance ?? aiResponse.approvalChance ?? "—"}%\n` +
+        `Status: ${check.statusLabel ?? aiResponse.statusLabel ?? "—"}\n\n` +
+        `This is an AI-assisted report only. Please verify with official immigration sources.\n\n` +
+        `Visa Shuttle`;
+      const html =
+        `<p>Hi ${user.fullName || "there"},</p>` +
+        `<p>Your Visa Shuttle Deep Check report${route ? ` for <strong>${route}</strong>` : ""} is attached.</p>` +
+        `<p><strong>Approval estimate:</strong> ${check.approvalChance ?? aiResponse.approvalChance ?? "—"}%<br>` +
+        `<strong>Status:</strong> ${check.statusLabel ?? aiResponse.statusLabel ?? "—"}</p>` +
+        `<p style="color:#64748b;font-size:13px">This is an AI-assisted report only. Please verify with official immigration sources.</p>`;
+      const emailResult = await sendTransactionalEmail({
+        to,
+        toName: user.fullName || to,
+        subject,
+        text,
+        html,
+        attachments: [{ filename: deepReportFilename(check), content: pdfBuf.toString("base64"), mimeType: "application/pdf" }],
+      });
+
+      if (!emailResult.ok) {
+        return res.status(502).json({ error: emailResult.error || "Email provider failed", provider: emailResult.provider, status: emailResult.status });
+      }
+      res.json({ ok: true, sent: true, to, provider: emailResult.provider });
+    } catch (err: any) {
+      console.error("[Deep Check Email] Error:", err);
+      res.status(500).json({ error: err?.message || "Failed to email Deep Check report" });
+    }
   });
 
   // === B2C Visa Tools Routes ===

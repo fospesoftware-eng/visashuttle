@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
 import {
   AlertCircle,
@@ -8,13 +8,18 @@ import {
   Brain,
   CheckCircle,
   Clock,
+  Download,
   FileText,
   Info,
+  Loader2,
+  Mail,
   TrendingUp,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -124,6 +129,8 @@ export default function HistoryDetailPage() {
   const [, setLocation] = useLocation();
   const [, params] = useRoute<{ id: string }>("/history/:id");
   const id = params?.id;
+  const { toast } = useToast();
+  const [isEmailingReport, setIsEmailingReport] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) setLocation("/sign-in");
@@ -183,6 +190,23 @@ export default function HistoryDetailPage() {
   const date = check.createdAt
     ? new Date(check.createdAt).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
     : "Saved check";
+  const canUseDeepReport = check.checkType === "deep" && Boolean(user.deepCheckAccess || ["deep", "pro", "demo"].includes(String(user.subscriptionPlan || "").toLowerCase()));
+  const downloadDeepReport = () => {
+    if (!canUseDeepReport) return;
+    window.open(`/api/b2c/deep-checks/${check.id}/pdf`, "_blank", "noopener,noreferrer");
+  };
+  const emailDeepReport = async () => {
+    if (!canUseDeepReport) return;
+    setIsEmailingReport(true);
+    try {
+      await apiRequest("POST", `/api/b2c/deep-checks/${check.id}/email`, {});
+      toast({ title: "Report emailed", description: `Your Deep Check PDF was sent to ${user.email}.` });
+    } catch (err: any) {
+      toast({ title: "Email failed", description: err.message || "Please check email settings and try again.", variant: "destructive" });
+    } finally {
+      setIsEmailingReport(false);
+    }
+  };
 
   return (
     <DashboardLayout title="Saved Visa Result" subtitle={`${form.visaType || check.checkType} → ${form.destinationCountry || "Destination"}`}>
@@ -198,6 +222,18 @@ export default function HistoryDetailPage() {
             <Clock className="w-3.5 h-3.5" />
             {date}
           </div>
+          {canUseDeepReport && (
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" className="gap-2" onClick={downloadDeepReport}>
+                <Download className="w-4 h-4" />
+                Download PDF
+              </Button>
+              <Button variant="outline" size="sm" className="gap-2" onClick={emailDeepReport} disabled={isEmailingReport}>
+                {isEmailingReport ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                Email PDF
+              </Button>
+            </div>
+          )}
         </div>
 
         <Card className="overflow-hidden border-0 shadow-xl">

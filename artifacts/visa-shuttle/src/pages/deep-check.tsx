@@ -6,7 +6,8 @@ import {
   TrendingUp, Download, Shield, ArrowRight, Zap, ChevronLeft,
   ChevronRight, Brain, User, Plane, CreditCard, Globe, Home,
   Info, RefreshCw, Flag, Star, AlertTriangle, Activity, BookOpen,
-  Briefcase, BadgeCheck, BarChart3, ClipboardList, Plus, Trash2, Users
+  Briefcase, BadgeCheck, BarChart3, ClipboardList, Plus, Trash2, Users,
+  Mail, Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -224,7 +225,9 @@ export default function DeepCheckPage() {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<Record<string, string>>({ ...BLANK });
   const [result, setResult] = useState<any>(null);
+  const [resultCheckId, setResultCheckId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEmailingReport, setIsEmailingReport] = useState(false);
   const [consentChecked, setConsentChecked] = useState(false);
   const [consentError, setConsentError] = useState("");
   const [visaHoldings, setVisaHoldings] = useState<VisaHolding[]>([]);
@@ -306,6 +309,37 @@ export default function DeepCheckPage() {
   const deepCheckPrice = formatB2cPrice(getStoredB2cCurrency());
   const basicCheckPrice = formatB2cPrice(getStoredB2cCurrency(), 0);
 
+  const resetDeepCheck = () => {
+    setResult(null);
+    setResultCheckId(null);
+    setStep(1);
+    setForm({ ...BLANK });
+  };
+
+  const downloadDeepCheckReport = () => {
+    if (!resultCheckId) {
+      toast({ title: "Report is not ready", description: "Please run the Deep Check again to generate a downloadable report.", variant: "destructive" });
+      return;
+    }
+    window.open(`/api/b2c/deep-checks/${resultCheckId}/pdf`, "_blank", "noopener,noreferrer");
+  };
+
+  const emailDeepCheckReport = async () => {
+    if (!resultCheckId) {
+      toast({ title: "Report is not ready", description: "Please run the Deep Check again to email the report.", variant: "destructive" });
+      return;
+    }
+    setIsEmailingReport(true);
+    try {
+      await apiRequest("POST", `/api/b2c/deep-checks/${resultCheckId}/email`, {});
+      toast({ title: "Report emailed", description: `Your Deep Check PDF was sent to ${user.email}.` });
+    } catch (err: any) {
+      toast({ title: "Email failed", description: err.message || "Please check email settings and try again.", variant: "destructive" });
+    } finally {
+      setIsEmailingReport(false);
+    }
+  };
+
   // ===================== RESULT SCORECARD =====================
   if (result) {
     const score: number = result.approvalChance ?? 0;
@@ -339,9 +373,18 @@ export default function DeepCheckPage() {
                 </div>
               )}
             </div>
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => { setResult(null); setStep(1); setForm({ ...BLANK }); }}>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" className="gap-2" onClick={downloadDeepCheckReport} disabled={!resultCheckId}>
+                <Download className="w-3.5 h-3.5" /> Download PDF
+              </Button>
+              <Button variant="outline" size="sm" className="gap-2" onClick={emailDeepCheckReport} disabled={!resultCheckId || isEmailingReport}>
+                {isEmailingReport ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+                Email PDF
+              </Button>
+              <Button variant="outline" size="sm" className="gap-2" onClick={resetDeepCheck}>
               <RefreshCw className="w-3.5 h-3.5" /> New Deep Check
-            </Button>
+              </Button>
+            </div>
           </div>
 
           {/* Score hero */}
@@ -582,8 +625,15 @@ export default function DeepCheckPage() {
 
           <div className="flex flex-wrap gap-3">
             <Button className="gap-2" style={{ background: "linear-gradient(135deg,#4055FF,#FF2060)" }}
-              onClick={() => { setResult(null); setStep(1); setForm({ ...BLANK }); }}>
+              onClick={resetDeepCheck}>
               <RefreshCw className="w-4 h-4" /> New Deep Check
+            </Button>
+            <Button variant="outline" className="gap-2" onClick={downloadDeepCheckReport} disabled={!resultCheckId}>
+              <Download className="w-4 h-4" /> Download PDF
+            </Button>
+            <Button variant="outline" className="gap-2" onClick={emailDeepCheckReport} disabled={!resultCheckId || isEmailingReport}>
+              {isEmailingReport ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+              Email PDF
             </Button>
             <Link href="/history">
               <Button variant="outline" className="gap-2">View History</Button>
@@ -731,6 +781,7 @@ export default function DeepCheckPage() {
       await new Promise(resolve => setTimeout(resolve, 900));
 
       setResult(data.result);
+      setResultCheckId(data.check?.id ?? null);
       await queryClient.invalidateQueries({ queryKey: ["/api/b2c/checks"] });
 
       // Auto-save profile from form data
