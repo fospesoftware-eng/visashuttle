@@ -30,7 +30,9 @@ export default function PricingPage() {
   const basicPrice = formatB2cPrice(currency, 0);
   const { data: planData } = useQuery<B2cPlan[]>({ queryKey: ["/api/public/b2c-plans"] });
   const plans = normalizeB2cPlans(planData);
+  const freePlan = plans.find(plan => plan.planKey === "free");
   const deepPlan = plans.find(plan => plan.planKey === "deep");
+  const proPlan = plans.find(plan => plan.planKey === "pro");
   const deepPrice = deepPlan ? formatB2cPlanPrice(deepPlan, currency) : formatB2cPrice(currency);
 
   function handleCurrencyChange(next: B2cCurrency) {
@@ -47,7 +49,12 @@ export default function PricingPage() {
   const comparisonRows = [
     { label: "Basic checks", free: "1", deep: "1", pro: "Unlimited*" },
     { label: "Deep checks", free: "—", deep: "1", pro: "10" },
-    { label: "Visa Tools credits", free: "100", deep: "500", pro: "1000" },
+    {
+      label: "Visa Tools credits",
+      free: String(freePlan?.visaToolsCredits ?? 0),
+      deep: String(deepPlan?.visaToolsCredits ?? 0),
+      pro: String(proPlan?.visaToolsCredits ?? 0),
+    },
     { label: "PDF reports", free: "—", deep: "Included", pro: "Included" },
   ];
 
@@ -219,7 +226,7 @@ export default function PricingPage() {
               { q: "How accurate is the AI scoring?", a: "Our AI analyzes 14 key factors used by immigration authorities and provides a probability estimate. It's a guidance tool, not a legal guarantee." },
               { q: "What is the Deep Check?", a: "Deep Check asks detailed questions across 7 dimensions (personal profile, finances, travel history, home ties, and more) and returns an embassy-style risk analysis with an action plan. It also supports Family applications (spouse + children)." },
               { q: "How much does Deep Check cost?", a: `Deep Check is a one-time report purchase. Current ${currency} price: ${deepPrice}.` },
-              { q: "What is included in Pro?", a: "Pro is a monthly plan with unlimited Basic checks, 10 Deep Checks, and 1000 Visa Tools Credit." },
+              { q: "What is included in Pro?", a: `Pro is a monthly plan with unlimited Basic checks, ${proPlan?.deepCheckLimit ?? 10} Deep Checks, and ${proPlan?.visaToolsCredits ?? 0} Visa Tools Credit.` },
               { q: "Can I check for my family?", a: "Yes. The Deep Check supports Family applicants, covering the primary applicant, spouse, and children traveling together in a single assessment." },
             ].map(({ q, a }) => (
               <div key={q} className="p-5 rounded-xl bg-background border">
