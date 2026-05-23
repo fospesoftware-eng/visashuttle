@@ -6805,7 +6805,16 @@ export async function registerRoutes(
   // All B2C users
   app.get("/api/admin/b2c-users", requireAdminAuth, async (req, res) => {
     const users = await storage.getAllB2cUsers();
-    const safe = users.map(({ password: _, ...u }) => u);
+    const safe = await Promise.all(users.map(async ({ password: _, ...u }) => {
+      const credits = await getB2cCreditSummary(u).catch(() => null);
+      return {
+        ...u,
+        visaToolsCreditsRemaining: credits?.remainingCredits ?? 0,
+        visaToolsCreditsIncluded: credits?.includedCredits ?? 0,
+        visaToolsCreditsPurchased: credits?.purchasedCredits ?? 0,
+        visaToolsCreditsUsed: credits?.usedCredits ?? 0,
+      };
+    }));
     res.json(safe);
   });
 
@@ -6815,6 +6824,30 @@ export async function registerRoutes(
     if (!user) return res.status(404).json({ error: "B2C user not found" });
     const { password: _, ...safeUser } = user;
     res.json(safeUser);
+  });
+
+  // Add Visa Tools credits to a B2C user (admin adjustment)
+  app.post("/api/admin/b2c-users/:id/credits", requireAdminAuth, async (req, res) => {
+    const user = await storage.getB2cUser(req.params.id);
+    if (!user) return res.status(404).json({ error: "B2C user not found" });
+
+    const credits = Math.floor(Number(req.body?.credits || 0));
+    if (!Number.isFinite(credits) || credits <= 0 || credits > 100000) {
+      return res.status(400).json({ error: "Credits must be between 1 and 100000" });
+    }
+
+    const note = String(req.body?.note || "SaaS admin credit adjustment").trim().slice(0, 80);
+    const order = await storage.createB2cCreditOrder({
+      userId: user.id,
+      orderId: `admin_credit_${Date.now()}_${randomUUID().slice(0, 8)}`,
+      credits,
+      amount: 0,
+      currency: "USD",
+      status: "paid",
+      creditedAt: new Date(),
+    });
+    const summary = await getB2cCreditSummary(user);
+    res.json({ ok: true, order: { ...order, note }, credits: summary });
   });
 
   // Delete B2C user (admin)

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Search, MoreVertical, User, Mail, Trash2, Edit2, Users, Globe, Shield } from "lucide-react";
+import { Plus, Search, MoreVertical, User, Mail, Trash2, Edit2, Users, Globe, Shield, Coins } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,6 +54,8 @@ export default function AdminUsersPage() {
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [deleteB2cId, setDeleteB2cId] = useState<string | null>(null);
   const [b2cEditUser, setB2cEditUser] = useState<any>(null);
+  const [creditUser, setCreditUser] = useState<any>(null);
+  const [creditForm, setCreditForm] = useState({ credits: 100, note: "" });
   const [form, setForm] = useState({ name: "", email: "", role: "agency_staff", tenantId: "", password: "" });
 
   const { toast } = useToast();
@@ -113,6 +115,17 @@ export default function AdminUsersPage() {
       qc.invalidateQueries({ queryKey: ["/api/admin/stats"] });
       setDeleteB2cId(null);
       toast({ title: "B2C user deleted" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const addB2cCreditsMutation = useMutation({
+    mutationFn: ({ id, data }: any) => apiRequest("POST", `/api/admin/b2c-users/${id}/credits`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/b2c-users"] });
+      setCreditUser(null);
+      setCreditForm({ credits: 100, note: "" });
+      toast({ title: "Credits added", description: "Visa Tools credits have been added to the user." });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
@@ -295,6 +308,7 @@ export default function AdminUsersPage() {
                       <TableRow>
                         <TableHead>User</TableHead>
                         <TableHead>Plan</TableHead>
+                        <TableHead>Tool Credits</TableHead>
                         <TableHead>Checks Used</TableHead>
                         <TableHead>Deep Check</TableHead>
                         <TableHead>Joined</TableHead>
@@ -320,6 +334,19 @@ export default function AdminUsersPage() {
                               {user.subscriptionPlan}
                             </span>
                           </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Coins className={`w-4 h-4 ${Number(user.visaToolsCreditsRemaining || 0) > 0 ? "text-emerald-600" : "text-red-500"}`} />
+                              <div>
+                                <p className={`text-sm font-bold ${Number(user.visaToolsCreditsRemaining || 0) > 0 ? "text-emerald-700" : "text-red-600"}`}>
+                                  {user.visaToolsCreditsRemaining ?? 0}
+                                </p>
+                                <p className="text-[11px] text-muted-foreground">
+                                  {user.visaToolsCreditsPurchased ?? 0} added · {user.visaToolsCreditsUsed ?? 0} used
+                                </p>
+                              </div>
+                            </div>
+                          </TableCell>
                           <TableCell className="text-sm">{user.freeChecksUsed} / {user.checkLimit}</TableCell>
                           <TableCell>
                             <Badge variant={user.deepCheckAccess ? "default" : "outline"} className="text-xs">
@@ -340,6 +367,9 @@ export default function AdminUsersPage() {
                                 <DropdownMenuItem onClick={() => setB2cEditUser({ ...user })}>
                                   <Edit2 className="w-4 h-4 mr-2" />Edit Plan
                                 </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => { setCreditUser({ ...user }); setCreditForm({ credits: 100, note: "" }); }}>
+                                  <Coins className="w-4 h-4 mr-2" />Add Credits
+                                </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem className="text-destructive" onClick={() => setDeleteB2cId(user.id)}>
                                   <Trash2 className="w-4 h-4 mr-2" />Delete
@@ -350,7 +380,7 @@ export default function AdminUsersPage() {
                         </TableRow>
                       ))}
                       {filteredB2c.length === 0 && (
-                        <TableRow><TableCell colSpan={6} className="text-center py-10 text-muted-foreground">No B2C users yet.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={7} className="text-center py-10 text-muted-foreground">No B2C users yet.</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
@@ -518,6 +548,57 @@ export default function AdminUsersPage() {
               disabled={updateB2cMutation.isPending}
             >
               {updateB2cMutation.isPending ? "Saving…" : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add B2C Visa Tools Credits Dialog */}
+      <Dialog open={!!creditUser} onOpenChange={() => setCreditUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Visa Tools Credits</DialogTitle>
+            <DialogDescription>
+              Add credits directly to {creditUser?.email}. This creates a paid admin adjustment with zero payment amount.
+            </DialogDescription>
+          </DialogHeader>
+          {creditUser && (
+            <div className="space-y-4 mt-2">
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <p className="text-xs text-muted-foreground">Current remaining credits</p>
+                <p className={`text-2xl font-bold ${Number(creditUser.visaToolsCreditsRemaining || 0) > 0 ? "text-emerald-700" : "text-red-600"}`}>
+                  {creditUser.visaToolsCreditsRemaining ?? 0}
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Credits to Add</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={100000}
+                  step={100}
+                  value={creditForm.credits}
+                  onChange={e => setCreditForm({ ...creditForm, credits: Number(e.target.value) })}
+                />
+                <p className="text-xs text-muted-foreground">Enter the total credits to add to this user's balance.</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Internal Note</Label>
+                <Input
+                  value={creditForm.note}
+                  onChange={e => setCreditForm({ ...creditForm, note: e.target.value })}
+                  placeholder="Optional admin note"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setCreditUser(null)}>Cancel</Button>
+            <Button
+              onClick={() => addB2cCreditsMutation.mutate({ id: creditUser.id, data: creditForm })}
+              disabled={addB2cCreditsMutation.isPending || !creditForm.credits || creditForm.credits <= 0}
+            >
+              {addB2cCreditsMutation.isPending ? "Adding..." : "Add Credits"}
             </Button>
           </DialogFooter>
         </DialogContent>
