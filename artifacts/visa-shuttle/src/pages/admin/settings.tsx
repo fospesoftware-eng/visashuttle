@@ -322,7 +322,15 @@ function TransactionalEmailCard() {
       if (!res.ok) {
         const status = data?.providerStatus ? `Provider status ${data.providerStatus}. ` : "";
         const detail = data?.providerDetail ? ` Detail: ${String(data.providerDetail).slice(0, 260)}` : "";
-        throw new Error(`${status}${data?.error || data?.message || text || `Email test failed with HTTP ${res.status}`}${detail}`);
+        const cloudflareDetail = data?.cloudflare_error
+          ? `${data.title || "Cloudflare error"}: ${data.detail || data.error_name || "Origin returned an incomplete response."}`
+          : "";
+        const errorText = typeof data?.error === "string"
+          ? data.error
+          : typeof data?.message === "string"
+            ? data.message
+            : cloudflareDetail || text || `Email test failed with HTTP ${res.status}`;
+        throw new Error(`${status}${errorText}${detail}`);
       }
       return data;
     },

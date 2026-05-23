@@ -198,15 +198,31 @@ async function sendTransactionalEmail(opts: {
     }));
   }
 
-  const resp = await fetch(`https://${host}/v1.1/email`, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      Authorization: `zoho-enczapikey ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12_000);
+  let resp: Response;
+  try {
+    resp = await fetch(`https://${host}/v1.1/email`, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        Accept: "application/json",
+        Authorization: `zoho-enczapikey ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (error: any) {
+    const timedOut = error?.name === "AbortError";
+    const message = timedOut
+      ? "Timed out connecting to ZeptoMail. Please retry after a minute or check the Mail Agent host."
+      : `Could not reach ZeptoMail: ${error?.message || "network error"}`;
+    console.warn("[email] ZeptoMail transport failed:", message);
+    return { ok: false, provider: "zeptomail", status: timedOut ? 504 : 502, error: message };
+  } finally {
+    clearTimeout(timeout);
+  }
+
   if (!resp.ok) {
     const detail = await resp.text().catch(() => "");
     const message = cleanProviderError(detail) || `ZeptoMail HTTP ${resp.status}`;
@@ -5018,7 +5034,7 @@ export async function registerRoutes(
         text: "This is a transactional email test from Visa Shuttle.",
         html: "<p>This is a transactional email test from <strong>Visa Shuttle</strong>.</p>",
       });
-      if (!result.ok) return res.status(502).json({
+      if (!result.ok) return res.status(424).json({
         error: result.error
           ? `ZeptoMail rejected the test email: ${result.error}`
           : `ZeptoMail rejected the test email with provider HTTP ${result.status || 502}. Check the Send Mail token, verified sender, bounce address, and Mail Agent domain.`,
