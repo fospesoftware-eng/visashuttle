@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Globe, Mail, Shield, Database, Save, Key, Bell, Lock, MessageSquare, CheckCircle, AlertCircle, Eye, EyeOff, Send, ChevronDown, ChevronUp, CreditCard, ExternalLink, FileText, Plus, Trash2, Tag } from "lucide-react";
+import { Globe, Mail, Shield, Database, Save, Key, Bell, Lock, MessageSquare, CheckCircle, AlertCircle, Eye, EyeOff, Send, ChevronDown, ChevronUp, CreditCard, ExternalLink, FileText, Plus, Trash2, Tag, Crown, Sparkles, Zap, Percent } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -616,6 +616,17 @@ interface B2cPlanResponse {
 }
 
 const B2C_PLAN_CURRENCIES = ["USD", "INR", "AED", "GBP", "EUR"];
+const B2C_PLAN_META: Record<string, { icon: any; accent: string; bg: string; label: string }> = {
+  free: { icon: Sparkles, accent: "text-slate-700", bg: "bg-slate-100", label: "Acquisition" },
+  deep: { icon: Crown, accent: "text-purple-700", bg: "bg-purple-100", label: "One-time" },
+  pro: { icon: Zap, accent: "text-blue-700", bg: "bg-blue-100", label: "Subscription" },
+};
+
+function formatPlanMoney(amount: number, currency: string) {
+  if (currency === "AED") return `AED ${amount}`;
+  const symbols: Record<string, string> = { USD: "$", INR: "₹", GBP: "£", EUR: "€" };
+  return `${symbols[currency] ?? `${currency} `}${amount}`;
+}
 
 // ── B2C Plans Card ─────────────────────────────────────────────────────────
 function B2cPlansCard() {
@@ -665,104 +676,206 @@ function B2cPlansCard() {
   }
 
   const featureText = form.features.join("\n");
+  const selectedMeta = B2C_PLAN_META[form.planKey] || B2C_PLAN_META.free;
+  const SelectedIcon = selectedMeta.icon;
+  const checkoutEnabled = form.conditions?.checkout !== false && form.billingType !== "free";
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle className="text-base flex items-center gap-2"><CreditCard className="w-4 h-4" />B2C User Plans</CardTitle>
-            <CardDescription>Edit Free, Deep Check, and Pro plan pricing, credits, limits, and visible features.</CardDescription>
-          </div>
-          <div className="flex rounded-xl border bg-muted/30 p-1">
-            {data.map(plan => (
-              <button
-                key={plan.planKey}
-                type="button"
-                onClick={() => setSelectedKey(plan.planKey)}
-                className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${selectedKey === plan.planKey ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-              >
-                {plan.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-5">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label>Plan Name</Label>
-            <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Billing Type</Label>
-            <Select value={form.billingType} onValueChange={(billingType: any) => setForm({ ...form, billingType })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="free">Free</SelectItem>
-                <SelectItem value="one_time">One-time</SelectItem>
-                <SelectItem value="monthly">Monthly</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        <div className="space-y-1.5">
-          <Label>Description</Label>
-          <Input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
-        </div>
-        <div className="grid gap-3 sm:grid-cols-5">
-          {B2C_PLAN_CURRENCIES.map(code => (
-            <div key={code} className="space-y-1.5">
-              <Label>{code}</Label>
-              <Input
-                type="number"
-                min={0}
-                value={form.prices?.[code] ?? 0}
-                onChange={e => setForm({ ...form, prices: { ...form.prices, [code]: Number(e.target.value) } })}
-              />
+    <div className="space-y-5">
+      <div className="grid gap-4 md:grid-cols-3">
+        {data.map(plan => {
+          const meta = B2C_PLAN_META[plan.planKey] || B2C_PLAN_META.free;
+          const Icon = meta.icon;
+          const isSelected = selectedKey === plan.planKey;
+          return (
+            <button
+              key={plan.planKey}
+              type="button"
+              onClick={() => setSelectedKey(plan.planKey)}
+              className={`rounded-2xl border p-4 text-left transition hover:border-primary/50 hover:shadow-sm ${isSelected ? "border-primary bg-primary/5 shadow-sm" : "bg-card"}`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${meta.bg}`}>
+                  <Icon className={`h-5 w-5 ${meta.accent}`} />
+                </div>
+                <Badge variant={plan.active ? "default" : "secondary"}>{plan.active ? "Active" : "Hidden"}</Badge>
+              </div>
+              <div className="mt-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{meta.label}</p>
+                <h3 className="mt-1 text-lg font-bold">{plan.name}</h3>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">{plan.description}</p>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                <div className="rounded-lg bg-muted/50 p-2">
+                  <p className="text-muted-foreground">USD</p>
+                  <p className="font-bold">{formatPlanMoney(plan.prices?.USD ?? 0, "USD")}</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 p-2">
+                  <p className="text-muted-foreground">Credits</p>
+                  <p className="font-bold">{plan.visaToolsCredits}</p>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <CardTitle className="text-base flex items-center gap-2">
+                <SelectedIcon className={`w-4 h-4 ${selectedMeta.accent}`} />
+                Edit {form.name}
+              </CardTitle>
+              <CardDescription>Control public pricing, checkout behaviour, limits, credits, and visible plan features.</CardDescription>
             </div>
-          ))}
-        </div>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className="space-y-1.5">
-            <Label>Basic Check Limit</Label>
-            <Input type="number" min={0} value={form.basicCheckLimit} onChange={e => setForm({ ...form, basicCheckLimit: Number(e.target.value) })} />
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="uppercase">{form.planKey}</Badge>
+              <Badge variant={checkoutEnabled ? "default" : "secondary"}>{checkoutEnabled ? "Checkout on" : "Checkout off"}</Badge>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid gap-3 sm:grid-cols-[1fr_180px_120px]">
+            <div className="space-y-1.5">
+              <Label>Plan Name</Label>
+              <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Billing Type</Label>
+              <Select value={form.billingType} onValueChange={(billingType: any) => setForm({ ...form, billingType, conditions: { ...form.conditions, checkout: billingType !== "free" } })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="free">Free</SelectItem>
+                  <SelectItem value="one_time">One-time</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Sort Order</Label>
+              <Input type="number" min={0} value={form.sortOrder} onChange={e => setForm({ ...form, sortOrder: Number(e.target.value) })} />
+            </div>
           </div>
           <div className="space-y-1.5">
-            <Label>Deep Check Limit</Label>
-            <Input type="number" min={0} value={form.deepCheckLimit} onChange={e => setForm({ ...form, deepCheckLimit: Number(e.target.value) })} />
+            <Label>Description</Label>
+            <Input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
           </div>
-          <div className="space-y-1.5">
-            <Label>Visa Tools Credit</Label>
-            <Input type="number" min={0} value={form.visaToolsCredits} onChange={e => setForm({ ...form, visaToolsCredits: Number(e.target.value) })} />
+
+          <div className="rounded-2xl border bg-muted/20 p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold">Currency Prices</p>
+                <p className="text-xs text-muted-foreground">Used by the public pricing page and B2C checkout.</p>
+              </div>
+              <Badge variant="outline">Default currency: USD</Badge>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-5">
+              {B2C_PLAN_CURRENCIES.map(code => (
+                <div key={code} className="space-y-1.5">
+                  <Label>{code}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={form.prices?.[code] ?? 0}
+                    onChange={e => setForm({ ...form, prices: { ...form.prices, [code]: Number(e.target.value) } })}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-        <div className="space-y-1.5">
-          <Label>Features</Label>
-          <Textarea
-            rows={8}
-            value={featureText}
-            onChange={e => setForm({ ...form, features: e.target.value.split("\n").map(line => line.trim()).filter(Boolean) })}
-            placeholder="One feature per line"
-          />
-        </div>
-        <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-          <div className="space-y-1.5">
-            <Label>CTA Text</Label>
-            <Input value={form.conditions?.cta || ""} onChange={e => setForm({ ...form, conditions: { ...form.conditions, cta: e.target.value } })} />
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="space-y-1.5">
+              <Label>Basic Check Limit</Label>
+              <Input type="number" min={0} value={form.basicCheckLimit} onChange={e => setForm({ ...form, basicCheckLimit: Number(e.target.value) })} />
+              <p className="text-xs text-muted-foreground">Use 9999 for unlimited display/fair-use plans.</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Deep Check Limit</Label>
+              <Input type="number" min={0} value={form.deepCheckLimit} onChange={e => setForm({ ...form, deepCheckLimit: Number(e.target.value) })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Visa Tools Credit</Label>
+              <Input type="number" min={0} value={form.visaToolsCredits} onChange={e => setForm({ ...form, visaToolsCredits: Number(e.target.value) })} />
+            </div>
           </div>
-          <div className="flex items-center gap-2 rounded-lg border px-3 py-2.5">
-            <Switch checked={form.active} onCheckedChange={active => setForm({ ...form, active })} />
-            <span className="text-sm">Active</span>
+
+          <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+            <div className="space-y-1.5">
+              <Label>Features</Label>
+              <Textarea
+                rows={10}
+                value={featureText}
+                onChange={e => setForm({ ...form, features: e.target.value.split("\n").map(line => line.trim()).filter(Boolean) })}
+                placeholder="One feature per line"
+              />
+              <p className="text-xs text-muted-foreground">These appear on the website pricing cards.</p>
+            </div>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label>CTA Text</Label>
+                <Input value={form.conditions?.cta || ""} onChange={e => setForm({ ...form, conditions: { ...form.conditions, cta: e.target.value } })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Plan Note / Conditions</Label>
+                <Textarea
+                  rows={4}
+                  value={form.conditions?.note || ""}
+                  onChange={e => setForm({ ...form, conditions: { ...form.conditions, note: e.target.value } })}
+                  placeholder="Fair usage terms, renewal notes, support conditions..."
+                />
+              </div>
+              <div className="grid gap-2">
+                <div className="flex items-center justify-between rounded-xl border px-3 py-2.5">
+                  <div>
+                    <p className="text-sm font-medium">Show on Pricing Page</p>
+                    <p className="text-xs text-muted-foreground">Hidden plans remain saved in admin.</p>
+                  </div>
+                  <Switch checked={form.active} onCheckedChange={active => setForm({ ...form, active })} />
+                </div>
+                <div className="flex items-center justify-between rounded-xl border px-3 py-2.5">
+                  <div>
+                    <p className="text-sm font-medium">Enable Checkout</p>
+                    <p className="text-xs text-muted-foreground">Free plans should normally keep this off.</p>
+                  </div>
+                  <Switch checked={checkoutEnabled} onCheckedChange={checkout => setForm({ ...form, conditions: { ...form.conditions, checkout } })} disabled={form.billingType === "free"} />
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-        <div className="flex justify-end">
-          <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="gap-2">
-            <Save className="w-4 h-4" /> Save B2C Plan
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+
+          <div className="rounded-2xl border bg-background p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <CreditCard className="h-4 w-4 text-primary" />
+              <p className="text-sm font-semibold">Live Card Preview</p>
+            </div>
+            <div className="rounded-xl border bg-muted/20 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{selectedMeta.label}</p>
+                  <h3 className="text-xl font-bold">{form.name}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{form.description}</p>
+                </div>
+                <Badge>{formatPlanMoney(form.prices?.USD ?? 0, "USD")}{form.billingType === "monthly" ? "/mo" : ""}</Badge>
+              </div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                <div className="rounded-lg bg-background p-2 text-xs"><span className="text-muted-foreground">Basic</span><p className="font-semibold">{form.basicCheckLimit >= 9999 ? "Unlimited" : form.basicCheckLimit}</p></div>
+                <div className="rounded-lg bg-background p-2 text-xs"><span className="text-muted-foreground">Deep</span><p className="font-semibold">{form.deepCheckLimit}</p></div>
+                <div className="rounded-lg bg-background p-2 text-xs"><span className="text-muted-foreground">Tools</span><p className="font-semibold">{form.visaToolsCredits}</p></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="gap-2">
+              <Save className="w-4 h-4" /> Save B2C Pricing Plan
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
@@ -1813,10 +1926,11 @@ export default function AdminSettingsPage() {
         </div>
 
         <Tabs defaultValue="general" className="space-y-4">
-          <TabsList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 h-auto w-full max-w-3xl">
+          <TabsList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 h-auto w-full max-w-5xl">
             <TabsTrigger value="general" data-testid="tab-general">General</TabsTrigger>
             <TabsTrigger value="security" data-testid="tab-security">Security</TabsTrigger>
             <TabsTrigger value="limits" data-testid="tab-limits">Defaults</TabsTrigger>
+            <TabsTrigger value="b2c-pricing" data-testid="tab-b2c-pricing">B2C Pricing</TabsTrigger>
             <TabsTrigger value="integrations" data-testid="tab-integrations">Integrations</TabsTrigger>
             <TabsTrigger value="email-templates">Email Templates</TabsTrigger>
             <TabsTrigger value="notifications">Alerts</TabsTrigger>
@@ -2001,10 +2115,22 @@ export default function AdminSettingsPage() {
           {/* ── Integrations Tab ──────────────────────────────────────────── */}
           <TabsContent value="integrations" className="space-y-4">
             <PaymentGatewayCard />
-            <B2cPlansCard />
-            <B2cCouponsCard />
             <TransactionalEmailCard />
             <SmsGatewayCard />
+          </TabsContent>
+
+          {/* ── B2C Pricing Tab ───────────────────────────────────────────── */}
+          <TabsContent value="b2c-pricing" className="space-y-4">
+            <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-background to-blue-50/40">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2"><Percent className="w-4 h-4 text-primary" />B2C Pricing Control Center</CardTitle>
+                <CardDescription>
+                  Manage website plans, checkout prices, Visa Tools credits, free limits, plan conditions, and promotional coupons from one place.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+            <B2cPlansCard />
+            <B2cCouponsCard />
           </TabsContent>
 
           <TabsContent value="email-templates" className="space-y-4">
