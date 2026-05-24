@@ -17,10 +17,10 @@ const footerColumns = [
     title: "For Business",
     links: [
       { label: "Agency CRM", href: "/business/agency-crm" },
-      { label: "Business API", href: "/api-pricing" },
-      { label: "Enterprise Solutions", href: "/business" },
-      { label: "Whitelabel Solutions", href: "/business" },
-      { label: "Agentic Visa AI", href: "/business" },
+      { label: "Business API", href: "/business/api" },
+      { label: "Enterprise Solutions", href: "/business/enterprise" },
+      { label: "Whitelabel Solutions", href: "/business/whitelabel" },
+      { label: "Agentic Visa AI", href: "/business/agentic-visa-ai" },
     ],
   },
   {
