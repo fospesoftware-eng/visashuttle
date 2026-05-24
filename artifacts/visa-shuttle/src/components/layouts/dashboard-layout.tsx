@@ -7,7 +7,7 @@ import {
   Menu, X, Building2, ShieldCheck, Database, Activity, Globe, CreditCard,
   CheckCircle, AlertCircle, Inbox, Receipt, Banknote, ClipboardList,
   Send, Stamp, Loader2, XCircle, UserSquare2, KeyRound, BookOpen, LayoutDashboard,
-  LifeBuoy, Wallet, Sparkles, FileSearch
+  LifeBuoy, Wallet, Sparkles, FileSearch, Newspaper, GitBranch
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -47,7 +47,15 @@ const adminNavItems: NavItem[] = [
   { icon: ClipboardList, label: "Operations", href: "/admin/operations" },
   { icon: CreditCard, label: "Finance", href: "/admin/finance" },
   { icon: Wallet, label: "Subscriptions", href: "/admin/subscriptions" },
-  { icon: LifeBuoy, label: "Support", href: "/admin/support" },
+  { icon: FileText, label: "Pages", href: "/admin/pages" },
+  { icon: Newspaper, label: "Updates", href: "/admin/updates" },
+  {
+    icon: LifeBuoy, label: "Support", href: "/admin/support",
+    children: [
+      { icon: LifeBuoy, label: "Tickets", href: "/admin/support" },
+      { icon: GitBranch, label: "Version Logs", href: "/admin/version-logs" },
+    ],
+  },
   { icon: Database, label: "Visa Knowledge", href: "/admin/vkb" },
   { icon: ShieldCheck, label: "AI Governance", href: "/admin/ai" },
   { icon: FileSearch, label: "Visa Tools", href: "/admin/visa-tools" },

@@ -30,14 +30,15 @@ const footerColumns = [
       { label: "Help & Support", href: "/help" },
       { label: "FAQ", href: "/pricing" },
       { label: "Report a Bug", href: "/report-bug" },
+      { label: "Version Logs", href: "/version-logs" },
     ],
   },
   {
     title: "About",
     links: [
-      { label: "Our Company", href: "/business" },
-      { label: "News Updates", href: "/help" },
-      { label: "Careers", href: "/help" },
+      { label: "Our Company", href: "/about" },
+      { label: "Updates", href: "/updates" },
+      { label: "Careers", href: "/careers" },
       { label: "Contact", href: "/contact" },
     ],
   },
@@ -76,7 +77,11 @@ export function SiteFooter() {
               <ul className="space-y-2.5">
                 {column.links.map((link) => (
                   <li key={`${column.title}-${link.label}`}>
-                    {link.href.startsWith("/#") ? (
+                    {link.href.startsWith("http") ? (
+                      <a href={link.href} target="_blank" rel="noreferrer" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+                        {link.label}
+                      </a>
+                    ) : link.href.startsWith("/#") ? (
                       <a href={link.href} className="text-sm text-muted-foreground transition-colors hover:text-foreground">
                         {link.label}
                       </a>

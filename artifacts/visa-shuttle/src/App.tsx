@@ -60,6 +60,10 @@ import ApiDocsPublicPage from "@/pages/public/api-docs";
 import HelpPage from "@/pages/help";
 import ReportBugPage from "@/pages/report-bug";
 import ContactPage from "@/pages/contact";
+import AboutPage from "@/pages/about";
+import UpdatesPage from "@/pages/updates";
+import CareersPage from "@/pages/careers";
+import { VersionLogDetailPage, VersionLogsPage } from "@/pages/version-logs";
 
 import CustomerDashboard from "@/pages/customer/dashboard";
 import CustomerCasePage from "@/pages/customer/case";
@@ -79,6 +83,9 @@ import AdminOperationsPage from "@/pages/admin/operations";
 import AdminFinancePage from "@/pages/admin/finance";
 import AdminSupportPage from "@/pages/admin/support";
 import AdminSubscriptionsPage from "@/pages/admin/subscriptions";
+import AdminPagesPage from "@/pages/admin/pages";
+import AdminUpdatesPage from "@/pages/admin/updates";
+import AdminVersionLogsPage from "@/pages/admin/version-logs";
 import AgencySupportPage from "@/pages/agency/support";
 
 import AgencyRegisterPage from "@/pages/agency-register";
@@ -178,6 +185,11 @@ function Router() {
       <Route path="/help" component={HelpPage} />
       <Route path="/report-bug" component={ReportBugPage} />
       <Route path="/contact" component={ContactPage} />
+      <Route path="/about" component={AboutPage} />
+      <Route path="/updates" component={UpdatesPage} />
+      <Route path="/careers" component={CareersPage} />
+      <Route path="/version-logs/:slug" component={VersionLogDetailPage} />
+      <Route path="/version-logs" component={VersionLogsPage} />
 
       <Route path="/app" component={AgencyDashboard} />
       <Route path="/app/leads" component={LeadsPage} />
@@ -268,6 +280,9 @@ function Router() {
       <Route path="/admin/finance" component={AdminFinancePage} />
       <Route path="/admin/support" component={AdminSupportPage} />
       <Route path="/admin/subscriptions" component={AdminSubscriptionsPage} />
+      <Route path="/admin/pages" component={AdminPagesPage} />
+      <Route path="/admin/updates" component={AdminUpdatesPage} />
+      <Route path="/admin/version-logs" component={AdminVersionLogsPage} />
       <Route path="/admin/audit" component={AdminAuditPage} />
       <Route path="/admin/settings" component={AdminSettingsPage} />
 
