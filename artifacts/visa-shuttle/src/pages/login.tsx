@@ -1,13 +1,50 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Eye, EyeOff, Plane, Shield, Zap } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, FileCheck2, Plane, ScanLine, Shield, UsersRound, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Logo } from "@/components/logo";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+
+function AgencyLoginMark({ compact = false }: { compact?: boolean }) {
+  if (compact) {
+    return (
+      <div className="relative h-16 w-16" aria-label="Agency workflow animation">
+        <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[#4055FF] via-[#9033F5] to-[#FF2060] opacity-15" />
+        <div className="absolute inset-2 animate-pulse rounded-xl bg-gradient-to-br from-[#4055FF] to-[#FF2060]" />
+        <div className="absolute inset-0 flex items-center justify-center text-white">
+          <FileCheck2 className="h-6 w-6" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative h-40 w-52" aria-label="Agency workflow animation">
+      <div className="absolute inset-x-5 top-5 h-28 rounded-[2rem] border border-[#4055FF]/15 bg-white/70 shadow-2xl shadow-[#4055FF]/10 backdrop-blur" />
+      <div className="absolute left-8 top-9 flex h-11 w-11 animate-pulse items-center justify-center rounded-2xl bg-[#4055FF]/10 text-[#4055FF]">
+        <UsersRound className="h-5 w-5" />
+      </div>
+      <div className="absolute left-[88px] top-9 flex h-11 w-11 items-center justify-center rounded-2xl bg-[#9033F5]/10 text-[#6D37D8]">
+        <ScanLine className="h-5 w-5" />
+      </div>
+      <div className="absolute right-8 top-9 flex h-11 w-11 animate-pulse items-center justify-center rounded-2xl bg-[#FF2060]/10 text-[#FF2060] [animation-delay:300ms]">
+        <CheckCircle2 className="h-5 w-5" />
+      </div>
+      <div className="absolute bottom-6 left-1/2 w-40 -translate-x-1/2 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+        <div className="mb-2 flex items-center justify-between text-[10px] font-black uppercase tracking-wide text-slate-400">
+          <span>Cases ready</span>
+          <span className="text-[#4055FF]">74%</span>
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+          <div className="h-full w-[74%] animate-pulse rounded-full bg-gradient-to-r from-[#4055FF] to-[#FF2060]" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();
@@ -78,7 +115,7 @@ export default function LoginPage() {
           {/* Left — branding panel */}
           <div className="hidden lg:flex flex-col gap-8 pr-8">
             <div>
-              <Logo size="lg" />
+              <AgencyLoginMark />
               <h2 className="mt-6 text-3xl font-bold leading-tight">
                 The complete visa processing platform for modern agencies
               </h2>
@@ -109,7 +146,7 @@ export default function LoginPage() {
           <Card className="w-full shadow-xl border-border/50">
             <CardHeader className="text-center pb-4">
               <div className="flex justify-center mb-3 lg:hidden">
-                <Logo size="lg" />
+                <AgencyLoginMark compact />
               </div>
               <CardTitle className="text-2xl font-bold">Sign in</CardTitle>
               <CardDescription>Access your dashboard</CardDescription>
