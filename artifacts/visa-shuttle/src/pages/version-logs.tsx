@@ -1,7 +1,5 @@
 import { Link } from "wouter";
 import { ArrowRight, GitBranch, Sparkles } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 
 const versions = [
   {
@@ -29,39 +27,41 @@ const versions = [
 
 export function VersionLogsPage() {
   return (
-    <main className="min-h-screen bg-[#F8FAFC]">
-      <section className="relative overflow-hidden border-b border-slate-200 px-4 py-14 md:py-20">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_0%,rgba(64,85,255,0.12),transparent_34%),radial-gradient(circle_at_86%_12%,rgba(255,32,96,0.08),transparent_30%),linear-gradient(180deg,#FFFFFF,#F8FAFC)]" />
+    <main className="min-h-screen bg-[#F7F9FF] text-slate-950">
+      <section className="relative overflow-hidden border-b border-slate-200 px-4 py-16 md:py-24">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_0%,rgba(64,85,255,0.14),transparent_30%),radial-gradient(circle_at_86%_10%,rgba(255,32,96,0.10),transparent_28%),linear-gradient(180deg,#FFFFFF,#F7F9FF)]" />
         <div className="relative mx-auto max-w-7xl">
-          <Badge className="mb-5 border-[#4055FF]/15 bg-white text-[#4055FF] shadow-sm hover:bg-white">Version Logs</Badge>
-          <h1 className="max-w-4xl text-4xl font-black tracking-tight text-[#15236B] md:text-6xl">
-            Product updates and release notes.
-          </h1>
-          <p className="mt-5 max-w-2xl text-base leading-7 text-slate-600 md:text-lg">
-            Follow the major Visa Shuttle product changes across B2C visa intelligence, agency CRM, business APIs, payments, and admin tools.
-          </p>
+          <p className="text-sm font-black uppercase tracking-[0.22em] text-[#4055FF]">Version Logs</p>
+          <div className="mt-7 grid gap-8 lg:grid-cols-[1fr_0.72fr] lg:items-end">
+            <h1 className="max-w-5xl text-5xl font-black leading-[0.98] tracking-tight text-[#101A4D] md:text-7xl">
+              Product releases, written clearly.
+            </h1>
+            <p className="text-lg leading-8 text-slate-600">
+              Follow major Visa Shuttle improvements across B2C visa intelligence, agency CRM, business APIs, payments, admin tools, and customer portals.
+            </p>
+          </div>
         </div>
       </section>
 
-      <section className="px-4 py-12 md:py-16">
-        <div className="mx-auto grid max-w-7xl gap-5">
-          {versions.map((entry) => (
-            <Link key={entry.slug} href={`/version-logs/${entry.slug}`}>
-              <Card className="cursor-pointer rounded-3xl border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
-                <CardContent className="grid gap-5 p-6 md:grid-cols-[180px_1fr_auto] md:items-center">
+      <section className="px-4 py-16 md:py-24">
+        <div className="mx-auto max-w-7xl">
+          <div className="grid gap-0 overflow-hidden rounded-[2.25rem] border border-slate-200 bg-white shadow-xl shadow-[#4055FF]/8">
+            {versions.map((entry) => (
+              <Link key={entry.slug} href={`/version-logs/${entry.slug}`}>
+                <article className="grid cursor-pointer gap-6 border-b border-slate-200 p-6 transition hover:bg-[#F7F9FF] last:border-b-0 md:grid-cols-[190px_1fr_auto] md:items-center md:p-8">
                   <div>
-                    <Badge className="border-0 bg-[#4055FF] text-white">{entry.version}</Badge>
-                    <p className="mt-2 text-sm font-semibold text-slate-500">{entry.date}</p>
+                    <p className="text-3xl font-black text-[#4055FF]">{entry.version}</p>
+                    <p className="mt-2 text-sm font-bold text-slate-400">{entry.date}</p>
                   </div>
                   <div>
-                    <h2 className="text-2xl font-black text-[#15236B]">{entry.title}</h2>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">{entry.bullets.join(" · ")}</p>
+                    <h2 className="text-2xl font-black tracking-tight text-[#101A4D] md:text-3xl">{entry.title}</h2>
+                    <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">{entry.bullets.join(" · ")}</p>
                   </div>
                   <ArrowRight className="hidden h-5 w-5 text-[#4055FF] md:block" />
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
+                </article>
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
     </main>
@@ -70,30 +70,38 @@ export function VersionLogsPage() {
 
 export function VersionLogDetailPage({ params }: { params?: { slug?: string } }) {
   const entry = versions.find((item) => item.slug === params?.slug) || versions[0];
+
   return (
-    <main className="min-h-screen bg-[#F8FAFC] px-4 py-14 md:py-20">
-      <article className="mx-auto max-w-4xl">
-        <Link href="/version-logs" className="mb-6 inline-flex items-center gap-2 text-sm font-bold text-[#4055FF]">
+    <main className="min-h-screen bg-[#F7F9FF] px-4 py-16 text-slate-950 md:py-24">
+      <article className="mx-auto max-w-5xl">
+        <Link href="/version-logs" className="mb-8 inline-flex items-center gap-2 text-sm font-black uppercase tracking-[0.16em] text-[#4055FF]">
           <GitBranch className="h-4 w-4" />
           All version logs
         </Link>
-        <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/60 md:p-8">
-          <div className="mb-5 flex flex-wrap items-center gap-3">
-            <Badge className="border-0 bg-[#4055FF] text-white">{entry.version}</Badge>
-            <span className="text-sm font-bold text-slate-400">{entry.date}</span>
+
+        <div className="overflow-hidden rounded-[2.25rem] border border-slate-200 bg-white shadow-xl shadow-[#4055FF]/8">
+          <div className="bg-gradient-to-br from-[#4055FF] via-[#7137EA] to-[#FF2060] p-8 text-white md:p-12">
+            <p className="text-sm font-black uppercase tracking-[0.22em] text-white/60">{entry.date}</p>
+            <h1 className="mt-5 max-w-4xl text-4xl font-black leading-tight tracking-tight md:text-6xl">{entry.title}</h1>
+            <p className="mt-6 text-2xl font-black text-white/80">{entry.version}</p>
           </div>
-          <h1 className="text-3xl font-black tracking-tight text-[#15236B] md:text-5xl">{entry.title}</h1>
-          <div className="mt-8 space-y-4">
-            {entry.bullets.map((bullet) => (
-              <div key={bullet} className="flex gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-[#FF2060]" />
-                <p className="text-sm font-semibold leading-6 text-slate-700">{bullet}</p>
-              </div>
-            ))}
+
+          <div className="p-6 md:p-10">
+            <div className="grid gap-4">
+              {entry.bullets.map((bullet) => (
+                <div key={bullet} className="grid gap-4 border-t border-slate-100 pt-5 md:grid-cols-[48px_1fr]">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#4055FF]/10 text-[#4055FF]">
+                    <Sparkles className="h-5 w-5" />
+                  </div>
+                  <p className="self-center text-base font-bold leading-7 text-slate-700">{bullet}</p>
+                </div>
+              ))}
+            </div>
+
+            <p className="mt-10 max-w-3xl text-sm leading-6 text-slate-500">
+              These notes summarize major visible product updates. Smaller fixes, infrastructure changes, and operational improvements may ship between listed releases.
+            </p>
           </div>
-          <p className="mt-8 text-sm leading-6 text-slate-500">
-            These notes summarize major visible product updates. Smaller fixes, infrastructure changes, and operational improvements may ship between listed releases.
-          </p>
         </div>
       </article>
     </main>
