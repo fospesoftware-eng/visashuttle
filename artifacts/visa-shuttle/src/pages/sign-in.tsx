@@ -1,13 +1,47 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Eye, EyeOff, PlaneTakeoff } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, PlaneTakeoff, ShieldCheck, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Logo } from "@/components/logo";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
+
+function SignInProgressMark() {
+  return (
+    <div className="relative h-36 w-36" aria-label="Visa Shuttle readiness animation">
+      <div className="absolute inset-0 rounded-full border border-white/20" />
+      <div className="absolute inset-4 rounded-full border border-white/15" />
+      <div className="absolute inset-7 animate-pulse rounded-full bg-white/10 blur-xl" />
+      <div className="absolute left-1/2 top-1/2 flex h-20 w-20 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[1.75rem] bg-white/16 shadow-2xl backdrop-blur">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-[#4055FF] shadow-lg">
+          <PlaneTakeoff className="h-6 w-6" />
+        </div>
+      </div>
+
+      <div className="absolute -right-2 top-8 flex h-10 w-10 animate-bounce items-center justify-center rounded-2xl bg-white/18 text-white shadow-lg backdrop-blur [animation-duration:3.2s]">
+        <CheckCircle2 className="h-5 w-5" />
+      </div>
+      <div className="absolute bottom-6 left-0 flex h-10 w-10 animate-pulse items-center justify-center rounded-2xl bg-white/18 text-white shadow-lg backdrop-blur">
+        <ShieldCheck className="h-5 w-5" />
+      </div>
+      <div className="absolute left-8 top-0 flex h-9 w-9 animate-bounce items-center justify-center rounded-2xl bg-white/16 text-white shadow-lg backdrop-blur [animation-duration:4s]">
+        <Sparkles className="h-4 w-4" />
+      </div>
+
+      <div className="absolute -bottom-5 left-1/2 w-44 -translate-x-1/2 rounded-2xl border border-white/15 bg-white/12 p-3 shadow-xl backdrop-blur">
+        <div className="mb-2 flex items-center justify-between text-[10px] font-bold uppercase tracking-wide text-white/70">
+          <span>Profile scan</span>
+          <span>82%</span>
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-white/15">
+          <div className="h-full w-[82%] animate-pulse rounded-full bg-white" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function SignInPage() {
   const [, setLocation] = useLocation();
@@ -40,7 +74,7 @@ export default function SignInPage() {
     <div className="min-h-screen flex flex-col lg:flex-row bg-background">
       {/* Left panel */}
       <div className="hidden lg:flex lg:w-[480px] xl:w-[520px] flex-col text-white p-10 xl:p-14 justify-between flex-shrink-0" style={{background:"linear-gradient(160deg,#4055FF 0%,#9033F5 50%,#FF2060 100%)"}}>
-        <Logo size="lg" showText variant="white" />
+        <SignInProgressMark />
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/15 text-sm font-medium mb-8">
             <PlaneTakeoff className="w-3.5 h-3.5" />
