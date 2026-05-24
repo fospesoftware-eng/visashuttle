@@ -1,46 +1,92 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { CheckCircle2, Eye, EyeOff, FileCheck2, Plane, ScanLine, Shield, UsersRound, Zap } from "lucide-react";
+import {
+  ArrowRight,
+  BriefcaseBusiness,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  FileCheck2,
+  Fingerprint,
+  Globe2,
+  LockKeyhole,
+  Plane,
+  ScanLine,
+  Shield,
+  Sparkles,
+  UsersRound,
+  Zap,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 
 function AgencyLoginMark({ compact = false }: { compact?: boolean }) {
   if (compact) {
     return (
       <div className="relative h-16 w-16" aria-label="Agency workflow animation">
-        <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[#4055FF] via-[#9033F5] to-[#FF2060] opacity-15" />
-        <div className="absolute inset-2 animate-pulse rounded-xl bg-gradient-to-br from-[#4055FF] to-[#FF2060]" />
-        <div className="absolute inset-0 flex items-center justify-center text-white">
-          <FileCheck2 className="h-6 w-6" />
+        <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-[#4055FF]/15 via-[#9033F5]/15 to-[#FF2060]/15" />
+        <div className="absolute inset-2 rounded-2xl border border-white/70 bg-white/80 shadow-lg backdrop-blur" />
+        <div className="absolute inset-0 flex items-center justify-center text-[#4055FF]">
+          <Fingerprint className="h-7 w-7" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="relative h-40 w-52" aria-label="Agency workflow animation">
-      <div className="absolute inset-x-5 top-5 h-28 rounded-[2rem] border border-[#4055FF]/15 bg-white/70 shadow-2xl shadow-[#4055FF]/10 backdrop-blur" />
-      <div className="absolute left-8 top-9 flex h-11 w-11 animate-pulse items-center justify-center rounded-2xl bg-[#4055FF]/10 text-[#4055FF]">
-        <UsersRound className="h-5 w-5" />
+    <div className="relative h-[330px] w-full max-w-[430px]" aria-label="Agency workflow animation">
+      <div className="absolute left-8 right-8 top-10 h-56 rounded-[2rem] border border-white/70 bg-white/60 shadow-2xl shadow-[#4055FF]/10 backdrop-blur-xl" />
+      <div className="absolute left-16 top-5 flex h-14 w-14 animate-bounce items-center justify-center rounded-3xl border border-white/70 bg-white text-[#4055FF] shadow-xl [animation-duration:4.5s]">
+        <BriefcaseBusiness className="h-6 w-6" />
       </div>
-      <div className="absolute left-[88px] top-9 flex h-11 w-11 items-center justify-center rounded-2xl bg-[#9033F5]/10 text-[#6D37D8]">
-        <ScanLine className="h-5 w-5" />
+      <div className="absolute right-14 top-16 flex h-12 w-12 animate-pulse items-center justify-center rounded-2xl bg-[#FF2060]/10 text-[#FF2060] shadow-lg">
+        <Sparkles className="h-5 w-5" />
       </div>
-      <div className="absolute right-8 top-9 flex h-11 w-11 animate-pulse items-center justify-center rounded-2xl bg-[#FF2060]/10 text-[#FF2060] [animation-delay:300ms]">
-        <CheckCircle2 className="h-5 w-5" />
-      </div>
-      <div className="absolute bottom-6 left-1/2 w-40 -translate-x-1/2 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
-        <div className="mb-2 flex items-center justify-between text-[10px] font-black uppercase tracking-wide text-slate-400">
-          <span>Cases ready</span>
-          <span className="text-[#4055FF]">74%</span>
+
+      <div className="absolute left-1/2 top-24 w-72 -translate-x-1/2 rounded-[1.75rem] border border-slate-200/80 bg-white p-4 shadow-2xl">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase text-slate-400">Today</p>
+            <p className="text-lg font-black text-slate-950">Visa desk</p>
+          </div>
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#4055FF]/10 text-[#4055FF]">
+            <FileCheck2 className="h-5 w-5" />
+          </div>
         </div>
-        <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-          <div className="h-full w-[74%] animate-pulse rounded-full bg-gradient-to-r from-[#4055FF] to-[#FF2060]" />
+        <div className="space-y-3">
+          {[
+            { icon: UsersRound, label: "Customer intake", value: "24", color: "text-[#4055FF]", bg: "bg-[#4055FF]/10" },
+            { icon: ScanLine, label: "Documents scanned", value: "88%", color: "text-[#9033F5]", bg: "bg-[#9033F5]/10" },
+            { icon: CheckCircle2, label: "Ready to submit", value: "12", color: "text-emerald-600", bg: "bg-emerald-500/10" },
+          ].map(({ icon: Icon, label, value, color, bg }) => (
+            <div key={label} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-3">
+              <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${bg} ${color}`}>
+                <Icon className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-slate-700">{label}</p>
+              </div>
+              <p className="text-sm font-black text-slate-950">{value}</p>
+            </div>
+          ))}
         </div>
+      </div>
+
+      <div className="absolute bottom-5 left-8 w-44 rounded-3xl border border-white/80 bg-white/80 p-4 shadow-xl backdrop-blur">
+        <div className="mb-3 flex items-center gap-2 text-xs font-bold text-slate-500">
+          <Globe2 className="h-4 w-4 text-[#4055FF]" />
+          Global workflow
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+          <div className="h-full w-[76%] animate-pulse rounded-full bg-gradient-to-r from-[#4055FF] via-[#9033F5] to-[#FF2060]" />
+        </div>
+      </div>
+      <div className="absolute bottom-10 right-8 flex items-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 shadow-xl">
+        <Shield className="h-4 w-4" />
+        Secure login
       </div>
     </div>
   );
@@ -108,73 +154,87 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex flex-col">
-      <main className="flex-1 flex items-center justify-center p-4">
-        <div className="w-full max-w-5xl grid lg:grid-cols-2 gap-8 items-center">
+    <div className="relative min-h-screen overflow-hidden bg-[#F7F9FF] text-slate-950">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(64,85,255,0.14),transparent_28%),radial-gradient(circle_at_78%_18%,rgba(255,32,96,0.12),transparent_26%),linear-gradient(180deg,#ffffff_0%,#F7F9FF_52%,#EEF3FF_100%)]" />
+      <div className="absolute left-1/2 top-0 h-px w-[82vw] -translate-x-1/2 bg-gradient-to-r from-transparent via-[#4055FF]/30 to-transparent" />
 
-          {/* Left — branding panel */}
-          <div className="hidden lg:flex flex-col gap-8 pr-8">
-            <div>
-              <AgencyLoginMark />
-              <h2 className="mt-6 text-3xl font-bold leading-tight">
-                The complete visa processing platform for modern agencies
-              </h2>
-              <p className="mt-3 text-muted-foreground text-lg">
-                Manage applications, track documents, and give customers a branded self-service portal — all in one place.
-              </p>
+      <main className="relative z-10 flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 lg:px-10">
+        <div className="grid w-full max-w-6xl items-center gap-8 lg:grid-cols-[1.08fr_0.92fr]">
+          <section className="hidden lg:block">
+            <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-[#4055FF]/15 bg-white/70 px-4 py-2 text-sm font-bold text-[#4055FF] shadow-sm backdrop-blur">
+              <LockKeyhole className="h-4 w-4" />
+              Agency command center
             </div>
-            <div className="space-y-4">
+
+            <h1 className="max-w-xl text-5xl font-black leading-[1.02] tracking-tight text-slate-950">
+              Welcome back to your visa operations desk.
+            </h1>
+            <p className="mt-5 max-w-xl text-lg leading-8 text-slate-600">
+              Sign in to manage leads, proposals, applications, documents, invoices, and customer portals from one focused agency workspace.
+            </p>
+
+            <AgencyLoginMark />
+
+            <div className="mt-6 grid max-w-xl gap-3 sm:grid-cols-3">
               {[
-                { icon: Plane, title: "Multi-country visa management", desc: "Handle Schengen, UK, US, and 50+ destinations" },
-                { icon: Shield, title: "Secure customer portals", desc: "White-label OTP login with your agency branding" },
-                { icon: Zap, title: "AI-powered document review", desc: "Instant quality checks and readiness scoring" },
-              ].map(({ icon: Icon, title, desc }) => (
-                <div key={title} className="flex gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                    <Icon className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-sm">{title}</p>
-                    <p className="text-sm text-muted-foreground">{desc}</p>
-                  </div>
+                { icon: Plane, label: "Applications" },
+                { icon: Shield, label: "Secure portal" },
+                { icon: Zap, label: "AI review" },
+              ].map(({ icon: Icon, label }) => (
+                <div key={label} className="rounded-2xl border border-white/80 bg-white/70 p-4 shadow-sm backdrop-blur">
+                  <Icon className="mb-3 h-5 w-5 text-[#4055FF]" />
+                  <p className="text-sm font-bold text-slate-800">{label}</p>
                 </div>
               ))}
             </div>
-          </div>
+          </section>
 
-          {/* Right — login card */}
-          <Card className="w-full shadow-xl border-border/50">
-            <CardHeader className="text-center pb-4">
-              <div className="flex justify-center mb-3 lg:hidden">
+          <section className="mx-auto w-full max-w-md">
+            <div className="rounded-[2rem] border border-white/80 bg-white/82 p-5 shadow-2xl shadow-[#4055FF]/12 backdrop-blur-xl sm:p-7">
+              <div className="mb-7 flex items-center gap-4 lg:hidden">
                 <AgencyLoginMark compact />
+                <div>
+                  <p className="text-sm font-bold uppercase text-[#4055FF]">Agency login</p>
+                  <h1 className="text-2xl font-black tracking-tight">Visa Shuttle</h1>
+                </div>
               </div>
-              <CardTitle className="text-2xl font-bold">Sign in</CardTitle>
-              <CardDescription>Access your dashboard</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
+
+              <div className="mb-7">
+                <div className="mb-4 inline-flex rounded-full bg-[#4055FF]/10 px-3 py-1 text-xs font-black uppercase text-[#4055FF]">
+                  Staff access
+                </div>
+                <h2 className="text-3xl font-black tracking-tight">Sign in</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-500">
+                  Continue to your agency dashboard and pick up customer work exactly where you left it.
+                </p>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-5">
                 {error && (
-                  <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive" data-testid="text-login-error">
+                  <div className="rounded-2xl border border-destructive/20 bg-destructive/10 p-3 text-sm font-medium text-destructive" data-testid="text-login-error">
                     {error}
                   </div>
                 )}
+
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email address</Label>
+                  <Label htmlFor="email" className="text-sm font-bold text-slate-700">Email address</Label>
                   <Input
                     id="email"
                     type="email"
-                    placeholder="you@example.com"
+                    placeholder="agency@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     autoComplete="email"
+                    className="h-12 rounded-2xl border-slate-200 bg-slate-50/70 px-4 text-base shadow-inner shadow-slate-100 focus-visible:ring-[#4055FF]"
                     data-testid="input-email"
                   />
                 </div>
+
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="password">Password</Label>
-                    <a href="#" className="text-sm text-primary hover:underline">
+                    <Label htmlFor="password" className="text-sm font-bold text-slate-700">Password</Label>
+                    <a href="#" className="text-sm font-semibold text-[#4055FF] hover:underline">
                       Forgot password?
                     </a>
                   </div>
@@ -186,7 +246,7 @@ export default function LoginPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
-                      className="pr-10"
+                      className="h-12 rounded-2xl border-slate-200 bg-slate-50/70 px-4 pr-12 text-base shadow-inner shadow-slate-100 focus-visible:ring-[#4055FF]"
                       autoComplete="current-password"
                       data-testid="input-password"
                     />
@@ -194,7 +254,7 @@ export default function LoginPage() {
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="absolute right-0 top-0 h-full px-3"
+                      className="absolute right-1 top-1 h-10 w-10 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-900"
                       onClick={() => setShowPassword(!showPassword)}
                       data-testid="button-toggle-password"
                     >
@@ -205,24 +265,48 @@ export default function LoginPage() {
 
                 <Button
                   type="submit"
-                  className="w-full font-semibold"
+                  className="h-12 w-full rounded-2xl border-0 bg-gradient-to-r from-[#4055FF] via-[#7137EA] to-[#FF2060] text-base font-black text-white shadow-xl shadow-[#4055FF]/20 transition-transform hover:scale-[1.01] hover:opacity-95"
                   disabled={isLoading}
                   data-testid="button-submit"
                 >
-                  {isLoading ? "Signing in…" : "Sign In"}
+                  {isLoading ? (
+                    <span className="flex items-center gap-2">
+                      <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                      Signing in...
+                    </span>
+                  ) : (
+                    <span className="flex items-center justify-center gap-2">
+                      Sign in to dashboard
+                      <ArrowRight className="h-4 w-4" />
+                    </span>
+                  )}
                 </Button>
               </form>
 
-              <p className="mt-5 text-center text-sm text-muted-foreground">
-                Don't have an account?{" "}
-                <Link href="/signup">
-                  <a className="text-primary hover:underline font-medium" data-testid="link-signup">
-                    Sign up free
+              <div className="mt-6 rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
+                    <Shield className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-800">Protected agency workspace</p>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                      Your agency session is secured and routed to the right dashboard based on your role.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <p className="mt-6 text-center text-sm text-slate-500">
+                New agency?{" "}
+                <Link href="/business/agency-crm/signup">
+                  <a className="font-bold text-[#4055FF] hover:underline" data-testid="link-signup">
+                    Create agency account
                   </a>
                 </Link>
               </p>
-            </CardContent>
-          </Card>
+            </div>
+          </section>
         </div>
       </main>
     </div>
