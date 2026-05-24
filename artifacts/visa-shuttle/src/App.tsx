@@ -269,6 +269,23 @@ function Router() {
   );
 }
 
+function ScrollToTop() {
+  const [location] = useLocation();
+
+  useEffect(() => {
+    window.requestAnimationFrame(() => {
+      const hash = window.location.hash.replace("#", "");
+      if (hash) {
+        document.getElementById(hash)?.scrollIntoView({ block: "start" });
+        return;
+      }
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    });
+  }, [location]);
+
+  return null;
+}
+
 const PRODUCT_SHELL_PREFIXES = [
   "/account",
   "/check",
@@ -307,6 +324,7 @@ function App() {
           <PasswordGate>
             <Toaster />
             <SubdomainRedirect />
+            <ScrollToTop />
             <SiteChrome />
             <CookieBanner />
           </PasswordGate>
