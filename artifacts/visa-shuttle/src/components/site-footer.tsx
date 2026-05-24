@@ -5,9 +5,9 @@ const footerColumns = [
   {
     title: "For Individuals",
     links: [
-      { label: "Basic Check", href: "/check" },
-      { label: "Deep Check", href: "/deep-check" },
-      { label: "Pro Plan", href: "/pricing" },
+      { label: "Basic Check", href: "/plans/basic-check" },
+      { label: "Deep Check", href: "/plans/deep-check" },
+      { label: "Pro Plan", href: "/plans/pro" },
       { label: "Fake Visa Detector", href: "/visa-tools/fake_visa" },
       { label: "Fake Agency Detector", href: "/visa-tools/fake_agency" },
       { label: "Fake Employment Detector", href: "/visa-tools/fake_employment_offer" },

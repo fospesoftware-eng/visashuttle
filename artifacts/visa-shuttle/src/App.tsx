@@ -21,6 +21,7 @@ import SignInPage from "@/pages/sign-in";
 import CheckPage from "@/pages/check";
 import AccountPage from "@/pages/account";
 import PricingPage from "@/pages/pricing";
+import { BasicCheckPlanPage, DeepCheckPlanPage, ProPlanPage } from "@/pages/plan-detail";
 import HistoryPage from "@/pages/history";
 import HistoryDetailPage from "@/pages/history-detail";
 import DeepCheckPage from "@/pages/deep-check";
@@ -128,6 +129,9 @@ function Router() {
       <Route path="/check" component={CheckPage} />
       <Route path="/account" component={AccountPage} />
       <Route path="/pricing" component={PricingPage} />
+      <Route path="/plans/basic-check" component={BasicCheckPlanPage} />
+      <Route path="/plans/deep-check" component={DeepCheckPlanPage} />
+      <Route path="/plans/pro" component={ProPlanPage} />
       <Route path="/history/:id" component={HistoryDetailPage} />
       <Route path="/history" component={HistoryPage} />
       <Route path="/deep-check" component={DeepCheckPage} />

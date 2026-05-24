@@ -46,6 +46,12 @@ export default function PricingPage() {
     return user ? path : `/sign-in?next=${encodeURIComponent(path)}`;
   }
 
+  function getPlanDetailHref(plan: B2cPlan) {
+    if (plan.planKey === "free") return "/plans/basic-check";
+    if (plan.planKey === "deep") return "/plans/deep-check";
+    return "/plans/pro";
+  }
+
   const comparisonRows = [
     { label: "Basic checks", free: "1", deep: "1", pro: "Unlimited*" },
     { label: "Deep checks", free: "—", deep: "1", pro: "10" },
@@ -181,6 +187,11 @@ export default function PricingPage() {
                         </Button>
                       </Link>
                     )}
+                    <Link href={getPlanDetailHref(plan)}>
+                      <Button variant="ghost" className="mt-2 h-10 w-full rounded-xl text-slate-600 hover:text-slate-950">
+                        View plan details
+                      </Button>
+                    </Link>
                   </CardContent>
                 </Card>
               );
