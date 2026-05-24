@@ -29,7 +29,7 @@ const footerColumns = [
       { label: "How It Works", href: "/help" },
       { label: "Help & Support", href: "/help" },
       { label: "FAQ", href: "/pricing" },
-      { label: "Report a Bug", href: "/help" },
+      { label: "Report a Bug", href: "/report-bug" },
     ],
   },
   {

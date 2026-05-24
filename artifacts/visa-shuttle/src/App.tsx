@@ -55,6 +55,7 @@ import AgencyCustomizerPage from "@/pages/agency/customizer";
 import ApiPricingPublicPage from "@/pages/public/api-pricing";
 import ApiDocsPublicPage from "@/pages/public/api-docs";
 import HelpPage from "@/pages/help";
+import ReportBugPage from "@/pages/report-bug";
 
 import CustomerDashboard from "@/pages/customer/dashboard";
 import CustomerCasePage from "@/pages/customer/case";
@@ -155,6 +156,7 @@ function Router() {
       <Route path="/docs/api" component={ApiDocsPublicPage} />
       <Route path="/api-pricing" component={ApiPricingPublicPage} />
       <Route path="/help" component={HelpPage} />
+      <Route path="/report-bug" component={ReportBugPage} />
 
       <Route path="/app" component={AgencyDashboard} />
       <Route path="/app/leads" component={LeadsPage} />
