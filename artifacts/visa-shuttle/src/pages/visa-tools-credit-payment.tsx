@@ -49,6 +49,8 @@ export default function VisaToolsCreditPaymentPage() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
   const orderId = useMemo(() => new URLSearchParams(window.location.search).get("order_id"), []);
+  const paymentProvider = useMemo(() => new URLSearchParams(window.location.search).get("provider"), []);
+  const paypalOrderId = useMemo(() => new URLSearchParams(window.location.search).get("token") || new URLSearchParams(window.location.search).get("paypal_order_id"), []);
   const isReturn = window.location.pathname.includes("/return");
 
   const { data: credits } = useQuery<{ remainingCredits: number; pricing: { unit: number; amountPerUnit: number } }>({
@@ -75,7 +77,10 @@ export default function VisaToolsCreditPaymentPage() {
     async function verify() {
       setIsVerifying(true);
       try {
-        const res = await apiRequest("GET", `/api/b2c/payments/visa-tools-credits/order/${orderId}`);
+        const query = paymentProvider === "paypal" || paypalOrderId
+          ? `?provider=paypal&paypal_order_id=${encodeURIComponent(paypalOrderId || "")}`
+          : "";
+        const res = await apiRequest("GET", `/api/b2c/payments/visa-tools-credits/order/${orderId}${query}`);
         const data = await res.json();
         if (cancelled) return;
         if (data.paid) {
@@ -94,7 +99,7 @@ export default function VisaToolsCreditPaymentPage() {
     }
     verify();
     return () => { cancelled = true; };
-  }, [isReturn, orderId, toast, user]);
+  }, [currency, isReturn, orderId, paymentProvider, paypalOrderId, toast, user]);
 
   async function startPayment() {
     setIsStarting(true);
@@ -103,7 +108,11 @@ export default function VisaToolsCreditPaymentPage() {
       storeB2cCurrency(currency);
       const res = await apiRequest("POST", "/api/b2c/payments/visa-tools-credits/order", { currency, units });
       const data = await res.json();
-      if (!data.paymentSessionId) throw new Error("Cashfree did not return a payment session");
+      if (data.provider === "paypal" && data.approvalUrl) {
+        window.location.href = data.approvalUrl;
+        return;
+      }
+      if (!data.paymentSessionId) throw new Error("Payment gateway did not return a checkout session");
       await loadCashfreeSdk();
       const cashfree = window.Cashfree?.({ mode: data.mode === "live" ? "production" : "sandbox" });
       if (!cashfree) throw new Error("Cashfree checkout is unavailable");
@@ -193,7 +202,7 @@ export default function VisaToolsCreditPaymentPage() {
             ) : (
               <Button onClick={startPayment} disabled={isStarting} className="h-12 w-full gap-2 border-0 text-white bg-gradient-to-r from-[#4055FF] to-[#FF2060]">
                 {isStarting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
-                {isStarting ? "Opening Cashfree..." : `Pay ${formatB2cPrice(currency, totalAmount)} with Cashfree`}
+                {isStarting ? "Opening checkout..." : "Pay Now"}
               </Button>
             )}
           </CardContent>
@@ -203,7 +212,7 @@ export default function VisaToolsCreditPaymentPage() {
           <CardHeader><CardTitle className="text-base">How Credits Work</CardTitle></CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground">
             <div className="flex gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 text-[#4055FF]" /><p>One Visa Tools analysis uses 100 credits after a successful AI result.</p></div>
-            <div className="flex gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 text-[#4055FF]" /><p>Plan credits are included automatically. Paid credits are added after Cashfree confirms payment.</p></div>
+            <div className="flex gap-2"><ShieldCheck className="mt-0.5 h-4 w-4 text-[#4055FF]" /><p>INR payments use Cashfree. Other currencies use PayPal, and credits are added after confirmation.</p></div>
             <Button variant="outline" className="w-full" onClick={() => setLocation("/visa-tools")}>Back to Visa Tools</Button>
           </CardContent>
         </Card>

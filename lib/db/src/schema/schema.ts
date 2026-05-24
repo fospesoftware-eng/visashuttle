@@ -676,11 +676,11 @@ export type EmailTemplate = typeof emailTemplates.$inferSelect;
 
 // ── Payment Gateway Config ───────────────────────────────────────────────────
 // `provider` selects which gateway is used for PLATFORM-level subscription
-// billing. Tenants/invoices keep using Cashfree fields. Adding Stripe means
-// extra columns rather than a parallel table to keep the admin UI simple.
+// billing and B2C checkout. Extra provider columns live here so admins can
+// switch gateways without re-entering credentials.
 export const paymentGatewayConfig = pgTable("payment_gateway_config", {
   id: serial("id").primaryKey(),
-  provider: text("provider").notNull().default("cashfree"), // "cashfree" | "stripe"
+  provider: text("provider").notNull().default("cashfree"), // "cashfree" | "stripe" | "paypal"
   mode: text("mode").notNull().default("test"),
   apiVersion: text("api_version").notNull().default("2023-08-01"),
   testClientId: text("test_client_id"),
@@ -696,6 +696,14 @@ export const paymentGatewayConfig = pgTable("payment_gateway_config", {
   stripeLivePublishableKey: text("stripe_live_publishable_key"),
   stripeLiveSecretKey: text("stripe_live_secret_key"),
   stripeWebhookSecret: text("stripe_webhook_secret"),
+  // PayPal Checkout Orders API credentials. Client IDs are safe to expose in
+  // admin UI; secrets stay server-side and are masked when returned.
+  paypalMode: text("paypal_mode").notNull().default("sandbox"),
+  paypalTestClientId: text("paypal_test_client_id"),
+  paypalTestClientSecret: text("paypal_test_client_secret"),
+  paypalLiveClientId: text("paypal_live_client_id"),
+  paypalLiveClientSecret: text("paypal_live_client_secret"),
+  paypalWebhookId: text("paypal_webhook_id"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
@@ -1174,11 +1182,13 @@ export const tenantSubscriptionInvoices = pgTable("tenant_subscription_invoices"
   periodEnd: timestamp("period_end"),
   // `provider` records which gateway processed this invoice so confirm can
   // branch correctly even if the admin switches the active provider later.
-  provider: text("provider").notNull().default("cashfree"), // "cashfree" | "stripe"
+  provider: text("provider").notNull().default("cashfree"), // "cashfree" | "stripe" | "paypal"
   cashfreeOrderId: text("cashfree_order_id"),
   cashfreePaymentId: text("cashfree_payment_id"),
   stripeSessionId: text("stripe_session_id"),
   stripePaymentIntentId: text("stripe_payment_intent_id"),
+  paypalOrderId: text("paypal_order_id"),
+  paypalCaptureId: text("paypal_capture_id"),
   paidAt: timestamp("paid_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });

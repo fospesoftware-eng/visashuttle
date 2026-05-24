@@ -76,7 +76,7 @@ interface EmailTemplateResponse {
 }
 
 interface PaymentGatewayConfigResponse {
-  provider: "cashfree" | "stripe";
+  provider: "cashfree" | "stripe" | "paypal";
   mode: "test" | "live";
   apiVersion: string;
   testClientId: string;
@@ -101,6 +101,20 @@ interface PaymentGatewayConfigResponse {
     hasTestCredentials: boolean;
     hasLiveCredentials: boolean;
     hasWebhookSecret: boolean;
+    activeReady: boolean;
+  };
+  paypal: {
+    mode: "sandbox" | "live";
+    testClientId: string;
+    testClientSecret: string;
+    liveClientId: string;
+    liveClientSecret: string;
+    webhookId: string;
+    sandboxBaseUrl: string;
+    productionBaseUrl: string;
+    hasTestCredentials: boolean;
+    hasLiveCredentials: boolean;
+    hasWebhookId: boolean;
     activeReady: boolean;
   };
 }
@@ -1066,8 +1080,10 @@ function PaymentGatewayCard() {
   const [showStripeTestSecret, setShowStripeTestSecret] = useState(false);
   const [showStripeLiveSecret, setShowStripeLiveSecret] = useState(false);
   const [showStripeWebhookSecret, setShowStripeWebhookSecret] = useState(false);
+  const [showPayPalTestSecret, setShowPayPalTestSecret] = useState(false);
+  const [showPayPalLiveSecret, setShowPayPalLiveSecret] = useState(false);
   const [form, setForm] = useState({
-    provider: "cashfree" as "cashfree" | "stripe",
+    provider: "cashfree" as "cashfree" | "stripe" | "paypal",
     mode: "test" as "test" | "live",
     apiVersion: "2023-08-01",
     testClientId: "",
@@ -1083,6 +1099,14 @@ function PaymentGatewayCard() {
       liveSecretKey: "",
       webhookSecret: "",
     },
+    paypal: {
+      mode: "sandbox" as "sandbox" | "live",
+      testClientId: "",
+      testClientSecret: "",
+      liveClientId: "",
+      liveClientSecret: "",
+      webhookId: "",
+    },
   });
 
   const { data: cfg, isLoading } = useQuery<PaymentGatewayConfigResponse>({
@@ -1092,7 +1116,7 @@ function PaymentGatewayCard() {
   useEffect(() => {
     if (cfg) {
       setForm({
-        provider: cfg.provider === "stripe" ? "stripe" : "cashfree",
+        provider: cfg.provider === "stripe" || cfg.provider === "paypal" ? cfg.provider : "cashfree",
         mode: cfg.mode || "test",
         apiVersion: cfg.apiVersion || "2023-08-01",
         testClientId: cfg.testClientId || "",
@@ -1107,6 +1131,14 @@ function PaymentGatewayCard() {
           livePublishableKey: cfg.stripe?.livePublishableKey || "",
           liveSecretKey: cfg.stripe?.liveSecretKey || "",
           webhookSecret: cfg.stripe?.webhookSecret || "",
+        },
+        paypal: {
+          mode: cfg.paypal?.mode || "sandbox",
+          testClientId: cfg.paypal?.testClientId || "",
+          testClientSecret: cfg.paypal?.testClientSecret || "",
+          liveClientId: cfg.paypal?.liveClientId || "",
+          liveClientSecret: cfg.paypal?.liveClientSecret || "",
+          webhookId: cfg.paypal?.webhookId || "",
         },
       });
     }
@@ -1124,7 +1156,7 @@ function PaymentGatewayCard() {
   });
 
   const activeBaseUrl = form.mode === "live" ? "https://api.cashfree.com/pg" : "https://sandbox.cashfree.com/pg";
-  const activeProviderReady = form.provider === "stripe" ? cfg?.stripe?.activeReady : cfg?.activeReady;
+  const activeProviderReady = form.provider === "stripe" ? cfg?.stripe?.activeReady : form.provider === "paypal" ? cfg?.paypal?.activeReady : cfg?.activeReady;
 
   return (
     <Card>
@@ -1135,7 +1167,7 @@ function PaymentGatewayCard() {
               <CreditCard className="w-4 h-4" />
               Payment Gateways
             </CardTitle>
-            <CardDescription>Configure Cashfree and Stripe credentials. The selected provider is used for tenant subscription billing.</CardDescription>
+            <CardDescription>Configure Cashfree, Stripe, and PayPal credentials. The selected provider is used for B2C checkout and tenant subscription billing.</CardDescription>
           </div>
           {isLoading ? (
             <div className="w-5 h-5 border-2 border-muted border-t-foreground rounded-full animate-spin" />
@@ -1146,6 +1178,8 @@ function PaymentGatewayCard() {
             >
               {form.provider === "stripe"
                 ? `${form.stripe.mode === "live" ? "Live" : "Test"} ${activeProviderReady ? "Ready" : "Not Configured"}`
+                : form.provider === "paypal"
+                ? `${form.paypal.mode === "live" ? "Live" : "Sandbox"} ${activeProviderReady ? "Ready" : "Not Configured"}`
                 : `${form.mode === "live" ? "Live" : "Test"} ${activeProviderReady ? "Ready" : "Not Configured"}`}
             </Badge>
           )}
@@ -1159,7 +1193,7 @@ function PaymentGatewayCard() {
           </p>
           <Select
             value={form.provider}
-            onValueChange={(provider: "cashfree" | "stripe") => setForm(f => ({ ...f, provider }))}
+            onValueChange={(provider: "cashfree" | "stripe" | "paypal") => setForm(f => ({ ...f, provider }))}
           >
             <SelectTrigger data-testid="select-active-provider" className="max-w-sm">
               <SelectValue />
@@ -1167,6 +1201,7 @@ function PaymentGatewayCard() {
             <SelectContent>
               <SelectItem value="cashfree">Cashfree (India)</SelectItem>
               <SelectItem value="stripe">Stripe (Global)</SelectItem>
+              <SelectItem value="paypal">PayPal (Global)</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -1479,6 +1514,146 @@ function PaymentGatewayCard() {
           <p className="text-xs text-muted-foreground">Used to verify Stripe webhook signatures. Find it in Stripe Dashboard → Developers → Webhooks.</p>
         </div>
 
+        <Separator className="my-2" />
+
+        {/* ── PayPal Credentials ─────────────────────────────────────────── */}
+        <div className="flex items-center gap-2 pt-1">
+          <CreditCard className="w-4 h-4 text-muted-foreground" />
+          <h3 className="text-sm font-semibold">PayPal Credentials</h3>
+          {form.provider === "paypal" && (
+            <Badge variant="outline" className="text-[10px] uppercase tracking-wide">Active</Badge>
+          )}
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label>Environment</Label>
+            <Select
+              value={form.paypal.mode}
+              onValueChange={(mode: "sandbox" | "live") =>
+                setForm(f => ({ ...f, paypal: { ...f.paypal, mode } }))
+              }
+            >
+              <SelectTrigger data-testid="select-paypal-mode">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sandbox">Sandbox</SelectItem>
+                <SelectItem value="live">Live / Production</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">Use sandbox while validating PayPal checkout, then switch to live for production.</p>
+          </div>
+          <div className="space-y-2">
+            <Label>Active endpoint</Label>
+            <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+              <span className="font-mono text-foreground break-all">
+                {form.paypal.mode === "live" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com"}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">Server creates and captures Orders API payments. Client secrets are never exposed to frontend.</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold">Sandbox Credentials</p>
+              <p className="text-xs text-muted-foreground">PayPal REST app credentials for testing checkout flows</p>
+            </div>
+            {cfg?.paypal?.hasTestCredentials
+              ? <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+              : <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="paypalTestClientId">Sandbox Client ID</Label>
+              <Input
+                id="paypalTestClientId"
+                value={form.paypal.testClientId}
+                onChange={e => setForm(f => ({ ...f, paypal: { ...f.paypal, testClientId: e.target.value } }))}
+                placeholder="PayPal sandbox client ID"
+                className="font-mono text-sm"
+                data-testid="input-paypal-test-client-id"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="paypalTestClientSecret">Sandbox Client Secret</Label>
+              <div className="relative">
+                <Input
+                  id="paypalTestClientSecret"
+                  type={showPayPalTestSecret ? "text" : "password"}
+                  value={form.paypal.testClientSecret}
+                  onChange={e => setForm(f => ({ ...f, paypal: { ...f.paypal, testClientSecret: e.target.value } }))}
+                  placeholder={cfg?.paypal?.hasTestCredentials ? "Saved — enter new value to update" : "PayPal sandbox secret"}
+                  className="pr-10 font-mono text-sm"
+                  data-testid="input-paypal-test-client-secret"
+                />
+                <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowPayPalTestSecret(s => !s)}>
+                  {showPayPalTestSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold">Live Credentials</p>
+              <p className="text-xs text-muted-foreground">PayPal production REST app credentials</p>
+            </div>
+            {cfg?.paypal?.hasLiveCredentials
+              ? <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+              : <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="paypalLiveClientId">Live Client ID</Label>
+              <Input
+                id="paypalLiveClientId"
+                value={form.paypal.liveClientId}
+                onChange={e => setForm(f => ({ ...f, paypal: { ...f.paypal, liveClientId: e.target.value } }))}
+                placeholder="PayPal live client ID"
+                className="font-mono text-sm"
+                data-testid="input-paypal-live-client-id"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="paypalLiveClientSecret">Live Client Secret</Label>
+              <div className="relative">
+                <Input
+                  id="paypalLiveClientSecret"
+                  type={showPayPalLiveSecret ? "text" : "password"}
+                  value={form.paypal.liveClientSecret}
+                  onChange={e => setForm(f => ({ ...f, paypal: { ...f.paypal, liveClientSecret: e.target.value } }))}
+                  placeholder={cfg?.paypal?.hasLiveCredentials ? "Saved — enter new value to update" : "PayPal live secret"}
+                  className="pr-10 font-mono text-sm"
+                  data-testid="input-paypal-live-client-secret"
+                />
+                <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowPayPalLiveSecret(s => !s)}>
+                  {showPayPalLiveSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="paypalWebhookId">Webhook ID <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+          <Input
+            id="paypalWebhookId"
+            value={form.paypal.webhookId}
+            onChange={e => setForm(f => ({ ...f, paypal: { ...f.paypal, webhookId: e.target.value } }))}
+            placeholder={cfg?.paypal?.hasWebhookId ? "Saved — enter new value to update" : "PayPal webhook ID"}
+            className="font-mono text-sm"
+            data-testid="input-paypal-webhook-id"
+          />
+          <p className="text-xs text-muted-foreground">Optional for future webhook verification. Current checkout verifies payment by capturing the approved PayPal order server-side.</p>
+        </div>
+
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-4">
             <a
@@ -1496,6 +1671,14 @@ function PaymentGatewayCard() {
               className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline"
             >
               Stripe docs <ExternalLink className="w-3 h-3" />
+            </a>
+            <a
+              href="https://developer.paypal.com/docs/api/orders/v2/"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:underline"
+            >
+              PayPal docs <ExternalLink className="w-3 h-3" />
             </a>
           </div>
           <Button

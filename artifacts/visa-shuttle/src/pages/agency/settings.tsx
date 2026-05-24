@@ -2198,6 +2198,14 @@ function SubscriptionTab({ tenantId }: { tenantId?: string }) {
         }
         return;
       }
+      if (data?.provider === "paypal") {
+        if (data?.approvalUrl) {
+          window.open(data.approvalUrl, "_blank");
+        } else {
+          toast({ title: "Could not start payment", description: "No PayPal approval URL returned", variant: "destructive" });
+        }
+        return;
+      }
       // Cashfree (default). Use the hosted-redirect approach via payment_session_id.
       if (data?.paymentSessionId) {
         const url = data.mode === "production" || data.mode === "live"
@@ -2303,7 +2311,7 @@ function SubscriptionTab({ tenantId }: { tenantId?: string }) {
                   {(initiateMut.isPending || confirming)
                     ? <Loader2 className="w-4 h-4 animate-spin" />
                     : <CreditCard className="w-4 h-4" />}
-                  Pay {fmt(sub.monthlyPriceCents, sub.currency)}
+                  Pay Now
                 </Button>
               ) : (
                 <p className="text-sm text-muted-foreground">No price set yet — contact support.</p>

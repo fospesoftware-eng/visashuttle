@@ -44,13 +44,21 @@ type StripeCreds = {
   secretKey?: string;
 };
 
+type PayPalCreds = {
+  mode: "live" | "sandbox";
+  baseUrl: string;
+  clientId?: string;
+  clientSecret?: string;
+};
+
 // The platform's active gateway selection + the credentials for whichever
 // provider is currently configured. `provider` decides which subscription
 // payment path runs at checkout time.
 type PlatformGatewaySelection = {
-  provider: "cashfree" | "stripe";
+  provider: "cashfree" | "stripe" | "paypal";
   cashfree: CashfreeCreds;
   stripe: StripeCreds;
+  paypal: PayPalCreds;
 };
 
 type ExtensionsHelpers = {
@@ -105,6 +113,68 @@ function callerIsTenantMember(req: Request, tenantId: string): boolean {
 function isPlatformAdmin(req: Request): boolean {
   const role = req.session?.userRole ?? "";
   return PLATFORM_ROLES.has(role);
+}
+
+async function getPayPalAccessToken(paypal: PayPalCreds): Promise<string> {
+  if (!paypal.clientId || !paypal.clientSecret) throw new Error("PayPal credentials are not configured");
+  const auth = Buffer.from(`${paypal.clientId}:${paypal.clientSecret}`).toString("base64");
+  const response = await fetch(`${paypal.baseUrl}/v1/oauth2/token`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Basic ${auth}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: "grant_type=client_credentials",
+    signal: AbortSignal.timeout(20000),
+  });
+  const data: any = await response.json().catch(() => ({}));
+  if (!response.ok || !data.access_token) throw new Error(data?.error_description || data?.error || "Unable to authenticate with PayPal");
+  return data.access_token;
+}
+
+function getPayPalApprovalUrl(order: any): string | undefined {
+  return order?.links?.find((link: any) => link?.rel === "approve")?.href;
+}
+
+async function createPayPalOrder(paypal: PayPalCreds, payload: any): Promise<any> {
+  const token = await getPayPalAccessToken(paypal);
+  const response = await fetch(`${paypal.baseUrl}/v2/checkout/orders`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "PayPal-Request-Id": randomUUID(),
+    },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(20000),
+  });
+  const data: any = await response.json().catch(() => ({}));
+  if (!response.ok) throw Object.assign(new Error(data?.message || data?.details?.[0]?.description || "Unable to create PayPal order"), { status: response.status, data });
+  return data;
+}
+
+async function capturePayPalOrder(paypal: PayPalCreds, orderId: string): Promise<any> {
+  const token = await getPayPalAccessToken(paypal);
+  const response = await fetch(`${paypal.baseUrl}/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "PayPal-Request-Id": randomUUID(),
+    },
+    signal: AbortSignal.timeout(20000),
+  });
+  const data: any = await response.json().catch(() => ({}));
+  if (!response.ok && data?.name !== "ORDER_ALREADY_CAPTURED") throw Object.assign(new Error(data?.message || data?.details?.[0]?.description || "Unable to verify PayPal payment"), { status: response.status, data });
+  return data;
+}
+
+function getPayPalCaptureId(data: any): string {
+  return String(data?.purchase_units?.[0]?.payments?.captures?.[0]?.id || "");
+}
+
+function gatewayForCheckoutCurrency(currency?: string | null): "cashfree" | "paypal" {
+  return String(currency || "").trim().toUpperCase() === "INR" ? "cashfree" : "paypal";
 }
 
 // ─── Validators ───────────────────────────────────────────────────────────────
@@ -637,8 +707,8 @@ export function registerPlatformExtensions(app: Express, helpers: ExtensionsHelp
   });
 
   // POST /api/agency/:tenantId/subscription/initiate-payment — creates a
-  // pending subscription invoice and a gateway order/session for the active
-  // platform-selected provider (Cashfree or Stripe).
+  // pending subscription invoice and routes INR through Cashfree, all other
+  // currencies through PayPal.
   app.post("/api/agency/:tenantId/subscription/initiate-payment", async (req, res) => {
     try {
       if (!callerIsTenantMember(req, String(req.params.tenantId))) {
@@ -651,6 +721,7 @@ export function registerPlatformExtensions(app: Express, helpers: ExtensionsHelp
       let gw: PlatformGatewaySelection;
       try { gw = await getPlatformGateway(); }
       catch { res.status(503).json({ error: "Online payment isn't configured yet. Please contact support." }); return; }
+      const checkoutProvider: PlatformGatewaySelection["provider"] = gatewayForCheckoutCurrency(sub.currency);
 
       // Compute the upcoming period: starts when the current one ends, or
       // today if there's no current period.
@@ -665,7 +736,7 @@ export function registerPlatformExtensions(app: Express, helpers: ExtensionsHelp
         amountCents: sub.monthlyPriceCents,
         currency: sub.currency,
         status: "pending",
-        provider: gw.provider,
+        provider: checkoutProvider,
         periodStart, periodEnd,
       } as any).returning();
 
@@ -674,7 +745,7 @@ export function registerPlatformExtensions(app: Express, helpers: ExtensionsHelp
       const tenantUser = await storage.getUser(req.session!.userId!);
 
       // ── Stripe branch ────────────────────────────────────────────────────
-      if (gw.provider === "stripe") {
+      if (checkoutProvider === "stripe") {
         const stripe = gw.stripe;
         if (!stripe.secretKey) {
           res.status(503).json({ error: "Stripe isn't configured yet. Please contact support." }); return;
@@ -734,6 +805,61 @@ export function registerPlatformExtensions(app: Express, helpers: ExtensionsHelp
           currency: sub.currency,
         });
         return;
+      }
+
+      // ── PayPal branch ────────────────────────────────────────────────────
+      if (checkoutProvider === "paypal") {
+        const paypal = gw.paypal;
+        if (!paypal.clientId || !paypal.clientSecret) {
+          res.status(503).json({ error: "PayPal isn't configured yet. Please contact support." }); return;
+        }
+        try {
+          const paypalOrder = await createPayPalOrder(paypal, {
+            intent: "CAPTURE",
+            purchase_units: [{
+              reference_id: orderId,
+              custom_id: invoice.id,
+              invoice_id: orderId,
+              description: `Visa Shuttle subscription - ${sub.plan}`,
+              amount: {
+                currency_code: sub.currency,
+                value: (sub.monthlyPriceCents / 100).toFixed(2),
+              },
+            }],
+            payment_source: {
+              paypal: {
+                experience_context: {
+                  brand_name: "Visa Shuttle",
+                  shipping_preference: "NO_SHIPPING",
+                  user_action: "PAY_NOW",
+                  return_url: `${origin}/app/settings?tab=subscription&order_id=${orderId}&provider=paypal`,
+                  cancel_url: `${origin}/app/settings?tab=subscription&order_id=${orderId}&provider=paypal&canceled=1`,
+                },
+              },
+            },
+          });
+          const approvalUrl = getPayPalApprovalUrl(paypalOrder);
+          if (!approvalUrl) { res.status(502).json({ error: "PayPal did not return an approval URL" }); return; }
+          await db.update(tenantSubscriptionInvoices).set({
+            paypalOrderId: paypalOrder.id,
+            cashfreeOrderId: orderId,
+          }).where(eq(tenantSubscriptionInvoices.id, invoice.id));
+
+          res.json({
+            provider: "paypal",
+            invoiceId: invoice.id,
+            orderId,
+            paypalOrderId: paypalOrder.id,
+            approvalUrl,
+            mode: paypal.mode,
+            amount: sub.monthlyPriceCents,
+            currency: sub.currency,
+          });
+          return;
+        } catch (e: any) {
+          res.status(e?.status >= 500 ? 503 : e?.status || 502).json({ error: e?.message || "Unable to create PayPal order" });
+          return;
+        }
       }
 
       // ── Cashfree branch (default) ────────────────────────────────────────
@@ -866,6 +992,48 @@ export function registerPlatformExtensions(app: Express, helpers: ExtensionsHelp
           status: "paid",
           paidAt: now,
           stripePaymentIntentId: typeof sdata.payment_intent === "string" ? sdata.payment_intent : null,
+        }).where(eq(tenantSubscriptionInvoices.id, invoice.id)).returning();
+
+        await db.update(tenantSubscriptions).set({
+          status: "active",
+          currentPeriodStart: invoice.periodStart ?? now,
+          currentPeriodEnd: invoice.periodEnd ?? null,
+          updatedAt: now,
+        }).where(eq(tenantSubscriptions.id, invoice.subscriptionId));
+
+        res.json({ paid: true, invoice: updatedInvoice });
+        return;
+      }
+
+      // ── PayPal verification ──────────────────────────────────────────────
+      if (provider === "paypal") {
+        const paypal = gw.paypal;
+        if (!paypal.clientId || !paypal.clientSecret) {
+          res.status(503).json({ error: "PayPal not configured" }); return;
+        }
+        if (!invoice.paypalOrderId) {
+          res.status(400).json({ error: "No PayPal order for this invoice" }); return;
+        }
+        let pdata: any;
+        try {
+          pdata = await capturePayPalOrder(paypal, invoice.paypalOrderId);
+        } catch (e: any) {
+          res.status(e?.status >= 500 ? 503 : e?.status || 502).json({ error: e?.message || "Unable to verify PayPal payment" });
+          return;
+        }
+        const capture = pdata?.purchase_units?.[0]?.payments?.captures?.[0];
+        const customId = String(capture?.custom_id || pdata?.purchase_units?.[0]?.custom_id || "");
+        if (customId && customId !== invoice.id) {
+          res.status(400).json({ error: "PayPal order does not match invoice" }); return;
+        }
+        const isPaid = pdata?.status === "COMPLETED" || capture?.status === "COMPLETED";
+        if (!isPaid) { res.json({ paid: false, status: pdata?.status || capture?.status }); return; }
+
+        const now = new Date();
+        const [updatedInvoice] = await db.update(tenantSubscriptionInvoices).set({
+          status: "paid",
+          paidAt: now,
+          paypalCaptureId: getPayPalCaptureId(pdata),
         }).where(eq(tenantSubscriptionInvoices.id, invoice.id)).returning();
 
         await db.update(tenantSubscriptions).set({

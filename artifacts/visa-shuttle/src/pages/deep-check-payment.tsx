@@ -69,7 +69,11 @@ export default function DeepCheckPaymentPage() {
   const [couponMessage, setCouponMessage] = useState("");
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
 
-  const orderId = useMemo(() => new URLSearchParams(window.location.search).get("order_id"), []);
+  const orderId = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("order_id") || params.get("token");
+  }, []);
+  const paymentProvider = useMemo(() => new URLSearchParams(window.location.search).get("provider"), []);
   const requestedPlanKey = useMemo(() => {
     const key = new URLSearchParams(window.location.search).get("plan");
     return key === "pro" ? "pro" : "deep";
@@ -102,7 +106,8 @@ export default function DeepCheckPaymentPage() {
       setIsVerifying(true);
       setError("");
       try {
-        const res = await apiRequest("GET", `/api/b2c/payments/deep-check/order/${orderId}`);
+        const query = paymentProvider === "paypal" ? "?provider=paypal" : "";
+        const res = await apiRequest("GET", `/api/b2c/payments/deep-check/order/${orderId}${query}`);
         const data = await res.json();
         if (cancelled) return;
         if (data.paid || data.deepCheckAccess) {
@@ -122,7 +127,7 @@ export default function DeepCheckPaymentPage() {
     return () => {
       cancelled = true;
     };
-  }, [isReturn, orderId, setLocation, toast, user]);
+  }, [isReturn, orderId, paymentProvider, setLocation, toast, user]);
 
   async function startPayment() {
     setIsStarting(true);
@@ -135,8 +140,12 @@ export default function DeepCheckPaymentPage() {
         setLocation(data.redirectUrl || "/deep-check");
         return;
       }
+      if (data.provider === "paypal" && data.approvalUrl) {
+        window.location.href = data.approvalUrl;
+        return;
+      }
       if (!data.paymentSessionId) {
-        throw new Error("Cashfree did not return a payment session");
+        throw new Error("Payment gateway did not return a checkout session");
       }
       await loadCashfreeSdk();
       const cashfree = window.Cashfree?.({ mode: data.mode === "live" ? "production" : "sandbox" });
@@ -381,7 +390,7 @@ export default function DeepCheckPaymentPage() {
                 data-testid="button-start-deep-check-payment"
               >
                 {isStarting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
-                {isStarting ? "Opening Cashfree..." : `Pay ${checkoutPriceLabel} with Cashfree`}
+                {isStarting ? "Opening checkout..." : "Pay Now"}
               </Button>
             )}
           </CardContent>
@@ -392,7 +401,7 @@ export default function DeepCheckPaymentPage() {
             <CardTitle className="text-base">Secure Checkout</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground">
-            <p>Payment is processed by Cashfree using the active test/live gateway mode configured in SaaS Admin.</p>
+            <p>INR payments are processed through Cashfree. Other currencies are processed through PayPal.</p>
             <p>After payment, you will be returned here and Deep Check access will be enabled automatically.</p>
             <Button variant="outline" className="w-full" onClick={() => setLocation("/pricing")}>
               Back to Pricing

@@ -209,6 +209,10 @@ export default function AgencyRegisterPage() {
       window.open(data.checkoutUrl, "_blank");
       return;
     }
+    if (data?.provider === "paypal" && data.approvalUrl) {
+      window.open(data.approvalUrl, "_blank");
+      return;
+    }
     if (data?.paymentSessionId) {
       const url = data.mode === "production" || data.mode === "live"
         ? `https://payments.cashfree.com/order/#${data.paymentSessionId}`
@@ -286,7 +290,7 @@ export default function AgencyRegisterPage() {
               Capture agency details, select the right CRM plan, complete payment, and start managing leads, proposals and applications.
             </p>
             <div className="mt-8 grid gap-3">
-              {["Automatic agency creation", "Lite / Go / Power plan selection", "Cashfree online payment or offline admin activation"].map((item) => (
+              {["Automatic agency creation", "Lite / Go / Power plan selection", "Online payment or offline admin activation"].map((item) => (
                 <div key={item} className="flex items-center gap-3 rounded-xl border bg-background/70 p-3">
                   <Check className="h-4 w-4 text-emerald-600" />
                   <span className="text-sm font-medium">{item}</span>
@@ -450,7 +454,7 @@ export default function AgencyRegisterPage() {
                     >
                       <CreditCard className="mb-2 h-5 w-5 text-[#4055FF]" />
                       <p className="font-semibold">Pay online</p>
-                      <p className="text-xs text-muted-foreground">Go to Cashfree payment gateway after signup.</p>
+                      <p className="text-xs text-muted-foreground">INR uses Cashfree. Other currencies use PayPal after signup.</p>
                     </button>
                     <button
                       type="button"

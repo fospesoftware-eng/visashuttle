@@ -496,6 +496,103 @@ function getStripeCredentials(cfg: StripeConfigShape | undefined): {
   return { mode, publishableKey: publishableKey?.trim(), secretKey: secretKey?.trim() };
 }
 
+type PayPalConfigShape = {
+  paypalMode?: string | null;
+  paypalTestClientId?: string | null;
+  paypalTestClientSecret?: string | null;
+  paypalLiveClientId?: string | null;
+  paypalLiveClientSecret?: string | null;
+};
+function getPayPalCredentials(cfg: PayPalConfigShape | undefined): {
+  mode: "live" | "sandbox";
+  baseUrl: string;
+  clientId?: string;
+  clientSecret?: string;
+} {
+  const mode: "live" | "sandbox" =
+    cfg?.paypalMode === "live" || process.env.PAYPAL_MODE === "live" ? "live" : "sandbox";
+  const clientId = mode === "live"
+    ? cfg?.paypalLiveClientId || process.env.PAYPAL_LIVE_CLIENT_ID
+    : cfg?.paypalTestClientId || process.env.PAYPAL_TEST_CLIENT_ID || process.env.PAYPAL_SANDBOX_CLIENT_ID;
+  const clientSecret = mode === "live"
+    ? cfg?.paypalLiveClientSecret || process.env.PAYPAL_LIVE_CLIENT_SECRET
+    : cfg?.paypalTestClientSecret || process.env.PAYPAL_TEST_CLIENT_SECRET || process.env.PAYPAL_SANDBOX_CLIENT_SECRET;
+  return {
+    mode,
+    baseUrl: mode === "live" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com",
+    clientId: clientId?.trim(),
+    clientSecret: clientSecret?.trim(),
+  };
+}
+
+async function getPayPalAccessToken(paypal: ReturnType<typeof getPayPalCredentials>): Promise<string> {
+  if (!paypal.clientId || !paypal.clientSecret) throw new Error("PayPal credentials are not configured");
+  const auth = Buffer.from(`${paypal.clientId}:${paypal.clientSecret}`).toString("base64");
+  const response = await fetch(`${paypal.baseUrl}/v1/oauth2/token`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Basic ${auth}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: "grant_type=client_credentials",
+    signal: AbortSignal.timeout(20000),
+  });
+  const data: any = await response.json().catch(() => ({}));
+  if (!response.ok || !data.access_token) {
+    throw new Error(data?.error_description || data?.error || "Unable to authenticate with PayPal");
+  }
+  return data.access_token;
+}
+
+function getPayPalApprovalUrl(order: any): string | undefined {
+  return order?.links?.find((link: any) => link?.rel === "approve")?.href;
+}
+
+async function createPayPalOrder(paypal: ReturnType<typeof getPayPalCredentials>, payload: any): Promise<any> {
+  const token = await getPayPalAccessToken(paypal);
+  const response = await fetch(`${paypal.baseUrl}/v2/checkout/orders`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "PayPal-Request-Id": randomUUID(),
+    },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(20000),
+  });
+  const data: any = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw Object.assign(new Error(data?.message || data?.details?.[0]?.description || "Unable to create PayPal order"), { status: response.status, data });
+  }
+  return data;
+}
+
+async function capturePayPalOrder(paypal: ReturnType<typeof getPayPalCredentials>, orderId: string): Promise<any> {
+  const token = await getPayPalAccessToken(paypal);
+  const response = await fetch(`${paypal.baseUrl}/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "PayPal-Request-Id": randomUUID(),
+    },
+    signal: AbortSignal.timeout(20000),
+  });
+  const data: any = await response.json().catch(() => ({}));
+  if (!response.ok && data?.name !== "ORDER_ALREADY_CAPTURED") {
+    throw Object.assign(new Error(data?.message || data?.details?.[0]?.description || "Unable to verify PayPal payment"), { status: response.status, data });
+  }
+  return data;
+}
+
+function getPayPalCaptureId(data: any): string {
+  return String(data?.purchase_units?.[0]?.payments?.captures?.[0]?.id || "");
+}
+
+function gatewayForCheckoutCurrency(currency?: string | null): "cashfree" | "paypal" {
+  return String(currency || "").trim().toUpperCase() === "INR" ? "cashfree" : "paypal";
+}
+
 function validateCashfreeMode(mode: "live" | "test", clientId?: string, clientSecret?: string): string | null {
   const id = clientId || "";
   const secret = clientSecret || "";
@@ -5231,6 +5328,10 @@ export async function registerRoutes(
       cfg?.stripeMode === "live" || process.env.STRIPE_MODE === "live" ? "live" : "test";
     const stripeTestReady = !!((cfg?.stripeTestPublishableKey || process.env.STRIPE_TEST_PUBLISHABLE_KEY) && (cfg?.stripeTestSecretKey || process.env.STRIPE_TEST_SECRET_KEY));
     const stripeLiveReady = !!((cfg?.stripeLivePublishableKey || process.env.STRIPE_LIVE_PUBLISHABLE_KEY) && (cfg?.stripeLiveSecretKey || process.env.STRIPE_LIVE_SECRET_KEY));
+    const paypalMode: "live" | "sandbox" =
+      cfg?.paypalMode === "live" || process.env.PAYPAL_MODE === "live" ? "live" : "sandbox";
+    const paypalTestReady = !!((cfg?.paypalTestClientId || process.env.PAYPAL_TEST_CLIENT_ID || process.env.PAYPAL_SANDBOX_CLIENT_ID) && (cfg?.paypalTestClientSecret || process.env.PAYPAL_TEST_CLIENT_SECRET || process.env.PAYPAL_SANDBOX_CLIENT_SECRET));
+    const paypalLiveReady = !!((cfg?.paypalLiveClientId || process.env.PAYPAL_LIVE_CLIENT_ID) && (cfg?.paypalLiveClientSecret || process.env.PAYPAL_LIVE_CLIENT_SECRET));
     res.json({
       provider: cfg?.provider || "cashfree",
       mode,
@@ -5263,6 +5364,20 @@ export async function registerRoutes(
         hasWebhookSecret: !!cfg?.stripeWebhookSecret,
         activeReady: stripeMode === "live" ? stripeLiveReady : stripeTestReady,
       },
+      paypal: {
+        mode: paypalMode,
+        testClientId: cfg?.paypalTestClientId || "",
+        testClientSecret: cfg?.paypalTestClientSecret ? maskKey(cfg.paypalTestClientSecret) : "",
+        liveClientId: cfg?.paypalLiveClientId || "",
+        liveClientSecret: cfg?.paypalLiveClientSecret ? maskKey(cfg.paypalLiveClientSecret) : "",
+        webhookId: cfg?.paypalWebhookId ? maskKey(cfg.paypalWebhookId) : "",
+        sandboxBaseUrl: "https://api-m.sandbox.paypal.com",
+        productionBaseUrl: "https://api-m.paypal.com",
+        hasTestCredentials: paypalTestReady,
+        hasLiveCredentials: paypalLiveReady,
+        hasWebhookId: !!cfg?.paypalWebhookId,
+        activeReady: paypalMode === "live" ? paypalLiveReady : paypalTestReady,
+      },
     });
   });
 
@@ -5277,10 +5392,11 @@ export async function registerRoutes(
       liveClientSecret,
       webhookSecret,
       stripe,
+      paypal,
     } = req.body;
     const patch: Record<string, any> = {};
     // Active provider for platform subscription billing.
-    if (provider === "cashfree" || provider === "stripe") patch.provider = provider;
+    if (provider === "cashfree" || provider === "stripe" || provider === "paypal") patch.provider = provider;
     if (mode !== undefined) patch.mode = mode === "live" ? "live" : "test";
     if (apiVersion !== undefined) patch.apiVersion = apiVersion || "2023-08-01";
     if (testClientId !== undefined && !String(testClientId).includes("•")) patch.testClientId = testClientId || null;
@@ -5309,10 +5425,29 @@ export async function registerRoutes(
         patch.stripeWebhookSecret = stripe.webhookSecret || null;
       }
     }
+    if (paypal && typeof paypal === "object") {
+      if (paypal.mode !== undefined) patch.paypalMode = paypal.mode === "live" ? "live" : "sandbox";
+      if (paypal.testClientId !== undefined && !String(paypal.testClientId).includes("•")) {
+        patch.paypalTestClientId = paypal.testClientId || null;
+      }
+      if (paypal.testClientSecret !== undefined && !String(paypal.testClientSecret).includes("•")) {
+        patch.paypalTestClientSecret = paypal.testClientSecret || null;
+      }
+      if (paypal.liveClientId !== undefined && !String(paypal.liveClientId).includes("•")) {
+        patch.paypalLiveClientId = paypal.liveClientId || null;
+      }
+      if (paypal.liveClientSecret !== undefined && !String(paypal.liveClientSecret).includes("•")) {
+        patch.paypalLiveClientSecret = paypal.liveClientSecret || null;
+      }
+      if (paypal.webhookId !== undefined && !String(paypal.webhookId).includes("•")) {
+        patch.paypalWebhookId = paypal.webhookId || null;
+      }
+    }
 
     const updated = await storage.upsertPaymentGatewayConfig(patch);
     const activeMode = updated.mode === "live" ? "live" : "test";
     const stripeActiveMode = updated.stripeMode === "live" ? "live" : "test";
+    const paypalActiveMode = updated.paypalMode === "live" ? "live" : "sandbox";
     res.json({
       success: true,
       provider: updated.provider || "cashfree",
@@ -5327,6 +5462,12 @@ export async function registerRoutes(
         hasTestCredentials: !!(updated.stripeTestPublishableKey && updated.stripeTestSecretKey),
         hasLiveCredentials: !!(updated.stripeLivePublishableKey && updated.stripeLiveSecretKey),
         hasWebhookSecret: !!updated.stripeWebhookSecret,
+      },
+      paypal: {
+        mode: paypalActiveMode,
+        hasTestCredentials: !!(updated.paypalTestClientId && updated.paypalTestClientSecret),
+        hasLiveCredentials: !!(updated.paypalLiveClientId && updated.paypalLiveClientSecret),
+        hasWebhookId: !!updated.paypalWebhookId,
       },
     });
   });
@@ -5567,7 +5708,7 @@ export async function registerRoutes(
     res.json({ user: safeUser });
   });
 
-  // ── B2C Payments: Deep Check via Cashfree ────────────────────────────────
+  // ── B2C Payments: Deep Check / Pro via configured platform gateway ───────
   app.post("/api/b2c/payments/deep-check/coupon", requireB2cAuth, async (req, res) => {
     const price = await getB2cPlanPrice(req.body?.planKey || "deep", req.body?.currency);
     if (!price || price.amount <= 0) return res.status(400).json({ error: "Selected B2C plan is not available for checkout." });
@@ -5594,18 +5735,6 @@ export async function registerRoutes(
       return res.json({ alreadyActive: true, redirectUrl: "/deep-check" });
     }
 
-    const cfg = await storage.getPaymentGatewayConfig();
-    const cashfree = getCashfreeCredentials(cfg);
-    if (!cashfree.clientId || !cashfree.clientSecret) {
-      return res.status(503).json({
-        error: `Cashfree ${cashfree.mode} credentials are not configured. Please add them in SaaS Admin > Integrations.`,
-      });
-    }
-    const modeError = validateCashfreeMode(cashfree.mode, cashfree.clientId, cashfree.clientSecret);
-    if (modeError) {
-      return res.status(400).json({ error: modeError });
-    }
-
     const price = await getB2cPlanPrice(requestedPlanKey, req.body?.currency);
     if (!price || price.amount <= 0) {
       return res.status(400).json({ error: "Selected B2C plan is not available for checkout." });
@@ -5616,8 +5745,74 @@ export async function registerRoutes(
     const checkoutAmount = discount?.finalAmount ?? price.amount;
     const orderPlanCode = price.planKey === "pro" ? "PRO" : "DEEP";
     const orderId = `VS_${orderPlanCode}_${price.currency}_${Date.now()}_${randomUUID().slice(0, 8)}`;
-    const requestId = randomUUID();
     const origin = getRequestOrigin(req);
+    const cfg = await storage.getPaymentGatewayConfig();
+
+    if (gatewayForCheckoutCurrency(price.currency) === "paypal") {
+      const paypal = getPayPalCredentials(cfg);
+      if (!paypal.clientId || !paypal.clientSecret) {
+        return res.status(503).json({ error: `PayPal ${paypal.mode} credentials are not configured. Please add them in SaaS Admin > Integrations.` });
+      }
+      try {
+        const paypalOrder = await createPayPalOrder(paypal, {
+          intent: "CAPTURE",
+          purchase_units: [{
+            reference_id: orderId,
+            custom_id: `b2c_plan:${user.id}:${price.planKey}`,
+            invoice_id: orderId,
+            description: `Visa Shuttle ${price.plan.name}`,
+            amount: {
+              currency_code: price.currency,
+              value: checkoutAmount.toFixed(2),
+            },
+          }],
+          payment_source: {
+            paypal: {
+              experience_context: {
+                brand_name: "Visa Shuttle",
+                shipping_preference: "NO_SHIPPING",
+                user_action: "PAY_NOW",
+                return_url: `${origin}/payment/deep-check/return?provider=paypal`,
+                cancel_url: `${origin}/payment/deep-check?canceled=1`,
+              },
+            },
+          },
+        });
+        const approvalUrl = getPayPalApprovalUrl(paypalOrder);
+        if (!approvalUrl) return res.status(502).json({ error: "PayPal did not return an approval URL" });
+        res.json({
+          provider: "paypal",
+          orderId: paypalOrder.id,
+          approvalUrl,
+          mode: paypal.mode,
+          amount: checkoutAmount,
+          currency: price.currency,
+          originalAmount: price.amount,
+          planKey: price.planKey,
+          couponCode: couponCheck.coupon?.code || "",
+          discountPercent: discount?.discountPercent || 0,
+          discountAmount: discount?.discountAmount || 0,
+        });
+        return;
+      } catch (err: any) {
+        console.error("[PayPal] Create B2C plan order failed:", err?.data || err);
+        return res.status(err?.status >= 500 ? 503 : err?.status || 502).json({
+          error: err?.message || "Unable to create PayPal order",
+        });
+      }
+    }
+
+    const cashfree = getCashfreeCredentials(cfg);
+    if (!cashfree.clientId || !cashfree.clientSecret) {
+      return res.status(503).json({
+        error: `Cashfree ${cashfree.mode} credentials are not configured. Please add them in SaaS Admin > Integrations.`,
+      });
+    }
+    const modeError = validateCashfreeMode(cashfree.mode, cashfree.clientId, cashfree.clientSecret);
+    if (modeError) {
+      return res.status(400).json({ error: modeError });
+    }
+    const requestId = randomUUID();
     const payload = {
       order_id: orderId,
       order_amount: checkoutAmount,
@@ -5703,11 +5898,52 @@ export async function registerRoutes(
     if (!user) return res.status(401).json({ error: "User not found" });
 
     const orderId = req.params.orderId;
-    if (!/^VS_(DEEP|PRO)_[a-zA-Z0-9_-]+$/.test(orderId)) {
+    const isPayPalOrder = req.query.provider === "paypal" || /^[A-Z0-9]{10,30}$/.test(orderId);
+    if (!isPayPalOrder && !/^VS_(DEEP|PRO)_[a-zA-Z0-9_-]+$/.test(orderId)) {
       return res.status(400).json({ error: "Invalid order id" });
     }
 
     const cfg = await storage.getPaymentGatewayConfig();
+    if (isPayPalOrder) {
+      const paypal = getPayPalCredentials(cfg);
+      if (!paypal.clientId || !paypal.clientSecret) {
+        return res.status(503).json({ error: "PayPal credentials are not configured" });
+      }
+      try {
+        const data = await capturePayPalOrder(paypal, orderId);
+        const capture = data?.purchase_units?.[0]?.payments?.captures?.[0];
+        const isPaid = data?.status === "COMPLETED" || capture?.status === "COMPLETED";
+        const customId = String(data?.purchase_units?.[0]?.payments?.captures?.[0]?.custom_id || data?.purchase_units?.[0]?.custom_id || "");
+        const [, customUserId, planKey] = customId.split(":");
+        if (customUserId && customUserId !== user.id) return res.status(403).json({ error: "Order does not belong to this user" });
+        const isProOrder = planKey === "pro";
+        if (isPaid && !user.deepCheckAccess) {
+          await storage.updateB2cUser(user.id, {
+            subscriptionPlan: isProOrder ? "pro" : "deep",
+            deepCheckAccess: true,
+            checkLimit: isProOrder ? 9999 : Math.max(user.checkLimit || 1, 1),
+          });
+        } else if (isPaid && isProOrder && user.subscriptionPlan !== "pro") {
+          await storage.updateB2cUser(user.id, {
+            subscriptionPlan: "pro",
+            deepCheckAccess: true,
+            checkLimit: 9999,
+          });
+        }
+        return res.json({
+          orderId,
+          status: data?.status || capture?.status,
+          paid: isPaid,
+          provider: "paypal",
+          captureId: getPayPalCaptureId(data),
+          deepCheckAccess: isPaid || user.deepCheckAccess,
+        });
+      } catch (err: any) {
+        console.error("[PayPal] Verify B2C plan order failed:", err?.data || err);
+        return res.status(err?.status >= 500 ? 503 : err?.status || 502).json({ error: err?.message || "Unable to verify PayPal order" });
+      }
+    }
+
     const cashfree = getCashfreeCredentials(cfg);
     if (!cashfree.clientId || !cashfree.clientSecret) {
       return res.status(503).json({ error: "Cashfree credentials are not configured" });
@@ -5772,14 +6008,6 @@ export async function registerRoutes(
     const credits = units * pricing.unit;
     const checkoutAmount = units * pricing.amountPerUnit;
 
-    const cfg = await storage.getPaymentGatewayConfig();
-    const cashfree = getCashfreeCredentials(cfg);
-    if (!cashfree.clientId || !cashfree.clientSecret) {
-      return res.status(503).json({ error: `Cashfree ${cashfree.mode} credentials are not configured. Please add them in SaaS Admin > Integrations.` });
-    }
-    const modeError = validateCashfreeMode(cashfree.mode, cashfree.clientId, cashfree.clientSecret);
-    if (modeError) return res.status(400).json({ error: modeError });
-
     const orderId = `VS_CREDITS_${pricing.currency}_${Date.now()}_${randomUUID().slice(0, 8)}`;
     await storage.createB2cCreditOrder({
       userId: user.id,
@@ -5792,6 +6020,66 @@ export async function registerRoutes(
     } as any);
 
     const origin = getRequestOrigin(req);
+    const cfg = await storage.getPaymentGatewayConfig();
+
+    if (gatewayForCheckoutCurrency(pricing.currency) === "paypal") {
+      const paypal = getPayPalCredentials(cfg);
+      if (!paypal.clientId || !paypal.clientSecret) {
+        return res.status(503).json({ error: `PayPal ${paypal.mode} credentials are not configured. Please add them in SaaS Admin > Integrations.` });
+      }
+      try {
+        const paypalOrder = await createPayPalOrder(paypal, {
+          intent: "CAPTURE",
+          purchase_units: [{
+            reference_id: orderId,
+            custom_id: orderId,
+            invoice_id: orderId,
+            description: `Visa Shuttle Visa Tools Credits - ${credits}`,
+            amount: {
+              currency_code: pricing.currency,
+              value: checkoutAmount.toFixed(2),
+            },
+          }],
+          payment_source: {
+            paypal: {
+              experience_context: {
+                brand_name: "Visa Shuttle",
+                shipping_preference: "NO_SHIPPING",
+                user_action: "PAY_NOW",
+                return_url: `${origin}/payment/visa-tools-credits/return?provider=paypal&order_id=${orderId}`,
+                cancel_url: `${origin}/payment/visa-tools-credits?canceled=1`,
+              },
+            },
+          },
+        });
+        const approvalUrl = getPayPalApprovalUrl(paypalOrder);
+        if (!approvalUrl) return res.status(502).json({ error: "PayPal did not return an approval URL" });
+        return res.json({
+          provider: "paypal",
+          orderId,
+          paypalOrderId: paypalOrder.id,
+          approvalUrl,
+          mode: paypal.mode,
+          amount: checkoutAmount,
+          currency: pricing.currency,
+          credits,
+          units,
+          unit: pricing.unit,
+          amountPerUnit: pricing.amountPerUnit,
+        });
+      } catch (err: any) {
+        console.error("[PayPal] Create credit order failed:", err?.data || err);
+        return res.status(err?.status >= 500 ? 503 : err?.status || 502).json({ error: err?.message || "Unable to create PayPal order" });
+      }
+    }
+
+    const cashfree = getCashfreeCredentials(cfg);
+    if (!cashfree.clientId || !cashfree.clientSecret) {
+      return res.status(503).json({ error: `Cashfree ${cashfree.mode} credentials are not configured. Please add them in SaaS Admin > Integrations.` });
+    }
+    const modeError = validateCashfreeMode(cashfree.mode, cashfree.clientId, cashfree.clientSecret);
+    if (modeError) return res.status(400).json({ error: modeError });
+
     const requestId = randomUUID();
     const payload = {
       order_id: orderId,
@@ -5865,6 +6153,33 @@ export async function registerRoutes(
     if (!localOrder || localOrder.userId !== user.id) return res.status(404).json({ error: "Credit order not found" });
 
     const cfg = await storage.getPaymentGatewayConfig();
+    if (req.query.provider === "paypal" || req.query.paypal_order_id || req.query.token) {
+      const paypalOrderId = String(req.query.paypal_order_id || req.query.token || "").trim();
+      if (!paypalOrderId) return res.status(400).json({ error: "Missing PayPal order id" });
+      const paypal = getPayPalCredentials(cfg);
+      if (!paypal.clientId || !paypal.clientSecret) return res.status(503).json({ error: "PayPal credentials are not configured" });
+      try {
+        const data = await capturePayPalOrder(paypal, paypalOrderId);
+        const capture = data?.purchase_units?.[0]?.payments?.captures?.[0];
+        const customId = String(capture?.custom_id || data?.purchase_units?.[0]?.custom_id || "");
+        if (customId && customId !== orderId) return res.status(400).json({ error: "PayPal order does not match credit order" });
+        const isPaid = data?.status === "COMPLETED" || capture?.status === "COMPLETED";
+        const order = isPaid && localOrder.status !== "paid" ? await storage.markB2cCreditOrderPaid(orderId) : localOrder;
+        return res.json({
+          orderId,
+          paypalOrderId,
+          provider: "paypal",
+          status: data?.status || capture?.status,
+          paid: isPaid,
+          credits: order?.credits ?? localOrder.credits,
+          summary: await getB2cCreditSummary(user),
+        });
+      } catch (err: any) {
+        console.error("[PayPal] Verify credit order failed:", err?.data || err);
+        return res.status(err?.status >= 500 ? 503 : err?.status || 502).json({ error: err?.message || "Unable to verify PayPal order" });
+      }
+    }
+
     const cashfree = getCashfreeCredentials(cfg);
     if (!cashfree.clientId || !cashfree.clientSecret) return res.status(503).json({ error: "Cashfree credentials are not configured" });
 
@@ -7815,11 +8130,12 @@ export async function registerRoutes(
   registerPlatformExtensions(app, {
     getPlatformGateway: async () => {
       const cfg = await storage.getPaymentGatewayConfig();
-      const provider = (cfg?.provider === "stripe" ? "stripe" : "cashfree") as "cashfree" | "stripe";
+      const provider = (cfg?.provider === "stripe" || cfg?.provider === "paypal" ? cfg.provider : "cashfree") as "cashfree" | "stripe" | "paypal";
       return {
         provider,
         cashfree: getCashfreeCredentials(cfg),
         stripe: getStripeCredentials(cfg),
+        paypal: getPayPalCredentials(cfg),
       };
     },
     getRequestOrigin,

@@ -2241,6 +2241,12 @@ export class MemStorage implements IStorage {
       stripeLivePublishableKey: data.stripeLivePublishableKey !== undefined ? data.stripeLivePublishableKey : existing?.stripeLivePublishableKey ?? null,
       stripeLiveSecretKey: data.stripeLiveSecretKey !== undefined ? data.stripeLiveSecretKey : existing?.stripeLiveSecretKey ?? null,
       stripeWebhookSecret: data.stripeWebhookSecret !== undefined ? data.stripeWebhookSecret : existing?.stripeWebhookSecret ?? null,
+      paypalMode: data.paypalMode !== undefined ? data.paypalMode : existing?.paypalMode ?? "sandbox",
+      paypalTestClientId: data.paypalTestClientId !== undefined ? data.paypalTestClientId : existing?.paypalTestClientId ?? null,
+      paypalTestClientSecret: data.paypalTestClientSecret !== undefined ? data.paypalTestClientSecret : existing?.paypalTestClientSecret ?? null,
+      paypalLiveClientId: data.paypalLiveClientId !== undefined ? data.paypalLiveClientId : existing?.paypalLiveClientId ?? null,
+      paypalLiveClientSecret: data.paypalLiveClientSecret !== undefined ? data.paypalLiveClientSecret : existing?.paypalLiveClientSecret ?? null,
+      paypalWebhookId: data.paypalWebhookId !== undefined ? data.paypalWebhookId : existing?.paypalWebhookId ?? null,
       updatedAt: new Date(),
     };
     return this.paymentGatewayConfigRecord!;
