@@ -2,20 +2,12 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   ArrowRight,
-  BriefcaseBusiness,
-  CheckCircle2,
   Eye,
   EyeOff,
   FileCheck2,
   Fingerprint,
-  Globe2,
-  LockKeyhole,
-  Plane,
-  ScanLine,
   Shield,
   Sparkles,
-  UsersRound,
-  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,67 +18,37 @@ import { queryClient } from "@/lib/queryClient";
 function AgencyLoginMark({ compact = false }: { compact?: boolean }) {
   if (compact) {
     return (
-      <div className="relative h-16 w-16" aria-label="Agency workflow animation">
-        <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-[#4055FF]/15 via-[#9033F5]/15 to-[#FF2060]/15" />
-        <div className="absolute inset-2 rounded-2xl border border-white/70 bg-white/80 shadow-lg backdrop-blur" />
+      <div className="relative h-14 w-14" aria-label="Agency workflow animation">
+        <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[#4055FF]/15 via-[#9033F5]/15 to-[#FF2060]/15" />
+        <div className="absolute inset-2 rounded-xl border border-white/70 bg-white/80 shadow-lg backdrop-blur" />
         <div className="absolute inset-0 flex items-center justify-center text-[#4055FF]">
-          <Fingerprint className="h-7 w-7" />
+          <Fingerprint className="h-6 w-6" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="relative h-[330px] w-full max-w-[430px]" aria-label="Agency workflow animation">
-      <div className="absolute left-8 right-8 top-10 h-56 rounded-[2rem] border border-white/70 bg-white/60 shadow-2xl shadow-[#4055FF]/10 backdrop-blur-xl" />
-      <div className="absolute left-16 top-5 flex h-14 w-14 animate-bounce items-center justify-center rounded-3xl border border-white/70 bg-white text-[#4055FF] shadow-xl [animation-duration:4.5s]">
-        <BriefcaseBusiness className="h-6 w-6" />
-      </div>
-      <div className="absolute right-14 top-16 flex h-12 w-12 animate-pulse items-center justify-center rounded-2xl bg-[#FF2060]/10 text-[#FF2060] shadow-lg">
-        <Sparkles className="h-5 w-5" />
-      </div>
+    <div className="relative flex h-[420px] w-full max-w-[440px] items-center justify-center" aria-label="Agency workflow animation">
+      <div className="absolute h-72 w-72 rounded-full bg-[#4055FF]/10 blur-3xl" />
+      <div className="absolute h-52 w-52 rounded-full bg-[#FF2060]/10 blur-3xl [transform:translate(78px,70px)]" />
 
-      <div className="absolute left-1/2 top-24 w-72 -translate-x-1/2 rounded-[1.75rem] border border-slate-200/80 bg-white p-4 shadow-2xl">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase text-slate-400">Today</p>
-            <p className="text-lg font-black text-slate-950">Visa desk</p>
-          </div>
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#4055FF]/10 text-[#4055FF]">
-            <FileCheck2 className="h-5 w-5" />
-          </div>
+      <div className="relative h-72 w-72 rounded-[3rem] border border-white/70 bg-white/45 shadow-2xl shadow-[#4055FF]/15 backdrop-blur-2xl">
+        <div className="absolute left-1/2 top-1/2 h-36 w-36 -translate-x-1/2 -translate-y-1/2 rounded-[2.25rem] bg-gradient-to-br from-[#4055FF] via-[#7137EA] to-[#FF2060] shadow-2xl shadow-[#4055FF]/25" />
+        <div className="absolute left-1/2 top-1/2 flex h-24 w-24 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[1.75rem] border border-white/25 bg-white/18 text-white shadow-xl backdrop-blur">
+          <FileCheck2 className="h-10 w-10" />
         </div>
-        <div className="space-y-3">
-          {[
-            { icon: UsersRound, label: "Customer intake", value: "24", color: "text-[#4055FF]", bg: "bg-[#4055FF]/10" },
-            { icon: ScanLine, label: "Documents scanned", value: "88%", color: "text-[#9033F5]", bg: "bg-[#9033F5]/10" },
-            { icon: CheckCircle2, label: "Ready to submit", value: "12", color: "text-emerald-600", bg: "bg-emerald-500/10" },
-          ].map(({ icon: Icon, label, value, color, bg }) => (
-            <div key={label} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-3">
-              <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${bg} ${color}`}>
-                <Icon className="h-4 w-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-slate-700">{label}</p>
-              </div>
-              <p className="text-sm font-black text-slate-950">{value}</p>
-            </div>
-          ))}
-        </div>
-      </div>
 
-      <div className="absolute bottom-5 left-8 w-44 rounded-3xl border border-white/80 bg-white/80 p-4 shadow-xl backdrop-blur">
-        <div className="mb-3 flex items-center gap-2 text-xs font-bold text-slate-500">
-          <Globe2 className="h-4 w-4 text-[#4055FF]" />
-          Global workflow
+        <div className="absolute left-7 top-7 flex h-16 w-16 animate-pulse items-center justify-center rounded-[1.35rem] border border-white/80 bg-white/85 text-[#4055FF] shadow-xl">
+          <Fingerprint className="h-7 w-7" />
         </div>
-        <div className="h-2 overflow-hidden rounded-full bg-slate-200">
-          <div className="h-full w-[76%] animate-pulse rounded-full bg-gradient-to-r from-[#4055FF] via-[#9033F5] to-[#FF2060]" />
+        <div className="absolute bottom-7 right-7 flex h-16 w-16 animate-pulse items-center justify-center rounded-[1.35rem] border border-white/80 bg-white/85 text-[#FF2060] shadow-xl [animation-delay:350ms]">
+          <Sparkles className="h-7 w-7" />
         </div>
-      </div>
-      <div className="absolute bottom-10 right-8 flex items-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 shadow-xl">
-        <Shield className="h-4 w-4" />
-        Secure login
+        <div className="absolute right-9 top-8 h-3 w-3 rounded-full bg-[#FF2060]" />
+        <div className="absolute bottom-12 left-10 h-2.5 w-2.5 rounded-full bg-[#4055FF]" />
+        <div className="absolute left-1/2 top-6 h-2 w-20 -translate-x-1/2 rounded-full bg-white/70" />
+        <div className="absolute bottom-6 left-1/2 h-2 w-28 -translate-x-1/2 rounded-full bg-white/70" />
       </div>
     </div>
   );
@@ -154,43 +116,39 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#F7F9FF] text-slate-950">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(64,85,255,0.14),transparent_28%),radial-gradient(circle_at_78%_18%,rgba(255,32,96,0.12),transparent_26%),linear-gradient(180deg,#ffffff_0%,#F7F9FF_52%,#EEF3FF_100%)]" />
-      <div className="absolute left-1/2 top-0 h-px w-[82vw] -translate-x-1/2 bg-gradient-to-r from-transparent via-[#4055FF]/30 to-transparent" />
+    <div className="relative min-h-screen overflow-hidden bg-[#F8FAFF] text-slate-950">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(64,85,255,0.10),transparent_31%),radial-gradient(circle_at_82%_76%,rgba(255,32,96,0.08),transparent_28%),linear-gradient(180deg,#FFFFFF_0%,#F8FAFF_60%,#EEF3FF_100%)]" />
 
       <main className="relative z-10 flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 lg:px-10">
-        <div className="grid w-full max-w-6xl items-center gap-8 lg:grid-cols-[1.08fr_0.92fr]">
-          <section className="hidden lg:block">
-            <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-[#4055FF]/15 bg-white/70 px-4 py-2 text-sm font-bold text-[#4055FF] shadow-sm backdrop-blur">
-              <LockKeyhole className="h-4 w-4" />
-              Agency command center
+        <div className="grid w-full max-w-6xl items-center gap-10 lg:grid-cols-[1fr_0.86fr]">
+          <section className="hidden min-h-[680px] flex-col justify-between rounded-[2.5rem] border border-white/80 bg-white/35 p-10 shadow-2xl shadow-[#4055FF]/8 backdrop-blur-xl lg:flex">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#4055FF]/12 bg-white/70 px-4 py-2 text-sm font-bold text-[#4055FF]">
+                <span className="h-2 w-2 rounded-full bg-[#FF2060]" />
+                Visa Shuttle Agency
+              </div>
+              <h1 className="mt-8 max-w-lg text-5xl font-black leading-[1] tracking-tight text-[#101A4D]">
+                One quiet place to run every visa case.
+              </h1>
+              <p className="mt-5 max-w-md text-base leading-7 text-slate-600">
+                Leads, proposals, documents, payments, and customer portals arranged into a focused agency workspace.
+              </p>
             </div>
-
-            <h1 className="max-w-xl text-5xl font-black leading-[1.02] tracking-tight text-slate-950">
-              Welcome back to your visa operations desk.
-            </h1>
-            <p className="mt-5 max-w-xl text-lg leading-8 text-slate-600">
-              Sign in to manage leads, proposals, applications, documents, invoices, and customer portals from one focused agency workspace.
-            </p>
 
             <AgencyLoginMark />
 
-            <div className="mt-6 grid max-w-xl gap-3 sm:grid-cols-3">
-              {[
-                { icon: Plane, label: "Applications" },
-                { icon: Shield, label: "Secure portal" },
-                { icon: Zap, label: "AI review" },
-              ].map(({ icon: Icon, label }) => (
-                <div key={label} className="rounded-2xl border border-white/80 bg-white/70 p-4 shadow-sm backdrop-blur">
-                  <Icon className="mb-3 h-5 w-5 text-[#4055FF]" />
-                  <p className="text-sm font-bold text-slate-800">{label}</p>
-                </div>
-              ))}
+            <div className="flex items-center justify-between border-t border-slate-200/80 pt-6">
+              <p className="max-w-xs text-sm leading-6 text-slate-500">
+                Built for agencies that need clear work queues and cleaner customer handoffs.
+              </p>
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#101A4D] text-white">
+                <ArrowRight className="h-4 w-4" />
+              </div>
             </div>
           </section>
 
           <section className="mx-auto w-full max-w-md">
-            <div className="rounded-[2rem] border border-white/80 bg-white/82 p-5 shadow-2xl shadow-[#4055FF]/12 backdrop-blur-xl sm:p-7">
+            <div className="rounded-[2rem] border border-white/80 bg-white/88 p-5 shadow-2xl shadow-[#4055FF]/12 backdrop-blur-xl sm:p-8">
               <div className="mb-7 flex items-center gap-4 lg:hidden">
                 <AgencyLoginMark compact />
                 <div>
@@ -200,12 +158,9 @@ export default function LoginPage() {
               </div>
 
               <div className="mb-7">
-                <div className="mb-4 inline-flex rounded-full bg-[#4055FF]/10 px-3 py-1 text-xs font-black uppercase text-[#4055FF]">
-                  Staff access
-                </div>
-                <h2 className="text-3xl font-black tracking-tight">Sign in</h2>
+                <h2 className="text-4xl font-black tracking-tight text-[#101A4D]">Log in</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-500">
-                  Continue to your agency dashboard and pick up customer work exactly where you left it.
+                  Access your agency dashboard.
                 </p>
               </div>
 
@@ -265,7 +220,7 @@ export default function LoginPage() {
 
                 <Button
                   type="submit"
-                  className="h-12 w-full rounded-2xl border-0 bg-gradient-to-r from-[#4055FF] via-[#7137EA] to-[#FF2060] text-base font-black text-white shadow-xl shadow-[#4055FF]/20 transition-transform hover:scale-[1.01] hover:opacity-95"
+                  className="h-12 w-full rounded-2xl border-0 bg-[#101A4D] text-base font-black text-white shadow-xl shadow-[#101A4D]/18 transition-transform hover:scale-[1.01] hover:bg-[#17266F]"
                   disabled={isLoading}
                   data-testid="button-submit"
                 >
@@ -283,7 +238,7 @@ export default function LoginPage() {
                 </Button>
               </form>
 
-              <div className="mt-6 rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+              <div className="mt-6 rounded-2xl border border-[#4055FF]/10 bg-[#4055FF]/5 p-4">
                 <div className="flex items-start gap-3">
                   <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
                     <Shield className="h-4 w-4" />
