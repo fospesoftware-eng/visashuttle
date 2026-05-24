@@ -3363,28 +3363,82 @@ export async function registerRoutes(
     }
   });
 
-  // POST /api/public/invoice/:token/initiate-payment — initiates a Cashfree
-  // order for the outstanding balance if the tenant has gateway credentials.
-  // Returns paymentSessionId (frontend uses Cashfree's drop-in or hosted
-  // checkout) plus the orderId we'll use in /confirm.
+  // POST /api/public/invoice/:token/initiate-payment — initiates the correct
+  // gateway order for the outstanding balance. INR stays on tenant Cashfree;
+  // every non-INR invoice uses platform PayPal.
   app.post("/api/public/invoice/:token/initiate-payment", async (req, res) => {
     try {
       const invoice = await storage.getInvoiceByPublicToken(req.params.token);
       if (!invoice) return res.status(404).json({ error: "Invalid payment link" });
       const balance = Math.max(0, invoice.total - invoice.paidAmount);
       if (balance <= 0) return res.status(400).json({ error: "This invoice is already fully paid." });
+      const orderId = `INV_${invoice.id.slice(0, 8)}_${Date.now()}`;
+      const origin = getRequestOrigin(req);
+      const currency = String(invoice.currency || "INR").toUpperCase();
+
+      if (gatewayForCheckoutCurrency(currency) === "paypal") {
+        const cfg = await storage.getPaymentGatewayConfig();
+        const paypal = getPayPalCredentials(cfg as any);
+        if (!paypal.clientId || !paypal.clientSecret) {
+          return res.status(503).json({ error: `PayPal ${paypal.mode} credentials are not configured. Please use the offline tab.` });
+        }
+        try {
+          const paypalMoney = getPayPalCheckoutMoney(currency, balance / 100);
+          const paypalOrder = await createPayPalOrder(paypal, {
+            intent: "CAPTURE",
+            purchase_units: [
+              {
+                reference_id: orderId,
+                invoice_id: orderId,
+                custom_id: invoice.id,
+                description: `Invoice ${invoice.invoiceNumber}`.slice(0, 127),
+                amount: {
+                  currency_code: paypalMoney.currency,
+                  value: formatPayPalAmount(paypalMoney.currency, paypalMoney.amount),
+                },
+              },
+            ],
+            payment_source: {
+              paypal: {
+                experience_context: {
+                  brand_name: "Visa Shuttle",
+                  shipping_preference: "NO_SHIPPING",
+                  user_action: "PAY_NOW",
+                  return_url: `${origin}/pay/invoice/${req.params.token}?provider=paypal&order_id=${orderId}`,
+                  cancel_url: `${origin}/pay/invoice/${req.params.token}`,
+                },
+              },
+            },
+          });
+          const approvalUrl = getPayPalApprovalUrl(paypalOrder);
+          if (!approvalUrl) return res.status(502).json({ error: "PayPal did not return an approval URL" });
+          return res.json({
+            provider: "paypal",
+            orderId,
+            paypalOrderId: paypalOrder?.id,
+            approvalUrl,
+            mode: paypal.mode,
+            amount: balance,
+            currency,
+            gatewayAmount: Math.round(paypalMoney.amount * 100),
+            gatewayCurrency: paypalMoney.currency,
+          });
+        } catch (err: any) {
+          console.error("[PayPal] Create invoice order failed:", err?.data || err);
+          return res.status(err?.status >= 500 ? 503 : err?.status || 502).json({ error: err?.message || "Unable to create PayPal order" });
+        }
+      }
+
       const cfg = await storage.getTenantPaymentGatewayConfig(invoice.tenantId);
       const cashfree = getCashfreeCredentials(cfg);
       if (!cashfree.clientId || !cashfree.clientSecret) {
         return res.status(503).json({ error: "Online payments are not configured for this agency. Please use the offline tab." });
       }
-      const orderId = `INV_${invoice.id.slice(0, 8)}_${Date.now()}`;
       const requestId = randomUUID();
-      const origin = getRequestOrigin(req);
       const payload = {
         order_id: orderId,
         order_amount: balance / 100,
-        order_currency: invoice.currency || "INR",
+        order_currency: currency,
         order_note: `Invoice ${invoice.invoiceNumber}`,
         customer_details: {
           customer_id: invoice.id.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 45),
@@ -3424,6 +3478,7 @@ export async function registerRoutes(
         });
       }
       res.json({
+        provider: "cashfree",
         orderId: data.order_id || orderId,
         paymentSessionId: data.payment_session_id,
         mode: cashfree.mode,
@@ -3436,9 +3491,8 @@ export async function registerRoutes(
   });
 
   // POST /api/public/invoice/:token/confirm — called by the public payment
-  // page after Cashfree's return-url. Verifies the order with Cashfree and,
-  // if PAID, records a `gateway` payment row (idempotent: if a payment with
-  // the same gateway-orderId reference already exists, returns it).
+  // page after gateway return. Verifies Cashfree for INR and PayPal for
+  // non-INR, then records the gateway payment idempotently.
   app.post("/api/public/invoice/:token/confirm", async (req, res) => {
     try {
       const invoice = await storage.getInvoiceByPublicToken(req.params.token);
@@ -3451,6 +3505,42 @@ export async function registerRoutes(
       const existing = (await storage.getPaymentsByInvoiceId(invoice.id))
         .find((p) => p.method === "gateway" && p.reference === orderId);
       if (existing) return res.json({ paid: true, payment: existing, alreadyRecorded: true });
+
+      const currency = String(invoice.currency || "INR").toUpperCase();
+      const provider = String(req.body?.provider || (gatewayForCheckoutCurrency(currency) === "paypal" ? "paypal" : "cashfree")).toLowerCase();
+      if (provider === "paypal") {
+        const paypalOrderId = String(req.body?.paypalOrderId || "").trim();
+        if (!paypalOrderId) return res.status(400).json({ error: "Missing PayPal order id" });
+        const cfg = await storage.getPaymentGatewayConfig();
+        const paypal = getPayPalCredentials(cfg as any);
+        if (!paypal.clientId || !paypal.clientSecret) return res.status(503).json({ error: "PayPal credentials are not configured" });
+        try {
+          const data = await capturePayPalOrder(paypal, paypalOrderId);
+          const unit = data?.purchase_units?.[0] || {};
+          if (unit?.custom_id && unit.custom_id !== invoice.id) {
+            return res.status(400).json({ error: "PayPal order does not belong to this invoice" });
+          }
+          if (unit?.reference_id && unit.reference_id !== orderId) {
+            return res.status(400).json({ error: "PayPal order reference mismatch" });
+          }
+          const capture = unit?.payments?.captures?.[0];
+          const isPaid = data?.status === "COMPLETED" || capture?.status === "COMPLETED";
+          if (!isPaid) return res.json({ paid: false, status: data?.status || capture?.status || "unknown" });
+          const amountCents = Math.round(Number(capture?.amount?.value ?? 0) * 100) || Math.max(0, invoice.total - invoice.paidAmount);
+          const payment = await storage.createPayment({
+            invoiceId: invoice.id,
+            tenantId: invoice.tenantId,
+            amount: amountCents,
+            method: "gateway",
+            reference: orderId,
+            notes: `PayPal ${paypal.mode} order ${getPayPalCaptureId(data)}`,
+          } as any);
+          return res.json({ paid: true, payment });
+        } catch (err: any) {
+          console.error("[PayPal] Verify invoice order failed:", err?.data || err);
+          return res.status(err?.status >= 500 ? 503 : err?.status || 502).json({ error: err?.message || "Unable to verify PayPal order" });
+        }
+      }
 
       const cfg = await storage.getTenantPaymentGatewayConfig(invoice.tenantId);
       const cashfree = getCashfreeCredentials(cfg);
@@ -8170,11 +8260,11 @@ export async function registerRoutes(
   });
 
   // ── Agency API Platform (paid pay-per-call public APIs + dashboard CRUD)
-  // Wire the Agency API Platform with Cashfree helpers so it can offer
-  // tenants a self-serve wallet top-up reusing this app's existing gateway
-  // integration (no second Cashfree client).
+  // Wire the Agency API Platform with shared gateway helpers so wallet top-up
+  // follows the same INR/Cashfree and non-INR/PayPal rule as checkout.
   await registerApiPlatformRoutes(app, {
     requireTenantAccess,
+    getRequestOrigin,
     cashfree: {
       getCredentials: async (tenantId: string) => {
         // Prefer tenant-scoped credentials (matches the invoice flow).
@@ -8185,6 +8275,15 @@ export async function registerRoutes(
       },
       getRequestOrigin,
       readBody: readCashfreeBody,
+    },
+    paypal: {
+      getCredentials: async () => getPayPalCredentials((await storage.getPaymentGatewayConfig()) as any),
+      createOrder: createPayPalOrder,
+      captureOrder: capturePayPalOrder,
+      getApprovalUrl: getPayPalApprovalUrl,
+      getCheckoutMoney: getPayPalCheckoutMoney,
+      formatAmount: formatPayPalAmount,
+      getCaptureId: getPayPalCaptureId,
     },
   });
 

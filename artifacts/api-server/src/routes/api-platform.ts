@@ -286,6 +286,21 @@ export interface CashfreeHelpers {
   readBody: (response: globalThis.Response) => Promise<any>;
 }
 
+export interface PayPalHelpers {
+  getCredentials: () => Promise<{
+    mode: "live" | "sandbox";
+    baseUrl: string;
+    clientId?: string;
+    clientSecret?: string;
+  }>;
+  createOrder: (paypal: Awaited<ReturnType<PayPalHelpers["getCredentials"]>>, payload: any) => Promise<any>;
+  captureOrder: (paypal: Awaited<ReturnType<PayPalHelpers["getCredentials"]>>, orderId: string) => Promise<any>;
+  getApprovalUrl: (order: any) => string | undefined;
+  getCheckoutMoney: (displayCurrency: string, displayAmount: number, preferredUsdAmount?: number | null) => { currency: string; amount: number };
+  formatAmount: (currency: string, amount: number) => string;
+  getCaptureId: (order: any) => string;
+}
+
 // ── public v1 endpoints ───────────────────────────────────────────────────
 const deepCheckBodySchema = z.object({ formData: z.record(z.string(), z.any()) });
 const visaReqBodySchema = z.object({
@@ -298,7 +313,7 @@ const BRAND_GRADIENT = "linear-gradient(90deg, #4055FF 0%, #9033F5 50%, #FF2060 
 
 export async function registerApiPlatformRoutes(
   app: Express,
-  helpers: { requireTenantAccess: RequireTenantAccessFn; cashfree?: CashfreeHelpers },
+  helpers: { requireTenantAccess: RequireTenantAccessFn; cashfree?: CashfreeHelpers; paypal?: PayPalHelpers; getRequestOrigin?: (req: Request) => string },
 ) {
   await ensurePricingSeeded().catch((err) => {
     console.warn("[api-platform] pricing seed skipped:", err?.message);
@@ -594,84 +609,122 @@ export async function registerApiPlatformRoutes(
     res.json({ balanceCents: balance });
   });
 
-  // ── Cashfree-backed wallet top-up — reuses the platform Cashfree integration
-  // already configured for invoice/proposal payments. Two-step flow:
-  //   1. /initiate-topup creates a Cashfree order tagged with the tenantId
-  //      and returns a paymentSessionId for the frontend SDK.
-  //   2. /confirm-topup verifies the order with Cashfree; on PAID, credits
-  //      the wallet ONCE (idempotent on the order id via the ledger
-  //      reference column).
+  // ── Gateway wallet top-up. API wallets are priced in USD, so they use
+  // PayPal under the production rule: only INR checkouts go through Cashfree.
   app.post("/api/agency/:tenantId/api/wallet/initiate-topup", async (req, res) => {
     if (!helpers.requireTenantAccess(req, res, req.params.tenantId)) return;
-    if (!helpers.cashfree) { res.status(503).json({ error: "Wallet top-up is not configured." }); return; }
     const body = z.object({ amountCents: z.number().int().positive() }).safeParse(req.body);
     if (!body.success) { res.status(400).json({ error: "amountCents is required" }); return; }
-    const cashfree = await helpers.cashfree.getCredentials(req.params.tenantId);
-    if (!cashfree.clientId || !cashfree.clientSecret) {
-      res.status(503).json({ error: "Online payments are not configured for this agency." });
+    if (!helpers.paypal) { res.status(503).json({ error: "PayPal wallet top-up is not configured." }); return; }
+    const paypal = await helpers.paypal.getCredentials();
+    if (!paypal.clientId || !paypal.clientSecret) {
+      res.status(503).json({ error: `PayPal ${paypal.mode} credentials are not configured.` });
       return;
     }
     const orderId = `WAL_${req.params.tenantId.slice(0, 8)}_${Date.now()}`;
-    const requestId = randomUUID();
-    const origin = helpers.cashfree.getRequestOrigin(req);
-    const payload = {
-      order_id: orderId,
-      // Cashfree wants the major-unit amount, not cents.
-      order_amount: body.data.amountCents / 100,
-      order_currency: "USD",
-      order_note: `VisaShuttle API wallet top-up`,
-      customer_details: {
-        customer_id: req.params.tenantId.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 45),
-        customer_email: getSessionField(req, "userEmail") || "noreply@visashuttle.app",
-        customer_name: getSessionField(req, "userName") || "Agency",
-        customer_phone: "9999999999",
-      },
-      order_meta: {
-        return_url: `${origin}/app/business/api/usage?topup_order=${orderId}`,
-      },
-      order_tags: { product: "wallet_topup", tenant_id: req.params.tenantId, amount_cents: String(body.data.amountCents) },
-    };
-    let gatewayRes;
+    const origin = (helpers.getRequestOrigin ?? helpers.cashfree?.getRequestOrigin)?.(req);
+    if (!origin) { res.status(503).json({ error: "Checkout origin is not configured." }); return; }
+    const paypalMoney = helpers.paypal.getCheckoutMoney("USD", body.data.amountCents / 100);
     try {
-      gatewayRes = await fetch(`${cashfree.baseUrl}/orders`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-version": cashfree.apiVersion,
-          "x-client-id": cashfree.clientId,
-          "x-client-secret": cashfree.clientSecret,
-          "x-request-id": requestId,
-          "x-idempotency-key": randomUUID(),
+      const paypalOrder = await helpers.paypal.createOrder(paypal, {
+        intent: "CAPTURE",
+        purchase_units: [
+          {
+            reference_id: orderId,
+            invoice_id: orderId,
+            custom_id: `${req.params.tenantId}:${orderId}:${body.data.amountCents}`,
+            description: "VisaShuttle API wallet top-up",
+            amount: {
+              currency_code: paypalMoney.currency,
+              value: helpers.paypal.formatAmount(paypalMoney.currency, paypalMoney.amount),
+            },
+          },
+        ],
+        payment_source: {
+          paypal: {
+            experience_context: {
+              brand_name: "Visa Shuttle",
+              shipping_preference: "NO_SHIPPING",
+              user_action: "PAY_NOW",
+              return_url: `${origin}/app/business/api/usage?provider=paypal&topup_order=${orderId}`,
+              cancel_url: `${origin}/app/business/api/usage`,
+            },
+          },
         },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(20000),
       });
-    } catch {
-      res.status(503).json({ error: "Payment gateway is temporarily unreachable." });
+      const approvalUrl = helpers.paypal.getApprovalUrl(paypalOrder);
+      if (!approvalUrl) { res.status(502).json({ error: "PayPal did not return an approval URL" }); return; }
+      res.json({
+        provider: "paypal",
+        orderId,
+        paypalOrderId: paypalOrder?.id,
+        approvalUrl,
+        mode: paypal.mode,
+        amountCents: body.data.amountCents,
+        currency: "USD",
+      });
+      return;
+    } catch (err: any) {
+      console.error("[PayPal] Create wallet top-up failed:", err?.data || err);
+      res.status(err?.status >= 500 ? 503 : err?.status || 502).json({ error: err?.message || "Unable to create PayPal order" });
       return;
     }
-    const data = await helpers.cashfree.readBody(gatewayRes);
-    if (!gatewayRes.ok) {
-      res.status(gatewayRes.status >= 500 ? 503 : gatewayRes.status).json({ error: data?.message || "Unable to create top-up order" });
-      return;
-    }
-    res.json({
-      orderId: data.order_id || orderId,
-      paymentSessionId: data.payment_session_id,
-      mode: cashfree.mode,
-      amountCents: body.data.amountCents,
-      currency: "USD",
-    });
+
   });
 
   app.post("/api/agency/:tenantId/api/wallet/confirm-topup", async (req, res) => {
     if (!helpers.requireTenantAccess(req, res, req.params.tenantId)) return;
-    if (!helpers.cashfree) { res.status(503).json({ error: "Wallet top-up is not configured." }); return; }
     const orderId = String(req.body?.orderId || "").trim();
     if (!orderId || !/^WAL_[a-zA-Z0-9_-]+$/.test(orderId)) {
       res.status(400).json({ error: "Invalid order id" });
       return;
     }
+    const provider = String(req.body?.provider || "paypal").toLowerCase();
+    if (provider === "paypal") {
+      if (!helpers.paypal) { res.status(503).json({ error: "PayPal wallet top-up is not configured." }); return; }
+      const paypalOrderId = String(req.body?.paypalOrderId || "").trim();
+      if (!paypalOrderId) { res.status(400).json({ error: "Missing PayPal order id" }); return; }
+      const existing = await db.select().from(tenantWalletLedger)
+        .where(and(eq(tenantWalletLedger.tenantId, req.params.tenantId), eq(tenantWalletLedger.reference, `paypal:${orderId}`)))
+        .limit(1);
+      if (existing.length > 0) {
+        const wallet = await getOrCreateWallet(req.params.tenantId);
+        res.json({ paid: true, alreadyRecorded: true, balanceCents: wallet?.balanceCents ?? 0 });
+        return;
+      }
+      const paypal = await helpers.paypal.getCredentials();
+      if (!paypal.clientId || !paypal.clientSecret) {
+        res.status(503).json({ error: "PayPal credentials are not configured" });
+        return;
+      }
+      try {
+        const data = await helpers.paypal.captureOrder(paypal, paypalOrderId);
+        const unit = data?.purchase_units?.[0] || {};
+        const expectedPrefix = `${req.params.tenantId}:${orderId}:`;
+        if (!String(unit?.custom_id || "").startsWith(expectedPrefix)) {
+          res.status(400).json({ error: "Order does not belong to this tenant" });
+          return;
+        }
+        const capture = unit?.payments?.captures?.[0];
+        const isPaid = data?.status === "COMPLETED" || capture?.status === "COMPLETED";
+        if (!isPaid) { res.json({ paid: false, status: data?.status || capture?.status || "unknown" }); return; }
+        const customAmount = parseInt(String(unit.custom_id).split(":")[2] || "0", 10) || 0;
+        const amountCents = customAmount || Math.round(Number(capture?.amount?.value ?? 0) * 100);
+        if (amountCents <= 0) {
+          res.status(400).json({ error: "Order amount missing" });
+          return;
+        }
+        const balance = await creditWallet(req.params.tenantId, amountCents, "topup", `paypal:${orderId}`, `PayPal ${paypal.mode} top-up ${helpers.paypal.getCaptureId(data)}`);
+        res.json({ paid: true, balanceCents: balance });
+        return;
+      } catch (err: any) {
+        console.error("[PayPal] Verify wallet top-up failed:", err?.data || err);
+        res.status(err?.status >= 500 ? 503 : err?.status || 502).json({ error: err?.message || "Unable to verify PayPal order" });
+        return;
+      }
+    }
+
+    if (!helpers.cashfree) { res.status(503).json({ error: "Cashfree wallet top-up is not configured." }); return; }
     // Idempotency: refuse to credit twice for the same Cashfree order.
     const existing = await db.select().from(tenantWalletLedger)
       .where(and(eq(tenantWalletLedger.tenantId, req.params.tenantId), eq(tenantWalletLedger.reference, `cashfree:${orderId}`)))

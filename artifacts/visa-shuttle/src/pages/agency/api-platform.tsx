@@ -286,8 +286,9 @@ function UsageView({ tenantId }: { tenantId: string }) {
   const usage = data?.usage ?? [];
   const ledger = wallet?.ledger ?? [];
 
-  // Self-serve Cashfree top-up. Two-step flow:
-  //   1. /initiate-topup → opens Cashfree drop-in with paymentSessionId
+  // Self-serve gateway top-up. USD API wallets go through PayPal; INR-only
+  // payment paths elsewhere keep using Cashfree.
+  //   1. /initiate-topup → redirects to the selected gateway checkout
   //   2. on return (?topup_order=…) → /confirm-topup credits the wallet
   //      ONCE (idempotent). Then we invalidate the queries so the new
   //      balance + ledger row appear instantly.
@@ -295,14 +296,16 @@ function UsageView({ tenantId }: { tenantId: string }) {
   const [topupAmount, setTopupAmount] = useState("25");
   const [busy, setBusy] = useState(false);
 
-  // Auto-confirm on return from Cashfree.
+  // Auto-confirm on return from the payment gateway.
   useEffect(() => {
     const url = new URL(window.location.href);
     const orderId = url.searchParams.get("topup_order");
+    const provider = url.searchParams.get("provider") || "paypal";
+    const paypalOrderId = url.searchParams.get("token") || undefined;
     if (!orderId) return;
     (async () => {
       try {
-        await apiRequest("POST", `/api/agency/${tenantId}/api/wallet/confirm-topup`, { orderId });
+        await apiRequest("POST", `/api/agency/${tenantId}/api/wallet/confirm-topup`, { orderId, provider, paypalOrderId });
         toast.toast({ title: "Wallet topped up" });
         queryClient.invalidateQueries({ queryKey: [`/api/agency/${tenantId}/api/wallet`] });
         queryClient.invalidateQueries({ queryKey: [`/api/agency/${tenantId}/api/usage`] });
@@ -310,6 +313,8 @@ function UsageView({ tenantId }: { tenantId: string }) {
         toast.toast({ title: "Could not confirm top-up", description: e?.message, variant: "destructive" });
       } finally {
         url.searchParams.delete("topup_order");
+        url.searchParams.delete("provider");
+        url.searchParams.delete("token");
         window.history.replaceState({}, "", url.pathname + (url.search || ""));
       }
     })();
@@ -322,6 +327,12 @@ function UsageView({ tenantId }: { tenantId: string }) {
       if (!Number.isFinite(cents) || cents <= 0) throw new Error("Enter an amount in USD greater than 0");
       const res = await apiRequest("POST", `/api/agency/${tenantId}/api/wallet/initiate-topup`, { amountCents: cents });
       const init = await res.json();
+      if (init?.provider === "paypal") {
+        if (!init.approvalUrl) throw new Error("PayPal did not return a checkout link");
+        setTopupOpen(false);
+        window.location.href = init.approvalUrl;
+        return;
+      }
       if (!init?.paymentSessionId) throw new Error("Cashfree did not return a payment session");
       await loadCashfreeSdk();
       const cashfree = window.Cashfree?.({ mode: init.mode === "live" ? "production" : "sandbox" });
@@ -343,7 +354,7 @@ function UsageView({ tenantId }: { tenantId: string }) {
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="text-3xl font-bold">{fmt(wallet?.wallet?.balanceCents ?? 0)}</div>
             <Button onClick={() => setTopupOpen(true)} style={{ backgroundImage: BRAND_GRADIENT }} className="text-white border-0">
-              <Wallet className="w-4 h-4 mr-2" /> Top up via Cashfree
+              <Wallet className="w-4 h-4 mr-2" /> Top up wallet
             </Button>
           </div>
         </CardContent>
@@ -352,7 +363,7 @@ function UsageView({ tenantId }: { tenantId: string }) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Top up your API wallet</DialogTitle>
-            <DialogDescription>You'll be redirected to Cashfree to complete the payment.</DialogDescription>
+            <DialogDescription>You'll be redirected to PayPal to complete the payment.</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
             <Label>Amount (USD)</Label>
@@ -361,7 +372,7 @@ function UsageView({ tenantId }: { tenantId: string }) {
           <DialogFooter>
             <Button variant="ghost" onClick={() => setTopupOpen(false)}>Cancel</Button>
             <Button disabled={busy} onClick={startTopup} style={{ backgroundImage: BRAND_GRADIENT }} className="text-white border-0">
-              {busy ? "Starting…" : "Continue to Cashfree"}
+              {busy ? "Starting…" : "Pay Now"}
             </Button>
           </DialogFooter>
         </DialogContent>

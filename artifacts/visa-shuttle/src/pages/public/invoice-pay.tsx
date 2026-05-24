@@ -81,6 +81,8 @@ export default function InvoicePayPage() {
   // avoid re-confirming on refresh.
   const params = new URLSearchParams(search);
   const orderIdFromGateway = params.get("order_id");
+  const providerFromGateway = params.get("provider") || undefined;
+  const paypalOrderIdFromGateway = params.get("token") || undefined;
 
   const { data, isLoading, error, refetch } = useQuery<PublicInvoiceResp>({
     queryKey: ["/api/public/invoice", token],
@@ -99,7 +101,11 @@ export default function InvoicePayPage() {
     setConfirming(true);
     (async () => {
       try {
-        const res = await apiRequest("POST", `/api/public/invoice/${token}/confirm`, { orderId: orderIdFromGateway });
+        const res = await apiRequest("POST", `/api/public/invoice/${token}/confirm`, {
+          orderId: orderIdFromGateway,
+          provider: providerFromGateway,
+          paypalOrderId: paypalOrderIdFromGateway,
+        });
         const json = await res.json();
         if (json.paid) {
           setConfirmed({
@@ -125,14 +131,32 @@ export default function InvoicePayPage() {
         setConfirming(false);
       }
     })();
-  }, [orderIdFromGateway, token, confirming, confirmed, data?.invoice.currency, refetch, toast]);
+  }, [orderIdFromGateway, providerFromGateway, paypalOrderIdFromGateway, token, confirming, confirmed, data?.invoice.currency, refetch, toast]);
 
   const initiateMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/public/invoice/${token}/initiate-payment`, {});
-      return res.json() as Promise<{ orderId: string; paymentSessionId: string; mode: "test" | "live" }>;
+      return res.json() as Promise<{
+        provider?: "cashfree" | "paypal";
+        orderId: string;
+        paymentSessionId?: string;
+        approvalUrl?: string;
+        mode: "test" | "live" | "sandbox";
+      }>;
     },
     onSuccess: async (data) => {
+      if (data.provider === "paypal") {
+        if (!data.approvalUrl) {
+          toast({ title: "Could not open checkout", description: "PayPal did not return a checkout link.", variant: "destructive" });
+          return;
+        }
+        window.location.href = data.approvalUrl;
+        return;
+      }
+      if (!data.paymentSessionId) {
+        toast({ title: "Could not open checkout", description: "Payment gateway did not return a session.", variant: "destructive" });
+        return;
+      }
       // Lazy-load Cashfree's JS SDK from their CDN; if it can't load, fall
       // back to a manual error message rather than hanging the page.
       try {
@@ -322,7 +346,7 @@ export default function InvoicePayPage() {
                   {gatewayConfigured ? (
                     <>
                       <p className="text-sm text-muted-foreground">
-                        Pay {fmtMoney(invoice.balance, invoice.currency)} securely with cards, UPI, netbanking or wallets.
+                        Pay {fmtMoney(invoice.balance, invoice.currency)} securely online.
                       </p>
                       <Button
                         className="w-full"
