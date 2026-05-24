@@ -6,6 +6,7 @@ import {
   Ticket, SlidersHorizontal, LogOut, Menu, X, ChevronRight, Shield, Crown, ShieldAlert, Coins
 } from "lucide-react";
 import { Logo } from "@/components/logo";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
 import { Button } from "@/components/ui/button";
 import { formatB2cPrice, getStoredB2cCurrency } from "@/lib/b2c-pricing";
@@ -198,6 +199,7 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
               )}
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
+              <ThemeToggle className="h-9 w-9 rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800" />
               {user && !canCheck && (
                 <Link href="/payment/deep-check">
                   <Button size="sm" className="hidden sm:flex gap-1.5 border-0 text-xs h-8 px-3 text-white hover:opacity-90" style={{background:"linear-gradient(135deg,#4055FF,#FF2060)"}}>
