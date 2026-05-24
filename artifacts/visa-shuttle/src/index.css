@@ -145,6 +145,10 @@
     @apply border-border;
   }
 
+  html.dark {
+    color-scheme: dark;
+  }
+
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }
@@ -236,6 +240,76 @@
   /* Subtle gradient for cards/sections */
   .gradient-subtle {
     background: linear-gradient(135deg, hsl(188 90% 42% / 0.05) 0%, hsl(340 82% 62% / 0.05) 100%);
+  }
+
+  /*
+   * Dark-mode compatibility layer.
+   * Several public pages and dashboard modules were built with explicit
+   * light Tailwind utility colors. These aliases keep those surfaces readable
+   * when the root `.dark` theme class is active, without changing their markup.
+   */
+  .dark :where(.bg-white),
+  .dark :where([class~="bg-white/95"]),
+  .dark :where([class~="bg-white/90"]),
+  .dark :where([class~="bg-white/88"]),
+  .dark :where([class~="bg-white/85"]),
+  .dark :where([class~="bg-white/82"]),
+  .dark :where([class~="bg-white/80"]),
+  .dark :where([class~="bg-white/75"]),
+  .dark :where([class~="bg-white/70"]),
+  .dark :where([class~="bg-white/60"]),
+  .dark :where([class~="bg-white/50"]),
+  .dark :where(.bg-slate-50),
+  .dark :where(.bg-slate-100),
+  .dark :where([class~="bg-slate-50/90"]),
+  .dark :where([class~="bg-slate-50/80"]),
+  .dark :where([class~="bg-slate-50/70"]),
+  .dark :where([class~="bg-slate-100/80"]),
+  .dark :where([class~="bg-[#F8FAFC]"]),
+  .dark :where([class~="bg-[#F7F9FF]"]),
+  .dark :where([class~="bg-[#F8FAFF]"]),
+  .dark :where([class~="bg-[#EEF3FF]"]) {
+    background-color: hsl(var(--card) / 0.94) !important;
+  }
+
+  .dark :where(.bg-slate-200),
+  .dark :where(.bg-slate-300),
+  .dark :where([class~="bg-slate-200/80"]),
+  .dark :where([class~="bg-slate-200/70"]) {
+    background-color: hsl(var(--muted)) !important;
+  }
+
+  .dark :where(.text-slate-950),
+  .dark :where(.text-slate-900),
+  .dark :where(.text-slate-800),
+  .dark :where(.text-slate-700),
+  .dark :where([class~="text-[#101A4D]"]),
+  .dark :where([class~="text-[#15236B]"]) {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  .dark :where(.text-slate-600),
+  .dark :where(.text-slate-500),
+  .dark :where(.text-slate-400) {
+    color: hsl(var(--muted-foreground)) !important;
+  }
+
+  .dark :where(.border-slate-50),
+  .dark :where(.border-slate-100),
+  .dark :where(.border-slate-200),
+  .dark :where(.border-slate-300),
+  .dark :where([class~="border-white/80"]),
+  .dark :where([class~="border-white/70"]),
+  .dark :where([class~="border-white/60"]) {
+    border-color: hsl(var(--border)) !important;
+  }
+
+  .dark :where(.shadow-slate-100),
+  .dark :where(.shadow-slate-200),
+  .dark :where([class~="shadow-slate-200/60"]),
+  .dark :where([class~="shadow-slate-200/70"]) {
+    --tw-shadow-color: rgb(0 0 0 / 0.35) !important;
+    --tw-shadow: var(--tw-shadow-colored) !important;
   }
 }
 
