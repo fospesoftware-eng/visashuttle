@@ -261,36 +261,96 @@
   .dark :where([class~="bg-white/50"]),
   .dark :where(.bg-slate-50),
   .dark :where(.bg-slate-100),
+  .dark :where(.bg-gray-50),
+  .dark :where(.bg-gray-100),
+  .dark :where(.bg-zinc-50),
+  .dark :where(.bg-zinc-100),
+  .dark :where(.bg-neutral-50),
+  .dark :where(.bg-neutral-100),
+  .dark :where(.bg-stone-50),
+  .dark :where(.bg-stone-100),
   .dark :where([class~="bg-slate-50/90"]),
   .dark :where([class~="bg-slate-50/80"]),
   .dark :where([class~="bg-slate-50/70"]),
   .dark :where([class~="bg-slate-100/80"]),
+  .dark :where([class~="bg-gray-50/90"]),
+  .dark :where([class~="bg-gray-50/80"]),
+  .dark :where([class~="bg-gray-50/70"]),
+  .dark :where([class~="bg-gray-100/80"]),
+  .dark :where([class~="bg-zinc-50/90"]),
+  .dark :where([class~="bg-zinc-50/80"]),
+  .dark :where([class~="bg-zinc-50/70"]),
+  .dark :where([class~="bg-zinc-100/80"]),
+  .dark :where([class~="bg-neutral-50/90"]),
+  .dark :where([class~="bg-neutral-50/80"]),
+  .dark :where([class~="bg-neutral-50/70"]),
+  .dark :where([class~="bg-neutral-100/80"]),
+  .dark :where([class~="bg-[#F5F7FF]"]),
   .dark :where([class~="bg-[#F8FAFC]"]),
   .dark :where([class~="bg-[#F7F9FF]"]),
   .dark :where([class~="bg-[#F8FAFF]"]),
-  .dark :where([class~="bg-[#EEF3FF]"]) {
+  .dark :where([class~="bg-[#EEF3FF]"]),
+  .dark :where([class~="bg-[#F0F4FF]"]),
+  .dark :where([class~="bg-[#F6F8FF]"]) {
     background-color: hsl(var(--card) / 0.94) !important;
   }
 
   .dark :where(.bg-slate-200),
   .dark :where(.bg-slate-300),
+  .dark :where(.bg-gray-200),
+  .dark :where(.bg-gray-300),
+  .dark :where(.bg-zinc-200),
+  .dark :where(.bg-zinc-300),
+  .dark :where(.bg-neutral-200),
+  .dark :where(.bg-neutral-300),
   .dark :where([class~="bg-slate-200/80"]),
-  .dark :where([class~="bg-slate-200/70"]) {
+  .dark :where([class~="bg-slate-200/70"]),
+  .dark :where([class~="bg-gray-200/80"]),
+  .dark :where([class~="bg-gray-200/70"]),
+  .dark :where([class~="bg-zinc-200/80"]),
+  .dark :where([class~="bg-zinc-200/70"]),
+  .dark :where([class~="bg-neutral-200/80"]),
+  .dark :where([class~="bg-neutral-200/70"]) {
     background-color: hsl(var(--muted)) !important;
   }
 
+  .dark :where(.text-black),
   .dark :where(.text-slate-950),
   .dark :where(.text-slate-900),
   .dark :where(.text-slate-800),
   .dark :where(.text-slate-700),
+  .dark :where(.text-gray-950),
+  .dark :where(.text-gray-900),
+  .dark :where(.text-gray-800),
+  .dark :where(.text-gray-700),
+  .dark :where(.text-zinc-950),
+  .dark :where(.text-zinc-900),
+  .dark :where(.text-zinc-800),
+  .dark :where(.text-zinc-700),
+  .dark :where(.text-neutral-950),
+  .dark :where(.text-neutral-900),
+  .dark :where(.text-neutral-800),
+  .dark :where(.text-neutral-700),
   .dark :where([class~="text-[#101A4D]"]),
-  .dark :where([class~="text-[#15236B]"]) {
+  .dark :where([class~="text-[#15236B]"]),
+  .dark :where([class~="text-[#2438D9]"]),
+  .dark :where([class~="text-[#273CCF]"]),
+  .dark :where([class~="text-[#A3113E]"]) {
     color: hsl(var(--foreground)) !important;
   }
 
   .dark :where(.text-slate-600),
   .dark :where(.text-slate-500),
-  .dark :where(.text-slate-400) {
+  .dark :where(.text-slate-400),
+  .dark :where(.text-gray-600),
+  .dark :where(.text-gray-500),
+  .dark :where(.text-gray-400),
+  .dark :where(.text-zinc-600),
+  .dark :where(.text-zinc-500),
+  .dark :where(.text-zinc-400),
+  .dark :where(.text-neutral-600),
+  .dark :where(.text-neutral-500),
+  .dark :where(.text-neutral-400) {
     color: hsl(var(--muted-foreground)) !important;
   }
 
@@ -298,6 +358,18 @@
   .dark :where(.border-slate-100),
   .dark :where(.border-slate-200),
   .dark :where(.border-slate-300),
+  .dark :where(.border-gray-50),
+  .dark :where(.border-gray-100),
+  .dark :where(.border-gray-200),
+  .dark :where(.border-gray-300),
+  .dark :where(.border-zinc-50),
+  .dark :where(.border-zinc-100),
+  .dark :where(.border-zinc-200),
+  .dark :where(.border-zinc-300),
+  .dark :where(.border-neutral-50),
+  .dark :where(.border-neutral-100),
+  .dark :where(.border-neutral-200),
+  .dark :where(.border-neutral-300),
   .dark :where([class~="border-white/80"]),
   .dark :where([class~="border-white/70"]),
   .dark :where([class~="border-white/60"]) {
@@ -306,8 +378,20 @@
 
   .dark :where(.shadow-slate-100),
   .dark :where(.shadow-slate-200),
+  .dark :where(.shadow-gray-100),
+  .dark :where(.shadow-gray-200),
+  .dark :where(.shadow-zinc-100),
+  .dark :where(.shadow-zinc-200),
+  .dark :where(.shadow-neutral-100),
+  .dark :where(.shadow-neutral-200),
   .dark :where([class~="shadow-slate-200/60"]),
-  .dark :where([class~="shadow-slate-200/70"]) {
+  .dark :where([class~="shadow-slate-200/70"]),
+  .dark :where([class~="shadow-gray-200/60"]),
+  .dark :where([class~="shadow-gray-200/70"]),
+  .dark :where([class~="shadow-zinc-200/60"]),
+  .dark :where([class~="shadow-zinc-200/70"]),
+  .dark :where([class~="shadow-neutral-200/60"]),
+  .dark :where([class~="shadow-neutral-200/70"]) {
     --tw-shadow-color: rgb(0 0 0 / 0.35) !important;
     --tw-shadow: var(--tw-shadow-colored) !important;
   }
