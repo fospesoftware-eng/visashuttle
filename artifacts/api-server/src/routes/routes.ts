@@ -582,6 +582,9 @@ async function capturePayPalOrder(paypal: ReturnType<typeof getPayPalCredentials
   if (!response.ok && data?.name !== "ORDER_ALREADY_CAPTURED") {
     throw Object.assign(new Error(data?.message || data?.details?.[0]?.description || "Unable to verify PayPal payment"), { status: response.status, data });
   }
+  if (!response.ok && data?.name === "ORDER_ALREADY_CAPTURED") {
+    return getPayPalOrder(paypal, orderId);
+  }
   return data;
 }
 
@@ -591,6 +594,53 @@ function getPayPalCaptureId(data: any): string {
 
 function gatewayForCheckoutCurrency(currency?: string | null): "cashfree" | "paypal" {
   return String(currency || "").trim().toUpperCase() === "INR" ? "cashfree" : "paypal";
+}
+
+async function getPayPalOrder(paypal: ReturnType<typeof getPayPalCredentials>, orderId: string): Promise<any> {
+  const token = await getPayPalAccessToken(paypal);
+  const response = await fetch(`${paypal.baseUrl}/v2/checkout/orders/${encodeURIComponent(orderId)}`, {
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    signal: AbortSignal.timeout(20000),
+  });
+  const data: any = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw Object.assign(new Error(data?.message || data?.details?.[0]?.description || "Unable to load PayPal order"), { status: response.status, data });
+  }
+  return data;
+}
+
+const PAYPAL_SUPPORTED_CURRENCIES = new Set([
+  "AUD", "BRL", "CAD", "CNY", "CZK", "DKK", "EUR", "HKD", "HUF", "ILS",
+  "JPY", "MYR", "MXN", "TWD", "NZD", "NOK", "PHP", "PLN", "GBP", "SGD",
+  "SEK", "CHF", "THB", "USD",
+]);
+const USD_FALLBACK_RATES: Record<string, number> = {
+  AED: 3.67,
+  SAR: 3.75,
+  QAR: 3.64,
+  KWD: 0.31,
+  BHD: 0.38,
+  OMR: 0.39,
+};
+const PAYPAL_ZERO_DECIMAL_CURRENCIES = new Set(["HUF", "JPY", "TWD"]);
+
+function getPayPalCheckoutMoney(displayCurrency: string, displayAmount: number, preferredUsdAmount?: number | null) {
+  const currency = String(displayCurrency || "USD").trim().toUpperCase();
+  const amount = Math.max(0, Number(displayAmount) || 0);
+  if (PAYPAL_SUPPORTED_CURRENCIES.has(currency)) return { currency, amount };
+  const usdAmount = Number(preferredUsdAmount);
+  if (Number.isFinite(usdAmount) && usdAmount > 0) return { currency: "USD", amount: usdAmount };
+  const rate = USD_FALLBACK_RATES[currency] || 1;
+  return { currency: "USD", amount: Math.max(1, Math.round((amount / rate) * 100) / 100) };
+}
+
+function formatPayPalAmount(currency: string, amount: number): string {
+  return PAYPAL_ZERO_DECIMAL_CURRENCIES.has(String(currency).toUpperCase())
+    ? String(Math.round(amount))
+    : amount.toFixed(2);
 }
 
 function validateCashfreeMode(mode: "live" | "test", clientId?: string, clientSecret?: string): string | null {
@@ -5754,6 +5804,10 @@ export async function registerRoutes(
         return res.status(503).json({ error: `PayPal ${paypal.mode} credentials are not configured. Please add them in SaaS Admin > Integrations.` });
       }
       try {
+        const planPrices = price.plan.prices && typeof price.plan.prices === "object" ? price.plan.prices as Record<string, unknown> : {};
+        const usdBaseAmount = Number(planPrices.USD || (price.planKey === "deep" ? B2C_DEEP_CHECK_PRICES.USD : 0)) || 0;
+        const usdCheckoutAmount = discount && usdBaseAmount > 0 ? applyCouponDiscount(usdBaseAmount, discount.discountPercent).finalAmount : usdBaseAmount;
+        const paypalMoney = getPayPalCheckoutMoney(price.currency, checkoutAmount, usdCheckoutAmount);
         const paypalOrder = await createPayPalOrder(paypal, {
           intent: "CAPTURE",
           purchase_units: [{
@@ -5762,8 +5816,8 @@ export async function registerRoutes(
             invoice_id: orderId,
             description: `Visa Shuttle ${price.plan.name}`,
             amount: {
-              currency_code: price.currency,
-              value: checkoutAmount.toFixed(2),
+              currency_code: paypalMoney.currency,
+              value: formatPayPalAmount(paypalMoney.currency, paypalMoney.amount),
             },
           }],
           payment_source: {
@@ -5787,6 +5841,8 @@ export async function registerRoutes(
           mode: paypal.mode,
           amount: checkoutAmount,
           currency: price.currency,
+          gatewayAmount: paypalMoney.amount,
+          gatewayCurrency: paypalMoney.currency,
           originalAmount: price.amount,
           planKey: price.planKey,
           couponCode: couponCheck.coupon?.code || "",
@@ -6028,6 +6084,12 @@ export async function registerRoutes(
         return res.status(503).json({ error: `PayPal ${paypal.mode} credentials are not configured. Please add them in SaaS Admin > Integrations.` });
       }
       try {
+        const conditions = plan?.conditions && typeof plan.conditions === "object" ? plan.conditions as Record<string, any> : {};
+        const extraCreditPrices = conditions.extraCreditPrices && typeof conditions.extraCreditPrices === "object"
+          ? conditions.extraCreditPrices as Record<string, unknown>
+          : { USD: 2 };
+        const usdCheckoutAmount = units * (Number(extraCreditPrices.USD || 2) || 2);
+        const paypalMoney = getPayPalCheckoutMoney(pricing.currency, checkoutAmount, usdCheckoutAmount);
         const paypalOrder = await createPayPalOrder(paypal, {
           intent: "CAPTURE",
           purchase_units: [{
@@ -6036,8 +6098,8 @@ export async function registerRoutes(
             invoice_id: orderId,
             description: `Visa Shuttle Visa Tools Credits - ${credits}`,
             amount: {
-              currency_code: pricing.currency,
-              value: checkoutAmount.toFixed(2),
+              currency_code: paypalMoney.currency,
+              value: formatPayPalAmount(paypalMoney.currency, paypalMoney.amount),
             },
           }],
           payment_source: {
@@ -6062,6 +6124,8 @@ export async function registerRoutes(
           mode: paypal.mode,
           amount: checkoutAmount,
           currency: pricing.currency,
+          gatewayAmount: paypalMoney.amount,
+          gatewayCurrency: paypalMoney.currency,
           credits,
           units,
           unit: pricing.unit,
