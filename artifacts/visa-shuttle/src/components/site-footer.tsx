@@ -47,8 +47,8 @@ const footerColumns = [
       { label: "Privacy & Cookies", href: "/privacy-policy" },
       { label: "Terms and Conditions", href: "/terms-and-conditions" },
       { label: "Refund Policy", href: "/refund-policy" },
-      { label: "Data Policy", href: "/privacy-policy" },
-      { label: "3rd Party Integration Policy", href: "/terms-and-conditions" },
+      { label: "Data Policy", href: "/data-policy" },
+      { label: "3rd Party Integration Policy", href: "/third-party-integration-policy" },
     ],
   },
 ];

@@ -81,6 +81,8 @@ import AgencyRegisterPage from "@/pages/agency-register";
 import PrivacyPolicyPage from "@/pages/privacy-policy";
 import TermsAndConditionsPage from "@/pages/terms-and-conditions";
 import RefundPolicyPage from "@/pages/refund-policy";
+import DataPolicyPage from "@/pages/data-policy";
+import ThirdPartyIntegrationPolicyPage from "@/pages/third-party-integration-policy";
 import SchengenSlotsPage from "@/pages/schengen-slots";
 
 import AgencyHomePage from "@/pages/whitelabel/agency-home";
@@ -148,6 +150,8 @@ function Router() {
       <Route path="/privacy-policy" component={PrivacyPolicyPage} />
       <Route path="/terms-and-conditions" component={TermsAndConditionsPage} />
       <Route path="/refund-policy" component={RefundPolicyPage} />
+      <Route path="/data-policy" component={DataPolicyPage} />
+      <Route path="/third-party-integration-policy" component={ThirdPartyIntegrationPolicyPage} />
       <Route path="/schengen-slots" component={SchengenSlotsPage} />
       {/* Public marketing routes for the Agency API platform.
           Note: the api-server (mounted at /api) serves the canonical
