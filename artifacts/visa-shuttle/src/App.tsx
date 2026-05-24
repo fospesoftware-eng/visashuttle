@@ -15,6 +15,7 @@ import HomePage from "@/pages/home";
 import BusinessPage from "@/pages/business";
 import AgencyCrmPage from "@/pages/agency-crm";
 import { AgenticVisaAiPage, BusinessApiDetailPage, EnterpriseSolutionsPage, WhitelabelSolutionsPage } from "@/pages/business-detail";
+import { AgencyCrmSignupPage, AgenticSignupPage, BusinessApiSignupPage, EnterpriseSignupPage, WhitelabelSignupPage } from "@/pages/business-signup";
 import LoginPage from "@/pages/login";
 import SignupPage from "@/pages/signup";
 import JoinPage from "@/pages/join";
@@ -123,10 +124,15 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={HomePage} />
+      <Route path="/business/agency-crm/signup" component={AgencyCrmSignupPage} />
       <Route path="/business/agency-crm" component={AgencyCrmPage} />
+      <Route path="/business/api/signup" component={BusinessApiSignupPage} />
       <Route path="/business/api" component={BusinessApiDetailPage} />
+      <Route path="/business/enterprise/signup" component={EnterpriseSignupPage} />
       <Route path="/business/enterprise" component={EnterpriseSolutionsPage} />
+      <Route path="/business/whitelabel/signup" component={WhitelabelSignupPage} />
       <Route path="/business/whitelabel" component={WhitelabelSolutionsPage} />
+      <Route path="/business/agentic-visa-ai/signup" component={AgenticSignupPage} />
       <Route path="/business/agentic-visa-ai" component={AgenticVisaAiPage} />
       <Route path="/business" component={BusinessPage} />
       <Route path="/join" component={JoinPage} />

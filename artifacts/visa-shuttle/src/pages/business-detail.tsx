@@ -34,8 +34,8 @@ const offerContent = {
       "Connect Visa Shuttle checks, risk scores, fraud analysis, and document intelligence directly into your own app or customer workflow.",
     icon: Code2,
     gradient: "from-[#4055FF] via-[#5B55F6] to-[#FF2060]",
-    primaryCta: "View API Pricing",
-    primaryHref: "/api-pricing",
+    primaryCta: "Request API Access",
+    primaryHref: "/business/api/signup",
     secondaryCta: "Read API Docs",
     secondaryHref: "/docs/api",
     proof: ["Pay-as-you-go usage", "API keys and usage tracking", "Structured JSON responses"],
@@ -67,8 +67,8 @@ const offerContent = {
       "A tailored operating layer for immigration firms, education consultants, travel groups, and platforms with complex visa workflows.",
     icon: Building2,
     gradient: "from-[#2438D9] via-[#4055FF] to-[#8B5CF6]",
-    primaryCta: "Contact Sales",
-    primaryHref: "/contact",
+    primaryCta: "Start Enterprise Enquiry",
+    primaryHref: "/business/enterprise/signup",
     secondaryCta: "Explore Agency CRM",
     secondaryHref: "/business/agency-crm",
     proof: ["Custom workflows", "Role-based teams", "Operational reporting"],
@@ -101,7 +101,7 @@ const offerContent = {
     icon: Palette,
     gradient: "from-[#4055FF] via-[#7C3AED] to-[#FF2060]",
     primaryCta: "Start Whitelabel Setup",
-    primaryHref: "/agency-register",
+    primaryHref: "/business/whitelabel/signup",
     secondaryCta: "See Agency CRM Plans",
     secondaryHref: "/business/agency-crm",
     proof: ["Branded portal", "Customer proposal links", "Custom domain support"],
@@ -134,7 +134,7 @@ const offerContent = {
     icon: Bot,
     gradient: "from-[#FF2060] via-[#7C3AED] to-[#4055FF]",
     primaryCta: "Request AI Workflow",
-    primaryHref: "/contact",
+    primaryHref: "/business/agentic-visa-ai/signup",
     secondaryCta: "Explore Customizer",
     secondaryHref: "/app/customizer",
     proof: ["AI profile review", "Document gap detection", "Operational recommendations"],
@@ -181,48 +181,47 @@ function BusinessOfferPage({ offerKey }: { offerKey: BusinessOfferKey }) {
 
   return (
     <main className="min-h-screen bg-[#F8FAFC]">
-      <section className={`relative overflow-hidden bg-gradient-to-br ${offer.gradient} px-4 py-14 text-white md:py-20`}>
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_14%_0%,rgba(255,255,255,0.18),transparent_32%),radial-gradient(circle_at_88%_16%,rgba(255,255,255,0.13),transparent_30%)]" />
-        <div className="pointer-events-none absolute left-[8%] top-16 h-28 w-28 animate-pulse rounded-full border border-white/20" />
-        <div className="pointer-events-none absolute bottom-12 right-[12%] h-20 w-20 animate-bounce rounded-3xl border border-white/15 [animation-duration:4s]" />
+      <section className="relative overflow-hidden border-b border-slate-200 px-4 py-14 md:py-20">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_14%_0%,rgba(64,85,255,0.12),transparent_32%),radial-gradient(circle_at_88%_12%,rgba(255,32,96,0.08),transparent_30%),linear-gradient(180deg,#FFFFFF,#F8FAFC)]" />
 
         <div className="relative mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1fr_0.9fr] lg:items-center">
           <div>
-            <Badge className="mb-5 border-white/20 bg-white/15 text-white hover:bg-white/15">{offer.eyebrow}</Badge>
-            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-3xl bg-white/15 shadow-2xl backdrop-blur">
+            <Badge className="mb-5 border-[#4055FF]/15 bg-white text-[#4055FF] shadow-sm hover:bg-white">{offer.eyebrow}</Badge>
+            <div className={`mb-6 flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br ${offer.gradient} text-white shadow-2xl shadow-[#4055FF]/20`}>
               <Icon className="h-8 w-8" />
             </div>
-            <h1 className="max-w-3xl text-4xl font-black tracking-tight md:text-6xl">{offer.title}</h1>
-            <p className="mt-5 max-w-2xl text-base leading-7 text-white/82 md:text-lg">{offer.summary}</p>
+            <h1 className="max-w-3xl text-4xl font-black tracking-tight text-[#15236B] md:text-6xl">{offer.title}</h1>
+            <p className="mt-5 max-w-2xl text-base leading-7 text-slate-600 md:text-lg">{offer.summary}</p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link href={offer.primaryHref}>
-                <Button size="lg" className="w-full gap-2 rounded-2xl bg-white text-[#2438D9] shadow-lg shadow-white/10 hover:bg-white/90 sm:w-auto">
+                <Button size="lg" className="w-full gap-2 rounded-2xl border-0 bg-gradient-to-r from-[#4055FF] to-[#FF2060] text-white shadow-lg shadow-[#4055FF]/20 hover:opacity-90 sm:w-auto">
                   {offer.primaryCta}
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
               <Link href={offer.secondaryHref}>
-                <Button size="lg" variant="outline" className="w-full rounded-2xl border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white sm:w-auto">
+                <Button size="lg" variant="outline" className="w-full rounded-2xl border-slate-200 bg-white/80 text-[#15236B] shadow-sm hover:bg-white sm:w-auto">
                   {offer.secondaryCta}
                 </Button>
               </Link>
             </div>
           </div>
 
-          <Card className="overflow-hidden rounded-[2rem] border-white/20 bg-white/12 text-white shadow-2xl backdrop-blur-xl">
+          <Card className="relative overflow-hidden rounded-[2rem] border-slate-200 bg-white shadow-2xl shadow-slate-200/70">
+            <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${offer.gradient}`} />
             <CardContent className="p-6 md:p-8">
-              <p className="text-sm font-bold uppercase tracking-wide text-white/60">Designed for</p>
+              <p className="text-sm font-bold uppercase tracking-wide text-slate-400">Designed for</p>
               <div className="mt-5 space-y-3">
                 {offer.proof.map((item) => (
-                  <div key={item} className="flex items-center gap-3 rounded-2xl bg-white/12 p-4">
-                    <BadgeCheck className="h-5 w-5 shrink-0" />
-                    <span className="text-sm font-bold">{item}</span>
+                  <div key={item} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                    <BadgeCheck className="h-5 w-5 shrink-0 text-[#4055FF]" />
+                    <span className="text-sm font-bold text-slate-800">{item}</span>
                   </div>
                 ))}
               </div>
-              <div className="mt-6 rounded-3xl border border-white/15 bg-white/10 p-5">
-                <p className="text-sm font-bold uppercase tracking-wide text-white/60">Business outcome</p>
-                <p className="mt-3 text-2xl font-black leading-tight">
+              <div className="mt-6 rounded-3xl border border-[#4055FF]/15 bg-gradient-to-br from-[#4055FF]/10 via-white to-[#FF2060]/10 p-5">
+                <p className="text-sm font-bold uppercase tracking-wide text-[#4055FF]">Business outcome</p>
+                <p className="mt-3 text-2xl font-black leading-tight text-[#15236B]">
                   Faster decisions, cleaner operations, and stronger customer workflows.
                 </p>
               </div>

@@ -170,28 +170,28 @@ export default function AgencyCrmPage() {
 
   return (
     <main className="min-h-screen bg-background">
-      <section className="relative overflow-hidden border-b">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(64,85,255,0.12),transparent_30%),radial-gradient(circle_at_80%_10%,rgba(255,32,96,0.10),transparent_28%),linear-gradient(180deg,hsl(var(--background)),rgba(64,85,255,0.04))]" />
+      <section className="relative overflow-hidden border-b border-slate-200 bg-[#F8FAFC]">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_0%,rgba(64,85,255,0.12),transparent_34%),radial-gradient(circle_at_90%_12%,rgba(255,32,96,0.08),transparent_30%),linear-gradient(180deg,#FFFFFF,#F8FAFC)]" />
         <div className="relative mx-auto grid max-w-7xl gap-10 px-4 py-16 md:grid-cols-[1.05fr_0.95fr] md:items-center md:py-20">
           <div>
-            <Badge className="mb-5 border-[#4055FF]/20 bg-[#4055FF]/10 text-[#4055FF] hover:bg-[#4055FF]/10">
+            <Badge className="mb-5 border-[#4055FF]/15 bg-white text-[#4055FF] shadow-sm hover:bg-white">
               Agency CRM Pricing
             </Badge>
-            <h1 className="max-w-3xl text-4xl font-black tracking-tight md:text-6xl">
-              Visa automation CRM built for agencies that move fast.
+            <h1 className="max-w-3xl text-4xl font-black tracking-tight text-[#15236B] md:text-6xl">
+              A modern visa CRM for agencies that want cleaner growth.
             </h1>
-            <p className="mt-5 max-w-2xl text-lg leading-8 text-muted-foreground">
+            <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
               Manage leads, proposals, applications, documents, payments and customer communication from one clean workspace.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link href="/agency-register">
-                <Button size="lg" className="gap-2 border-0 text-white hover:opacity-90" style={{ background: "linear-gradient(135deg,#4055FF,#9033F5,#FF2060)" }}>
+              <Link href="/business/agency-crm/signup">
+                <Button size="lg" className="gap-2 rounded-2xl border-0 text-white shadow-lg shadow-[#4055FF]/20 hover:opacity-90" style={{ background: "linear-gradient(135deg,#4055FF,#9033F5,#FF2060)" }}>
                   Start agency CRM
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
               <Link href="/business">
-                <Button size="lg" variant="outline" className="gap-2">
+                <Button size="lg" variant="outline" className="gap-2 rounded-2xl border-slate-200 bg-white/80 text-[#15236B] shadow-sm hover:bg-white">
                   Explore business tools
                   <Globe className="h-4 w-4" />
                 </Button>
@@ -203,7 +203,9 @@ export default function AgencyCrmPage() {
           </div>
 
           <div className="relative">
-            <div className="rounded-2xl border bg-card p-4 shadow-2xl shadow-[#4055FF]/10">
+            <div className="absolute -left-5 top-10 hidden h-24 w-24 animate-pulse rounded-full bg-[#4055FF]/10 blur-2xl md:block" />
+            <div className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-5 shadow-2xl shadow-slate-200/70">
+              <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-[#4055FF] via-[#9033F5] to-[#FF2060]" />
               <div className="grid gap-3">
                 {[
                   { label: "Applications this month", value: "482", icon: FileCheck, color: "text-[#4055FF]" },
@@ -212,8 +214,8 @@ export default function AgencyCrmPage() {
                 ].map((item) => {
                   const Icon = item.icon;
                   return (
-                    <div key={item.label} className="flex items-center gap-4 rounded-xl border bg-background p-4">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-muted">
+                    <div key={item.label} className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white shadow-sm">
                         <Icon className={`h-5 w-5 ${item.color}`} />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -225,7 +227,7 @@ export default function AgencyCrmPage() {
                   );
                 })}
               </div>
-              <div className="mt-4 rounded-xl border border-[#4055FF]/15 bg-gradient-to-br from-[#4055FF]/10 via-background to-[#FF2060]/10 p-5">
+              <div className="mt-4 rounded-3xl border border-[#4055FF]/15 bg-gradient-to-br from-[#4055FF]/10 via-white to-[#FF2060]/10 p-5">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Recommended plan</p>
@@ -298,7 +300,7 @@ export default function AgencyCrmPage() {
                   <span className="text-4xl font-black tracking-tight">{convertPrice(plan.usdPrice, curr)}</span>
                   <span className="pb-1 text-sm font-medium text-muted-foreground">{plan.period}</span>
                 </div>
-                <Link href="/agency-register">
+                <Link href={`/business/agency-crm/signup?plan=${plan.name.toLowerCase()}`}>
                   <Button className="mt-6 w-full gap-2 border-0 text-white hover:opacity-90" style={{ background: plan.buttonGradient }}>
                     Get {plan.name}
                     <ArrowRight className="h-4 w-4" />
@@ -386,7 +388,7 @@ export default function AgencyCrmPage() {
                 <span className="inline-flex items-center gap-2"><Headphones className="h-4 w-4" /> Support</span>
               </div>
             </div>
-            <Link href="/agency-register">
+            <Link href="/business/agency-crm/signup">
               <Button size="lg" className="gap-2 border-0 text-white hover:opacity-90" style={{ background: "linear-gradient(135deg,#4055FF,#9033F5,#FF2060)" }}>
                 Create agency account
                 <ArrowRight className="h-4 w-4" />
