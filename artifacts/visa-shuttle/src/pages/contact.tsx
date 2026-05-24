@@ -1,15 +1,35 @@
 import { useState, type FormEvent } from "react";
+import { Link } from "wouter";
 import { Building2, Clock, Mail, MapPin, MessageSquareText, Send, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const CONTACT_EMAIL = "hello@visashuttle.com";
+const TOPICS = [
+  { value: "basic-check", label: "Basic Check" },
+  { value: "deep-check", label: "Deep Check" },
+  { value: "pro-plan", label: "Pro Plan" },
+  { value: "visa-tools", label: "Visa Tools" },
+  { value: "agency-crm", label: "Agency CRM" },
+  { value: "business-api", label: "Business API" },
+  { value: "billing", label: "Billing & Payments" },
+  { value: "technical-support", label: "Technical Support" },
+  { value: "partnership", label: "Partnership / Sales" },
+  { value: "other", label: "Other" },
+];
 
 export default function ContactPage() {
-  const [form, setForm] = useState({ name: "", email: "", company: "", message: "" });
+  const [form, setForm] = useState({ name: "", email: "", company: "", topic: "deep-check", message: "" });
 
   function update(key: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -24,6 +44,7 @@ export default function ContactPage() {
       `Name: ${form.name || "-"}`,
       `Email: ${form.email || "-"}`,
       `Company: ${form.company || "-"}`,
+      `Topic: ${TOPICS.find((topic) => topic.value === form.topic)?.label || form.topic}`,
       "",
       "Message:",
       form.message || "-",
@@ -101,6 +122,18 @@ export default function ContactPage() {
                   <p className="mt-1 text-sm leading-6 text-slate-600">Most enquiries are reviewed within 1 business day.</p>
                 </div>
               </div>
+
+              <div className="rounded-2xl border border-[#4055FF]/20 bg-[#4055FF]/5 p-5 shadow-sm">
+                <p className="text-sm font-bold text-slate-950">Signed agency users</p>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  For signed agencies, please use the in-app support system instead of this contact form.
+                </p>
+                <Link href="/app/support">
+                  <Button variant="outline" className="mt-4 rounded-xl border-[#4055FF]/25 text-[#4055FF] hover:bg-[#4055FF]/10">
+                    Open Agency Support
+                  </Button>
+                </Link>
+              </div>
             </div>
 
             <Card className="rounded-3xl border-slate-200 bg-white shadow-xl shadow-slate-200/60">
@@ -137,6 +170,22 @@ export default function ContactPage() {
                         data-testid="input-contact-page-email"
                       />
                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="contact-topic">Topic</Label>
+                    <Select value={form.topic} onValueChange={(value) => update("topic", value)}>
+                      <SelectTrigger id="contact-topic" data-testid="select-contact-page-topic">
+                        <SelectValue placeholder="Select a topic" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TOPICS.map((topic) => (
+                          <SelectItem key={topic.value} value={topic.value}>
+                            {topic.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="space-y-2">

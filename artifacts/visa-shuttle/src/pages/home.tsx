@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef, type FormEvent } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Sparkles, Brain, Zap, Shield, ArrowRight, CheckCircle,
   Globe, Star, TrendingUp, FileText, Lock,
-  Mail, MapPin, Send,
   Flag, Map, Stamp, Compass, UserCheck, Wallet,
   Plane, ShieldAlert, CalendarCheck, TicketCheck,
   Hotel, CreditCard, FolderCheck, Bot,
@@ -12,9 +11,6 @@ import { SignalArt, type SignalKind } from "@/components/signal-art";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
 import { POPULAR_DESTINATIONS, VISA_TYPES } from "@/shared/destinations";
 import { formatB2cPrice, getStoredB2cCurrency } from "@/lib/b2c-pricing";
@@ -216,7 +212,6 @@ export default function HomePage() {
   const [samples, setSamples] = useState<VisaScoreSample[]>([]);
   const [userCountry, setUserCountry] = useState<string | null>(null);
   const [pulse, setPulse] = useState(0); // increments to trigger subtle "live" animation
-  const [contactForm, setContactForm] = useState({ name: "", email: "", message: "" });
   const pulseRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const basicCheckPrice = formatB2cPrice(getStoredB2cCurrency(), 0);
 
@@ -257,15 +252,6 @@ export default function HomePage() {
   function handleCheckCTA() {
     if (user) setLocation("/check");
     else setLocation("/join");
-  }
-
-  function handleContactSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const subject = encodeURIComponent(`Visa Shuttle contact from ${contactForm.name || "website visitor"}`);
-    const body = encodeURIComponent(
-      `Name: ${contactForm.name}\nEmail: ${contactForm.email}\n\nMessage:\n${contactForm.message}`
-    );
-    window.location.href = `mailto:hello@visashuttle.com?subject=${subject}&body=${body}`;
   }
 
   return (
@@ -854,99 +840,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Contact */}
-      <section id="contact" className="py-12 md:py-16 px-4 bg-muted/30 border-y">
-        <div className="max-w-6xl mx-auto grid lg:grid-cols-[0.85fr_1.15fr] gap-8 items-start">
-          <div>
-            <Badge className="mb-5 bg-[#4055FF]/10 text-[#4055FF] dark:bg-[#4055FF]/20 dark:text-[#8899FF] border-[#4055FF]/20 hover:bg-[#4055FF]/10">
-              Contact
-            </Badge>
-            <h2 className="text-2xl md:text-3xl font-bold mb-3">Get in Touch</h2>
-            <p className="text-muted-foreground mb-8 leading-relaxed">
-              Have a question about visa checks, business access, or your application planning? Send us a message and the Visa Shuttle team will follow up.
-            </p>
-
-            <div className="space-y-4">
-              <div className="flex items-start gap-3 rounded-xl border bg-background p-4">
-                <div className="w-10 h-10 rounded-lg bg-[#4055FF]/10 text-[#4055FF] flex items-center justify-center flex-shrink-0">
-                  <MapPin className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="font-semibold">Fospe Software Private Limited</p>
-                  <p className="text-sm text-muted-foreground">Level 8, Tower I, UBB</p>
-                  <p className="text-sm text-muted-foreground">Cessna Business Park, ORR, Bangalore – 560 103</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 rounded-xl border bg-background p-4">
-                <div className="w-10 h-10 rounded-lg bg-[#FF2060]/10 text-[#FF2060] flex items-center justify-center flex-shrink-0">
-                  <Mail className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="font-semibold">Email</p>
-                  <a href="mailto:hello@visashuttle.com" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                    hello@visashuttle.com
-                  </a>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <Card className="rounded-2xl shadow-lg">
-            <CardContent className="p-6 md:p-8">
-              <form className="space-y-5" onSubmit={handleContactSubmit}>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="contact-name">Name</Label>
-                    <Input
-                      id="contact-name"
-                      value={contactForm.name}
-                      onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
-                      placeholder="Your name"
-                      required
-                      data-testid="input-contact-name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="contact-email">Email</Label>
-                    <Input
-                      id="contact-email"
-                      type="email"
-                      value={contactForm.email}
-                      onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
-                      placeholder="you@example.com"
-                      required
-                      data-testid="input-contact-email"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="contact-message">Message</Label>
-                  <Textarea
-                    id="contact-message"
-                    value={contactForm.message}
-                    onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
-                    placeholder="How can we help?"
-                    rows={6}
-                    required
-                    data-testid="textarea-contact-message"
-                  />
-                </div>
-
-                <Button
-                  type="submit"
-                  className="w-full md:w-auto gap-2 border-0 text-white hover:opacity-90"
-                  style={{background:"linear-gradient(135deg,#4055FF,#FF2060)"}}
-                  data-testid="button-contact-submit"
-                >
-                  <Send className="w-4 h-4" />
-                  Send Message
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
     </div>
   );
 }
