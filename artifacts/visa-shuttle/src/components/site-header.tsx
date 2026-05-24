@@ -19,7 +19,7 @@ export function SiteHeader() {
     { label: "Pricing", href: "/pricing" },
     { label: "For Business", href: "/business" },
     { label: "Help", href: "/help" },
-    { label: "Contact", href: "/#contact", anchor: true },
+    { label: "Contact", href: "/contact" },
   ];
 
   return (

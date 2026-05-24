@@ -38,7 +38,7 @@ const footerColumns = [
       { label: "Our Company", href: "/business" },
       { label: "News Updates", href: "/help" },
       { label: "Careers", href: "/help" },
-      { label: "Contact", href: "/#contact" },
+      { label: "Contact", href: "/contact" },
     ],
   },
   {
