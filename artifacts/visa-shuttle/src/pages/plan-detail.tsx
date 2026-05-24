@@ -46,7 +46,7 @@ const planContent = {
     headline: "Start with a fast AI visa chance check",
     summary:
       "A quick, clean assessment for first-time users who want to understand their approval chance before spending time on a full application.",
-    gradient: "from-slate-900 via-[#4055FF] to-slate-800",
+    gradient: "from-[#2438D9] via-[#4055FF] to-[#7857FF]",
     accent: "text-[#4055FF]",
     icon: Gauge,
     primaryCta: "Start Basic Check",
@@ -164,7 +164,7 @@ function CurrencySwitcher({ currency, onChange }: { currency: B2cCurrency; onCha
             type="button"
             onClick={() => onChange(code)}
             className={`rounded-xl px-2 py-2 text-xs font-black transition ${
-              currency === code ? "bg-white text-slate-950 shadow-sm" : "text-white/75 hover:bg-white/10 hover:text-white"
+              currency === code ? "bg-white text-[#2438D9] shadow-sm" : "text-white/75 hover:bg-white/10 hover:text-white"
             }`}
           >
             <span className="block text-base leading-none">{B2C_CURRENCY_FLAGS[code]}</span>
@@ -218,7 +218,7 @@ function PlanDetailPage({ planKey }: { planKey: PlanKey }) {
             <p className="mt-5 max-w-2xl text-base leading-7 text-white/82 md:text-lg">{content.summary}</p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link href={primaryHref}>
-                <Button size="lg" className="w-full gap-2 rounded-2xl bg-white text-slate-950 hover:bg-white/90 sm:w-auto">
+                <Button size="lg" className="w-full gap-2 rounded-2xl bg-white text-[#2438D9] shadow-lg shadow-white/10 hover:bg-white/90 sm:w-auto">
                   {content.primaryCta}
                   <ArrowRight className="h-4 w-4" />
                 </Button>
@@ -272,7 +272,7 @@ function PlanDetailPage({ planKey }: { planKey: PlanKey }) {
         <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[0.9fr_1.1fr]">
           <div>
             <p className={`text-sm font-black uppercase tracking-wide ${content.accent}`}>Included features</p>
-            <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950 md:text-4xl">Everything this plan unlocks</h2>
+            <h2 className="mt-3 text-3xl font-black tracking-tight text-[#15236B] md:text-4xl">Everything this plan unlocks</h2>
             <p className="mt-4 text-base leading-7 text-slate-600">
               Built for clear decisions, practical next steps, and a smoother path before you commit to an application.
             </p>
@@ -293,7 +293,7 @@ function PlanDetailPage({ planKey }: { planKey: PlanKey }) {
           <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
               <p className={`text-sm font-black uppercase tracking-wide ${content.accent}`}>How it works</p>
-              <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950">From signup to smarter decision</h2>
+              <h2 className="mt-3 text-3xl font-black tracking-tight text-[#15236B]">From signup to smarter decision</h2>
             </div>
             <Link href={primaryHref}>
               <Button className="w-full gap-2 rounded-2xl border-0 bg-gradient-to-r from-[#4055FF] to-[#FF2060] text-white hover:opacity-90 md:w-auto">
@@ -306,7 +306,7 @@ function PlanDetailPage({ planKey }: { planKey: PlanKey }) {
             {content.steps.map((step, index) => (
               <Card key={step} className="rounded-3xl border-slate-200 bg-[#F8FAFC] shadow-sm">
                 <CardContent className="p-6">
-                  <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-lg font-black text-white">
+                  <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#4055FF] to-[#FF2060] text-lg font-black text-white shadow-lg shadow-[#4055FF]/20">
                     {index + 1}
                   </div>
                   <p className="text-base font-bold leading-7 text-slate-900">{step}</p>
@@ -325,7 +325,7 @@ function PlanDetailPage({ planKey }: { planKey: PlanKey }) {
                 <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#4055FF]/10 text-[#4055FF] transition group-hover:scale-110">
                   <CardIcon className="h-6 w-6" />
                 </div>
-                <h3 className="text-xl font-black tracking-tight text-slate-950">{title}</h3>
+                <h3 className="text-xl font-black tracking-tight text-[#15236B]">{title}</h3>
                 <p className="mt-3 text-sm leading-6 text-slate-600">{body}</p>
               </CardContent>
             </Card>
@@ -334,8 +334,9 @@ function PlanDetailPage({ planKey }: { planKey: PlanKey }) {
       </section>
 
       <section className="px-4 pb-16">
-        <div className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-slate-950 p-6 text-white shadow-2xl md:p-8">
-          <div className="grid gap-6 md:grid-cols-[1fr_auto] md:items-center">
+        <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#2438D9] via-[#4055FF] to-[#FF2060] p-6 text-white shadow-2xl shadow-[#4055FF]/20 md:p-8">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_0%,rgba(255,255,255,0.18),transparent_34%),radial-gradient(circle_at_86%_100%,rgba(255,255,255,0.16),transparent_30%)]" />
+          <div className="relative grid gap-6 md:grid-cols-[1fr_auto] md:items-center">
             <div>
               <div className="mb-4 flex flex-wrap gap-2">
                 <Badge className="border-white/15 bg-white/10 text-white hover:bg-white/10">
@@ -358,7 +359,7 @@ function PlanDetailPage({ planKey }: { planKey: PlanKey }) {
               </p>
             </div>
             <Link href={primaryHref}>
-              <Button size="lg" className="w-full gap-2 rounded-2xl bg-white text-slate-950 hover:bg-white/90 md:w-auto">
+              <Button size="lg" className="w-full gap-2 rounded-2xl bg-white text-[#2438D9] shadow-lg shadow-white/10 hover:bg-white/90 md:w-auto">
                 {content.primaryCta}
                 <ArrowRight className="h-4 w-4" />
               </Button>
