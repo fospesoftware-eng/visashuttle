@@ -178,8 +178,11 @@ async function sendTransactionalEmail(opts: {
   attachments?: Array<{ filename: string; content: string; mimeType?: string }>;
 }): Promise<{ ok: boolean; provider?: string; error?: string; status?: number; detail?: string }> {
   const cfg = await storage.getZeptoMailConfig().catch(() => undefined);
-  const token = normalizeZeptoMailToken(cfg?.sendMailToken || "");
-  if (!cfg?.enabled || !token) return { ok: false, provider: "zeptomail", error: "ZeptoMail is not configured" };
+  const tokens = [
+    normalizeZeptoMailToken(cfg?.sendMailToken || ""),
+    normalizeZeptoMailToken((cfg as any)?.sendMailToken2 || ""),
+  ].filter(Boolean);
+  if (!cfg?.enabled || tokens.length === 0) return { ok: false, provider: "zeptomail", error: "ZeptoMail is not configured" };
   const host = normalizeZeptoMailHost(cfg.host);
   const senderAddress = normalizeZeptoMailSender(cfg.senderAddress);
   const payload: Record<string, unknown> = {
@@ -200,38 +203,59 @@ async function sendTransactionalEmail(opts: {
     }));
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 12_000);
-  let resp: Response;
-  try {
-    resp = await fetch(`https://${host}/v1.1/email`, {
-      method: "POST",
-      signal: controller.signal,
-      headers: {
-        Accept: "application/json",
-        Authorization: `zoho-enczapikey ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-  } catch (error: any) {
-    const timedOut = error?.name === "AbortError";
-    const message = timedOut
-      ? "Timed out connecting to ZeptoMail. Please retry after a minute or check the Mail Agent host."
-      : `Could not reach ZeptoMail: ${error?.message || "network error"}`;
-    console.warn("[email] ZeptoMail transport failed:", message);
-    return { ok: false, provider: "zeptomail", status: timedOut ? 504 : 502, error: message };
-  } finally {
-    clearTimeout(timeout);
+  async function postWithToken(token: string) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12_000);
+    try {
+      const resp = await fetch(`https://${host}/v1.1/email`, {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          Accept: "application/json",
+          Authorization: `Zoho-enczapikey ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      return resp;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
-  if (!resp.ok) {
+  let lastFailure: { status: number; detail: string; message: string } | null = null;
+  for (let index = 0; index < tokens.length; index++) {
+    let resp: Response;
+    try {
+      resp = await postWithToken(tokens[index]);
+    } catch (error: any) {
+      const timedOut = error?.name === "AbortError";
+      const message = timedOut
+        ? "Timed out connecting to ZeptoMail. Please retry after a minute or check the Mail Agent host."
+        : `Could not reach ZeptoMail: ${error?.message || "network error"}`;
+      console.warn("[email] ZeptoMail transport failed:", message);
+      return { ok: false, provider: "zeptomail", status: timedOut ? 504 : 502, error: message };
+    }
+
+    if (resp.ok) return { ok: true, provider: "zeptomail", status: resp.status };
+
     const detail = await resp.text().catch(() => "");
     const message = cleanProviderError(detail) || `ZeptoMail HTTP ${resp.status}`;
-    console.warn("[email] ZeptoMail rejected:", resp.status, message.slice(0, 300));
-    return { ok: false, provider: "zeptomail", status: resp.status, error: message, detail: detail.slice(0, 1000) };
+    lastFailure = { status: resp.status, detail: detail.slice(0, 1000), message };
+    const canTryBackupToken = index === 0 && tokens.length > 1 && (resp.status === 401 || resp.status === 403);
+    if (canTryBackupToken) {
+      console.warn("[email] ZeptoMail token 1 rejected. Retrying with token 2.");
+      continue;
+    }
+    break;
   }
-  return { ok: true, provider: "zeptomail", status: resp.status };
+
+  if (lastFailure) {
+    console.warn("[email] ZeptoMail rejected:", lastFailure.status, lastFailure.message.slice(0, 300));
+    return { ok: false, provider: "zeptomail", status: lastFailure.status, error: lastFailure.message, detail: lastFailure.detail };
+  }
+
+  return { ok: false, provider: "zeptomail", status: 502, error: "ZeptoMail rejected the request." };
 }
 
 // Send a staff-invitation email containing the agency dashboard URL + the
@@ -5504,14 +5528,16 @@ export async function registerRoutes(
       bounceAddress: cfg?.bounceAddress || "",
       replyToAddress: cfg?.replyToAddress || "",
       sendMailToken: cfg?.sendMailToken ? maskKey(cfg.sendMailToken) : "",
+      sendMailToken2: (cfg as any)?.sendMailToken2 ? maskKey((cfg as any).sendMailToken2) : "",
       enabled: !!cfg?.enabled,
       hasSendMailToken: !!cfg?.sendMailToken,
-      ready: !!(cfg?.enabled && cfg?.sendMailToken && cfg?.senderAddress),
+      hasSendMailToken2: !!(cfg as any)?.sendMailToken2,
+      ready: !!(cfg?.enabled && (cfg?.sendMailToken || (cfg as any)?.sendMailToken2) && cfg?.senderAddress),
     });
   });
 
   app.post("/api/admin/email-config", requireAdminAuth, async (req, res) => {
-    const { domain, host, agentAlias, senderAddress, senderName, bounceAddress, replyToAddress, sendMailToken, enabled } = req.body;
+    const { domain, host, agentAlias, senderAddress, senderName, bounceAddress, replyToAddress, sendMailToken, sendMailToken2, enabled } = req.body;
     const patch: Record<string, any> = { provider: "zeptomail" };
     if (domain !== undefined) patch.domain = String(domain || "visashuttle.com").trim();
     if (host !== undefined) patch.host = normalizeZeptoMailHost(String(host || "api.zeptomail.com"));
@@ -5521,6 +5547,7 @@ export async function registerRoutes(
     if (bounceAddress !== undefined) patch.bounceAddress = String(bounceAddress || "").trim() || null;
     if (replyToAddress !== undefined) patch.replyToAddress = String(replyToAddress || "").trim() || null;
     if (sendMailToken !== undefined && !String(sendMailToken).includes("•")) patch.sendMailToken = normalizeZeptoMailToken(String(sendMailToken || "")) || null;
+    if (sendMailToken2 !== undefined && !String(sendMailToken2).includes("•")) patch.sendMailToken2 = normalizeZeptoMailToken(String(sendMailToken2 || "")) || null;
     if (enabled !== undefined) patch.enabled = !!enabled;
     const updated = await storage.upsertZeptoMailConfig(patch);
     res.json({
@@ -5533,9 +5560,11 @@ export async function registerRoutes(
       bounceAddress: updated.bounceAddress || "",
       replyToAddress: updated.replyToAddress || "",
       sendMailToken: updated.sendMailToken ? maskKey(updated.sendMailToken) : "",
+      sendMailToken2: (updated as any).sendMailToken2 ? maskKey((updated as any).sendMailToken2) : "",
       enabled: updated.enabled,
       hasSendMailToken: !!updated.sendMailToken,
-      ready: !!(updated.enabled && updated.sendMailToken && updated.senderAddress),
+      hasSendMailToken2: !!(updated as any).sendMailToken2,
+      ready: !!(updated.enabled && (updated.sendMailToken || (updated as any).sendMailToken2) && updated.senderAddress),
     });
   });
 
@@ -5545,7 +5574,9 @@ export async function registerRoutes(
       if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return res.status(400).json({ error: "A valid test email is required" });
       const cfg = await storage.getZeptoMailConfig();
       if (!cfg?.enabled) return res.status(400).json({ error: "ZeptoMail is disabled. Enable transactional email and save settings first." });
-      if (!normalizeZeptoMailToken(cfg?.sendMailToken || "")) return res.status(400).json({ error: "ZeptoMail Send Mail token is missing. Paste the token and save settings first." });
+      if (!normalizeZeptoMailToken(cfg?.sendMailToken || "") && !normalizeZeptoMailToken((cfg as any)?.sendMailToken2 || "")) {
+        return res.status(400).json({ error: "ZeptoMail Send Mail token is missing. Paste at least one token and save settings first." });
+      }
       if (!cfg?.senderAddress || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cfg.senderAddress)) {
         return res.status(400).json({ error: "Sender address is invalid. Use the verified sender notifications@visashuttle.com." });
       }

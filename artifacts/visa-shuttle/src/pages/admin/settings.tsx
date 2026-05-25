@@ -56,8 +56,10 @@ interface EmailConfigResponse {
   bounceAddress: string;
   replyToAddress: string;
   sendMailToken: string;
+  sendMailToken2: string;
   enabled: boolean;
   hasSendMailToken: boolean;
+  hasSendMailToken2: boolean;
   ready: boolean;
 }
 
@@ -262,6 +264,7 @@ function AiProviderCard() {
 function TransactionalEmailCard() {
   const { toast } = useToast();
   const [showToken, setShowToken] = useState(false);
+  const [showToken2, setShowToken2] = useState(false);
   const [testEmail, setTestEmail] = useState("");
   const [form, setForm] = useState({
     domain: "visashuttle.com",
@@ -272,6 +275,7 @@ function TransactionalEmailCard() {
     bounceAddress: "",
     replyToAddress: "",
     sendMailToken: "",
+    sendMailToken2: "",
     enabled: false,
   });
 
@@ -290,6 +294,7 @@ function TransactionalEmailCard() {
         bounceAddress: cfg.bounceAddress || "",
         replyToAddress: cfg.replyToAddress || "",
         sendMailToken: cfg.sendMailToken || "",
+        sendMailToken2: cfg.sendMailToken2 || "",
         enabled: !!cfg.enabled,
       });
     }
@@ -429,7 +434,27 @@ function TransactionalEmailCard() {
             </button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Used server-side as <span className="font-mono">Authorization: zoho-enczapikey &lt;token&gt;</span>. Tokens are masked after saving.
+            Used server-side as <span className="font-mono">Authorization: Zoho-enczapikey &lt;token&gt;</span>. Tokens are masked after saving.
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label>Send Mail Token 2</Label>
+          <div className="relative">
+            <Input
+              type={showToken2 ? "text" : "password"}
+              value={form.sendMailToken2}
+              onChange={e => setForm(f => ({ ...f, sendMailToken2: e.target.value }))}
+              placeholder={cfg?.hasSendMailToken2 ? "Token 2 saved — enter new value to rotate" : "Optional backup Send Mail token"}
+              className="pr-10 font-mono text-sm"
+              data-testid="input-zepto-send-mail-token-2"
+            />
+            <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowToken2(s => !s)}>
+              {showToken2 ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Optional backup. If token 1 is rejected with authorization failure, the server retries with token 2.
           </p>
         </div>
 

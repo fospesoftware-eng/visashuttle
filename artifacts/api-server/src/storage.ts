@@ -2134,9 +2134,10 @@ export class MemStorage implements IStorage {
       bounceAddress: data.bounceAddress !== undefined ? data.bounceAddress : existing?.bounceAddress ?? null,
       replyToAddress: data.replyToAddress !== undefined ? data.replyToAddress : existing?.replyToAddress ?? null,
       sendMailToken: data.sendMailToken !== undefined ? data.sendMailToken : existing?.sendMailToken ?? null,
+      sendMailToken2: (data as any).sendMailToken2 !== undefined ? (data as any).sendMailToken2 : (existing as any)?.sendMailToken2 ?? null,
       enabled: data.enabled !== undefined ? !!data.enabled : existing?.enabled ?? false,
       updatedAt: new Date(),
-    };
+    } as ZeptoMailConfig;
     return this.zeptoMailConfigRecord;
   }
   async getEmailTemplates(audience = "b2c"): Promise<EmailTemplate[]> {
@@ -3462,11 +3463,22 @@ class HybridStorage extends MemStorage {
         bounce_address text,
         reply_to_address text,
         send_mail_token text,
+        send_mail_token_2 text,
         enabled boolean NOT NULL DEFAULT false,
         updated_at timestamp DEFAULT now()
       )
 	    `);
+    await db.execute(sql`ALTER TABLE zeptomail_config ADD COLUMN IF NOT EXISTS domain text NOT NULL DEFAULT 'visashuttle.com'`);
+    await db.execute(sql`ALTER TABLE zeptomail_config ADD COLUMN IF NOT EXISTS host text NOT NULL DEFAULT 'api.zeptomail.com'`);
+    await db.execute(sql`ALTER TABLE zeptomail_config ADD COLUMN IF NOT EXISTS agent_alias text DEFAULT '448141e4788dab46'`);
+    await db.execute(sql`ALTER TABLE zeptomail_config ADD COLUMN IF NOT EXISTS sender_address text NOT NULL DEFAULT 'notifications@visashuttle.com'`);
+    await db.execute(sql`ALTER TABLE zeptomail_config ADD COLUMN IF NOT EXISTS sender_name text NOT NULL DEFAULT 'Visa Shuttle'`);
     await db.execute(sql`ALTER TABLE zeptomail_config ADD COLUMN IF NOT EXISTS bounce_address text`);
+    await db.execute(sql`ALTER TABLE zeptomail_config ADD COLUMN IF NOT EXISTS reply_to_address text`);
+    await db.execute(sql`ALTER TABLE zeptomail_config ADD COLUMN IF NOT EXISTS send_mail_token text`);
+    await db.execute(sql`ALTER TABLE zeptomail_config ADD COLUMN IF NOT EXISTS send_mail_token_2 text`);
+    await db.execute(sql`ALTER TABLE zeptomail_config ADD COLUMN IF NOT EXISTS enabled boolean NOT NULL DEFAULT false`);
+    await db.execute(sql`ALTER TABLE zeptomail_config ADD COLUMN IF NOT EXISTS updated_at timestamp DEFAULT now()`);
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS email_templates (
         id varchar PRIMARY KEY DEFAULT gen_random_uuid(),

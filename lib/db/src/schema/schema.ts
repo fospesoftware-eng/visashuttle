@@ -645,6 +645,7 @@ export const zeptoMailConfig = pgTable("zeptomail_config", {
   bounceAddress: text("bounce_address"),
   replyToAddress: text("reply_to_address"),
   sendMailToken: text("send_mail_token"),
+  sendMailToken2: text("send_mail_token_2"),
   enabled: boolean("enabled").notNull().default(false),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
