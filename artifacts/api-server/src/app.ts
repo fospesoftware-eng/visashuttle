@@ -98,6 +98,7 @@ app.use(
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 app.use((req: Request, res: Response, next: NextFunction) => {
   if (SAFE_METHODS.has(req.method)) return next();
+  if (req.path.startsWith("/api/webhooks/")) return next();
 
   const origin = req.get("origin");
   if (origin) {

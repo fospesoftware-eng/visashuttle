@@ -6168,9 +6168,9 @@ export async function registerRoutes(
   app.post("/api/webhooks/cashfree", async (req, res) => {
     const event = req.body || {};
     const orderId = String(event?.data?.order?.order_id || event?.data?.order_id || event?.order_id || "").trim();
-    if (!orderId) return res.status(202).json({ received: true, ignored: "missing_order_id" });
+    if (!orderId) return res.json({ received: true, ignored: "missing_order_id" });
     if (!/^VS_(DEEP|PRO)_[a-zA-Z0-9_-]+$/.test(orderId)) {
-      return res.status(202).json({ received: true, ignored: "non_b2c_plan_order" });
+      return res.json({ received: true, ignored: "non_b2c_plan_order" });
     }
 
     const cfg = await storage.getPaymentGatewayConfig();
@@ -6191,20 +6191,24 @@ export async function registerRoutes(
       const data = await readCashfreeBody(response);
       if (!response.ok) {
         console.error("[Cashfree webhook] Verify order failed:", data);
-        return res.status(response.status >= 500 ? 503 : 202).json({ received: true, verified: false });
+        return res.status(response.status >= 500 ? 503 : 200).json({ received: true, verified: false });
       }
       if (data.order_status !== "PAID") {
         return res.json({ received: true, paid: false, status: data.order_status });
       }
       const userId = String(data?.order_tags?.user_id || event?.data?.order?.order_tags?.user_id || "").trim();
       const planKey = String(data?.order_tags?.plan_key || (orderId.startsWith("VS_PRO_") ? "pro" : "deep")).trim();
-      if (!userId) return res.status(202).json({ received: true, paid: true, ignored: "missing_user_id" });
+      if (!userId) return res.json({ received: true, paid: true, ignored: "missing_user_id" });
       await activateB2cPlanPurchase(userId, planKey);
       return res.json({ received: true, paid: true, orderId, planKey });
     } catch (err: any) {
       console.error("[Cashfree webhook] Error:", err);
       return res.status(503).json({ error: "Webhook verification failed" });
     }
+  });
+
+  app.get("/api/webhooks/cashfree", async (_req, res) => {
+    res.json({ received: true, endpoint: "cashfree" });
   });
 
   app.post("/api/webhooks/paypal", async (req, res) => {
