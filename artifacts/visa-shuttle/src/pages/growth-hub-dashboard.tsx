@@ -59,6 +59,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Logo, LogoMark } from "@/components/logo";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 type HubView = "dashboard" | "leads" | "campaigns" | "wallet" | "analytics" | "profile" | "billing" | "soon";
 type AdminHubView = "dashboard" | "businesses" | "leads" | "campaigns" | "wallets" | "billing" | "settings" | "soon";
@@ -110,27 +113,27 @@ const soonFeatures = [
 
 function statusClass(status: string) {
   const s = status.toLowerCase();
-  if (["active", "converted", "unlocked", "approved"].includes(s)) return "bg-emerald-100 text-emerald-700 border-0";
-  if (["new", "pending"].includes(s)) return "bg-blue-100 text-blue-700 border-0";
-  if (["paused", "locked"].includes(s)) return "bg-amber-100 text-amber-700 border-0";
-  if (["rejected", "suspended"].includes(s)) return "bg-red-100 text-red-700 border-0";
-  return "bg-slate-100 text-slate-700 border-0";
+  if (["active", "converted", "unlocked", "approved"].includes(s)) return "border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300";
+  if (["new", "pending"].includes(s)) return "border-0 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300";
+  if (["paused", "locked"].includes(s)) return "border-0 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300";
+  if (["rejected", "suspended", "failed"].includes(s)) return "border-0 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300";
+  return "border-0 bg-muted text-muted-foreground";
 }
 
 function Metric({ title, value, hint, icon: Icon }: { title: string; value: string; hint: string; icon: React.ElementType }) {
   return (
-    <Card className="border-slate-200 shadow-sm">
+    <Card className="border-border bg-card shadow-sm">
       <CardContent className="p-5">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-slate-500">{title}</p>
-            <p className="mt-2 text-2xl font-black text-slate-950 dark:text-white">{value}</p>
+            <p className="text-sm font-medium text-muted-foreground">{title}</p>
+            <p className="mt-2 text-2xl font-black text-foreground">{value}</p>
           </div>
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-[#4055FF] dark:bg-blue-950/40">
             <Icon className="h-5 w-5" />
           </div>
         </div>
-        <p className="mt-3 text-xs text-slate-500">{hint}</p>
+        <p className="mt-3 text-xs text-muted-foreground">{hint}</p>
       </CardContent>
     </Card>
   );
@@ -138,6 +141,7 @@ function Metric({ title, value, hint, icon: Icon }: { title: string; value: stri
 
 function BusinessShell({ view, children }: { view: HubView; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const nav = [
     ["dashboard", "Dashboard", Gauge],
     ["leads", "Leads", Inbox],
@@ -149,11 +153,26 @@ function BusinessShell({ view, children }: { view: HubView; children: React.Reac
     ["soon", "Coming Soon", Lock],
   ] as const;
 
-  const Sidebar = (
-    <aside className="flex h-full w-72 shrink-0 flex-col border-r bg-white dark:bg-slate-950">
-      <div className="border-b p-5">
-        <Link href="/business/growth-hub" className="text-sm font-bold text-[#4055FF]">Visa Shuttle</Link>
-        <h1 className="mt-1 text-xl font-black text-slate-950 dark:text-white">Growth Hub</h1>
+  const Sidebar = ({ mobile = false }: { mobile?: boolean }) => (
+    <aside className={`flex h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300 ${mobile ? "w-64" : collapsed ? "w-16" : "w-64"}`}>
+      <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
+        {collapsed && !mobile ? <LogoMark /> : <Logo size="md" />}
+        {!mobile && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setCollapsed(!collapsed)}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className="hidden lg:flex"
+          >
+            {collapsed ? <Menu className="h-4 w-4" /> : <X className="h-4 w-4" />}
+          </Button>
+        )}
+        {mobile && (
+          <Button variant="ghost" size="icon" onClick={() => setOpen(false)} aria-label="Close menu">
+            <X className="h-5 w-5" />
+          </Button>
+        )}
       </div>
       <nav className="grid gap-1 p-3">
         {nav.map(([key, label, Icon]) => (
@@ -161,45 +180,68 @@ function BusinessShell({ view, children }: { view: HubView; children: React.Reac
             key={key}
             href={key === "dashboard" ? "/growth-hub" : `/growth-hub/${key}`}
             onClick={() => setOpen(false)}
-            className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition ${view === key ? "bg-[#4055FF] text-white" : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900"}`}
+            title={collapsed && !mobile ? label : undefined}
+            className={`flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors ${view === key ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"}`}
           >
-            <Icon className="h-4 w-4" />
-            {label}
+            <Icon className="h-5 w-5 shrink-0" />
+            {(!collapsed || mobile) && <span className="truncate">{label}</span>}
           </Link>
         ))}
       </nav>
-      <div className="mt-auto p-4">
+      <div className={`mt-auto border-t border-sidebar-border p-4 ${collapsed && !mobile ? "hidden" : ""}`}>
         <div className="rounded-2xl bg-gradient-to-br from-[#4055FF] to-[#00B4D8] p-4 text-white">
           <p className="text-sm font-bold">Credit Balance</p>
           <p className="mt-2 text-2xl font-black">2,840</p>
           <Button size="sm" className="mt-3 w-full bg-white text-[#4055FF] hover:bg-white/90">Add Credits</Button>
+        </div>
+        <div className="mt-3 flex items-center gap-3 rounded-xl px-2 py-2">
+          <Avatar className="h-8 w-8">
+            <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">GH</AvatarFallback>
+          </Avatar>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-sidebar-foreground">Growth Partner</p>
+            <p className="truncate text-xs text-sidebar-foreground/60">growth@visashuttle.com</p>
+          </div>
         </div>
       </div>
     </aside>
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-white">
+    <div className="min-h-screen bg-background text-foreground">
       <div className="flex min-h-screen">
-        <div className="hidden lg:block">{Sidebar}</div>
-        {open && <div className="fixed inset-0 z-50 bg-black/40 lg:hidden" onClick={() => setOpen(false)}><div className="h-full" onClick={(e) => e.stopPropagation()}>{Sidebar}</div></div>}
-        <div className="min-w-0 flex-1">
-          <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-white/90 px-4 backdrop-blur dark:bg-slate-950/90 lg:px-6">
+        <div className="hidden lg:block"><Sidebar /></div>
+        {open && (
+          <div className="fixed inset-0 z-50 bg-black/50 lg:hidden" onClick={() => setOpen(false)}>
+            <div className="h-full" onClick={(e) => e.stopPropagation()}><Sidebar mobile /></div>
+          </div>
+        )}
+        <div className="min-w-0 flex-1 transition-all duration-300">
+          <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b bg-background/95 px-4 backdrop-blur lg:px-6">
             <div className="flex items-center gap-3">
               <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setOpen(true)}><Menu className="h-5 w-5" /></Button>
+              <div className="relative hidden sm:block">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input placeholder="Search leads, campaigns…" className="w-64 bg-muted/50 pl-9" />
+              </div>
               <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Santamonica Study Abroad</p>
-                <h2 className="text-lg font-black">Growth Hub Dashboard</h2>
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Santamonica Study Abroad</p>
+                <h2 className="text-lg font-black text-foreground">Growth Hub</h2>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Badge className="hidden bg-emerald-100 text-emerald-700 sm:inline-flex">Wallet 2,840</Badge>
+              <ThemeToggle />
+              <Badge className="hidden border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 sm:inline-flex">Wallet 2,840</Badge>
               <Button size="sm" className="hidden border-0 text-white sm:inline-flex" style={{ background: brand }}><Plus className="mr-1 h-4 w-4" /> Add Credits</Button>
               <Button variant="ghost" size="icon"><Bell className="h-5 w-5" /></Button>
-              <Button variant="ghost" size="icon"><UserRound className="h-5 w-5" /></Button>
+              <Button variant="ghost" size="icon" className="rounded-full">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">GH</AvatarFallback>
+                </Avatar>
+              </Button>
             </div>
           </header>
-          <main className="mx-auto max-w-7xl p-4 lg:p-6">{children}</main>
+          <main className="mx-auto max-w-7xl p-4 md:p-6">{children}</main>
         </div>
       </div>
     </div>
