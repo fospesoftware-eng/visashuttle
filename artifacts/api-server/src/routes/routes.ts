@@ -5593,20 +5593,20 @@ export async function registerRoutes(
     }
     if (paypal && typeof paypal === "object") {
       if (paypal.mode !== undefined) patch.paypalMode = paypal.mode === "live" ? "live" : "sandbox";
-      if (paypal.testClientId !== undefined && !String(paypal.testClientId).includes("•")) {
-        patch.paypalTestClientId = paypal.testClientId || null;
+      if (paypal.testClientId !== undefined && String(paypal.testClientId).trim() && !String(paypal.testClientId).includes("•")) {
+        patch.paypalTestClientId = String(paypal.testClientId).trim();
       }
-      if (paypal.testClientSecret !== undefined && !String(paypal.testClientSecret).includes("•")) {
-        patch.paypalTestClientSecret = paypal.testClientSecret || null;
+      if (paypal.testClientSecret !== undefined && String(paypal.testClientSecret).trim() && !String(paypal.testClientSecret).includes("•")) {
+        patch.paypalTestClientSecret = String(paypal.testClientSecret).trim();
       }
-      if (paypal.liveClientId !== undefined && !String(paypal.liveClientId).includes("•")) {
-        patch.paypalLiveClientId = paypal.liveClientId || null;
+      if (paypal.liveClientId !== undefined && String(paypal.liveClientId).trim() && !String(paypal.liveClientId).includes("•")) {
+        patch.paypalLiveClientId = String(paypal.liveClientId).trim();
       }
-      if (paypal.liveClientSecret !== undefined && !String(paypal.liveClientSecret).includes("•")) {
-        patch.paypalLiveClientSecret = paypal.liveClientSecret || null;
+      if (paypal.liveClientSecret !== undefined && String(paypal.liveClientSecret).trim() && !String(paypal.liveClientSecret).includes("•")) {
+        patch.paypalLiveClientSecret = String(paypal.liveClientSecret).trim();
       }
-      if (paypal.webhookId !== undefined && !String(paypal.webhookId).includes("•")) {
-        patch.paypalWebhookId = paypal.webhookId || null;
+      if (paypal.webhookId !== undefined && String(paypal.webhookId).trim() && !String(paypal.webhookId).includes("•")) {
+        patch.paypalWebhookId = String(paypal.webhookId).trim();
       }
     }
 

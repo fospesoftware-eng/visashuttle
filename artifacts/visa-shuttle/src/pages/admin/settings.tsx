@@ -1147,7 +1147,7 @@ function PaymentGatewayCard({ section = "all" }: { section?: PaymentGatewaySecti
   }, [cfg]);
 
   const saveMutation = useMutation({
-    mutationFn: (data: typeof form) => apiRequest("POST", "/api/admin/payment-gateway-config", data),
+    mutationFn: (data: Partial<typeof form>) => apiRequest("POST", "/api/admin/payment-gateway-config", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-gateway-config"] });
       toast({ title: "Payment gateway saved", description: "Settings have been updated." });
@@ -1170,6 +1170,28 @@ function PaymentGatewayCard({ section = "all" }: { section?: PaymentGatewaySecti
       : section === "stripe"
         ? "Configure Stripe credentials for global card payment support."
         : "Configure Cashfree, Stripe, and PayPal credentials. The selected provider is used for B2C checkout and tenant subscription billing.";
+  const buildSavePayload = (): Partial<typeof form> => {
+    const base = { provider: form.provider };
+    if (section === "cashfree") {
+      return {
+        ...base,
+        mode: form.mode,
+        apiVersion: form.apiVersion,
+        testClientId: form.testClientId,
+        testClientSecret: form.testClientSecret,
+        liveClientId: form.liveClientId,
+        liveClientSecret: form.liveClientSecret,
+        webhookSecret: form.webhookSecret,
+      };
+    }
+    if (section === "stripe") {
+      return { ...base, stripe: form.stripe };
+    }
+    if (section === "paypal") {
+      return { ...base, paypal: form.paypal };
+    }
+    return form;
+  };
 
   return (
     <Card>
@@ -1707,7 +1729,7 @@ function PaymentGatewayCard({ section = "all" }: { section?: PaymentGatewaySecti
             </a>
           </div>
           <Button
-            onClick={() => saveMutation.mutate(form)}
+            onClick={() => saveMutation.mutate(buildSavePayload())}
             disabled={saveMutation.isPending}
             className="gap-2"
             data-testid="button-save-payment-gateway-config"
