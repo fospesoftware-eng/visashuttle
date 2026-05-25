@@ -3256,6 +3256,32 @@ class HybridStorage extends MemStorage {
     return rows.length > 0;
   }
 
+  private async ensureVisaToolChecksTable(): Promise<void> {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS visa_tool_checks (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id varchar NOT NULL,
+        tool_type text NOT NULL,
+        country text,
+        input_summary text,
+        uploaded_file_url text,
+        risk_score integer,
+        risk_level text,
+        claude_response_json jsonb,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`ALTER TABLE visa_tool_checks ADD COLUMN IF NOT EXISTS user_id varchar`);
+    await db.execute(sql`ALTER TABLE visa_tool_checks ADD COLUMN IF NOT EXISTS tool_type text`);
+    await db.execute(sql`ALTER TABLE visa_tool_checks ADD COLUMN IF NOT EXISTS country text`);
+    await db.execute(sql`ALTER TABLE visa_tool_checks ADD COLUMN IF NOT EXISTS input_summary text`);
+    await db.execute(sql`ALTER TABLE visa_tool_checks ADD COLUMN IF NOT EXISTS uploaded_file_url text`);
+    await db.execute(sql`ALTER TABLE visa_tool_checks ADD COLUMN IF NOT EXISTS risk_score integer`);
+    await db.execute(sql`ALTER TABLE visa_tool_checks ADD COLUMN IF NOT EXISTS risk_level text`);
+    await db.execute(sql`ALTER TABLE visa_tool_checks ADD COLUMN IF NOT EXISTS claude_response_json jsonb`);
+    await db.execute(sql`ALTER TABLE visa_tool_checks ADD COLUMN IF NOT EXISTS created_at timestamp DEFAULT now()`);
+  }
+
   // Visa Checks — persisted to DB
   async createVisaCheck(check: InsertVisaCheck): Promise<VisaCheck> {
     const rows = await db.insert(visaChecks).values(check).returning();
@@ -3272,21 +3298,59 @@ class HybridStorage extends MemStorage {
   }
 
   async createVisaToolCheck(check: InsertVisaToolCheck): Promise<VisaToolCheck> {
-    const rows = await db.insert(visaToolChecks).values(check).returning();
-    return rows[0];
+    try {
+      const rows = await db.insert(visaToolChecks).values(check).returning();
+      return rows[0];
+    } catch (error) {
+      if (isMissingRelationError(error) || isMissingColumnError(error)) {
+        await this.ensureVisaToolChecksTable();
+        const rows = await db.insert(visaToolChecks).values(check).returning();
+        return rows[0];
+      }
+      if (shouldUseMemoryFallback(error)) return super.createVisaToolCheck(check);
+      throw error;
+    }
   }
 
   async getVisaToolChecksByUserId(userId: string): Promise<VisaToolCheck[]> {
-    return db.select().from(visaToolChecks).where(eq(visaToolChecks.userId, userId)).orderBy(desc(visaToolChecks.createdAt));
+    try {
+      return await db.select().from(visaToolChecks).where(eq(visaToolChecks.userId, userId)).orderBy(desc(visaToolChecks.createdAt));
+    } catch (error) {
+      if (isMissingRelationError(error) || isMissingColumnError(error)) {
+        await this.ensureVisaToolChecksTable();
+        return await db.select().from(visaToolChecks).where(eq(visaToolChecks.userId, userId)).orderBy(desc(visaToolChecks.createdAt));
+      }
+      if (shouldUseMemoryFallback(error)) return super.getVisaToolChecksByUserId(userId);
+      throw error;
+    }
   }
 
   async getVisaToolCheck(id: string): Promise<VisaToolCheck | undefined> {
-    const rows = await db.select().from(visaToolChecks).where(eq(visaToolChecks.id, id)).limit(1);
-    return rows[0];
+    try {
+      const rows = await db.select().from(visaToolChecks).where(eq(visaToolChecks.id, id)).limit(1);
+      return rows[0];
+    } catch (error) {
+      if (isMissingRelationError(error) || isMissingColumnError(error)) {
+        await this.ensureVisaToolChecksTable();
+        const rows = await db.select().from(visaToolChecks).where(eq(visaToolChecks.id, id)).limit(1);
+        return rows[0];
+      }
+      if (shouldUseMemoryFallback(error)) return super.getVisaToolCheck(id);
+      throw error;
+    }
   }
 
   async getAllVisaToolChecks(): Promise<VisaToolCheck[]> {
-    return db.select().from(visaToolChecks).orderBy(desc(visaToolChecks.createdAt));
+    try {
+      return await db.select().from(visaToolChecks).orderBy(desc(visaToolChecks.createdAt));
+    } catch (error) {
+      if (isMissingRelationError(error) || isMissingColumnError(error)) {
+        await this.ensureVisaToolChecksTable();
+        return await db.select().from(visaToolChecks).orderBy(desc(visaToolChecks.createdAt));
+      }
+      if (shouldUseMemoryFallback(error)) return super.getAllVisaToolChecks();
+      throw error;
+    }
   }
 
   // Saved Profiles — persisted to DB
