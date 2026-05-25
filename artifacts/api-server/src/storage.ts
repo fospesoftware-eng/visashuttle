@@ -3874,15 +3874,36 @@ class HybridStorage extends MemStorage {
         updated_at timestamp DEFAULT now()
       )
     `);
+    await db.execute(sql`ALTER TABLE b2c_credit_orders ADD COLUMN IF NOT EXISTS user_id varchar`);
+    await db.execute(sql`ALTER TABLE b2c_credit_orders ADD COLUMN IF NOT EXISTS order_id text`);
+    await db.execute(sql`ALTER TABLE b2c_credit_orders ADD COLUMN IF NOT EXISTS credits integer NOT NULL DEFAULT 0`);
+    await db.execute(sql`ALTER TABLE b2c_credit_orders ADD COLUMN IF NOT EXISTS amount integer NOT NULL DEFAULT 0`);
+    await db.execute(sql`ALTER TABLE b2c_credit_orders ADD COLUMN IF NOT EXISTS currency text NOT NULL DEFAULT 'USD'`);
+    await db.execute(sql`ALTER TABLE b2c_credit_orders ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'created'`);
+    await db.execute(sql`ALTER TABLE b2c_credit_orders ADD COLUMN IF NOT EXISTS credited_at timestamp`);
+    await db.execute(sql`ALTER TABLE b2c_credit_orders ADD COLUMN IF NOT EXISTS created_at timestamp DEFAULT now()`);
+    await db.execute(sql`ALTER TABLE b2c_credit_orders ADD COLUMN IF NOT EXISTS updated_at timestamp DEFAULT now()`);
+    await db.execute(sql`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'b2c_credit_orders_order_id_unique'
+        ) THEN
+          ALTER TABLE b2c_credit_orders ADD CONSTRAINT b2c_credit_orders_order_id_unique UNIQUE (order_id);
+        END IF;
+      EXCEPTION WHEN duplicate_table THEN
+        NULL;
+      END $$;
+    `);
   }
 
   async getB2cCreditOrdersByUserId(userId: string): Promise<B2cCreditOrder[]> {
     try {
       return await db.select().from(b2cCreditOrdersTable).where(eq(b2cCreditOrdersTable.userId, userId)).orderBy(desc(b2cCreditOrdersTable.createdAt));
     } catch (error) {
-      if (isMissingRelationError(error)) {
+      if (isMissingRelationError(error) || isMissingColumnError(error)) {
         await this.ensureB2cCreditOrderTable();
-        return [];
+        return await db.select().from(b2cCreditOrdersTable).where(eq(b2cCreditOrdersTable.userId, userId)).orderBy(desc(b2cCreditOrdersTable.createdAt));
       }
       if (shouldUseMemoryFallback(error)) return super.getB2cCreditOrdersByUserId(userId);
       throw error;
@@ -3894,9 +3915,10 @@ class HybridStorage extends MemStorage {
       const rows = await db.select().from(b2cCreditOrdersTable).where(eq(b2cCreditOrdersTable.orderId, orderId)).limit(1);
       return rows[0];
     } catch (error) {
-      if (isMissingRelationError(error)) {
+      if (isMissingRelationError(error) || isMissingColumnError(error)) {
         await this.ensureB2cCreditOrderTable();
-        return undefined;
+        const rows = await db.select().from(b2cCreditOrdersTable).where(eq(b2cCreditOrdersTable.orderId, orderId)).limit(1);
+        return rows[0];
       }
       if (shouldUseMemoryFallback(error)) return super.getB2cCreditOrderByOrderId(orderId);
       throw error;
@@ -3908,7 +3930,7 @@ class HybridStorage extends MemStorage {
       const rows = await db.insert(b2cCreditOrdersTable).values(data).returning();
       return rows[0];
     } catch (error) {
-      if (isMissingRelationError(error)) {
+      if (isMissingRelationError(error) || isMissingColumnError(error)) {
         await this.ensureB2cCreditOrderTable();
         const rows = await db.insert(b2cCreditOrdersTable).values(data).returning();
         return rows[0];
@@ -3926,7 +3948,7 @@ class HybridStorage extends MemStorage {
         .returning();
       return rows[0];
     } catch (error) {
-      if (isMissingRelationError(error)) {
+      if (isMissingRelationError(error) || isMissingColumnError(error)) {
         await this.ensureB2cCreditOrderTable();
         return undefined;
       }
