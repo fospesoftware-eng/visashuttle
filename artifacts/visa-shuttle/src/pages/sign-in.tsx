@@ -43,6 +43,22 @@ function SignInProgressMark() {
   );
 }
 
+function BlendedSignInLogo() {
+  return (
+    <Link href="/" className="group relative inline-flex w-fit items-center">
+      <div className="absolute -inset-4 rounded-full bg-white/10 blur-2xl transition-opacity duration-500 group-hover:opacity-80" />
+      <div className="absolute -left-3 top-1/2 h-px w-24 -translate-y-1/2 bg-gradient-to-r from-transparent via-white/45 to-transparent opacity-70" />
+      <div className="absolute -right-7 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-white/70 shadow-[0_0_22px_rgba(255,255,255,0.85)] animate-pulse" />
+      <img
+        src="/visa-shuttle-logo-white.png"
+        alt="Visa Shuttle"
+        className="relative h-11 w-auto object-contain opacity-85 mix-blend-screen drop-shadow-[0_14px_34px_rgba(255,255,255,0.18)] transition duration-500 group-hover:opacity-100 group-hover:drop-shadow-[0_18px_42px_rgba(255,255,255,0.26)]"
+        data-testid="signin-logo"
+      />
+    </Link>
+  );
+}
+
 export default function SignInPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -74,7 +90,10 @@ export default function SignInPage() {
     <div className="min-h-screen flex flex-col lg:flex-row bg-background">
       {/* Left panel */}
       <div className="hidden lg:flex lg:w-[480px] xl:w-[520px] flex-col text-white p-10 xl:p-14 justify-between flex-shrink-0" style={{background:"linear-gradient(160deg,#4055FF 0%,#9033F5 50%,#FF2060 100%)"}}>
-        <SignInProgressMark />
+        <div className="space-y-12">
+          <BlendedSignInLogo />
+          <SignInProgressMark />
+        </div>
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/15 text-sm font-medium mb-8">
             <PlaneTakeoff className="w-3.5 h-3.5" />
