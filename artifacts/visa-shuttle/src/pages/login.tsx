@@ -4,16 +4,15 @@ import {
   ArrowRight,
   Eye,
   EyeOff,
-  FileCheck2,
   Fingerprint,
   Shield,
-  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import agencySigninPlane from "@/assets/agency-signin-paper-plane.png";
 
 function AgencyLoginMark({ compact = false }: { compact?: boolean }) {
   if (compact) {
@@ -29,27 +28,13 @@ function AgencyLoginMark({ compact = false }: { compact?: boolean }) {
   }
 
   return (
-    <div className="relative flex h-[420px] w-full max-w-[440px] items-center justify-center" aria-label="Agency workflow animation">
-      <div className="absolute h-72 w-72 rounded-full bg-[#4055FF]/10 blur-3xl" />
-      <div className="absolute h-52 w-52 rounded-full bg-[#FF2060]/10 blur-3xl [transform:translate(78px,70px)]" />
-
-      <div className="relative h-72 w-72 rounded-[3rem] border border-white/70 bg-white/45 shadow-2xl shadow-[#4055FF]/15 backdrop-blur-2xl">
-        <div className="absolute left-1/2 top-1/2 h-36 w-36 -translate-x-1/2 -translate-y-1/2 rounded-[2.25rem] bg-gradient-to-br from-[#4055FF] via-[#7137EA] to-[#FF2060] shadow-2xl shadow-[#4055FF]/25" />
-        <div className="absolute left-1/2 top-1/2 flex h-24 w-24 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[1.75rem] border border-white/25 bg-white/18 text-white shadow-xl backdrop-blur">
-          <FileCheck2 className="h-10 w-10" />
-        </div>
-
-        <div className="absolute left-7 top-7 flex h-16 w-16 animate-pulse items-center justify-center rounded-[1.35rem] border border-white/80 bg-white/85 text-[#4055FF] shadow-xl">
-          <Fingerprint className="h-7 w-7" />
-        </div>
-        <div className="absolute bottom-7 right-7 flex h-16 w-16 animate-pulse items-center justify-center rounded-[1.35rem] border border-white/80 bg-white/85 text-[#FF2060] shadow-xl [animation-delay:350ms]">
-          <Sparkles className="h-7 w-7" />
-        </div>
-        <div className="absolute right-9 top-8 h-3 w-3 rounded-full bg-[#FF2060]" />
-        <div className="absolute bottom-12 left-10 h-2.5 w-2.5 rounded-full bg-[#4055FF]" />
-        <div className="absolute left-1/2 top-6 h-2 w-20 -translate-x-1/2 rounded-full bg-white/70" />
-        <div className="absolute bottom-6 left-1/2 h-2 w-28 -translate-x-1/2 rounded-full bg-white/70" />
-      </div>
+    <div className="relative flex h-[420px] w-full max-w-[500px] items-center justify-center" aria-label="Visa Shuttle travel mark">
+      <img
+        src={agencySigninPlane}
+        alt="Visa Shuttle travel mark"
+        className="h-auto w-full max-w-[500px] object-contain"
+        loading="eager"
+      />
     </div>
   );
 }
