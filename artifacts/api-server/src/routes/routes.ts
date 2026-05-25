@@ -5241,11 +5241,10 @@ export async function registerRoutes(
       : payload.toolType === "fake_agency"
         ? [
           "This is a fake agency detector request.",
-          "Use official_registry_check as an MEA/eMigrate registered recruiting-agent signal when it is present.",
-          "Use unregistered_agency_grievance_check as a serious risk signal when matched.",
-          "If the agency is matched and status is Active, treat that as a positive indicator, but still assess impersonation, payment demands, unrealistic claims, mismatched contact details, and suspicious documents.",
-          "If the agency is matched but status is not Active, treat the status as a major risk signal.",
-          "If the agency appears in the unregistered-agency grievance list, clearly mention that status and recommend official verification before any payment.",
+          "The agencyName field is the primary agency identity selected from the dropdown or entered manually. Always consider that agency name in the analysis.",
+          "Use official_registry_check as a positive MEA/eMigrate registered recruiting-agent signal whenever matched. Registered agencies should improve the trust assessment, while still checking for impersonation, fake contact details, payment pressure, and suspicious documents.",
+          "Use unregistered_agency_grievance_check as a strong negative signal when matched. Clearly mention the grievance count and status in red flags and next steps.",
+          "If an agency appears in both sources, the unregistered grievance match must remain a serious negative risk factor, but still mention the registered-agent signal separately.",
           "If no match is found for an India-based recruiting agency, mention that no MEA/eMigrate RA match was found.",
         ].join(" ")
       : "";
@@ -5281,12 +5280,12 @@ export async function registerRoutes(
         const statusLine = registry.matched
           ? `MEA/eMigrate RA registry match: ${registry.agency_name || "Registered Agent"} (${registry.raid || "RA ID not listed"}) - status: ${registry.status}; source updated as on ${registry.updated_as_on}.`
           : `MEA/eMigrate RA registry check: ${registry.status}; source updated as on ${registry.updated_as_on}. ${registry.note}`;
-        if (registry.matched && registry.is_active) {
-          result.risk_score = Math.min(result.risk_score, 55);
+        if (registry.matched) {
+          result.risk_score = Math.min(result.risk_score, registry.is_active ? 50 : 60);
           result.risk_level = normalizeRiskLevel("", result.risk_score);
           result.positive_indicators = [statusLine, ...result.positive_indicators].slice(0, 12);
         } else {
-          result.risk_score = Math.max(result.risk_score, registry.matched ? 70 : 55);
+          result.risk_score = Math.max(result.risk_score, 55);
           result.risk_level = normalizeRiskLevel("", result.risk_score);
           result.red_flags = [statusLine, ...result.red_flags].slice(0, 12);
         }
@@ -5296,12 +5295,14 @@ export async function registerRoutes(
         const grievance = meaUnregisteredCheck as any;
         result.unregistered_agency_grievance_check = grievance;
         if (grievance.matched) {
-          const grievanceLine = `Unregistered-agency grievance list match: ${grievance.agency_name || "Agency"} - status: ${grievance.status}; grievances: ${grievance.grievance_count ?? "listed"}; source updated as on ${grievance.updated_as_on}.`;
-          result.risk_score = Math.max(result.risk_score, 85);
+          const grievanceCount = Number(grievance.grievance_count || 0);
+          const grievanceLine = `Unregistered-agency grievance list match: ${grievance.agency_name || "Agency"} - status: ${grievance.status}; grievance count: ${grievance.grievance_count ?? "listed"}; source updated as on ${grievance.updated_as_on}.`;
+          result.risk_score = Math.max(result.risk_score, grievanceCount >= 3 ? 95 : grievanceCount >= 2 ? 90 : 85);
           result.risk_level = normalizeRiskLevel("", result.risk_score);
           result.red_flags = [grievanceLine, ...result.red_flags].slice(0, 12);
           result.recommended_next_steps = [
-            "Do not make any payment until the agency is verified through official MEA/eMigrate channels.",
+            `Treat the grievance-list match as a serious negative signal${grievance.grievance_count ? ` (${grievance.grievance_count} grievance${grievance.grievance_count === 1 ? "" : "s"} recorded)` : ""}; do not make any payment until independently verified.`,
+            "Verify the agency directly through official MEA/eMigrate channels and confirm the exact contact person, bank account, and offer details.",
             ...result.recommended_next_steps,
           ].slice(0, 10);
         }
