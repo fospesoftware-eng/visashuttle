@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link } from "wouter";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation } from "wouter";
 import {
   Activity,
   ArrowUpRight,
@@ -338,6 +338,13 @@ function ComingSoonGrid() {
 }
 
 export function GrowthHubDashboardPage({ view = "dashboard" }: { view?: HubView }) {
+  const [, setLocation] = useLocation();
+  useEffect(() => {
+    if (localStorage.getItem("growth_hub_demo_session") !== "true") {
+      setLocation("/growth-hub/login");
+    }
+  }, [setLocation]);
+
   const content = {
     dashboard: <Overview />,
     leads: <LeadTable />,

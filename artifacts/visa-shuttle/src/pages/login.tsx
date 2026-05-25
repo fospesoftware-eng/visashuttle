@@ -6,6 +6,7 @@ import {
   EyeOff,
   FileCheck2,
   Fingerprint,
+  Megaphone,
   Shield,
   Sparkles,
 } from "lucide-react";
@@ -14,6 +15,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+
+const GROWTH_HUB_DEMO_EMAIL = "growth@visashuttle.com";
+const GROWTH_HUB_DEMO_PASSWORD = "Growth@123";
 
 function AgencyLoginMark({ compact = false }: { compact?: boolean }) {
   if (compact) {
@@ -57,6 +61,8 @@ function AgencyLoginMark({ compact = false }: { compact?: boolean }) {
 export default function LoginPage() {
   const [, setLocation] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
+  const initialMode = typeof window !== "undefined" && window.location.pathname.startsWith("/growth-hub/login") ? "growth" : "agency";
+  const [loginMode, setLoginMode] = useState<"agency" | "growth">(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -67,6 +73,23 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     setError("");
+
+    if (loginMode === "growth") {
+      if (email.trim().toLowerCase() !== GROWTH_HUB_DEMO_EMAIL || password !== GROWTH_HUB_DEMO_PASSWORD) {
+        setError("Invalid Growth Hub demo username or password");
+        setIsLoading(false);
+        return;
+      }
+      localStorage.setItem("growth_hub_demo_session", "true");
+      localStorage.setItem("growth_hub_business_name", "Santamonica Study Abroad");
+      toast({
+        title: "Welcome to Growth Hub",
+        description: "Demo business dashboard loaded with sample leads and campaign data.",
+      });
+      setLocation("/growth-hub");
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const res = await fetch("/api/auth/login", {
@@ -125,13 +148,15 @@ export default function LoginPage() {
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-[#4055FF]/12 bg-white/70 px-4 py-2 text-sm font-bold text-[#4055FF]">
                 <span className="h-2 w-2 rounded-full bg-[#FF2060]" />
-                Visa Shuttle Agency
+                Visa Shuttle {loginMode === "growth" ? "Growth Hub" : "Agency"}
               </div>
               <h1 className="mt-8 max-w-lg text-5xl font-black leading-[1] tracking-tight text-[#101A4D]">
-                One quiet place to run every visa case.
+                {loginMode === "growth" ? "Turn visa intent into business growth." : "One quiet place to run every visa case."}
               </h1>
               <p className="mt-5 max-w-md text-base leading-7 text-slate-600">
-                Leads, proposals, documents, payments, and customer portals arranged into a focused agency workspace.
+                {loginMode === "growth"
+                  ? "Lead exchange, display campaigns, credit wallet, and analytics for travel and immigration businesses."
+                  : "Leads, proposals, documents, payments, and customer portals arranged into a focused agency workspace."}
               </p>
             </div>
 
@@ -139,7 +164,9 @@ export default function LoginPage() {
 
             <div className="flex items-center justify-between border-t border-slate-200/80 pt-6">
               <p className="max-w-xs text-sm leading-6 text-slate-500">
-                Built for agencies that need clear work queues and cleaner customer handoffs.
+                {loginMode === "growth"
+                  ? "Built for partners who want targeted visibility after visa approval chance checks."
+                  : "Built for agencies that need clear work queues and cleaner customer handoffs."}
               </p>
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#101A4D] text-white">
                 <ArrowRight className="h-4 w-4" />
@@ -152,7 +179,7 @@ export default function LoginPage() {
               <div className="mb-7 flex items-center gap-4 lg:hidden">
                 <AgencyLoginMark compact />
                 <div>
-                  <p className="text-sm font-bold uppercase text-[#4055FF]">Agency login</p>
+                  <p className="text-sm font-bold uppercase text-[#4055FF]">{loginMode === "growth" ? "Growth Hub login" : "Agency login"}</p>
                   <h1 className="text-2xl font-black tracking-tight">Visa Shuttle</h1>
                 </div>
               </div>
@@ -160,9 +187,50 @@ export default function LoginPage() {
               <div className="mb-7">
                 <h2 className="text-4xl font-black tracking-tight text-[#101A4D]">Log in</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-500">
-                  Access your agency dashboard.
+                  {loginMode === "growth" ? "Access your Growth Hub business dashboard." : "Access your agency dashboard."}
                 </p>
               </div>
+
+              <div className="mb-6 grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-1">
+                <button
+                  type="button"
+                  onClick={() => { setLoginMode("agency"); setError(""); }}
+                  className={`rounded-xl px-3 py-2 text-sm font-black transition ${loginMode === "agency" ? "bg-white text-[#101A4D] shadow-sm" : "text-slate-500 hover:text-slate-900"}`}
+                >
+                  Agency CRM
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setLoginMode("growth"); setError(""); setEmail(GROWTH_HUB_DEMO_EMAIL); setPassword(GROWTH_HUB_DEMO_PASSWORD); }}
+                  className={`rounded-xl px-3 py-2 text-sm font-black transition ${loginMode === "growth" ? "bg-white text-[#101A4D] shadow-sm" : "text-slate-500 hover:text-slate-900"}`}
+                >
+                  Growth Hub
+                </button>
+              </div>
+
+              {loginMode === "growth" && (
+                <div className="mb-5 rounded-2xl border border-[#4055FF]/15 bg-[#4055FF]/5 p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#4055FF]/10 text-[#4055FF]">
+                      <Megaphone className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-black text-slate-800">Growth Hub demo login</p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">Username: <span className="font-bold text-slate-700">{GROWTH_HUB_DEMO_EMAIL}</span></p>
+                      <p className="text-xs leading-5 text-slate-500">Password: <span className="font-bold text-slate-700">{GROWTH_HUB_DEMO_PASSWORD}</span></p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-3 h-8 rounded-xl"
+                        onClick={() => { setEmail(GROWTH_HUB_DEMO_EMAIL); setPassword(GROWTH_HUB_DEMO_PASSWORD); }}
+                      >
+                        Use demo credentials
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <form onSubmit={handleSubmit} className="space-y-5">
                 {error && (
@@ -176,7 +244,7 @@ export default function LoginPage() {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="agency@example.com"
+                    placeholder={loginMode === "growth" ? GROWTH_HUB_DEMO_EMAIL : "agency@example.com"}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -197,7 +265,7 @@ export default function LoginPage() {
                     <Input
                       id="password"
                       type={showPassword ? "text" : "password"}
-                      placeholder="Enter your password"
+                      placeholder={loginMode === "growth" ? GROWTH_HUB_DEMO_PASSWORD : "Enter your password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
@@ -246,17 +314,19 @@ export default function LoginPage() {
                   <div>
                     <p className="text-sm font-bold text-slate-800">Protected agency workspace</p>
                     <p className="mt-1 text-xs leading-5 text-slate-500">
-                      Your agency session is secured and routed to the right dashboard based on your role.
+                      {loginMode === "growth"
+                        ? "Demo Growth Hub opens with sample leads, campaigns, wallet, analytics, and billing data."
+                        : "Your agency session is secured and routed to the right dashboard based on your role."}
                     </p>
                   </div>
                 </div>
               </div>
 
               <p className="mt-6 text-center text-sm text-slate-500">
-                New agency?{" "}
-                <Link href="/business/agency-crm/signup">
+                {loginMode === "growth" ? "Need Growth Hub access? " : "New agency? "}
+                <Link href={loginMode === "growth" ? "/business/growth-hub" : "/business/agency-crm/signup"}>
                   <a className="font-bold text-[#4055FF] hover:underline" data-testid="link-signup">
-                    Create agency account
+                    {loginMode === "growth" ? "View Growth Hub" : "Create agency account"}
                   </a>
                 </Link>
               </p>

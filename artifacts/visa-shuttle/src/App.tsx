@@ -147,6 +147,7 @@ function Router() {
       <Route path="/business/agentic-visa-ai" component={AgenticVisaAiPage} />
       <Route path="/business/growth-hub" component={GrowthHubPage} />
       <Route path="/business" component={BusinessPage} />
+      <Route path="/growth-hub/login" component={LoginPage} />
       <Route path="/growth-hub/leads">{() => <GrowthHubDashboardPage view="leads" />}</Route>
       <Route path="/growth-hub/campaigns">{() => <GrowthHubDashboardPage view="campaigns" />}</Route>
       <Route path="/growth-hub/wallet">{() => <GrowthHubDashboardPage view="wallet" />}</Route>
