@@ -122,7 +122,7 @@ const valueProps = [
   { icon: FileCheck, title: "Faster application handling" },
   { icon: MessageSquare, title: "Automated customer communication" },
   { icon: Users, title: "Built for agencies and consultants" },
-  { icon: BarChart3, title: "Scalable CRM plus visa automation" },
+  { icon: BarChart3, title: "Scalable Visa Desk plus visa automation" },
   { icon: ShieldCheck, title: "Modern cloud-based infrastructure" },
   { icon: WalletCards, title: "India-friendly UPI, QR and online payments" },
 ];
@@ -164,7 +164,7 @@ function FeatureValue({ value }: { value: boolean | string }) {
   return <span className="text-sm font-semibold text-foreground">{value}</span>;
 }
 
-export default function AgencyCrmPage() {
+export default function VisaDeskPage() {
   const [currencyCode, setCurrencyCode] = useState<CurrencyCode>("USD");
   const curr = CURRENCIES.find((c) => c.code === currencyCode)!;
 
@@ -175,18 +175,18 @@ export default function AgencyCrmPage() {
         <div className="relative mx-auto grid max-w-7xl gap-10 px-4 py-16 md:grid-cols-[1.05fr_0.95fr] md:items-center md:py-20">
           <div>
             <Badge className="mb-5 border-[#4055FF]/15 bg-white text-[#4055FF] shadow-sm hover:bg-white">
-              Agency CRM Pricing
+              Visa Desk Pricing
             </Badge>
             <h1 className="max-w-3xl text-4xl font-black tracking-tight text-[#15236B] md:text-6xl">
-              A modern visa CRM for agencies that want cleaner growth.
+              A modern Visa Desk for agencies that want cleaner growth.
             </h1>
             <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
               Manage leads, proposals, applications, documents, payments and customer communication from one clean workspace.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link href="/business/agency-crm/signup">
+              <Link href="/business/visa-desk/signup">
                 <Button size="lg" className="gap-2 rounded-2xl border-0 text-white shadow-lg shadow-[#4055FF]/20 hover:opacity-90" style={{ background: "linear-gradient(135deg,#4055FF,#9033F5,#FF2060)" }}>
-                  Start agency CRM
+                  Start Visa Desk
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
@@ -236,7 +236,7 @@ export default function AgencyCrmPage() {
                   <Badge className="border-0 bg-[#4055FF] text-white">Best value</Badge>
                 </div>
                 <div className="mt-5 grid grid-cols-3 gap-2 text-center text-xs text-foreground">
-                  {["CRM", "Payments", "SMS"].map((item) => (
+                  {["Visa Desk", "Payments", "SMS"].map((item) => (
                     <div key={item} className="rounded-lg border bg-background/70 px-2 py-3 font-semibold">{item}</div>
                   ))}
                 </div>
@@ -250,7 +250,7 @@ export default function AgencyCrmPage() {
         <div className="mb-9 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-muted-foreground">Plans</p>
-            <h2 className="mt-2 text-3xl font-black tracking-tight md:text-4xl">Choose the CRM plan that fits your agency</h2>
+            <h2 className="mt-2 text-3xl font-black tracking-tight md:text-4xl">Choose the Visa Desk plan that fits your agency</h2>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center md:flex-col md:items-end">
             <DropdownMenu>
@@ -300,7 +300,7 @@ export default function AgencyCrmPage() {
                   <span className="text-4xl font-black tracking-tight">{convertPrice(plan.usdPrice, curr)}</span>
                   <span className="pb-1 text-sm font-medium text-muted-foreground">{plan.period}</span>
                 </div>
-                <Link href={`/business/agency-crm/signup?plan=${plan.name.toLowerCase()}`}>
+                <Link href={`/business/visa-desk/signup?plan=${plan.name.toLowerCase()}`}>
                   <Button className="mt-6 w-full gap-2 border-0 text-white hover:opacity-90" style={{ background: plan.buttonGradient }}>
                     Get {plan.name}
                     <ArrowRight className="h-4 w-4" />
@@ -388,7 +388,7 @@ export default function AgencyCrmPage() {
                 <span className="inline-flex items-center gap-2"><Headphones className="h-4 w-4" /> Support</span>
               </div>
             </div>
-            <Link href="/business/agency-crm/signup">
+            <Link href="/business/visa-desk/signup">
               <Button size="lg" className="gap-2 border-0 text-white hover:opacity-90" style={{ background: "linear-gradient(135deg,#4055FF,#9033F5,#FF2060)" }}>
                 Create agency account
                 <ArrowRight className="h-4 w-4" />

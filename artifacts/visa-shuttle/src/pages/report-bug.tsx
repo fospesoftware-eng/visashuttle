@@ -109,7 +109,7 @@ export default function ReportBugPage() {
                         <SelectItem value="website">Website</SelectItem>
                         <SelectItem value="b2c-dashboard">B2C Dashboard</SelectItem>
                         <SelectItem value="visa-tools">Visa Tools</SelectItem>
-                        <SelectItem value="agency-crm">Agency CRM</SelectItem>
+                        <SelectItem value="visa-desk">Visa Desk</SelectItem>
                         <SelectItem value="payments">Payments</SelectItem>
                         <SelectItem value="login">Login / Signup</SelectItem>
                       </SelectContent>

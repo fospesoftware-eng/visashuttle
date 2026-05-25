@@ -284,10 +284,10 @@ export default function AgencyRegisterPage() {
       <div className="mx-auto flex min-h-screen w-full max-w-6xl items-center">
         <div className="grid w-full gap-6 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
           <div className="hidden lg:block">
-            <Badge className="mb-4 border-0 bg-[#4055FF] text-white">Agency CRM</Badge>
+            <Badge className="mb-4 border-0 bg-[#4055FF] text-white">Visa Desk</Badge>
             <h1 className="text-4xl font-black tracking-tight">Launch your visa agency workspace in minutes.</h1>
             <p className="mt-4 max-w-md text-muted-foreground">
-              Capture agency details, select the right CRM plan, complete payment, and start managing leads, proposals and applications.
+              Capture agency details, select the right Visa Desk plan, complete payment, and start managing leads, proposals and applications.
             </p>
             <div className="mt-8 grid gap-3">
               {["Automatic agency creation", "Lite / Go / Power plan selection", "Online payment or offline admin activation"].map((item) => (
@@ -307,7 +307,7 @@ export default function AgencyRegisterPage() {
                 </div>
                 <div>
                   <CardTitle>Agency Signup</CardTitle>
-                  <CardDescription>Create and activate your agency CRM.</CardDescription>
+                  <CardDescription>Create and activate your Visa Desk.</CardDescription>
                 </div>
               </div>
               <div className="grid grid-cols-4 gap-2">

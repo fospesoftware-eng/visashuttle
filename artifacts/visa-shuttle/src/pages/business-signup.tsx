@@ -13,20 +13,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-type SignupType = "agency-crm" | "api" | "enterprise" | "whitelabel" | "agentic";
+type SignupType = "visa-desk" | "api" | "enterprise" | "whitelabel" | "agentic";
 
 const SALES_EMAIL = "hello@visashuttle.com";
 
 const signupContent = {
-  "agency-crm": {
-    title: "Start Agency CRM",
-    eyebrow: "Agency CRM signup",
-    description: "Tell us about your agency and preferred CRM plan. We will guide you through setup, payment, and activation.",
+  "visa-desk": {
+    title: "Start Visa Desk",
+    eyebrow: "Visa Desk signup",
+    description: "Tell us about your agency and preferred Visa Desk plan. We will guide you through setup, payment, and activation.",
     icon: Building2,
     plans: ["Lite", "Go", "Power"],
-    intentLabel: "Preferred CRM plan",
+    intentLabel: "Preferred Visa Desk plan",
     intentPlaceholder: "Select a plan",
-    outcome: "Agency workspace, CRM plan setup, payment guidance, and onboarding support.",
+    outcome: "Agency workspace, Visa Desk plan setup, payment guidance, and onboarding support.",
   },
   api: {
     title: "Request Business API Access",
@@ -240,8 +240,8 @@ export default function BusinessSignupPage({ type }: { type: SignupType }) {
   );
 }
 
-export function AgencyCrmSignupPage() {
-  return <BusinessSignupPage type="agency-crm" />;
+export function VisaDeskSignupPage() {
+  return <BusinessSignupPage type="visa-desk" />;
 }
 
 export function BusinessApiSignupPage() {

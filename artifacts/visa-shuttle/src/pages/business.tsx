@@ -297,14 +297,14 @@ const planCategories = [
     href: "/agency-register",
   },
   {
-    name: "Agency CRM",
+    name: "Visa Desk",
     icon: Building2,
     badge: "Best for visa teams",
     color: "from-[#4055FF] to-[#9033F5]",
     description: "Run leads, customers, proposals, documents, payments, and applications in one branded workspace.",
     plans: ["Lite · ₹1,999/mo", "Go · ₹3,999/mo", "Power · ₹7,999/mo"],
-    cta: "View CRM plans",
-    href: "/business/agency-crm",
+    cta: "View Visa Desk plans",
+    href: "/business/visa-desk",
     highlight: true,
   },
   {
@@ -337,7 +337,7 @@ function convertPrice(usdAmount: number, curr: typeof CURRENCIES[number]): strin
 
 const pricingPlans = [
   {
-    category: "Agency CRM",
+    category: "Visa Desk",
     name: "Starter",
     usdPrice: 49,
     period: "/mo",
@@ -347,7 +347,7 @@ const pricingPlans = [
     accent: false,
   },
   {
-    category: "Agency CRM",
+    category: "Visa Desk",
     name: "Professional",
     usdPrice: 149,
     period: "/mo",

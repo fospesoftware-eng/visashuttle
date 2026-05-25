@@ -10,10 +10,10 @@ const versions = [
     bullets: ["Fake Visa Detector and fraud-risk tools", "Free, Deep Check, and Pro plan detail pages", "Visa Tools credits and admin credit management"],
   },
   {
-    slug: "agency-crm-customer-portals",
+    slug: "visa-desk-customer-portals",
     version: "v1.7",
     date: "May 2026",
-    title: "Agency CRM proposal and customer portal improvements",
+    title: "Visa Desk proposal and customer portal improvements",
     bullets: ["Proposal links with customer upload flow", "Offline payment and agency branding settings", "Customer, leads, and application workflow refinements"],
   },
   {
@@ -37,7 +37,7 @@ export function VersionLogsPage() {
               Product releases, written clearly.
             </h1>
             <p className="text-lg leading-8 text-slate-600">
-              Follow major Visa Shuttle improvements across B2C visa intelligence, agency CRM, business APIs, payments, admin tools, and customer portals.
+              Follow major Visa Shuttle improvements across B2C visa intelligence, Visa Desk, business APIs, payments, admin tools, and customer portals.
             </p>
           </div>
         </div>

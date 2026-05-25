@@ -69,8 +69,8 @@ const offerContent = {
     gradient: "from-[#2438D9] via-[#4055FF] to-[#8B5CF6]",
     primaryCta: "Start Enterprise Enquiry",
     primaryHref: "/business/enterprise/signup",
-    secondaryCta: "Explore Agency CRM",
-    secondaryHref: "/business/agency-crm",
+    secondaryCta: "Explore Visa Desk",
+    secondaryHref: "/business/visa-desk",
     proof: ["Custom workflows", "Role-based teams", "Operational reporting"],
     features: [
       "Custom dashboards for teams, branches, and operations",
@@ -84,7 +84,7 @@ const offerContent = {
     ],
     workflow: [
       "Map your current visa operation and approval stages",
-      "Configure CRM modules, roles, checklists, payments, and reporting",
+      "Configure Visa Desk modules, roles, checklists, payments, and reporting",
       "Launch with onboarding, staff training, and ongoing product support",
     ],
     cards: [
@@ -102,8 +102,8 @@ const offerContent = {
     gradient: "from-[#4055FF] via-[#7C3AED] to-[#FF2060]",
     primaryCta: "Start Whitelabel Setup",
     primaryHref: "/business/whitelabel/signup",
-    secondaryCta: "See Agency CRM Plans",
-    secondaryHref: "/business/agency-crm",
+    secondaryCta: "See Visa Desk Plans",
+    secondaryHref: "/business/visa-desk",
     proof: ["Branded portal", "Customer proposal links", "Custom domain support"],
     features: [
       "Agency logo and brand appearance on customer-facing pages",
@@ -294,7 +294,7 @@ function BusinessOfferPage({ offerKey }: { offerKey: BusinessOfferKey }) {
             <div>
               <h2 className="text-2xl font-black tracking-tight md:text-4xl">Ready to build with Visa Shuttle?</h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-white/68">
-                Tell us your use case and we will guide you to the right business plan, API setup, CRM workflow, or enterprise implementation.
+                Tell us your use case and we will guide you to the right business plan, API setup, Visa Desk workflow, or enterprise implementation.
               </p>
             </div>
             <Link href={offer.primaryHref}>

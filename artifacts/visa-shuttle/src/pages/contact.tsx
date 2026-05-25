@@ -20,7 +20,7 @@ const TOPICS = [
   { value: "deep-check", label: "Deep Check" },
   { value: "pro-plan", label: "Pro Plan" },
   { value: "visa-tools", label: "Visa Tools" },
-  { value: "agency-crm", label: "Agency CRM" },
+  { value: "visa-desk", label: "Visa Desk" },
   { value: "business-api", label: "Business API" },
   { value: "billing", label: "Billing & Payments" },
   { value: "technical-support", label: "Technical Support" },
@@ -64,7 +64,7 @@ export default function ContactPage() {
             </div>
             <h1 className="text-4xl font-black tracking-tight text-slate-950 md:text-6xl">Talk to our team</h1>
             <p className="mt-5 max-w-2xl text-base leading-7 text-slate-600 md:text-lg">
-              Questions about visa checks, agency CRM, business API access, billing, or support? Send us a message and
+              Questions about visa checks, Visa Desk, business API access, billing, or support? Send us a message and
               the right team will follow up.
             </p>
           </div>

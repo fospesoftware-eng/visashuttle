@@ -81,7 +81,7 @@ export default function AboutPage() {
                   {[
                     ["Product", "Visa Shuttle"],
                     ["Company", "Fospe Software Private Limited"],
-                    ["Focus", "AI checks, agency CRM, APIs, white-label workflows"],
+                    ["Focus", "AI checks, Visa Desk, APIs, white-label workflows"],
                     ["Promise", "Clearer preparation before official submission"],
                   ].map(([label, value]) => (
                     <div key={label} className="flex flex-col justify-center border-b border-slate-100 pb-4 last:border-0 last:pb-0">
@@ -148,7 +148,7 @@ export default function AboutPage() {
         <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-3">
           {[
             { icon: ShieldCheck, title: "For individuals", body: "Basic checks, deep checks, fraud-risk tools, PDF reports, and check history for signed-in users." },
-            { icon: Building2, title: "For agencies", body: "CRM, customer portals, proposals, document uploads, invoicing, offline payments, and agency branding." },
+            { icon: Building2, title: "For agencies", body: "Visa Desk, customer portals, proposals, document uploads, invoicing, offline payments, and agency branding." },
             { icon: Globe2, title: "For platforms", body: "Business API, white-label solutions, enterprise workflows, and agentic visa AI for larger teams." },
           ].map(({ icon: Icon, title, body }) => (
             <div key={title} className="rounded-[2rem] border border-slate-200 bg-white p-7 shadow-sm">

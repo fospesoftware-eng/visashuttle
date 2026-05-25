@@ -197,7 +197,7 @@ export default function LoginPage() {
                   onClick={() => { setLoginMode("agency"); setError(""); }}
                   className={`rounded-xl px-3 py-2 text-sm font-black transition ${loginMode === "agency" ? "bg-white text-[#101A4D] shadow-sm" : "text-slate-500 hover:text-slate-900"}`}
                 >
-                  Agency CRM
+                  Visa Desk
                 </button>
                 <button
                   type="button"
@@ -324,7 +324,7 @@ export default function LoginPage() {
 
               <p className="mt-6 text-center text-sm text-slate-500">
                 {loginMode === "growth" ? "Need Growth Hub access? " : "New agency? "}
-                <Link href={loginMode === "growth" ? "/business/growth-hub" : "/business/agency-crm/signup"}>
+                <Link href={loginMode === "growth" ? "/business/growth-hub" : "/business/visa-desk/signup"}>
                   <a className="font-bold text-[#4055FF] hover:underline" data-testid="link-signup">
                     {loginMode === "growth" ? "View Growth Hub" : "Create agency account"}
                   </a>

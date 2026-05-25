@@ -29,7 +29,7 @@ export default function DataPolicyPage() {
           <Section title="1. Purpose">
             <p>
               This Data Policy explains how Visa Shuttle collects, processes, stores, protects, and deletes data used
-              across our AI visa checks, Visa Tools, Agency CRM, proposal links, payment workflows, and business APIs.
+              across our AI visa checks, Visa Tools, Visa Desk, proposal links, payment workflows, and business APIs.
             </p>
           </Section>
 
@@ -37,7 +37,7 @@ export default function DataPolicyPage() {
             <ul className="list-disc pl-5 space-y-1">
               <li>Account details such as name, email address, mobile number, and login metadata.</li>
               <li>Visa assessment inputs such as nationality, destination, travel purpose, employment, income, travel history, and documents.</li>
-              <li>Agency CRM data such as leads, customers, proposals, applications, invoices, document checklists, and team activity.</li>
+              <li>Visa Desk data such as leads, customers, proposals, applications, invoices, document checklists, and team activity.</li>
               <li>Uploaded files, including passport scans, visa documents, offer letters, screenshots, and supporting documents.</li>
               <li>Payment, subscription, and credit records, excluding full card details, which are handled by payment providers.</li>
               <li>Technical logs, device data, IP address, browser data, audit events, and API usage details.</li>
@@ -59,7 +59,7 @@ export default function DataPolicyPage() {
             <ul className="list-disc pl-5 space-y-1">
               <li>Account and transaction records are retained while the account is active and as required for legal, tax, or audit purposes.</li>
               <li>Visa check history and reports are retained to allow users to re-open past results unless deletion is requested.</li>
-              <li>Agency CRM records are retained for the agency workspace unless deleted by authorized users or required by law.</li>
+              <li>Visa Desk records are retained for the agency workspace unless deleted by authorized users or required by law.</li>
               <li>Temporary logs and diagnostics may be rotated or deleted periodically.</li>
             </ul>
           </Section>

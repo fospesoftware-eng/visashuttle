@@ -13,11 +13,11 @@ import { SiteFooter } from "@/components/site-footer";
 import NotFound from "@/pages/not-found";
 import HomePage from "@/pages/home";
 import BusinessPage from "@/pages/business";
-import AgencyCrmPage from "@/pages/agency-crm";
+import VisaDeskPage from "@/pages/visa-desk";
 import GrowthHubPage from "@/pages/growth-hub";
 import { AdminGrowthHubPage, GrowthHubDashboardPage } from "@/pages/growth-hub-dashboard";
 import { AgenticVisaAiPage, BusinessApiDetailPage, EnterpriseSolutionsPage, WhitelabelSolutionsPage } from "@/pages/business-detail";
-import { AgencyCrmSignupPage, AgenticSignupPage, BusinessApiSignupPage, EnterpriseSignupPage, WhitelabelSignupPage } from "@/pages/business-signup";
+import { AgenticSignupPage, BusinessApiSignupPage, EnterpriseSignupPage, VisaDeskSignupPage, WhitelabelSignupPage } from "@/pages/business-signup";
 import LoginPage from "@/pages/login";
 import SignupPage from "@/pages/signup";
 import JoinPage from "@/pages/join";
@@ -135,8 +135,8 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={HomePage} />
-      <Route path="/business/agency-crm/signup" component={AgencyCrmSignupPage} />
-      <Route path="/business/agency-crm" component={AgencyCrmPage} />
+      <Route path="/business/visa-desk/signup" component={VisaDeskSignupPage} />
+      <Route path="/business/visa-desk" component={VisaDeskPage} />
       <Route path="/business/api/signup" component={BusinessApiSignupPage} />
       <Route path="/business/api" component={BusinessApiDetailPage} />
       <Route path="/business/enterprise/signup" component={EnterpriseSignupPage} />

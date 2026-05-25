@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 
 const logs = [
   { version: "v1.8", title: "Visa Tools, credits, and B2C plan upgrades", status: "Published" },
-  { version: "v1.7", title: "Agency CRM proposal and customer portal improvements", status: "Published" },
+  { version: "v1.7", title: "Visa Desk proposal and customer portal improvements", status: "Published" },
   { version: "v1.6", title: "Payments, public policy pages, and business pages", status: "Published" },
 ];
 

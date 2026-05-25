@@ -18,7 +18,7 @@ const footerColumns = [
   {
     title: "For Business",
     links: [
-      { label: "Agency CRM", href: "/business/agency-crm" },
+      { label: "Visa Desk", href: "/business/visa-desk" },
       { label: "Growth Hub", href: "/business/growth-hub" },
       { label: "Business API", href: "/business/api" },
       { label: "Enterprise Solutions", href: "/business/enterprise" },

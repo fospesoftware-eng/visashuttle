@@ -39,7 +39,7 @@ export default function ThirdPartyIntegrationPolicyPage() {
               <li>Payment gateways for checkout, subscriptions, invoices, and credit purchases.</li>
               <li>Email and SMS providers for OTPs, transactional notifications, reports, and alerts.</li>
               <li>Cloud, database, file storage, logging, and monitoring services for platform operations.</li>
-              <li>Business APIs and agency tools, including CRM, white-label, and customer portal features.</li>
+              <li>Business APIs and agency tools, including Visa Desk, white-label, and customer portal features.</li>
             </ul>
           </Section>
 
