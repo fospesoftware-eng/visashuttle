@@ -50,19 +50,48 @@ type AgencySuggestion = {
 
 function AgencyNameDropdown({
   value,
+  manualMode,
   suggestions,
   search,
   onSearchChange,
   onSelect,
+  onManualMode,
+  onListMode,
+  onManualValueChange,
 }: {
   value: string;
+  manualMode: boolean;
   suggestions: AgencySuggestion[];
   search: string;
   onSearchChange: (value: string) => void;
   onSelect: (agency: AgencySuggestion) => void;
+  onManualMode: () => void;
+  onListMode: () => void;
+  onManualValueChange: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const selected = suggestions.find((agency) => agency.name === value);
+
+  if (manualMode) {
+    return (
+      <div className="space-y-2">
+        <Input
+          value={value}
+          onChange={(event) => onManualValueChange(event.target.value)}
+          placeholder="Enter agency name manually"
+        />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-auto px-0 text-xs font-semibold text-[#4055FF] hover:bg-transparent hover:text-[#2337E8]"
+          onClick={() => { onListMode(); onManualValueChange(""); onSearchChange(""); }}
+        >
+          Search uploaded agency list again
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <Popover open={open} onOpenChange={(next) => { setOpen(next); if (next) onSearchChange(value || search); }}>
@@ -90,6 +119,20 @@ function AgencyNameDropdown({
           <CommandList>
             <CommandEmpty>No agency found in uploaded lists.</CommandEmpty>
             <CommandGroup>
+              <CommandItem
+                value="none-of-the-above"
+                onSelect={() => {
+                  onManualMode();
+                  setOpen(false);
+                }}
+                className="items-start border-b border-border/70 py-3"
+              >
+                <Check className="mt-0.5 h-4 w-4 opacity-0" />
+                <div>
+                  <p className="font-semibold">None of the above</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Enter agency name manually</p>
+                </div>
+              </CommandItem>
               {suggestions.map((agency) => (
                 <CommandItem
                   key={`${agency.sourceType}-${agency.name}-${agency.raId || agency.state || ""}`}
@@ -117,6 +160,15 @@ function AgencyNameDropdown({
           </CommandList>
         </Command>
       </PopoverContent>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="mt-1 h-auto px-0 text-xs font-semibold text-[#4055FF] hover:bg-transparent hover:text-[#2337E8]"
+        onClick={onManualMode}
+      >
+        None of the above? Add manually
+      </Button>
       {selected && (
         <p className={cn(
           "mt-1.5 text-xs",
@@ -317,6 +369,7 @@ export default function VisaToolCheckPage() {
   const activeTool = tools.find((tool) => tool.type === params?.toolType);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [agencySearch, setAgencySearch] = useState("");
+  const [agencyManualMode, setAgencyManualMode] = useState(false);
   const [manualText, setManualText] = useState("");
   const [file, setFile] = useState<{ name: string; type: string; size: number; base64: string } | null>(null);
   const [result, setResult] = useState<VisaToolCheck | null>(null);
@@ -437,9 +490,16 @@ export default function VisaToolCheckPage() {
                     {activeTool.type === "fake_agency" && field.key === "agencyName" ? (
                       <AgencyNameDropdown
                         value={fields.agencyName || ""}
+                        manualMode={agencyManualMode}
                         suggestions={agencySuggestions}
                         search={agencySearch}
                         onSearchChange={setAgencySearch}
+                        onManualMode={() => {
+                          setAgencyManualMode(true);
+                          setFields((prev) => ({ ...prev, agencyName: agencySearch || prev.agencyName || "" }));
+                        }}
+                        onListMode={() => setAgencyManualMode(false)}
+                        onManualValueChange={(value) => setFields((prev) => ({ ...prev, agencyName: value }))}
                         onSelect={(agency) => setFields((prev) => ({
                           ...prev,
                           agencyName: agency.name,
