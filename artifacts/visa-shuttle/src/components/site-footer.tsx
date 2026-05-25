@@ -9,6 +9,7 @@ const footerColumns = [
       { label: "Deep Check", href: "/plans/deep-check" },
       { label: "Pro Plan", href: "/plans/pro" },
       { label: "Fake Visa Detector", href: "/visa-tools/fake_visa" },
+      { label: "Rejection Recovery", href: "/visa-tools/rejection_recovery" },
       { label: "Fake Agency Detector", href: "/visa-tools/fake_agency" },
       { label: "Fake Employment Detector", href: "/visa-tools/fake_employment_offer" },
     ],

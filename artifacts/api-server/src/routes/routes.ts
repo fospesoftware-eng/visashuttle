@@ -4902,12 +4902,14 @@ export async function registerRoutes(
   const visaToolRateLimit = new Map<string, number[]>();
   const VISA_TOOL_TYPES = new Set([
     "fake_visa",
+    "rejection_recovery",
     "fake_employment_offer",
     "fake_agency",
     "fake_visa_scheme",
   ]);
   const VISA_TOOL_LABELS: Record<string, string> = {
     fake_visa: "Fake Visa Detector",
+    rejection_recovery: "Rejection Recovery",
     fake_employment_offer: "Fake Employment Offer Letter Detector",
     fake_agency: "Fake Agency Detector",
     fake_visa_scheme: "Fake Visa Schemes",
@@ -5006,15 +5008,32 @@ export async function registerRoutes(
         "positive_indicators",
         "explanation",
         "recommended_next_steps",
+        ...(payload.toolType === "rejection_recovery" ? [
+          "real_refusal_reasons",
+          "wait_time_guidance",
+          "reapplication_strategy",
+          "documents_to_fix",
+        ] : []),
         "disclaimer",
       ],
     };
 
+    const toolSpecificInstruction = payload.toolType === "rejection_recovery"
+      ? [
+        "This is a visa refusal/rejection recovery analysis.",
+        "Decode the likely real refusal reasons from the rejection letter and applicant context.",
+        "Explain how long the applicant should generally wait before reapplying, based on whether the refusal issues can be fixed quickly. Do not invent official mandatory waiting periods unless stated in the document.",
+        "Build a practical reapplication strategy with evidence improvements, documents to fix, profile gaps, and timing.",
+        "Return extra JSON keys: real_refusal_reasons, wait_time_guidance, reapplication_strategy, documents_to_fix.",
+      ].join(" ")
+      : "";
+
     const content: any[] = [{
       type: "text",
       text: [
-        "Analyze this Visa Shuttle fraud-risk check request. Return strict JSON only, matching the expected schema.",
+        "Analyze this Visa Shuttle AI check request. Return strict JSON only, matching the expected schema.",
         "Never say the document, agency, offer, or scheme is 100% fake or 100% genuine. Use risk-based language only.",
+        toolSpecificInstruction,
         JSON.stringify(promptPayload, null, 2),
       ].join("\n\n"),
     }];
@@ -5044,7 +5063,7 @@ export async function registerRoutes(
       body: JSON.stringify({
         model,
         max_tokens: 4096,
-        system: "You are a visa fraud risk analysis assistant for Visa Shuttle. You do not provide legal confirmation. You analyze submitted text/documents for fraud indicators, inconsistencies, missing details, suspicious claims, formatting issues, and risk signals. Always return strict JSON only.",
+        system: "You are a visa risk and rejection recovery analysis assistant for Visa Shuttle. You do not provide legal confirmation, immigration advice, or government verification. You analyze submitted text/documents for refusal reasons, missing evidence, inconsistencies, fraud indicators, formatting issues, suspicious claims, and risk signals. Always return strict JSON only.",
         messages: [{ role: "user", content }],
       }),
     });
@@ -5067,7 +5086,11 @@ export async function registerRoutes(
       positive_indicators: Array.isArray(parsed.positive_indicators) ? parsed.positive_indicators.map(String).slice(0, 12) : [],
       explanation: String(parsed.explanation || ""),
       recommended_next_steps: Array.isArray(parsed.recommended_next_steps) ? parsed.recommended_next_steps.map(String).slice(0, 10) : [],
-      disclaimer: "This is an AI-assisted risk analysis only. Please verify with official government, employer, or registered agency sources.",
+      real_refusal_reasons: Array.isArray(parsed.real_refusal_reasons) ? parsed.real_refusal_reasons.map(String).slice(0, 10) : [],
+      wait_time_guidance: String(parsed.wait_time_guidance || ""),
+      reapplication_strategy: Array.isArray(parsed.reapplication_strategy) ? parsed.reapplication_strategy.map(String).slice(0, 10) : [],
+      documents_to_fix: Array.isArray(parsed.documents_to_fix) ? parsed.documents_to_fix.map(String).slice(0, 12) : [],
+      disclaimer: "This is an AI-assisted risk analysis only. Please verify with official government, employer, registered agency, or qualified immigration sources.",
     };
   }
 

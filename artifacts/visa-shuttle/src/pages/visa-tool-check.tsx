@@ -29,64 +29,92 @@ function ResultPanel({ check }: { check: VisaToolCheck | null }) {
   const output = check?.claudeResponseJson || {};
 
   return (
-    <Card className="border-0 shadow-sm">
+    <Card className="border border-slate-200 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
       <CardContent className="p-5">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
-            <h3 className="text-lg font-black text-slate-900">Result</h3>
-            <p className="text-sm text-slate-500">Confidence score, red flags and next steps</p>
+            <h3 className="text-lg font-black text-slate-950 dark:text-white">Result</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Confidence score, red flags and next steps</p>
           </div>
           {check && <Badge className={riskColor(check.riskLevel)}>{check.riskLevel || "Risk"}</Badge>}
         </div>
 
         {!check ? (
-          <div className="rounded-2xl border bg-slate-50 p-8 text-center">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center dark:border-slate-800 dark:bg-slate-950/50">
             <SearchCheck className="mx-auto mb-3 h-8 w-8 text-[#4055FF]" />
-            <p className="text-sm text-slate-500">Run this check to see the saved risk report here.</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Run this check to see the saved risk report here.</p>
           </div>
         ) : (
           <div className="space-y-5">
-            <div className="rounded-2xl border bg-gradient-to-br from-slate-50 to-white p-5">
+            <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-5 dark:border-slate-800 dark:from-slate-950/80 dark:to-slate-900">
               <div className="flex items-end justify-between">
                 <div>
-                  <p className="text-sm text-slate-500">Risk score</p>
-                  <p className="text-5xl font-black text-slate-900">{check.riskScore ?? output.risk_score ?? 0}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Risk score</p>
+                  <p className="text-5xl font-black text-slate-950 dark:text-white">{check.riskScore ?? output.risk_score ?? 0}</p>
                 </div>
-                <div className="text-right text-sm text-slate-500">0 lower risk<br />100 highest risk</div>
+                <div className="text-right text-sm text-slate-500 dark:text-slate-400">0 lower risk<br />100 highest risk</div>
               </div>
-              <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100">
+              <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                 <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-amber-400 to-red-500" style={{ width: `${check.riskScore ?? output.risk_score ?? 0}%` }} />
               </div>
             </div>
 
             <section>
-              <h4 className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-900"><ShieldAlert className="h-4 w-4 text-orange-500" /> Red flags</h4>
+              <h4 className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-950 dark:text-white"><ShieldAlert className="h-4 w-4 text-orange-500" /> Red flags</h4>
               <div className="space-y-2">
                 {(output.red_flags || []).length ? output.red_flags.map((item: string) => (
-                  <div key={item} className="rounded-lg border border-orange-100 bg-orange-50 px-3 py-2 text-sm text-orange-800">{item}</div>
-                )) : <p className="text-sm text-slate-500">No major red flags returned by AI.</p>}
+                  <div key={item} className="rounded-lg border border-orange-100 bg-orange-50 px-3 py-2 text-sm text-orange-800 dark:border-orange-800/70 dark:bg-orange-950/40 dark:text-orange-200">{item}</div>
+                )) : <p className="text-sm text-slate-500 dark:text-slate-400">No major red flags returned by AI.</p>}
               </div>
             </section>
 
+            {(output.real_refusal_reasons || []).length > 0 && (
+              <section>
+                <h4 className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-950 dark:text-white"><FileText className="h-4 w-4 text-[#4055FF]" /> Likely refusal reasons</h4>
+                <div className="space-y-2">
+                  {(output.real_refusal_reasons || []).map((item: string) => (
+                    <div key={item} className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-800 dark:border-blue-800/70 dark:bg-blue-950/40 dark:text-blue-200">{item}</div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             <section>
-              <h4 className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-900"><BadgeCheck className="h-4 w-4 text-emerald-500" /> Positive indicators</h4>
+              <h4 className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-950 dark:text-white"><BadgeCheck className="h-4 w-4 text-emerald-500" /> Positive indicators</h4>
               <div className="space-y-2">
                 {(output.positive_indicators || []).map((item: string) => (
-                  <div key={item} className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{item}</div>
+                  <div key={item} className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-800/70 dark:bg-emerald-950/40 dark:text-emerald-200">{item}</div>
                 ))}
               </div>
             </section>
 
-            <section className="rounded-xl border bg-slate-50 p-4">
-              <h4 className="mb-2 text-sm font-bold text-slate-900">Explanation</h4>
-              <p className="text-sm leading-6 text-slate-600">{output.explanation || output.summary}</p>
+            <section className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/50">
+              <h4 className="mb-2 text-sm font-bold text-slate-950 dark:text-white">Explanation</h4>
+              <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">{output.explanation || output.summary}</p>
             </section>
 
+            {(output.wait_time_guidance || output.reapplication_strategy?.length) && (
+              <section className="rounded-xl border border-[#4055FF]/20 bg-[#4055FF]/5 p-4 dark:border-[#4055FF]/30 dark:bg-[#4055FF]/10">
+                <h4 className="mb-2 text-sm font-bold text-slate-950 dark:text-white">Reapplication strategy</h4>
+                {output.wait_time_guidance && (
+                  <p className="mb-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{output.wait_time_guidance}</p>
+                )}
+                <div className="space-y-2">
+                  {(output.reapplication_strategy || []).map((item: string) => (
+                    <div key={item} className="flex gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">
+                      <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-[#4055FF]" />
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             <section>
-              <h4 className="mb-2 text-sm font-bold text-slate-900">Recommended next steps</h4>
+              <h4 className="mb-2 text-sm font-bold text-slate-950 dark:text-white">Recommended next steps</h4>
               <div className="space-y-2">
                 {(output.recommended_next_steps || []).map((item: string) => (
-                  <div key={item} className="flex gap-2 rounded-lg border bg-white px-3 py-2 text-sm text-slate-700">
+                  <div key={item} className="flex gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">
                     <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-[#4055FF]" />
                     {item}
                   </div>
@@ -94,11 +122,25 @@ function ResultPanel({ check }: { check: VisaToolCheck | null }) {
               </div>
             </section>
 
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
+            {(output.documents_to_fix || []).length > 0 && (
+              <section>
+                <h4 className="mb-2 text-sm font-bold text-slate-950 dark:text-white">Documents to fix</h4>
+                <div className="space-y-2">
+                  {(output.documents_to_fix || []).map((item: string) => (
+                    <div key={item} className="flex gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">
+                      <FileText className="mt-0.5 h-4 w-4 shrink-0 text-[#4055FF]" />
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800 dark:border-amber-800/70 dark:bg-amber-950/35 dark:text-amber-200">
               {output.disclaimer || "This is an AI-assisted risk analysis only. Please verify with official government or employer sources."}
             </div>
 
-            <Button variant="outline" className="gap-2" onClick={() => window.print()}>
+            <Button variant="outline" className="gap-2 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-100 dark:hover:bg-slate-800" onClick={() => window.print()}>
               <Download className="h-4 w-4" />
               Download Report PDF
             </Button>

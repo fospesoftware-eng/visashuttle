@@ -9,6 +9,7 @@ import {
   FileText,
   Globe2,
   Loader2,
+  RefreshCcw,
   ShieldCheck,
   ShieldAlert,
 } from "lucide-react";
@@ -18,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 
-type ToolType = "fake_visa" | "fake_employment_offer" | "fake_agency" | "fake_visa_scheme";
+type ToolType = "fake_visa" | "rejection_recovery" | "fake_employment_offer" | "fake_agency" | "fake_visa_scheme";
 
 export type VisaToolType = ToolType;
 
@@ -57,6 +58,22 @@ export const tools: Array<{
       { key: "issuingAuthority", label: "Issuing authority", placeholder: "Embassy / consulate / immigration office" },
       { key: "dateOfIssue", label: "Date of issue", type: "date" },
       { key: "dateOfExpiry", label: "Date of expiry", type: "date" },
+    ],
+  },
+  {
+    type: "rejection_recovery",
+    title: "Rejection Recovery",
+    description: "Upload your refusal letter to decode likely refusal reasons, wait-time guidance and a reapplication strategy.",
+    icon: RefreshCcw,
+    gradient: "from-[#4055FF] via-[#9033F5] to-[#FF2060]",
+    textLabel: "Paste refusal letter text, officer notes, refusal codes, application timeline or profile details",
+    fields: [
+      { key: "destinationCountry", label: "Destination country", placeholder: "Canada" },
+      { key: "visaType", label: "Visa type", placeholder: "Visitor visa" },
+      { key: "refusalDate", label: "Refusal date", type: "date" },
+      { key: "previousApplicationDate", label: "Previous application date", type: "date" },
+      { key: "applicantNationality", label: "Applicant nationality", placeholder: "India" },
+      { key: "mainRefusalReason", label: "Reason mentioned, if known", placeholder: "Purpose of visit / financial proof / ties to home country" },
     ],
   },
   {
