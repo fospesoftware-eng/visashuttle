@@ -6,6 +6,8 @@ import {
   ArrowLeft,
   ArrowRight,
   BadgeCheck,
+  Check,
+  ChevronsUpDown,
   Download,
   FileText,
   Loader2,
@@ -20,10 +22,114 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { riskColor, stripDataPrefix, tools, type VisaToolCheck } from "@/pages/visa-tools";
+
+type AgencySuggestion = {
+  name: string;
+  state?: string;
+  district?: string;
+  status?: string;
+  raId?: string;
+  source?: string;
+  sourceType?: "registered" | "grievance";
+  grievances?: number | null;
+};
+
+function AgencyNameDropdown({
+  value,
+  suggestions,
+  search,
+  onSearchChange,
+  onSelect,
+}: {
+  value: string;
+  suggestions: AgencySuggestion[];
+  search: string;
+  onSearchChange: (value: string) => void;
+  onSelect: (agency: AgencySuggestion) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = suggestions.find((agency) => agency.name === value);
+
+  return (
+    <Popover open={open} onOpenChange={(next) => { setOpen(next); if (next) onSearchChange(value || search); }}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="h-10 w-full justify-between bg-background px-3 font-normal"
+        >
+          <span className={cn("truncate text-left", !value && "text-muted-foreground")}>
+            {value || "Select agency from uploaded list"}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder="Search agency name..."
+            value={search}
+            onValueChange={onSearchChange}
+          />
+          <CommandList>
+            <CommandEmpty>No agency found in uploaded lists.</CommandEmpty>
+            <CommandGroup>
+              {suggestions.map((agency) => (
+                <CommandItem
+                  key={`${agency.sourceType}-${agency.name}-${agency.raId || agency.state || ""}`}
+                  value={agency.name}
+                  onSelect={() => {
+                    onSelect(agency);
+                    setOpen(false);
+                  }}
+                  className="items-start py-3"
+                >
+                  <Check className={cn("mt-0.5 h-4 w-4", value === agency.name ? "opacity-100" : "opacity-0")} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="truncate font-semibold">{agency.name}</span>
+                      {agency.raId && <Badge variant="outline" className="text-[10px]">{agency.raId}</Badge>}
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {[agency.source, agency.status, agency.state, agency.district].filter(Boolean).join(" · ")}
+                      {agency.grievances ? ` · ${agency.grievances} grievance${agency.grievances === 1 ? "" : "s"}` : ""}
+                    </p>
+                  </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+      {selected && (
+        <p className={cn(
+          "mt-1.5 text-xs",
+          selected.sourceType === "grievance" ? "text-red-600 dark:text-red-300" : "text-emerald-700 dark:text-emerald-300",
+        )}>
+          {selected.sourceType === "grievance"
+            ? `Selected from grievance list${selected.grievances ? ` · ${selected.grievances} grievance${selected.grievances === 1 ? "" : "s"}` : ""}.`
+            : `Selected from MEA/eMigrate RA registry${selected.raId ? ` · ${selected.raId}` : ""}.`}
+        </p>
+      )}
+    </Popover>
+  );
+}
 
 function ResultPanel({ check }: { check: VisaToolCheck | null }) {
   const output = check?.claudeResponseJson || {};
@@ -210,17 +316,17 @@ export default function VisaToolCheckPage() {
   const { toast } = useToast();
   const activeTool = tools.find((tool) => tool.type === params?.toolType);
   const [fields, setFields] = useState<Record<string, string>>({});
+  const [agencySearch, setAgencySearch] = useState("");
   const [manualText, setManualText] = useState("");
   const [file, setFile] = useState<{ name: string; type: string; size: number; base64: string } | null>(null);
   const [result, setResult] = useState<VisaToolCheck | null>(null);
-  const agencyNameQuery = fields.agencyName || "";
-  const { data: agencySuggestions = [] } = useQuery<Array<{ name: string; state: string; grievances: number | null }>>({
-    queryKey: ["/api/b2c/visa-tools/agency-name-suggestions", agencyNameQuery],
+  const { data: agencySuggestions = [] } = useQuery<AgencySuggestion[]>({
+    queryKey: ["/api/b2c/visa-tools/agency-name-suggestions", agencySearch],
     queryFn: async () => {
-      const res = await apiRequest("GET", `/api/b2c/visa-tools/agency-name-suggestions?q=${encodeURIComponent(agencyNameQuery)}`);
+      const res = await apiRequest("GET", `/api/b2c/visa-tools/agency-name-suggestions?q=${encodeURIComponent(agencySearch)}`);
       return res.json();
     },
-    enabled: activeTool?.type === "fake_agency" && agencyNameQuery.trim().length >= 2,
+    enabled: activeTool?.type === "fake_agency",
   });
 
   useEffect(() => {
@@ -328,21 +434,26 @@ export default function VisaToolCheckPage() {
                 {activeTool.fields.map((field) => (
                   <div key={field.key} className="space-y-1.5">
                     <Label>{field.label}</Label>
-                    <Input
-                      type={field.type || "text"}
-                      placeholder={field.placeholder}
-                      value={fields[field.key] || ""}
-                      onChange={(e) => setFields((prev) => ({ ...prev, [field.key]: e.target.value }))}
-                      list={activeTool.type === "fake_agency" && field.key === "agencyName" ? "unregistered-agency-suggestions" : undefined}
-                    />
-                    {activeTool.type === "fake_agency" && field.key === "agencyName" && (
-                      <datalist id="unregistered-agency-suggestions">
-                        {agencySuggestions.map((agency) => (
-                          <option key={`${agency.name}-${agency.state}-${agency.grievances ?? ""}`} value={agency.name}>
-                            {agency.state}{agency.grievances ? ` - ${agency.grievances} grievance${agency.grievances === 1 ? "" : "s"}` : ""}
-                          </option>
-                        ))}
-                      </datalist>
+                    {activeTool.type === "fake_agency" && field.key === "agencyName" ? (
+                      <AgencyNameDropdown
+                        value={fields.agencyName || ""}
+                        suggestions={agencySuggestions}
+                        search={agencySearch}
+                        onSearchChange={setAgencySearch}
+                        onSelect={(agency) => setFields((prev) => ({
+                          ...prev,
+                          agencyName: agency.name,
+                          raId: agency.raId || prev.raId || "",
+                          countryCity: [agency.state, agency.district].filter(Boolean).join(", ") || prev.countryCity || "",
+                        }))}
+                      />
+                    ) : (
+                      <Input
+                        type={field.type || "text"}
+                        placeholder={field.placeholder}
+                        value={fields[field.key] || ""}
+                        onChange={(e) => setFields((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                      />
                     )}
                   </div>
                 ))}
@@ -350,7 +461,7 @@ export default function VisaToolCheckPage() {
 
               {activeTool.type === "fake_agency" && agencySuggestions.length > 0 && (
                 <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800 dark:border-red-800/70 dark:bg-red-950/35 dark:text-red-200">
-                  Agency name suggestions include entries from the “Unregistered Agencies against which Grievances Received” list. Selecting one will include that status in the AI check.
+                  Agency dropdown is powered by uploaded MEA/eMigrate registered agents and the “Unregistered Agencies against which Grievances Received” list. Selecting one includes that registry/grievance status in the AI check.
                 </div>
               )}
 

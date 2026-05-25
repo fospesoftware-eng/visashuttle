@@ -7174,20 +7174,53 @@ export async function registerRoutes(
 
   app.get("/api/b2c/visa-tools/agency-name-suggestions", requireB2cAuth, async (req, res) => {
     const query = normalizeAgencyLookup(req.query.q);
-    if (query.length < 2) return res.json([]);
-    const suggestions = MEA_UNREGISTERED_ENTRIES
+    const registered = MEA_RA_ENTRIES.map((entry) => ({
+      name: entry.name || "",
+      state: entry.state || "",
+      district: entry.district || "",
+      status: entry.status || "",
+      raId: entry.raid || "",
+      source: "MEA/eMigrate RA Registry",
+      sourceType: "registered",
+      grievances: null as number | null,
+    }));
+    const unregistered = MEA_UNREGISTERED_ENTRIES.map((entry) => ({
+      name: entry.name || "",
+      state: entry.state || "",
+      district: "",
+      status: "Unregistered grievance record",
+      raId: "",
+      source: "Unregistered Agencies Grievance List",
+      sourceType: "grievance",
+      grievances: entry.grievances ?? null,
+    }));
+    const seen = new Set<string>();
+    const suggestions = [...registered, ...unregistered]
       .map((entry) => {
         const normalized = normalizeAgencyLookup(entry.name);
-        const score = normalized.startsWith(query) ? 100 : normalized.includes(query) ? 60 : 0;
-        return { entry, score };
+        const score = !query
+          ? entry.sourceType === "grievance" ? 55 + Number(entry.grievances || 0) : entry.status.toLowerCase() === "active" ? 50 : 35
+          : normalized.startsWith(query) ? 120 : normalized.includes(query) ? 80 : 0;
+        return { entry, normalized, score };
       })
-      .filter((item) => item.score > 0)
+      .filter((item) => item.entry.name && item.score > 0)
+      .filter((item) => {
+        const key = `${item.entry.sourceType}:${item.normalized}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
       .sort((a, b) => b.score - a.score || String(a.entry.name || "").localeCompare(String(b.entry.name || "")))
-      .slice(0, 20)
+      .slice(0, 40)
       .map(({ entry }) => ({
-        name: entry.name || "",
-        state: entry.state || "",
-        grievances: entry.grievances ?? null,
+        name: entry.name,
+        state: entry.state,
+        district: entry.district,
+        status: entry.status,
+        raId: entry.raId,
+        source: entry.source,
+        sourceType: entry.sourceType,
+        grievances: entry.grievances,
       }));
     res.json(suggestions);
   });
