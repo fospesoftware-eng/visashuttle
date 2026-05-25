@@ -292,7 +292,7 @@ export default function DeepCheckPaymentPage() {
             </div>
             <CardTitle className="text-2xl md:text-3xl mt-6">{selectedPlan.name}</CardTitle>
             <p className="text-blue-100 leading-relaxed">
-              Pay securely with Cashfree and unlock {isProPlan ? "your Pro plan benefits" : "your Deep Check report workflow"} immediately after successful payment.
+              Pay through a secure encrypted checkout and unlock {isProPlan ? "your Pro plan benefits" : "your Deep Check report workflow"} immediately after successful payment.
             </p>
           </CardHeader>
           <CardContent className="p-7 space-y-5">
@@ -404,7 +404,7 @@ export default function DeepCheckPaymentPage() {
             <CardTitle className="text-base">Secure Checkout</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground">
-            <p>INR payments are processed through Cashfree. Other currencies are processed through PayPal.</p>
+            <p>Your payment is protected by secure checkout and verified automatically before access is activated.</p>
             <p>After payment, you will be returned here and Deep Check access will be enabled automatically.</p>
             <Button variant="outline" className="w-full" onClick={() => setLocation("/pricing")}>
               Back to Pricing
