@@ -130,11 +130,11 @@ export default function DeepCheckPaymentPage() {
           toast({ title: "Deep Check activated", description: "Your Deep Check access is now ready." });
         } else {
           const status = data.status || "Pending";
-          setLocation(`/payment/deep-check/failure?status=${encodeURIComponent(status)}&provider=${encodeURIComponent(paymentProvider || "cashfree")}&order_id=${encodeURIComponent(orderId)}&plan=${selectedPlan.planKey}&currency=${currency}`);
+          setLocation(`/deep-check?payment=retry&status=${encodeURIComponent(status)}&order_id=${encodeURIComponent(orderId)}&plan=${selectedPlan.planKey}&currency=${currency}`);
         }
       } catch (err: any) {
         if (!cancelled) {
-          setLocation(`/payment/deep-check/failure?reason=${encodeURIComponent(err.message || "Could not verify payment")}&provider=${encodeURIComponent(paymentProvider || "gateway")}&plan=${selectedPlan.planKey}&currency=${currency}`);
+          setLocation(`/deep-check?payment=retry&reason=${encodeURIComponent(err.message || "Could not verify payment")}&plan=${selectedPlan.planKey}&currency=${currency}`);
         }
       } finally {
         if (!cancelled) setIsVerifying(false);

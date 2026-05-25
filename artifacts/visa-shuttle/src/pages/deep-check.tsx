@@ -308,6 +308,13 @@ export default function DeepCheckPage() {
   const hasAccess = user.deepCheckAccess;
   const deepCheckPrice = formatB2cPrice(getStoredB2cCurrency());
   const basicCheckPrice = formatB2cPrice(getStoredB2cCurrency(), 0);
+  const paymentParams = new URLSearchParams(window.location.search);
+  const showPaymentRetryNotice = paymentParams.get("payment") === "retry";
+  const retryPlan = paymentParams.get("plan") === "pro" ? "pro" : "deep";
+  const retryCurrency = paymentParams.get("currency") || getStoredB2cCurrency();
+  const paymentStatus = paymentParams.get("status") || "";
+  const paymentReason = paymentParams.get("reason") || "";
+  const retryPaymentHref = `/payment/deep-check?plan=${retryPlan}&currency=${encodeURIComponent(retryCurrency)}`;
 
   const resetDeepCheck = () => {
     setResult(null);
@@ -649,6 +656,30 @@ export default function DeepCheckPage() {
     return (
       <DashboardLayout title="Deep Check" subtitle="Embassy-style AI visa risk analysis">
         <div className="max-w-3xl space-y-6">
+          {showPaymentRetryNotice && (
+            <Card className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20">
+              <CardContent className="p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex gap-3">
+                  <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/50">
+                    <AlertCircle className="h-4 w-4 text-amber-700 dark:text-amber-300" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">Payment was not completed</p>
+                    <p className="mt-1 text-sm text-amber-800 dark:text-amber-200">
+                      {paymentStatus
+                        ? `Your payment is currently ${paymentStatus}. Complete the payment to unlock Deep Check.`
+                        : paymentReason || "Complete the payment to unlock Deep Check."}
+                    </p>
+                  </div>
+                </div>
+                <Link href={retryPaymentHref}>
+                  <Button className="w-full sm:w-auto bg-amber-600 text-white hover:bg-amber-700">
+                    Retry Payment
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          )}
           <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white p-8 md:p-10">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(59,130,246,0.15),transparent_60%)]" />
             <div className="relative">
