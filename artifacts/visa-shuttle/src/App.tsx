@@ -33,6 +33,7 @@ import SavedProfilePage from "@/pages/saved-profile";
 import SettingsPage from "@/pages/settings";
 import VisaToolsPage from "@/pages/visa-tools";
 import VisaToolCheckPage from "@/pages/visa-tool-check";
+import { FakeAgencyDetectorPage, FakeEmploymentDetectorPage, FakeVisaDetectorPage, RejectionRecoveryPage } from "@/pages/visa-tool-detail";
 import VisaToolsHistoryPage, { VisaToolsHistoryDetailPage } from "@/pages/visa-tools-history";
 
 import VisaCheckPage, { B2cVisaCheckPage, B2cVisaCheckResultPage } from "@/pages/visa-check";
@@ -150,6 +151,10 @@ function Router() {
       <Route path="/plans/basic-check" component={BasicCheckPlanPage} />
       <Route path="/plans/deep-check" component={DeepCheckPlanPage} />
       <Route path="/plans/pro" component={ProPlanPage} />
+      <Route path="/tools/fake-visa-detector" component={FakeVisaDetectorPage} />
+      <Route path="/tools/rejection-recovery" component={RejectionRecoveryPage} />
+      <Route path="/tools/fake-agency-detector" component={FakeAgencyDetectorPage} />
+      <Route path="/tools/fake-employment-detector" component={FakeEmploymentDetectorPage} />
       <Route path="/history/:id" component={HistoryDetailPage} />
       <Route path="/history" component={HistoryPage} />
       <Route path="/deep-check" component={DeepCheckPage} />
