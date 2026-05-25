@@ -65,6 +65,32 @@ function ToolReport({ check }: { check: VisaToolCheck }) {
             </section>
           )}
 
+          {output.unregistered_agency_grievance_check && (
+            <section className={`rounded-xl border p-4 ${
+              output.unregistered_agency_grievance_check.matched
+                ? "border-red-200 bg-red-50"
+                : "border-slate-200 bg-slate-50"
+            }`}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-bold text-slate-900">Unregistered Agency Grievance List</h3>
+                <Badge className={output.unregistered_agency_grievance_check.matched
+                  ? "border-0 bg-red-100 text-red-700"
+                  : "border-0 bg-slate-100 text-slate-700"
+                }>
+                  {output.unregistered_agency_grievance_check.status || "Not found"}
+                </Badge>
+              </div>
+              <p className="mt-2 text-sm leading-6 text-slate-700">
+                {output.unregistered_agency_grievance_check.matched
+                  ? `${output.unregistered_agency_grievance_check.agency_name || "Agency"} appears in the grievance list for unregistered agencies${output.unregistered_agency_grievance_check.grievance_count ? ` with ${output.unregistered_agency_grievance_check.grievance_count} grievance${output.unregistered_agency_grievance_check.grievance_count === 1 ? "" : "s"}` : ""}.`
+                  : output.unregistered_agency_grievance_check.note}
+              </p>
+              <p className="mt-2 text-xs text-slate-500">
+                Source updated as on {output.unregistered_agency_grievance_check.updated_as_on}. This is a serious risk signal when matched; verify through official MEA/eMigrate channels before any payment.
+              </p>
+            </section>
+          )}
+
           <section>
             <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-900"><ShieldAlert className="h-4 w-4 text-orange-500" /> Red flags</h3>
             <div className="space-y-2">

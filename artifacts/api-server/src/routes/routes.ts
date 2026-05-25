@@ -9,6 +9,7 @@ import { sendOtp, verifyOtp, getSmsProviderStatus } from "../sms";
 import { getEntryRequirement } from "../shared/visa-free";
 import indiaVisaChanceDataset from "../shared/india_visa_chance_dataset_non_visa_free_2026.json" assert { type: "json" };
 import meaRegisteredAgentsDataset from "../shared/mea_registered_agents_2026_05_25.json" assert { type: "json" };
+import meaUnregisteredAgencyGrievancesDataset from "../shared/mea_unregistered_agencies_grievances_2026_05_25.json" assert { type: "json" };
 import bcrypt from "bcryptjs";
 import rateLimit from "express-rate-limit";
 import { randomUUID, randomBytes } from "crypto";
@@ -4992,9 +4993,17 @@ export async function registerRoutes(
     status?: string;
     website?: string;
   };
+  type MeaUnregisteredAgencyGrievance = {
+    name?: string;
+    address?: string;
+    state?: string;
+    grievances?: number | null;
+  };
 
   const MEA_RA_SOURCE_DATE = String((meaRegisteredAgentsDataset as any).updatedAsOn || "25-05-2026");
   const MEA_RA_ENTRIES = ((meaRegisteredAgentsDataset as any).entries || []) as MeaRegisteredAgent[];
+  const MEA_UNREGISTERED_SOURCE_DATE = String((meaUnregisteredAgencyGrievancesDataset as any).importedOn || "25-05-2026");
+  const MEA_UNREGISTERED_ENTRIES = ((meaUnregisteredAgencyGrievancesDataset as any).entries || []) as MeaUnregisteredAgencyGrievance[];
 
   function normalizeAgencyLookup(value: unknown): string {
     return String(value || "")
@@ -5015,6 +5024,62 @@ export async function registerRoutes(
     } catch {
       return raw.replace(/^https?:\/\//, "").replace(/^www\./, "").split(/[/?#]/)[0];
     }
+  }
+
+  function findMeaUnregisteredAgencyGrievance(fields: Record<string, unknown>, manualText: string) {
+    const agencyName = normalizeAgencyLookup(fields.agencyName);
+    const inputText = `${Object.values(fields).join(" ")} ${manualText || ""}`;
+    const candidates = MEA_UNREGISTERED_ENTRIES.map((entry) => {
+      const entryName = normalizeAgencyLookup(entry.name);
+      let score = 0;
+      const reasons: string[] = [];
+      if (agencyName && entryName) {
+        const shorter = agencyName.length <= entryName.length ? agencyName : entryName;
+        const longer = agencyName.length > entryName.length ? agencyName : entryName;
+        const agencyTokens = new Set(agencyName.split(" ").filter((token) => token.length > 2));
+        const entryTokens = entryName.split(" ").filter((token) => token.length > 2);
+        const tokenMatches = entryTokens.filter((token) => agencyTokens.has(token)).length;
+        if (shorter.length >= 5 && longer.includes(shorter)) {
+          score += 90;
+          reasons.push("agency name matched");
+        } else if (entryTokens.length && tokenMatches >= Math.min(2, entryTokens.length)) {
+          score += 55;
+          reasons.push("agency name tokens matched");
+        }
+      }
+      const normalizedInput = normalizeAgencyLookup(inputText);
+      if (entryName && normalizedInput.includes(entryName) && entryName.length >= 5) {
+        score += 70;
+        reasons.push("name found in submitted text");
+      }
+      return { entry, score, reasons };
+    }).filter((candidate) => candidate.score >= 55).sort((a, b) => b.score - a.score);
+
+    const best = candidates[0];
+    if (!best) {
+      return {
+        checked: true,
+        source: "List of Unregistered Agencies against which Grievances Received",
+        updated_as_on: MEA_UNREGISTERED_SOURCE_DATE,
+        matched: false,
+        status: "Not found",
+        note: "No match was found in the unregistered-agency grievance list.",
+      };
+    }
+    return {
+      checked: true,
+      source: "List of Unregistered Agencies against which Grievances Received",
+      updated_as_on: MEA_UNREGISTERED_SOURCE_DATE,
+      matched: true,
+      match_confidence: best.score >= 90 ? "High" : "Possible",
+      match_reasons: best.reasons,
+      agency_name: best.entry.name || "",
+      status: "Unregistered agency grievance record found",
+      state: best.entry.state || "",
+      address: best.entry.address || "",
+      grievance_count: best.entry.grievances ?? null,
+      note: "This agency/name appears in a grievance list for unregistered agencies. Treat as a serious risk signal and verify through official MEA/eMigrate channels before proceeding.",
+    };
   }
 
   function findMeaRegisteredAgent(fields: Record<string, unknown>, manualText: string) {
@@ -5101,6 +5166,9 @@ export async function registerRoutes(
     const meaRegistryCheck = payload.toolType === "fake_agency"
       ? findMeaRegisteredAgent(payload.fields, payload.manualText)
       : null;
+    const meaUnregisteredCheck = payload.toolType === "fake_agency"
+      ? findMeaUnregisteredAgencyGrievance(payload.fields, payload.manualText)
+      : null;
     const promptPayload = {
       tool_type: payload.toolType,
       country: payload.fields.country || payload.fields.destinationCountry || "",
@@ -5115,6 +5183,7 @@ export async function registerRoutes(
         storage_policy: "private_user_document_reference_only",
       } : null,
       official_registry_check: meaRegistryCheck,
+      unregistered_agency_grievance_check: meaUnregisteredCheck,
       analysis_required: [
         "risk_score",
         "risk_level",
@@ -5144,8 +5213,10 @@ export async function registerRoutes(
         ? [
           "This is a fake agency detector request.",
           "Use official_registry_check as an MEA/eMigrate registered recruiting-agent signal when it is present.",
+          "Use unregistered_agency_grievance_check as a serious risk signal when matched.",
           "If the agency is matched and status is Active, treat that as a positive indicator, but still assess impersonation, payment demands, unrealistic claims, mismatched contact details, and suspicious documents.",
           "If the agency is matched but status is not Active, treat the status as a major risk signal.",
+          "If the agency appears in the unregistered-agency grievance list, clearly mention that status and recommend official verification before any payment.",
           "If no match is found for an India-based recruiting agency, mention that no MEA/eMigrate RA match was found.",
         ].join(" ")
       : "";
@@ -5229,6 +5300,20 @@ export async function registerRoutes(
         result.red_flags = [statusLine, ...result.red_flags].slice(0, 12);
       }
       (result as any).official_registry_check = registry;
+    }
+    if (meaUnregisteredCheck) {
+      const grievance = meaUnregisteredCheck as any;
+      (result as any).unregistered_agency_grievance_check = grievance;
+      if (grievance.matched) {
+        const grievanceLine = `Unregistered-agency grievance list match: ${grievance.agency_name || "Agency"} - status: ${grievance.status}; grievances: ${grievance.grievance_count ?? "listed"}; source updated as on ${grievance.updated_as_on}.`;
+        result.risk_score = Math.max(result.risk_score, 85);
+        result.risk_level = normalizeRiskLevel("", result.risk_score);
+        result.red_flags = [grievanceLine, ...result.red_flags].slice(0, 12);
+        result.recommended_next_steps = [
+          "Do not make any payment until the agency is verified through official MEA/eMigrate channels.",
+          ...result.recommended_next_steps,
+        ].slice(0, 10);
+      }
     }
     return result;
   }
@@ -7048,6 +7133,26 @@ export async function registerRoutes(
     const user = await storage.getB2cUser(req.session.b2cUserId!);
     if (!user) return res.status(401).json({ error: "User not found" });
     res.json(await getB2cCreditSummary(user, req.query.currency));
+  });
+
+  app.get("/api/b2c/visa-tools/agency-name-suggestions", requireB2cAuth, async (req, res) => {
+    const query = normalizeAgencyLookup(req.query.q);
+    if (query.length < 2) return res.json([]);
+    const suggestions = MEA_UNREGISTERED_ENTRIES
+      .map((entry) => {
+        const normalized = normalizeAgencyLookup(entry.name);
+        const score = normalized.startsWith(query) ? 100 : normalized.includes(query) ? 60 : 0;
+        return { entry, score };
+      })
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score || String(a.entry.name || "").localeCompare(String(b.entry.name || "")))
+      .slice(0, 20)
+      .map(({ entry }) => ({
+        name: entry.name || "",
+        state: entry.state || "",
+        grievances: entry.grievances ?? null,
+      }));
+    res.json(suggestions);
   });
 
   app.get("/api/b2c/visa-tools/checks/:id", requireB2cAuth, async (req, res) => {

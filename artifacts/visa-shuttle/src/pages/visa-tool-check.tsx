@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useRoute } from "wouter";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -81,6 +81,32 @@ function ResultPanel({ check }: { check: VisaToolCheck | null }) {
                 </p>
                 <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                   Source updated as on {output.official_registry_check.updated_as_on}. This confirms a registry signal only; verify the exact offer, contact person, payment request, and official government records before proceeding.
+                </p>
+              </section>
+            )}
+
+            {output.unregistered_agency_grievance_check && (
+              <section className={`rounded-xl border p-4 ${
+                output.unregistered_agency_grievance_check.matched
+                  ? "border-red-200 bg-red-50 dark:border-red-800/70 dark:bg-red-950/35"
+                  : "border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/50"
+              }`}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h4 className="text-sm font-bold text-slate-950 dark:text-white">Unregistered Agency Grievance List</h4>
+                  <Badge className={output.unregistered_agency_grievance_check.matched
+                    ? "border-0 bg-red-100 text-red-700 dark:bg-red-900/60 dark:text-red-200"
+                    : "border-0 bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  }>
+                    {output.unregistered_agency_grievance_check.status || "Not found"}
+                  </Badge>
+                </div>
+                <p className="mt-2 text-sm leading-6 text-slate-700 dark:text-slate-300">
+                  {output.unregistered_agency_grievance_check.matched
+                    ? `${output.unregistered_agency_grievance_check.agency_name || "Agency"} appears in the grievance list for unregistered agencies${output.unregistered_agency_grievance_check.grievance_count ? ` with ${output.unregistered_agency_grievance_check.grievance_count} grievance${output.unregistered_agency_grievance_check.grievance_count === 1 ? "" : "s"}` : ""}.`
+                    : output.unregistered_agency_grievance_check.note}
+                </p>
+                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                  Source updated as on {output.unregistered_agency_grievance_check.updated_as_on}. This is a serious risk signal when matched; verify through official MEA/eMigrate channels before any payment.
                 </p>
               </section>
             )}
@@ -187,6 +213,15 @@ export default function VisaToolCheckPage() {
   const [manualText, setManualText] = useState("");
   const [file, setFile] = useState<{ name: string; type: string; size: number; base64: string } | null>(null);
   const [result, setResult] = useState<VisaToolCheck | null>(null);
+  const agencyNameQuery = fields.agencyName || "";
+  const { data: agencySuggestions = [] } = useQuery<Array<{ name: string; state: string; grievances: number | null }>>({
+    queryKey: ["/api/b2c/visa-tools/agency-name-suggestions", agencyNameQuery],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/b2c/visa-tools/agency-name-suggestions?q=${encodeURIComponent(agencyNameQuery)}`);
+      return res.json();
+    },
+    enabled: activeTool?.type === "fake_agency" && agencyNameQuery.trim().length >= 2,
+  });
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -298,10 +333,26 @@ export default function VisaToolCheckPage() {
                       placeholder={field.placeholder}
                       value={fields[field.key] || ""}
                       onChange={(e) => setFields((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                      list={activeTool.type === "fake_agency" && field.key === "agencyName" ? "unregistered-agency-suggestions" : undefined}
                     />
+                    {activeTool.type === "fake_agency" && field.key === "agencyName" && (
+                      <datalist id="unregistered-agency-suggestions">
+                        {agencySuggestions.map((agency) => (
+                          <option key={`${agency.name}-${agency.state}-${agency.grievances ?? ""}`} value={agency.name}>
+                            {agency.state}{agency.grievances ? ` - ${agency.grievances} grievance${agency.grievances === 1 ? "" : "s"}` : ""}
+                          </option>
+                        ))}
+                      </datalist>
+                    )}
                   </div>
                 ))}
               </div>
+
+              {activeTool.type === "fake_agency" && agencySuggestions.length > 0 && (
+                <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800 dark:border-red-800/70 dark:bg-red-950/35 dark:text-red-200">
+                  Agency name suggestions include entries from the “Unregistered Agencies against which Grievances Received” list. Selecting one will include that status in the AI check.
+                </div>
+              )}
 
               <div className="mt-4 space-y-1.5">
                 <Label>{activeTool.textLabel}</Label>
