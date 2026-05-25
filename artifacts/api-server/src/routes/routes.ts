@@ -5940,7 +5940,7 @@ export async function registerRoutes(
                 shipping_preference: "NO_SHIPPING",
                 user_action: "PAY_NOW",
                 return_url: `${origin}/payment/deep-check/return?provider=paypal`,
-                cancel_url: `${origin}/payment/deep-check?canceled=1`,
+                cancel_url: `${origin}/payment/deep-check/failure?provider=paypal&reason=canceled`,
               },
             },
           },
@@ -6062,6 +6062,27 @@ export async function registerRoutes(
     });
   });
 
+  async function activateB2cPlanPurchase(userId: string, planKey: string) {
+    const user = await storage.getB2cUser(userId);
+    if (!user) return null;
+    const normalizedPlan = planKey === "pro" ? "pro" : "deep";
+    if (normalizedPlan === "pro" && user.subscriptionPlan !== "pro") {
+      return storage.updateB2cUser(user.id, {
+        subscriptionPlan: "pro",
+        deepCheckAccess: true,
+        checkLimit: 9999,
+      });
+    }
+    if (!user.deepCheckAccess) {
+      return storage.updateB2cUser(user.id, {
+        subscriptionPlan: normalizedPlan,
+        deepCheckAccess: true,
+        checkLimit: normalizedPlan === "pro" ? 9999 : Math.max(user.checkLimit || 1, 1),
+      });
+    }
+    return user;
+  }
+
   app.get("/api/b2c/payments/deep-check/order/:orderId", requireB2cAuth, async (req, res) => {
     const user = await storage.getB2cUser(req.session.b2cUserId!);
     if (!user) return res.status(401).json({ error: "User not found" });
@@ -6086,19 +6107,7 @@ export async function registerRoutes(
         const [, customUserId, planKey] = customId.split(":");
         if (customUserId && customUserId !== user.id) return res.status(403).json({ error: "Order does not belong to this user" });
         const isProOrder = planKey === "pro";
-        if (isPaid && !user.deepCheckAccess) {
-          await storage.updateB2cUser(user.id, {
-            subscriptionPlan: isProOrder ? "pro" : "deep",
-            deepCheckAccess: true,
-            checkLimit: isProOrder ? 9999 : Math.max(user.checkLimit || 1, 1),
-          });
-        } else if (isPaid && isProOrder && user.subscriptionPlan !== "pro") {
-          await storage.updateB2cUser(user.id, {
-            subscriptionPlan: "pro",
-            deepCheckAccess: true,
-            checkLimit: 9999,
-          });
-        }
+        if (isPaid) await activateB2cPlanPurchase(user.id, isProOrder ? "pro" : "deep");
         return res.json({
           orderId,
           status: data?.status || capture?.status,
@@ -6146,19 +6155,7 @@ export async function registerRoutes(
 
     const isPaid = data.order_status === "PAID";
     const isProOrder = orderId.startsWith("VS_PRO_") || data?.order_tags?.plan_key === "pro";
-    if (isPaid && !user.deepCheckAccess) {
-      await storage.updateB2cUser(user.id, {
-        subscriptionPlan: isProOrder ? "pro" : "deep",
-        deepCheckAccess: true,
-        checkLimit: isProOrder ? 9999 : Math.max(user.checkLimit || 1, 1),
-      });
-    } else if (isPaid && isProOrder && user.subscriptionPlan !== "pro") {
-      await storage.updateB2cUser(user.id, {
-        subscriptionPlan: "pro",
-        deepCheckAccess: true,
-        checkLimit: 9999,
-      });
-    }
+    if (isPaid) await activateB2cPlanPurchase(user.id, isProOrder ? "pro" : "deep");
 
     res.json({
       orderId: data.order_id || orderId,
@@ -6166,6 +6163,71 @@ export async function registerRoutes(
       paid: isPaid,
       deepCheckAccess: isPaid || user.deepCheckAccess,
     });
+  });
+
+  app.post("/api/webhooks/cashfree", async (req, res) => {
+    const event = req.body || {};
+    const orderId = String(event?.data?.order?.order_id || event?.data?.order_id || event?.order_id || "").trim();
+    if (!orderId) return res.status(202).json({ received: true, ignored: "missing_order_id" });
+    if (!/^VS_(DEEP|PRO)_[a-zA-Z0-9_-]+$/.test(orderId)) {
+      return res.status(202).json({ received: true, ignored: "non_b2c_plan_order" });
+    }
+
+    const cfg = await storage.getPaymentGatewayConfig();
+    const cashfree = getCashfreeCredentials(cfg);
+    if (!cashfree.clientId || !cashfree.clientSecret) {
+      return res.status(503).json({ error: "Cashfree credentials are not configured" });
+    }
+    try {
+      const response = await fetch(`${cashfree.baseUrl}/orders/${encodeURIComponent(orderId)}`, {
+        headers: {
+          "x-api-version": cashfree.apiVersion,
+          "x-client-id": cashfree.clientId,
+          "x-client-secret": cashfree.clientSecret,
+          "x-request-id": randomUUID(),
+        },
+        signal: AbortSignal.timeout(20000),
+      });
+      const data = await readCashfreeBody(response);
+      if (!response.ok) {
+        console.error("[Cashfree webhook] Verify order failed:", data);
+        return res.status(response.status >= 500 ? 503 : 202).json({ received: true, verified: false });
+      }
+      if (data.order_status !== "PAID") {
+        return res.json({ received: true, paid: false, status: data.order_status });
+      }
+      const userId = String(data?.order_tags?.user_id || event?.data?.order?.order_tags?.user_id || "").trim();
+      const planKey = String(data?.order_tags?.plan_key || (orderId.startsWith("VS_PRO_") ? "pro" : "deep")).trim();
+      if (!userId) return res.status(202).json({ received: true, paid: true, ignored: "missing_user_id" });
+      await activateB2cPlanPurchase(userId, planKey);
+      return res.json({ received: true, paid: true, orderId, planKey });
+    } catch (err: any) {
+      console.error("[Cashfree webhook] Error:", err);
+      return res.status(503).json({ error: "Webhook verification failed" });
+    }
+  });
+
+  app.post("/api/webhooks/paypal", async (req, res) => {
+    const event = req.body || {};
+    const resource = event.resource || {};
+    const customId = String(
+      resource.custom_id ||
+      resource.supplementary_data?.related_ids?.custom_id ||
+      resource.purchase_units?.[0]?.custom_id ||
+      resource.purchase_units?.[0]?.payments?.captures?.[0]?.custom_id ||
+      "",
+    );
+    const eventType = String(event.event_type || "");
+    const status = String(resource.status || event.status || "");
+    const isPaid = eventType === "PAYMENT.CAPTURE.COMPLETED" || eventType === "CHECKOUT.ORDER.COMPLETED" || status === "COMPLETED";
+    if (!customId.startsWith("b2c_plan:")) {
+      return res.status(202).json({ received: true, ignored: "non_b2c_plan_event" });
+    }
+    const [, userId, planKey] = customId.split(":");
+    if (!isPaid) return res.json({ received: true, paid: false, status: status || eventType });
+    if (!userId) return res.status(202).json({ received: true, paid: true, ignored: "missing_user_id" });
+    await activateB2cPlanPurchase(userId, planKey);
+    return res.json({ received: true, paid: true, planKey: planKey === "pro" ? "pro" : "deep" });
   });
 
   app.post("/api/b2c/payments/visa-tools-credits/order", requireB2cAuth, async (req, res) => {

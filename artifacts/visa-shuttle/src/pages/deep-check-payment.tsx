@@ -115,10 +115,13 @@ export default function DeepCheckPaymentPage() {
           setIsSuccess(true);
           toast({ title: "Deep Check activated", description: "Your Deep Check access is now ready." });
         } else {
-          setError(`Payment status: ${data.status || "Pending"}. Please complete the payment to unlock Deep Check.`);
+          const status = data.status || "Pending";
+          setLocation(`/payment/deep-check/failure?status=${encodeURIComponent(status)}&provider=${encodeURIComponent(paymentProvider || "cashfree")}&order_id=${encodeURIComponent(orderId)}&plan=${selectedPlan.planKey}&currency=${currency}`);
         }
       } catch (err: any) {
-        if (!cancelled) setError(err.message || "Could not verify payment");
+        if (!cancelled) {
+          setLocation(`/payment/deep-check/failure?reason=${encodeURIComponent(err.message || "Could not verify payment")}&provider=${encodeURIComponent(paymentProvider || "gateway")}&plan=${selectedPlan.planKey}&currency=${currency}`);
+        }
       } finally {
         if (!cancelled) setIsVerifying(false);
       }
