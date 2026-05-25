@@ -3565,8 +3565,47 @@ class HybridStorage extends MemStorage {
   }
 
   // Payment Gateway Config — single-row config stored in DB
+  private async ensurePaymentGatewayConfigTable(): Promise<void> {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS payment_gateway_config (
+        id serial PRIMARY KEY,
+        provider text NOT NULL DEFAULT 'cashfree',
+        mode text NOT NULL DEFAULT 'test',
+        api_version text NOT NULL DEFAULT '2023-08-01',
+        test_client_id text,
+        test_client_secret text,
+        live_client_id text,
+        live_client_secret text,
+        webhook_secret text,
+        updated_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`ALTER TABLE payment_gateway_config ADD COLUMN IF NOT EXISTS provider text NOT NULL DEFAULT 'cashfree'`);
+    await db.execute(sql`ALTER TABLE payment_gateway_config ADD COLUMN IF NOT EXISTS mode text NOT NULL DEFAULT 'test'`);
+    await db.execute(sql`ALTER TABLE payment_gateway_config ADD COLUMN IF NOT EXISTS api_version text NOT NULL DEFAULT '2023-08-01'`);
+    await db.execute(sql`ALTER TABLE payment_gateway_config ADD COLUMN IF NOT EXISTS test_client_id text`);
+    await db.execute(sql`ALTER TABLE payment_gateway_config ADD COLUMN IF NOT EXISTS test_client_secret text`);
+    await db.execute(sql`ALTER TABLE payment_gateway_config ADD COLUMN IF NOT EXISTS live_client_id text`);
+    await db.execute(sql`ALTER TABLE payment_gateway_config ADD COLUMN IF NOT EXISTS live_client_secret text`);
+    await db.execute(sql`ALTER TABLE payment_gateway_config ADD COLUMN IF NOT EXISTS webhook_secret text`);
+    await db.execute(sql`ALTER TABLE payment_gateway_config ADD COLUMN IF NOT EXISTS stripe_mode text NOT NULL DEFAULT 'test'`);
+    await db.execute(sql`ALTER TABLE payment_gateway_config ADD COLUMN IF NOT EXISTS stripe_test_publishable_key text`);
+    await db.execute(sql`ALTER TABLE payment_gateway_config ADD COLUMN IF NOT EXISTS stripe_test_secret_key text`);
+    await db.execute(sql`ALTER TABLE payment_gateway_config ADD COLUMN IF NOT EXISTS stripe_live_publishable_key text`);
+    await db.execute(sql`ALTER TABLE payment_gateway_config ADD COLUMN IF NOT EXISTS stripe_live_secret_key text`);
+    await db.execute(sql`ALTER TABLE payment_gateway_config ADD COLUMN IF NOT EXISTS stripe_webhook_secret text`);
+    await db.execute(sql`ALTER TABLE payment_gateway_config ADD COLUMN IF NOT EXISTS paypal_mode text NOT NULL DEFAULT 'sandbox'`);
+    await db.execute(sql`ALTER TABLE payment_gateway_config ADD COLUMN IF NOT EXISTS paypal_test_client_id text`);
+    await db.execute(sql`ALTER TABLE payment_gateway_config ADD COLUMN IF NOT EXISTS paypal_test_client_secret text`);
+    await db.execute(sql`ALTER TABLE payment_gateway_config ADD COLUMN IF NOT EXISTS paypal_live_client_id text`);
+    await db.execute(sql`ALTER TABLE payment_gateway_config ADD COLUMN IF NOT EXISTS paypal_live_client_secret text`);
+    await db.execute(sql`ALTER TABLE payment_gateway_config ADD COLUMN IF NOT EXISTS paypal_webhook_id text`);
+    await db.execute(sql`ALTER TABLE payment_gateway_config ADD COLUMN IF NOT EXISTS updated_at timestamp DEFAULT now()`);
+  }
+
   async getPaymentGatewayConfig(): Promise<PaymentGatewayConfig | undefined> {
     try {
+      await this.ensurePaymentGatewayConfigTable();
       const rows = await db.select().from(paymentGatewayConfigTable).limit(1);
       return rows[0];
     } catch (error) {
@@ -3580,6 +3619,7 @@ class HybridStorage extends MemStorage {
 
   async upsertPaymentGatewayConfig(data: Partial<InsertPaymentGatewayConfig>): Promise<PaymentGatewayConfig> {
     try {
+      await this.ensurePaymentGatewayConfigTable();
       const existing = await this.getPaymentGatewayConfig();
       if (existing) {
         const rows = await db.update(paymentGatewayConfigTable)
