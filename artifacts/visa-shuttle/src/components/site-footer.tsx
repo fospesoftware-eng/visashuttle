@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { FaFacebookF, FaInstagram, FaLinkedinIn, FaXTwitter } from "react-icons/fa6";
 import { Logo } from "@/components/logo";
 
 const footerColumns = [
@@ -56,6 +57,13 @@ const footerColumns = [
   },
 ];
 
+const socialLinks = [
+  { label: "Facebook", href: "http://facebook.com/visashuttle", icon: FaFacebookF },
+  { label: "Instagram", href: "http://instagram.com/visashuttle", icon: FaInstagram },
+  { label: "X", href: "http://x.com/visa_shuttle", icon: FaXTwitter },
+  { label: "LinkedIn", href: "http://linkedin.com/company/visashuttle", icon: FaLinkedinIn },
+];
+
 export function SiteFooter() {
   return (
     <footer className="border-t bg-background px-4 py-12">
@@ -66,6 +74,21 @@ export function SiteFooter() {
             <p className="max-w-md text-sm leading-6 text-muted-foreground">
               AI-powered visa checks, fraud-risk tools, and agency automation for individuals and businesses.
             </p>
+            <div className="flex items-center gap-2">
+              {socialLinks.map(({ label, href, icon: Icon }) => (
+                <a
+                  key={label}
+                  href={href}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={label}
+                  title={label}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/80 text-muted-foreground transition-colors hover:border-[#4055FF]/40 hover:bg-[#4055FF]/10 hover:text-[#4055FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4055FF]/35"
+                >
+                  <Icon className="h-4 w-4" aria-hidden="true" />
+                </a>
+              ))}
+            </div>
           </div>
           <p className="max-w-sm text-sm leading-6 text-muted-foreground md:text-right">
             AI-based estimation only. Does not guarantee visa approval.
