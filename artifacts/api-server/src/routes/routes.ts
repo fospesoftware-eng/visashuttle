@@ -539,13 +539,16 @@ async function getPayPalAccessToken(paypal: ReturnType<typeof getPayPalCredentia
   });
   const data: any = await response.json().catch(() => ({}));
   if (!response.ok || !data.access_token) {
-    throw new Error(data?.error_description || data?.error || "Unable to authenticate with PayPal");
+    throw Object.assign(
+      new Error(data?.error_description || data?.error || "Unable to authenticate with PayPal"),
+      { status: response.status || 502, data },
+    );
   }
   return data.access_token;
 }
 
 function getPayPalApprovalUrl(order: any): string | undefined {
-  return order?.links?.find((link: any) => link?.rel === "approve")?.href;
+  return order?.links?.find((link: any) => link?.rel === "approve" || link?.rel === "payer-action")?.href;
 }
 
 async function createPayPalOrder(paypal: ReturnType<typeof getPayPalCredentials>, payload: any): Promise<any> {
@@ -5914,7 +5917,7 @@ export async function registerRoutes(
     if (gatewayForCheckoutCurrency(price.currency) === "paypal") {
       const paypal = getPayPalCredentials(cfg);
       if (!paypal.clientId || !paypal.clientSecret) {
-        return res.status(503).json({ error: `PayPal ${paypal.mode} credentials are not configured. Please add them in SaaS Admin > Integrations.` });
+        return res.status(503).json({ error: `PayPal ${paypal.mode} credentials are not configured. Please add them in SaaS Admin > PayPal.` });
       }
       try {
         const planPrices = price.plan.prices && typeof price.plan.prices === "object" ? price.plan.prices as Record<string, unknown> : {};
@@ -5965,8 +5968,12 @@ export async function registerRoutes(
         return;
       } catch (err: any) {
         console.error("[PayPal] Create B2C plan order failed:", err?.data || err);
-        return res.status(err?.status >= 500 ? 503 : err?.status || 502).json({
-          error: err?.message || "Unable to create PayPal order",
+        const message = String(err?.message || "Unable to create PayPal order");
+        const isAuthError = err?.status === 401 || /auth|credential|client|secret/i.test(message);
+        return res.status(isAuthError ? 400 : err?.status >= 500 ? 503 : err?.status || 502).json({
+          error: isAuthError
+            ? `PayPal authentication failed in ${paypal.mode.toUpperCase()} mode. Please verify Client ID, Client Secret, and environment in SaaS Admin > PayPal.`
+            : message,
         });
       }
     }
@@ -6260,7 +6267,7 @@ export async function registerRoutes(
     if (gatewayForCheckoutCurrency(pricing.currency) === "paypal") {
       const paypal = getPayPalCredentials(cfg);
       if (!paypal.clientId || !paypal.clientSecret) {
-        return res.status(503).json({ error: `PayPal ${paypal.mode} credentials are not configured. Please add them in SaaS Admin > Integrations.` });
+        return res.status(503).json({ error: `PayPal ${paypal.mode} credentials are not configured. Please add them in SaaS Admin > PayPal.` });
       }
       try {
         const conditions = plan?.conditions && typeof plan.conditions === "object" ? plan.conditions as Record<string, any> : {};

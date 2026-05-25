@@ -128,12 +128,17 @@ async function getPayPalAccessToken(paypal: PayPalCreds): Promise<string> {
     signal: AbortSignal.timeout(20000),
   });
   const data: any = await response.json().catch(() => ({}));
-  if (!response.ok || !data.access_token) throw new Error(data?.error_description || data?.error || "Unable to authenticate with PayPal");
+  if (!response.ok || !data.access_token) {
+    throw Object.assign(
+      new Error(data?.error_description || data?.error || "Unable to authenticate with PayPal"),
+      { status: response.status || 502, data },
+    );
+  }
   return data.access_token;
 }
 
 function getPayPalApprovalUrl(order: any): string | undefined {
-  return order?.links?.find((link: any) => link?.rel === "approve")?.href;
+  return order?.links?.find((link: any) => link?.rel === "approve" || link?.rel === "payer-action")?.href;
 }
 
 async function createPayPalOrder(paypal: PayPalCreds, payload: any): Promise<any> {
