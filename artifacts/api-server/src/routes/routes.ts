@@ -4962,6 +4962,11 @@ export async function registerRoutes(
     return Math.max(0, Math.min(100, Math.round(n)));
   }
 
+  function truncateVisaToolText(value: unknown, maxLength = 500): string {
+    const text = String(value || "").trim().replace(/\s+/g, " ");
+    return text.length > maxLength ? `${text.slice(0, maxLength).trim()}...` : text;
+  }
+
   function normalizeRiskLevel(value: unknown, score: number): string {
     const raw = String(value || "").toLowerCase();
     if (raw.includes("critical")) return "Critical";
@@ -5076,7 +5081,7 @@ export async function registerRoutes(
       agency_name: best.entry.name || "",
       status: "Unregistered agency grievance record found",
       state: best.entry.state || "",
-      address: best.entry.address || "",
+      address: truncateVisaToolText(best.entry.address, 300),
       grievance_count: best.entry.grievances ?? null,
       note: "This agency/name appears in a grievance list for unregistered agencies. Treat as a serious risk signal and verify through official MEA/eMigrate channels before proceeding.",
     };
@@ -5246,30 +5251,92 @@ export async function registerRoutes(
       }
     }
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 4096,
-        system: "You are a visa risk and rejection recovery analysis assistant for Visa Shuttle. You do not provide legal confirmation, immigration advice, or government verification. You analyze submitted text/documents for refusal reasons, missing evidence, inconsistencies, fraud indicators, formatting issues, suspicious claims, and risk signals. Always return strict JSON only.",
-        messages: [{ role: "user", content }],
-      }),
+    const applyAgencySignals = (result: any) => {
+      if (meaRegistryCheck) {
+        const registry = meaRegistryCheck as any;
+        const statusLine = registry.matched
+          ? `MEA/eMigrate RA registry match: ${registry.agency_name || "Registered Agent"} (${registry.raid || "RA ID not listed"}) - status: ${registry.status}; source updated as on ${registry.updated_as_on}.`
+          : `MEA/eMigrate RA registry check: ${registry.status}; source updated as on ${registry.updated_as_on}. ${registry.note}`;
+        if (registry.matched && registry.is_active) {
+          result.risk_score = Math.min(result.risk_score, 55);
+          result.risk_level = normalizeRiskLevel("", result.risk_score);
+          result.positive_indicators = [statusLine, ...result.positive_indicators].slice(0, 12);
+        } else {
+          result.risk_score = Math.max(result.risk_score, registry.matched ? 70 : 55);
+          result.risk_level = normalizeRiskLevel("", result.risk_score);
+          result.red_flags = [statusLine, ...result.red_flags].slice(0, 12);
+        }
+        result.official_registry_check = registry;
+      }
+      if (meaUnregisteredCheck) {
+        const grievance = meaUnregisteredCheck as any;
+        result.unregistered_agency_grievance_check = grievance;
+        if (grievance.matched) {
+          const grievanceLine = `Unregistered-agency grievance list match: ${grievance.agency_name || "Agency"} - status: ${grievance.status}; grievances: ${grievance.grievance_count ?? "listed"}; source updated as on ${grievance.updated_as_on}.`;
+          result.risk_score = Math.max(result.risk_score, 85);
+          result.risk_level = normalizeRiskLevel("", result.risk_score);
+          result.red_flags = [grievanceLine, ...result.red_flags].slice(0, 12);
+          result.recommended_next_steps = [
+            "Do not make any payment until the agency is verified through official MEA/eMigrate channels.",
+            ...result.recommended_next_steps,
+          ].slice(0, 10);
+        }
+      }
+      return result;
+    };
+
+    const buildAgencyFallbackResult = (reason: string) => applyAgencySignals({
+      risk_score: 50,
+      risk_level: "Medium",
+      summary: "Agency registry screening completed. Full AI analysis could not be completed right now.",
+      red_flags: [],
+      positive_indicators: [],
+      explanation: `The agency was checked against the available MEA/eMigrate registered-agent list and the unregistered-agency grievance list. Full AI text/document analysis was unavailable for this request. ${truncateVisaToolText(reason, 180)}`,
+      recommended_next_steps: [
+        "Verify the agency directly through official MEA/eMigrate or government sources.",
+        "Avoid advance payments until the agency, offer, and payment recipient are independently verified.",
+      ],
+      real_refusal_reasons: [],
+      wait_time_guidance: "",
+      reapplication_strategy: [],
+      documents_to_fix: [],
+      disclaimer: "This is an AI-assisted risk analysis only. Please verify with official government, employer, registered agency, or qualified immigration sources.",
     });
 
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Claude Visa Tools error: ${response.status} ${text}`);
+    let parsed: any;
+    try {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 4096,
+          system: "You are a visa risk and rejection recovery analysis assistant for Visa Shuttle. You do not provide legal confirmation, immigration advice, or government verification. You analyze submitted text/documents for refusal reasons, missing evidence, inconsistencies, fraud indicators, formatting issues, suspicious claims, and risk signals. Always return strict JSON only.",
+          messages: [{ role: "user", content }],
+        }),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Claude Visa Tools error: ${response.status} ${truncateVisaToolText(text, 500)}`);
+      }
+      const data = await response.json() as any;
+      const text = data.content?.find((part: any) => part.type === "text")?.text || "";
+      const jsonText = extractJsonObject(text);
+      if (!jsonText) throw new Error("Claude did not return valid JSON");
+      parsed = JSON.parse(jsonText);
+    } catch (err: any) {
+      if (payload.toolType === "fake_agency") {
+        console.warn("[Visa Tools] Fake agency AI fallback:", err?.message || err);
+        return buildAgencyFallbackResult(err?.message || "AI provider unavailable.");
+      }
+      throw err;
     }
-    const data = await response.json() as any;
-    const text = data.content?.find((part: any) => part.type === "text")?.text || "";
-    const jsonText = extractJsonObject(text);
-    if (!jsonText) throw new Error("Claude did not return valid JSON");
-    const parsed = JSON.parse(jsonText);
+
     const riskScore = clampRiskScore(parsed.risk_score);
     const result = {
       risk_score: riskScore,
@@ -5285,37 +5352,7 @@ export async function registerRoutes(
       documents_to_fix: Array.isArray(parsed.documents_to_fix) ? parsed.documents_to_fix.map(String).slice(0, 12) : [],
       disclaimer: "This is an AI-assisted risk analysis only. Please verify with official government, employer, registered agency, or qualified immigration sources.",
     };
-    if (meaRegistryCheck) {
-      const registry = meaRegistryCheck as any;
-      const statusLine = registry.matched
-        ? `MEA/eMigrate RA registry match: ${registry.agency_name || "Registered Agent"} (${registry.raid || "RA ID not listed"}) - status: ${registry.status}; source updated as on ${registry.updated_as_on}.`
-        : `MEA/eMigrate RA registry check: ${registry.status}; source updated as on ${registry.updated_as_on}. ${registry.note}`;
-      if (registry.matched && registry.is_active) {
-        result.risk_score = Math.min(result.risk_score, 55);
-        result.risk_level = normalizeRiskLevel("", result.risk_score);
-        result.positive_indicators = [statusLine, ...result.positive_indicators].slice(0, 12);
-      } else {
-        result.risk_score = Math.max(result.risk_score, registry.matched ? 70 : 55);
-        result.risk_level = normalizeRiskLevel("", result.risk_score);
-        result.red_flags = [statusLine, ...result.red_flags].slice(0, 12);
-      }
-      (result as any).official_registry_check = registry;
-    }
-    if (meaUnregisteredCheck) {
-      const grievance = meaUnregisteredCheck as any;
-      (result as any).unregistered_agency_grievance_check = grievance;
-      if (grievance.matched) {
-        const grievanceLine = `Unregistered-agency grievance list match: ${grievance.agency_name || "Agency"} - status: ${grievance.status}; grievances: ${grievance.grievance_count ?? "listed"}; source updated as on ${grievance.updated_as_on}.`;
-        result.risk_score = Math.max(result.risk_score, 85);
-        result.risk_level = normalizeRiskLevel("", result.risk_score);
-        result.red_flags = [grievanceLine, ...result.red_flags].slice(0, 12);
-        result.recommended_next_steps = [
-          "Do not make any payment until the agency is verified through official MEA/eMigrate channels.",
-          ...result.recommended_next_steps,
-        ].slice(0, 10);
-      }
-    }
-    return result;
+    return applyAgencySignals(result);
   }
 
   // ── OTP Send ─────────────────────────────────────────────────────────────
