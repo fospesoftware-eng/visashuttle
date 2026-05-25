@@ -143,13 +143,13 @@ export default function GrowthHubPage() {
               Connect your services with users actively planning international travel, education, tourism, and immigration through Visa Shuttle.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link href="/contact?topic=growth-hub">
+              <Link href="/growth-hub">
                 <Button size="lg" className="w-full gap-2 border-0 text-white sm:w-auto" style={{ background: "linear-gradient(135deg,#4055FF,#FF2060)" }}>
                   Join Growth Hub
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
-              <Link href="/contact?topic=growth-hub">
+              <Link href="/growth-hub">
                 <Button size="lg" variant="outline" className="w-full sm:w-auto">
                   Contact Sales
                 </Button>
@@ -248,10 +248,10 @@ export default function GrowthHubPage() {
               Visa Shuttle Growth Hub connects global visa applicants with trusted travel and immigration services using AI-powered lead exchange and business promotion.
             </p>
             <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-              <Link href="/contact?topic=growth-hub">
+              <Link href="/growth-hub">
                 <Button className="w-full bg-white text-[#4055FF] hover:bg-white/90 sm:w-auto">Start Campaign</Button>
               </Link>
-              <Link href="/contact?topic=growth-hub">
+              <Link href="/growth-hub">
                 <Button variant="outline" className="w-full border-white/35 bg-white/10 text-white hover:bg-white/20 sm:w-auto">Add Credits</Button>
               </Link>
             </div>
@@ -306,10 +306,10 @@ export default function GrowthHubPage() {
             Start reaching high-intent visa applicants through AI-powered lead exchange and display campaigns.
           </p>
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
-            <Link href="/contact?topic=growth-hub"><Button className="border-0 text-white" style={{ background: "linear-gradient(135deg,#4055FF,#FF2060)" }}>Join Growth Hub</Button></Link>
-            <Link href="/contact?topic=growth-hub"><Button variant="outline">Start Campaign</Button></Link>
-            <Link href="/contact?topic=growth-hub"><Button variant="outline">Add Credits</Button></Link>
-            <Link href="/contact?topic=growth-hub"><Button variant="outline">Contact Sales</Button></Link>
+            <Link href="/growth-hub"><Button className="border-0 text-white" style={{ background: "linear-gradient(135deg,#4055FF,#FF2060)" }}>Join Growth Hub</Button></Link>
+            <Link href="/growth-hub"><Button variant="outline">Start Campaign</Button></Link>
+            <Link href="/growth-hub"><Button variant="outline">Add Credits</Button></Link>
+            <Link href="/growth-hub"><Button variant="outline">Contact Sales</Button></Link>
           </div>
           <p className="mx-auto mt-7 max-w-3xl text-sm leading-6 text-muted-foreground">
             Visa Shuttle Growth Hub is an AI-powered lead exchange and business promotion platform connecting global visa applicants with trusted travel and immigration services.

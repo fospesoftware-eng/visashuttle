@@ -15,6 +15,7 @@ import HomePage from "@/pages/home";
 import BusinessPage from "@/pages/business";
 import AgencyCrmPage from "@/pages/agency-crm";
 import GrowthHubPage from "@/pages/growth-hub";
+import { AdminGrowthHubPage, GrowthHubDashboardPage } from "@/pages/growth-hub-dashboard";
 import { AgenticVisaAiPage, BusinessApiDetailPage, EnterpriseSolutionsPage, WhitelabelSolutionsPage } from "@/pages/business-detail";
 import { AgencyCrmSignupPage, AgenticSignupPage, BusinessApiSignupPage, EnterpriseSignupPage, WhitelabelSignupPage } from "@/pages/business-signup";
 import LoginPage from "@/pages/login";
@@ -146,6 +147,14 @@ function Router() {
       <Route path="/business/agentic-visa-ai" component={AgenticVisaAiPage} />
       <Route path="/business/growth-hub" component={GrowthHubPage} />
       <Route path="/business" component={BusinessPage} />
+      <Route path="/growth-hub/leads">{() => <GrowthHubDashboardPage view="leads" />}</Route>
+      <Route path="/growth-hub/campaigns">{() => <GrowthHubDashboardPage view="campaigns" />}</Route>
+      <Route path="/growth-hub/wallet">{() => <GrowthHubDashboardPage view="wallet" />}</Route>
+      <Route path="/growth-hub/analytics">{() => <GrowthHubDashboardPage view="analytics" />}</Route>
+      <Route path="/growth-hub/profile">{() => <GrowthHubDashboardPage view="profile" />}</Route>
+      <Route path="/growth-hub/billing">{() => <GrowthHubDashboardPage view="billing" />}</Route>
+      <Route path="/growth-hub/soon">{() => <GrowthHubDashboardPage view="soon" />}</Route>
+      <Route path="/growth-hub">{() => <GrowthHubDashboardPage />}</Route>
       <Route path="/join" component={JoinPage} />
       <Route path="/sign-in" component={SignInPage} />
       <Route path="/check" component={CheckPage} />
@@ -284,6 +293,14 @@ function Router() {
       <Route path="/admin/vkb" component={AdminVKBPage} />
       <Route path="/admin/ai" component={AdminAIPage} />
       <Route path="/admin/visa-tools" component={AdminVisaToolsPage} />
+      <Route path="/admin/growth-hub/businesses">{() => <AdminGrowthHubPage view="businesses" />}</Route>
+      <Route path="/admin/growth-hub/leads">{() => <AdminGrowthHubPage view="leads" />}</Route>
+      <Route path="/admin/growth-hub/campaigns">{() => <AdminGrowthHubPage view="campaigns" />}</Route>
+      <Route path="/admin/growth-hub/wallets">{() => <AdminGrowthHubPage view="wallets" />}</Route>
+      <Route path="/admin/growth-hub/billing">{() => <AdminGrowthHubPage view="billing" />}</Route>
+      <Route path="/admin/growth-hub/settings">{() => <AdminGrowthHubPage view="settings" />}</Route>
+      <Route path="/admin/growth-hub/soon">{() => <AdminGrowthHubPage view="soon" />}</Route>
+      <Route path="/admin/growth-hub">{() => <AdminGrowthHubPage />}</Route>
       <Route path="/admin/users" component={AdminUsersPage} />
       <Route path="/admin/operations" component={AdminOperationsPage} />
       <Route path="/admin/finance" component={AdminFinancePage} />
@@ -333,6 +350,7 @@ const PRODUCT_SHELL_PREFIXES = [
   "/deep-check",
   "/payment",
   "/history",
+  "/growth-hub",
   "/saved-profile",
   "/settings",
   "/visa-tools",

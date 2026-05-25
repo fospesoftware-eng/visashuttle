@@ -59,6 +59,7 @@ const adminNavItems: NavItem[] = [
   { icon: Database, label: "Visa Knowledge", href: "/admin/vkb" },
   { icon: ShieldCheck, label: "AI Governance", href: "/admin/ai" },
   { icon: FileSearch, label: "Visa Tools", href: "/admin/visa-tools" },
+  { icon: Sparkles, label: "Growth Hub", href: "/admin/growth-hub", badge: "Beta" },
   { icon: Activity, label: "Audit Logs", href: "/admin/audit" },
   { icon: Settings, label: "Settings", href: "/admin/settings" },
 ];
