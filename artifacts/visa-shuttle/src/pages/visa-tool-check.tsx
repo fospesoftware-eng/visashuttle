@@ -39,6 +39,7 @@ import { riskColor, stripDataPrefix, tools, type VisaToolCheck } from "@/pages/v
 
 type AgencySuggestion = {
   name: string;
+  country?: string;
   state?: string;
   district?: string;
   status?: string;
@@ -150,7 +151,7 @@ function AgencyNameDropdown({
                       {agency.raId && <Badge variant="outline" className="text-[10px]">{agency.raId}</Badge>}
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {[agency.source, agency.status, agency.state, agency.district].filter(Boolean).join(" · ")}
+                      {[agency.source, agency.status, agency.country, agency.state, agency.district].filter(Boolean).join(" · ")}
                       {agency.grievances ? ` · ${agency.grievances} grievance${agency.grievances === 1 ? "" : "s"}` : ""}
                     </p>
                   </div>
@@ -224,7 +225,7 @@ function ResultPanel({ check }: { check: VisaToolCheck | null }) {
                   : "border-amber-200 bg-amber-50 dark:border-amber-800/70 dark:bg-amber-950/30"
               }`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h4 className="text-sm font-bold text-slate-950 dark:text-white">MEA/eMigrate RA Registry</h4>
+                  <h4 className="text-sm font-bold text-slate-950 dark:text-white">MEA/eMigrate Reputed RA Registry</h4>
                   <Badge className={output.official_registry_check.matched && output.official_registry_check.is_active
                     ? "border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-200"
                     : "border-0 bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-200"
@@ -234,7 +235,7 @@ function ResultPanel({ check }: { check: VisaToolCheck | null }) {
                 </div>
                 <p className="mt-2 text-sm leading-6 text-slate-700 dark:text-slate-300">
                   {output.official_registry_check.matched
-                    ? `${output.official_registry_check.agency_name || "Agency"} ${output.official_registry_check.raid ? `(${output.official_registry_check.raid})` : ""} is listed in the MEA/eMigrate Recruiting Agents report.`
+                    ? `${output.official_registry_check.agency_name || "Agency"} ${output.official_registry_check.raid ? `(${output.official_registry_check.raid})` : ""} is listed in the MEA/eMigrate reputed Recruiting Agents report with status: ${output.official_registry_check.status || "Not listed"}.`
                     : output.official_registry_check.note}
                 </p>
                 <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
@@ -504,7 +505,8 @@ export default function VisaToolCheckPage() {
                           ...prev,
                           agencyName: agency.name,
                           raId: agency.raId || prev.raId || "",
-                          countryCity: [agency.state, agency.district].filter(Boolean).join(", ") || prev.countryCity || "",
+                          country: agency.country || "India",
+                          city: agency.district || agency.state || prev.city || "",
                         }))}
                       />
                     ) : (
@@ -521,7 +523,7 @@ export default function VisaToolCheckPage() {
 
               {activeTool.type === "fake_agency" && agencySuggestions.length > 0 && (
                 <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800 dark:border-red-800/70 dark:bg-red-950/35 dark:text-red-200">
-                  Agency dropdown is powered by uploaded MEA/eMigrate registered agents and the “Unregistered Agencies against which Grievances Received” list. Selecting one includes that registry/grievance status in the AI check.
+                  Agency dropdown is powered by the uploaded MEA/eMigrate registered/reputed Recruiting Agents report and the “Unregistered Agencies against which Grievances Received” list. Selecting one includes registry status, city/state, and grievance status in the AI check.
                 </div>
               )}
 

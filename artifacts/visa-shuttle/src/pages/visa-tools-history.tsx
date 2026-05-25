@@ -46,7 +46,7 @@ function ToolReport({ check }: { check: VisaToolCheck }) {
                 : "border-amber-200 bg-amber-50"
             }`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-sm font-bold text-slate-900">MEA/eMigrate RA Registry</h3>
+                <h3 className="text-sm font-bold text-slate-900">MEA/eMigrate Reputed RA Registry</h3>
                 <Badge className={output.official_registry_check.matched && output.official_registry_check.is_active
                   ? "border-0 bg-emerald-100 text-emerald-700"
                   : "border-0 bg-amber-100 text-amber-700"
@@ -56,7 +56,7 @@ function ToolReport({ check }: { check: VisaToolCheck }) {
               </div>
               <p className="mt-2 text-sm leading-6 text-slate-700">
                 {output.official_registry_check.matched
-                  ? `${output.official_registry_check.agency_name || "Agency"} ${output.official_registry_check.raid ? `(${output.official_registry_check.raid})` : ""} is listed in the MEA/eMigrate Recruiting Agents report.`
+                  ? `${output.official_registry_check.agency_name || "Agency"} ${output.official_registry_check.raid ? `(${output.official_registry_check.raid})` : ""} is listed in the MEA/eMigrate reputed Recruiting Agents report with status: ${output.official_registry_check.status || "Not listed"}.`
                   : output.official_registry_check.note}
               </p>
               <p className="mt-2 text-xs text-slate-500">

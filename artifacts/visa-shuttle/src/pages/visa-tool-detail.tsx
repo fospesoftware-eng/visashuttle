@@ -65,7 +65,8 @@ const toolDetails = {
     toolPath: "/visa-tools/fake_agency",
     proof: ["Agency trust signals", "Domain and email checks", "Scam language review"],
     features: [
-      "Website, phone, email, city, and social profile review",
+      "Website, phone, email, country, city, and social profile review",
+      "MEA/eMigrate reputed Recruiting Agent status and grievance-list checks",
       "Detect suspicious domain/email mismatch and generic claims",
       "Flag payment-first language and 100% guarantee promises",
       "Get trust indicators and recommended verification steps",

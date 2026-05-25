@@ -5173,12 +5173,14 @@ export async function registerRoutes(
       raid: best.entry.raid || "",
       agency_name: best.entry.name || "",
       status: best.entry.status || "Status not listed",
+      reputation_signal: "MEA/eMigrate listed recruiting agent",
+      country: "India",
       state: best.entry.state || "",
       district: best.entry.district || "",
       rc_number: best.entry.rc || "",
       website: best.entry.website || "",
       is_active: String(best.entry.status || "").toLowerCase() === "active",
-      note: "Recognized in the MEA/eMigrate Recruiting Agents list. This is a registry signal, not a guarantee of the current offer, person, or payment request.",
+      note: "Recognized in the MEA/eMigrate Recruiting Agents list as a reputed/registered-agency source signal. Check the listed status before trusting the current offer, person, or payment request.",
     };
   }
 
@@ -5242,7 +5244,7 @@ export async function registerRoutes(
         ? [
           "This is a fake agency detector request.",
           "The agencyName field is the primary agency identity selected from the dropdown or entered manually. Always consider that agency name in the analysis.",
-          "Use official_registry_check as a positive MEA/eMigrate registered recruiting-agent signal whenever matched. Registered agencies should improve the trust assessment, while still checking for impersonation, fake contact details, payment pressure, and suspicious documents.",
+          "Use official_registry_check as a positive reputed MEA/eMigrate registered recruiting-agent signal whenever matched, but check and mention the current status. Active status should improve the trust assessment. Dormant, expired, or non-active status should be treated as a caution even though the name is listed.",
           "Use unregistered_agency_grievance_check as a strong negative signal when matched. Clearly mention the grievance count and status in red flags and next steps.",
           "If an agency appears in both sources, the unregistered grievance match must remain a serious negative risk factor, but still mention the registered-agent signal separately.",
           "If no match is found for an India-based recruiting agency, mention that no MEA/eMigrate RA match was found.",
@@ -5278,12 +5280,18 @@ export async function registerRoutes(
       if (meaRegistryCheck) {
         const registry = meaRegistryCheck as any;
         const statusLine = registry.matched
-          ? `MEA/eMigrate RA registry match: ${registry.agency_name || "Registered Agent"} (${registry.raid || "RA ID not listed"}) - status: ${registry.status}; source updated as on ${registry.updated_as_on}.`
+          ? `MEA/eMigrate reputed RA registry match: ${registry.agency_name || "Registered Agent"} (${registry.raid || "RA ID not listed"}) - status: ${registry.status}; source updated as on ${registry.updated_as_on}.`
           : `MEA/eMigrate RA registry check: ${registry.status}; source updated as on ${registry.updated_as_on}. ${registry.note}`;
         if (registry.matched) {
-          result.risk_score = Math.min(result.risk_score, registry.is_active ? 50 : 60);
+          result.risk_score = Math.min(result.risk_score, registry.is_active ? 45 : 60);
           result.risk_level = normalizeRiskLevel("", result.risk_score);
           result.positive_indicators = [statusLine, ...result.positive_indicators].slice(0, 12);
+          if (!registry.is_active) {
+            result.red_flags = [
+              `MEA/eMigrate RA record was found, but current listed status is "${registry.status || "not active"}"; verify status through official channels before payment.`,
+              ...result.red_flags,
+            ].slice(0, 12);
+          }
         } else {
           result.risk_score = Math.max(result.risk_score, 55);
           result.risk_level = normalizeRiskLevel("", result.risk_score);
@@ -7208,16 +7216,18 @@ export async function registerRoutes(
     const query = normalizeAgencyLookup(req.query.q);
     const registered = MEA_RA_ENTRIES.map((entry) => ({
       name: entry.name || "",
+      country: "India",
       state: entry.state || "",
       district: entry.district || "",
       status: entry.status || "",
       raId: entry.raid || "",
-      source: "MEA/eMigrate RA Registry",
+      source: "MEA/eMigrate Reputed RA Registry",
       sourceType: "registered",
       grievances: null as number | null,
     }));
     const unregistered = MEA_UNREGISTERED_ENTRIES.map((entry) => ({
       name: entry.name || "",
+      country: "India",
       state: entry.state || "",
       district: "",
       status: "Unregistered grievance record",
@@ -7246,6 +7256,7 @@ export async function registerRoutes(
       .slice(0, 40)
       .map(({ entry }) => ({
         name: entry.name,
+        country: entry.country,
         state: entry.state,
         district: entry.district,
         status: entry.status,
