@@ -121,7 +121,7 @@ export default function LoginPage() {
 
       <main className="relative z-10 flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 lg:px-10">
         <div className="grid w-full max-w-6xl items-center gap-10 lg:grid-cols-[1fr_0.86fr]">
-          <section className="hidden min-h-[680px] flex-col justify-between rounded-[2.5rem] border border-white/80 bg-white/35 p-10 shadow-2xl shadow-[#4055FF]/8 backdrop-blur-xl lg:flex">
+          <section className="hidden min-h-[680px] flex-col justify-between rounded-[2.5rem] bg-white/35 p-10 shadow-2xl shadow-[#4055FF]/8 backdrop-blur-xl lg:flex">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-[#4055FF]/12 bg-white/70 px-4 py-2 text-sm font-bold text-[#4055FF]">
                 <span className="h-2 w-2 rounded-full bg-[#FF2060]" />
