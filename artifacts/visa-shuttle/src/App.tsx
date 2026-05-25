@@ -14,6 +14,7 @@ import NotFound from "@/pages/not-found";
 import HomePage from "@/pages/home";
 import BusinessPage from "@/pages/business";
 import AgencyCrmPage from "@/pages/agency-crm";
+import GrowthHubPage from "@/pages/growth-hub";
 import { AgenticVisaAiPage, BusinessApiDetailPage, EnterpriseSolutionsPage, WhitelabelSolutionsPage } from "@/pages/business-detail";
 import { AgencyCrmSignupPage, AgenticSignupPage, BusinessApiSignupPage, EnterpriseSignupPage, WhitelabelSignupPage } from "@/pages/business-signup";
 import LoginPage from "@/pages/login";
@@ -143,6 +144,7 @@ function Router() {
       <Route path="/business/whitelabel" component={WhitelabelSolutionsPage} />
       <Route path="/business/agentic-visa-ai/signup" component={AgenticSignupPage} />
       <Route path="/business/agentic-visa-ai" component={AgenticVisaAiPage} />
+      <Route path="/business/growth-hub" component={GrowthHubPage} />
       <Route path="/business" component={BusinessPage} />
       <Route path="/join" component={JoinPage} />
       <Route path="/sign-in" component={SignInPage} />

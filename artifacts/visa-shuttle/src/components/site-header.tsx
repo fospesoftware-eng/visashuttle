@@ -18,6 +18,7 @@ export function SiteHeader() {
     { label: "How It Works", href: "/#how-it-works", anchor: true },
     { label: "Pricing", href: "/pricing" },
     { label: "For Business", href: "/business" },
+    { label: "Growth Hub", href: "/business/growth-hub" },
     { label: "Help", href: "/help" },
     { label: "Contact", href: "/contact" },
   ];
