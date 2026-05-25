@@ -1072,7 +1072,9 @@ function B2cCouponsCard() {
 }
 
 // ── Payment Gateway Card ───────────────────────────────────────────────────
-function PaymentGatewayCard() {
+type PaymentGatewaySection = "all" | "cashfree" | "stripe" | "paypal";
+
+function PaymentGatewayCard({ section = "all" }: { section?: PaymentGatewaySection }) {
   const { toast } = useToast();
   const [showTestSecret, setShowTestSecret] = useState(false);
   const [showLiveSecret, setShowLiveSecret] = useState(false);
@@ -1157,6 +1159,17 @@ function PaymentGatewayCard() {
 
   const activeBaseUrl = form.mode === "live" ? "https://api.cashfree.com/pg" : "https://sandbox.cashfree.com/pg";
   const activeProviderReady = form.provider === "stripe" ? cfg?.stripe?.activeReady : form.provider === "paypal" ? cfg?.paypal?.activeReady : cfg?.activeReady;
+  const sectionTitle = section === "cashfree" ? "Cashfree Payment Gateway"
+    : section === "paypal" ? "PayPal Payment Gateway"
+    : section === "stripe" ? "Stripe Payment Gateway"
+    : "Payment Gateways";
+  const sectionDescription = section === "cashfree"
+    ? "Configure Cashfree for INR checkout, B2C Deep Check payments, and India payment flows."
+    : section === "paypal"
+      ? "Configure PayPal for non-INR checkout, global payments, and webhook identification."
+      : section === "stripe"
+        ? "Configure Stripe credentials for global card payment support."
+        : "Configure Cashfree, Stripe, and PayPal credentials. The selected provider is used for B2C checkout and tenant subscription billing.";
 
   return (
     <Card>
@@ -1165,9 +1178,9 @@ function PaymentGatewayCard() {
           <div>
             <CardTitle className="text-base flex items-center gap-2">
               <CreditCard className="w-4 h-4" />
-              Payment Gateways
+              {sectionTitle}
             </CardTitle>
-            <CardDescription>Configure Cashfree, Stripe, and PayPal credentials. The selected provider is used for B2C checkout and tenant subscription billing.</CardDescription>
+            <CardDescription>{sectionDescription}</CardDescription>
           </div>
           {isLoading ? (
             <div className="w-5 h-5 border-2 border-muted border-t-foreground rounded-full animate-spin" />
@@ -1207,6 +1220,8 @@ function PaymentGatewayCard() {
         </div>
       </CardContent>
       <CardContent className="space-y-5">
+        {(section === "all" || section === "cashfree") && (
+          <>
         <div className="flex items-center gap-2 pt-1">
           <CreditCard className="w-4 h-4 text-muted-foreground" />
           <h3 className="text-sm font-semibold">Cashfree Credentials</h3>
@@ -1365,8 +1380,12 @@ function PaymentGatewayCard() {
           </div>
           <p className="text-xs text-muted-foreground">Cashfree merchant APIs use `x-client-id`, `x-client-secret`, and `x-api-version` headers. Keep secrets server-side only.</p>
         </div>
+          </>
+        )}
 
-        <Separator className="my-2" />
+        {(section === "all" || section === "stripe") && (
+          <>
+        {section === "all" && <Separator className="my-2" />}
 
         {/* ── Stripe Credentials ─────────────────────────────────────────── */}
         <div className="flex items-center gap-2 pt-1">
@@ -1513,8 +1532,12 @@ function PaymentGatewayCard() {
           </div>
           <p className="text-xs text-muted-foreground">Used to verify Stripe webhook signatures. Find it in Stripe Dashboard → Developers → Webhooks.</p>
         </div>
+          </>
+        )}
 
-        <Separator className="my-2" />
+        {(section === "all" || section === "paypal") && (
+          <>
+        {section === "all" && <Separator className="my-2" />}
 
         {/* ── PayPal Credentials ─────────────────────────────────────────── */}
         <div className="flex items-center gap-2 pt-1">
@@ -1653,6 +1676,8 @@ function PaymentGatewayCard() {
           />
           <p className="text-xs text-muted-foreground">Optional for future webhook verification. Current checkout verifies payment by capturing the approved PayPal order server-side.</p>
         </div>
+          </>
+        )}
 
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-4">
@@ -2153,12 +2178,16 @@ export default function AdminSettingsPage() {
         </div>
 
         <Tabs defaultValue="general" className="space-y-4">
-          <TabsList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 h-auto w-full max-w-5xl">
+          <TabsList className="flex h-auto w-full max-w-5xl flex-wrap justify-start gap-1 p-1">
             <TabsTrigger value="general" data-testid="tab-general">General</TabsTrigger>
             <TabsTrigger value="security" data-testid="tab-security">Security</TabsTrigger>
             <TabsTrigger value="limits" data-testid="tab-limits">Defaults</TabsTrigger>
             <TabsTrigger value="b2c-pricing" data-testid="tab-b2c-pricing">B2C Pricing</TabsTrigger>
-            <TabsTrigger value="integrations" data-testid="tab-integrations">Integrations</TabsTrigger>
+            <TabsTrigger value="cashfree" data-testid="tab-cashfree">Cashfree</TabsTrigger>
+            <TabsTrigger value="paypal" data-testid="tab-paypal">PayPal</TabsTrigger>
+            <TabsTrigger value="stripe" data-testid="tab-stripe">Stripe</TabsTrigger>
+            <TabsTrigger value="email" data-testid="tab-email">Email</TabsTrigger>
+            <TabsTrigger value="sms" data-testid="tab-sms">SMS</TabsTrigger>
             <TabsTrigger value="email-templates">Email Templates</TabsTrigger>
             <TabsTrigger value="notifications">Alerts</TabsTrigger>
           </TabsList>
@@ -2277,7 +2306,7 @@ export default function AdminSettingsPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {[
-                  { label: "ZeptoMail Send Mail Token", hint: "Managed in Integrations → ZeptoMail Transactional Email" },
+                  { label: "ZeptoMail Send Mail Token", hint: "Managed in Settings → Email" },
                   { label: "Stripe Secret Key", hint: "Used for subscription billing" },
                 ].map(k => (
                   <div key={k.label} className="space-y-1.5">
@@ -2339,10 +2368,25 @@ export default function AdminSettingsPage() {
             </Button>
           </TabsContent>
 
-          {/* ── Integrations Tab ──────────────────────────────────────────── */}
-          <TabsContent value="integrations" className="space-y-4">
-            <PaymentGatewayCard />
+          {/* ── Payment Gateway Tabs ─────────────────────────────────────── */}
+          <TabsContent value="cashfree" className="space-y-4">
+            <PaymentGatewayCard section="cashfree" />
+          </TabsContent>
+
+          <TabsContent value="paypal" className="space-y-4">
+            <PaymentGatewayCard section="paypal" />
+          </TabsContent>
+
+          <TabsContent value="stripe" className="space-y-4">
+            <PaymentGatewayCard section="stripe" />
+          </TabsContent>
+
+          {/* ── Communication Tabs ───────────────────────────────────────── */}
+          <TabsContent value="email" className="space-y-4">
             <TransactionalEmailCard />
+          </TabsContent>
+
+          <TabsContent value="sms" className="space-y-4">
             <SmsGatewayCard />
           </TabsContent>
 
