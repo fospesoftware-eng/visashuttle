@@ -50,6 +50,20 @@ function loadCashfreeSdk() {
   });
 }
 
+async function readCheckoutJson(res: Response) {
+  const contentType = res.headers.get("content-type") || "";
+  const text = await res.text();
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    throw new Error(
+      contentType.includes("application/json")
+        ? "Checkout returned invalid payment data. Please refresh and try again."
+        : "Checkout returned an unexpected response. Please refresh and try again.",
+    );
+  }
+}
+
 export default function DeepCheckPaymentPage() {
   const { user, isLoading: authLoading } = useB2cAuth();
   const [, setLocation] = useLocation();
@@ -108,7 +122,7 @@ export default function DeepCheckPaymentPage() {
       try {
         const query = paymentProvider === "paypal" ? "?provider=paypal" : "";
         const res = await apiRequest("GET", `/api/b2c/payments/deep-check/order/${orderId}${query}`);
-        const data = await res.json();
+        const data = await readCheckoutJson(res);
         if (cancelled) return;
         if (data.paid || data.deepCheckAccess) {
           await queryClient.invalidateQueries({ queryKey: ["/api/b2c/auth/me"] });
@@ -138,7 +152,7 @@ export default function DeepCheckPaymentPage() {
     try {
       storeB2cCurrency(currency);
       const res = await apiRequest("POST", "/api/b2c/payments/deep-check/order", { planKey: selectedPlan.planKey, currency, couponCode: coupon?.code || couponCode });
-      const data = await res.json();
+      const data = await readCheckoutJson(res);
       if (data.alreadyActive) {
         setLocation(data.redirectUrl || "/deep-check");
         return;
@@ -169,12 +183,12 @@ export default function DeepCheckPaymentPage() {
       setCoupon(null);
       return;
     }
-    setIsApplyingCoupon(true);
+      setIsApplyingCoupon(true);
     setCouponMessage("");
     setError("");
     try {
       const res = await apiRequest("POST", "/api/b2c/payments/deep-check/coupon", { planKey: selectedPlan.planKey, currency, couponCode: code });
-      const data = await res.json();
+      const data = await readCheckoutJson(res);
       setCoupon({
         code: data.code,
         discountPercent: data.discountPercent,
