@@ -108,10 +108,10 @@ export const tools: Array<{
 
 export function riskColor(level?: string | null) {
   const normalized = String(level || "").toLowerCase();
-  if (normalized.includes("critical")) return "bg-red-100 text-red-700 border-red-200";
-  if (normalized.includes("high")) return "bg-orange-100 text-orange-700 border-orange-200";
-  if (normalized.includes("medium")) return "bg-amber-100 text-amber-700 border-amber-200";
-  return "bg-emerald-100 text-emerald-700 border-emerald-200";
+  if (normalized.includes("critical")) return "bg-red-100 text-red-700 border-red-200 dark:bg-red-950/45 dark:text-red-200 dark:border-red-800/70";
+  if (normalized.includes("high")) return "bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-950/45 dark:text-orange-200 dark:border-orange-800/70";
+  if (normalized.includes("medium")) return "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/45 dark:text-amber-200 dark:border-amber-800/70";
+  return "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/45 dark:text-emerald-200 dark:border-emerald-800/70";
 }
 
 export function stripDataPrefix(dataUrl: string) {
@@ -150,25 +150,27 @@ export default function VisaToolsPage() {
   return (
     <DashboardLayout title="Visa Tools" subtitle="AI-assisted fraud-risk checks">
       <div className="space-y-6">
-        <div className="rounded-2xl border bg-gradient-to-br from-[#4055FF]/10 via-white to-[#FF2060]/10 p-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-br from-[#4055FF]/10 via-white to-[#FF2060]/10 p-5 shadow-sm dark:border-slate-800 dark:from-[#4055FF]/20 dark:via-slate-950 dark:to-[#FF2060]/15">
+          <div className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-[#4055FF]/10 blur-3xl dark:bg-[#4055FF]/20" />
+          <div className="pointer-events-none absolute -bottom-28 left-1/3 h-60 w-60 rounded-full bg-[#FF2060]/10 blur-3xl dark:bg-[#FF2060]/15" />
+          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <Badge className="mb-3 border-0 bg-[#4055FF] text-white">Signed-in users only</Badge>
-              <h2 className="text-2xl font-black tracking-tight text-slate-900">Visa Tools</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+              <h2 className="text-2xl font-black tracking-tight text-slate-950 dark:text-white">Visa Tools</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
                 Analyze visas, offer letters, agencies and visa schemes for possible fraud indicators. Results are risk-based and need official verification.
               </p>
             </div>
-            <div className="rounded-xl border bg-white/80 p-3 text-sm text-slate-600">
-              <div className="mb-3 flex items-center justify-between gap-3 rounded-lg bg-[#4055FF]/5 px-3 py-2">
-                <span className="text-xs font-semibold text-slate-600">Credits remaining</span>
-                <span className="text-sm font-black text-[#4055FF]">{credits?.remainingCredits ?? 0}</span>
+            <div className="rounded-xl border border-white/70 bg-white/85 p-3 text-sm text-slate-600 shadow-sm backdrop-blur dark:border-slate-700/80 dark:bg-slate-900/80 dark:text-slate-300">
+              <div className="mb-3 flex items-center justify-between gap-3 rounded-lg bg-[#4055FF]/5 px-3 py-2 dark:bg-[#4055FF]/15">
+                <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Credits remaining</span>
+                <span className="text-sm font-black text-[#4055FF] dark:text-blue-300">{credits?.remainingCredits ?? 0}</span>
               </div>
               <div className="flex items-start gap-2">
                 <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-500" />
                 <span>This is AI-assisted analysis only, not legal or government verification.</span>
               </div>
-              <Button variant="outline" size="sm" className="mt-3 w-full" onClick={() => setLocation("/payment/visa-tools-credits")}>
+              <Button variant="outline" size="sm" className="mt-3 w-full dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-100 dark:hover:bg-slate-800" onClick={() => setLocation("/payment/visa-tools-credits")}>
                 Buy additional credits
               </Button>
             </div>
@@ -179,17 +181,17 @@ export default function VisaToolsPage() {
           <button
             type="button"
             onClick={() => setLocation("/visa-tools/visa-check")}
-            className="rounded-2xl border bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#4055FF] hover:shadow-lg"
+            className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#4055FF] hover:shadow-lg dark:border-slate-800 dark:bg-slate-900/80 dark:hover:border-[#4055FF]"
             data-testid="card-visa-check-tool"
           >
             <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#4055FF] to-[#9033F5] text-white">
               <Globe2 className="h-5 w-5" />
             </div>
-            <h3 className="font-bold text-slate-900">Visa Check</h3>
-            <p className="mt-2 text-xs leading-5 text-slate-500">
+            <h3 className="font-bold text-slate-950 dark:text-white">Visa Check</h3>
+            <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
               Check destination entry requirements, visa type, passport validity and route conditions in a guided flow.
             </p>
-            <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-[#4055FF]">
+            <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-[#4055FF] dark:text-blue-300">
               Open Visa Check <ArrowRight className="h-3 w-3" />
             </span>
           </button>
@@ -199,14 +201,14 @@ export default function VisaToolsPage() {
               <button
                 key={tool.type}
                 onClick={() => setLocation(`/visa-tools/${tool.type}`)}
-                className="rounded-2xl border bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#4055FF] hover:shadow-lg"
+                className="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#4055FF] hover:shadow-lg dark:border-slate-800 dark:bg-slate-900/80 dark:hover:border-[#4055FF]"
               >
                 <div className={`mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${tool.gradient} text-white`}>
                   <Icon className="h-5 w-5" />
                 </div>
-                <h3 className="font-bold text-slate-900">{tool.title}</h3>
-                <p className="mt-2 text-xs leading-5 text-slate-500">{tool.description}</p>
-                <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-[#4055FF]">
+                <h3 className="font-bold text-slate-950 dark:text-white">{tool.title}</h3>
+                <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">{tool.description}</p>
+                <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-[#4055FF] dark:text-blue-300">
                   Start Check <ArrowRight className="h-3 w-3" />
                 </span>
               </button>
@@ -214,18 +216,18 @@ export default function VisaToolsPage() {
           })}
         </div>
 
-        <Card className="border-0 shadow-sm">
+        <Card className="border border-slate-200 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
           <CardContent className="p-5">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 className="text-lg font-black text-slate-900">Previous Visa Tools Checks</h3>
-                <p className="text-sm text-slate-500">Every completed scan is saved under your account.</p>
+                <h3 className="text-lg font-black text-slate-950 dark:text-white">Previous Visa Tools Checks</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Every completed scan is saved under your account.</p>
               </div>
-              <Button variant="outline" size="sm" onClick={() => setLocation("/visa-tools/history")}>Open full history</Button>
+              <Button variant="outline" size="sm" className="dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-100 dark:hover:bg-slate-800" onClick={() => setLocation("/visa-tools/history")}>Open full history</Button>
             </div>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {history.map((check) => (
-                <button key={check.id} onClick={() => setLocation(`/visa-tools/history/${check.id}`)} className="rounded-xl border bg-white p-4 text-left transition hover:border-[#4055FF]">
+                <button key={check.id} onClick={() => setLocation(`/visa-tools/history/${check.id}`)} className="rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-[#4055FF] dark:border-slate-800 dark:bg-slate-950/50 dark:hover:border-[#4055FF]">
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <Badge variant="secondary">{tools.find((t) => t.type === check.toolType)?.title || check.toolType}</Badge>
                     <Badge className={riskColor(check.riskLevel)}>{check.riskLevel}</Badge>
@@ -233,13 +235,13 @@ export default function VisaToolsPage() {
                   <div className="flex items-center gap-3">
                     <FileText className="h-5 w-5 text-[#4055FF]" />
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-900">{check.inputSummary || "Visa Tools check"}</p>
-                      <p className="text-xs text-slate-500">{new Date(check.createdAt).toLocaleString()}</p>
+                      <p className="truncate text-sm font-semibold text-slate-950 dark:text-slate-100">{check.inputSummary || "Visa Tools check"}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{new Date(check.createdAt).toLocaleString()}</p>
                     </div>
                   </div>
                 </button>
               ))}
-              {!history.length && <p className="text-sm text-slate-500">No Visa Tools history yet.</p>}
+              {!history.length && <p className="text-sm text-slate-500 dark:text-slate-400">No Visa Tools history yet.</p>}
             </div>
           </CardContent>
         </Card>
