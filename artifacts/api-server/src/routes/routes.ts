@@ -5044,6 +5044,10 @@ export async function registerRoutes(
       .replace(/\s+/g, " ");
   }
 
+  function compactAgencyLookup(value: unknown): string {
+    return normalizeAgencyLookup(value).replace(/\s+/g, "");
+  }
+
   function normalizeDomain(value: unknown): string {
     const raw = String(value || "").trim().toLowerCase();
     if (!raw) return "";
@@ -5067,6 +5071,8 @@ export async function registerRoutes(
     const inputText = `${Object.values(fields).join(" ")} ${manualText || ""}`;
     const candidates = MEA_UNREGISTERED_ENTRIES.map((entry) => {
       const entryName = normalizeAgencyLookup(entry.name);
+      const compactAgencyName = compactAgencyLookup(fields.agencyName);
+      const compactEntryName = compactAgencyLookup(entry.name);
       let score = 0;
       const reasons: string[] = [];
       if (agencyName && entryName) {
@@ -5081,6 +5087,9 @@ export async function registerRoutes(
         } else if (entryTokens.length && tokenMatches >= Math.min(2, entryTokens.length)) {
           score += 55;
           reasons.push("agency name tokens matched");
+        } else if (compactAgencyName && compactEntryName && (compactAgencyName.includes(compactEntryName) || compactEntryName.includes(compactAgencyName))) {
+          score += 58;
+          reasons.push("agency compact name matched");
         }
       }
       const normalizedInput = normalizeAgencyLookup(inputText);
@@ -5127,6 +5136,8 @@ export async function registerRoutes(
     const candidates = MEA_RA_ENTRIES.map((entry) => {
       const entryDomain = normalizeDomain(entry.website);
       const entryName = normalizeAgencyLookup(entry.name);
+      const compactAgencyName = compactAgencyLookup(fields.agencyName);
+      const compactEntryName = compactAgencyLookup(entry.name);
       let score = 0;
       const reasons: string[] = [];
       if (raid && String(entry.raid || "").toUpperCase() === raid) {
@@ -5149,6 +5160,9 @@ export async function registerRoutes(
         } else if (entryTokens.length && tokenMatches >= Math.min(2, entryTokens.length)) {
           score += 45;
           reasons.push("agency name tokens matched");
+        } else if (compactAgencyName && compactEntryName && (compactAgencyName.includes(compactEntryName) || compactEntryName.includes(compactAgencyName))) {
+          score += 50;
+          reasons.push("agency compact name matched");
         }
       }
       return { entry, score, reasons };
@@ -7247,9 +7261,19 @@ export async function registerRoutes(
     const suggestions = [...registered, ...unregistered]
       .map((entry) => {
         const normalized = normalizeAgencyLookup(entry.name);
+        const compactNormalized = normalized.replace(/\s+/g, "");
+        const compactQuery = query.replace(/\s+/g, "");
+        const searchable = normalizeAgencyLookup([entry.name, entry.raId, entry.status, entry.state, entry.district, entry.source].filter(Boolean).join(" "));
+        const compactSearchable = searchable.replace(/\s+/g, "");
         const score = !query
           ? entry.sourceType === "grievance" ? 55 + Number(entry.grievances || 0) : isMeaActiveStatus(entry.status) ? 50 : 35
-          : normalized.startsWith(query) ? 120 : normalized.includes(query) ? 80 : 0;
+          : normalized.startsWith(query) ? 140
+            : compactNormalized.startsWith(compactQuery) ? 135
+              : normalized.includes(query) ? 100
+                : compactNormalized.includes(compactQuery) ? 95
+                  : searchable.includes(query) ? 75
+                    : compactSearchable.includes(compactQuery) ? 70
+                      : 0;
         return { entry, normalized, score };
       })
       .filter((item) => item.entry.name && item.score > 0)
