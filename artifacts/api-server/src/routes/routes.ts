@@ -5055,6 +5055,13 @@ export async function registerRoutes(
     }
   }
 
+  function isMeaActiveStatus(status: unknown): boolean {
+    const value = String(status || "").toLowerCase();
+    if (!value) return false;
+    if (/\b(expired|dormant|cancelled|canceled|suspended|de-activated|deactivated)\b/.test(value)) return false;
+    return /\bactive\b/.test(value);
+  }
+
   function findMeaUnregisteredAgencyGrievance(fields: Record<string, unknown>, manualText: string) {
     const agencyName = normalizeAgencyLookup(fields.agencyName);
     const inputText = `${Object.values(fields).join(" ")} ${manualText || ""}`;
@@ -5179,7 +5186,7 @@ export async function registerRoutes(
       district: best.entry.district || "",
       rc_number: best.entry.rc || "",
       website: best.entry.website || "",
-      is_active: String(best.entry.status || "").toLowerCase() === "active",
+      is_active: isMeaActiveStatus(best.entry.status),
       note: "Recognized in the MEA/eMigrate Recruiting Agents list as a reputed/registered-agency source signal. Check the listed status before trusting the current offer, person, or payment request.",
     };
   }
@@ -7241,7 +7248,7 @@ export async function registerRoutes(
       .map((entry) => {
         const normalized = normalizeAgencyLookup(entry.name);
         const score = !query
-          ? entry.sourceType === "grievance" ? 55 + Number(entry.grievances || 0) : entry.status.toLowerCase() === "active" ? 50 : 35
+          ? entry.sourceType === "grievance" ? 55 + Number(entry.grievances || 0) : isMeaActiveStatus(entry.status) ? 50 : 35
           : normalized.startsWith(query) ? 120 : normalized.includes(query) ? 80 : 0;
         return { entry, normalized, score };
       })

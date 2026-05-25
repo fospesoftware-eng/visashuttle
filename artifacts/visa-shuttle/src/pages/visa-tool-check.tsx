@@ -49,6 +49,13 @@ type AgencySuggestion = {
   grievances?: number | null;
 };
 
+function isActiveRaStatus(status?: string) {
+  const value = (status || "").toLowerCase();
+  if (!value) return false;
+  if (/\b(expired|dormant|cancelled|canceled|suspended|de-activated|deactivated)\b/.test(value)) return false;
+  return /\bactive\b/.test(value);
+}
+
 function AgencyNameDropdown({
   value,
   manualMode,
@@ -72,6 +79,7 @@ function AgencyNameDropdown({
 }) {
   const [open, setOpen] = useState(false);
   const selected = suggestions.find((agency) => agency.name === value);
+  const selectedIsWarning = Boolean(selected && selected.sourceType === "registered" && !isActiveRaStatus(selected.status));
 
   if (manualMode) {
     return (
@@ -173,11 +181,13 @@ function AgencyNameDropdown({
       {selected && (
         <p className={cn(
           "mt-1.5 text-xs",
-          selected.sourceType === "grievance" ? "text-red-600 dark:text-red-300" : "text-emerald-700 dark:text-emerald-300",
+          selected.sourceType === "grievance" || selectedIsWarning ? "text-red-600 dark:text-red-300" : "text-emerald-700 dark:text-emerald-300",
         )}>
           {selected.sourceType === "grievance"
             ? `Selected from grievance list${selected.grievances ? ` · ${selected.grievances} grievance${selected.grievances === 1 ? "" : "s"}` : ""}.`
-            : `Selected from MEA/eMigrate RA registry${selected.raId ? ` · ${selected.raId}` : ""}.`}
+            : selectedIsWarning
+              ? `Selected from MEA/eMigrate RA registry${selected.raId ? ` · ${selected.raId}` : ""} · warning: ${selected.status || "not active"}.`
+              : `Selected from MEA/eMigrate RA registry${selected.raId ? ` · ${selected.raId}` : ""}.`}
         </p>
       )}
     </Popover>
@@ -222,13 +232,17 @@ function ResultPanel({ check }: { check: VisaToolCheck | null }) {
               <section className={`rounded-xl border p-4 ${
                 output.official_registry_check.matched && output.official_registry_check.is_active
                   ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800/70 dark:bg-emerald-950/30"
-                  : "border-amber-200 bg-amber-50 dark:border-amber-800/70 dark:bg-amber-950/30"
+                  : output.official_registry_check.matched
+                    ? "border-red-200 bg-red-50 dark:border-red-800/70 dark:bg-red-950/30"
+                    : "border-amber-200 bg-amber-50 dark:border-amber-800/70 dark:bg-amber-950/30"
               }`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h4 className="text-sm font-bold text-slate-950 dark:text-white">MEA/eMigrate Reputed RA Registry</h4>
                   <Badge className={output.official_registry_check.matched && output.official_registry_check.is_active
                     ? "border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-200"
-                    : "border-0 bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-200"
+                    : output.official_registry_check.matched
+                      ? "border-0 bg-red-100 text-red-700 dark:bg-red-900/60 dark:text-red-200"
+                      : "border-0 bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-200"
                   }>
                     {output.official_registry_check.status || "Not found"}
                   </Badge>
