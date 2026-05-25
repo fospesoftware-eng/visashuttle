@@ -8,6 +8,7 @@ import express from "express";
 import { sendOtp, verifyOtp, getSmsProviderStatus } from "../sms";
 import { getEntryRequirement } from "../shared/visa-free";
 import indiaVisaChanceDataset from "../shared/india_visa_chance_dataset_non_visa_free_2026.json" assert { type: "json" };
+import meaRegisteredAgentsDataset from "../shared/mea_registered_agents_2026_05_25.json" assert { type: "json" };
 import bcrypt from "bcryptjs";
 import rateLimit from "express-rate-limit";
 import { randomUUID, randomBytes } from "crypto";
@@ -4981,6 +4982,112 @@ export async function registerRoutes(
     return [VISA_TOOL_LABELS[toolType] || toolType, ...pairs, text].filter(Boolean).join(" | ").slice(0, 1200);
   }
 
+  type MeaRegisteredAgent = {
+    sno?: string;
+    raid?: string;
+    name?: string;
+    state?: string;
+    district?: string;
+    rc?: string;
+    status?: string;
+    website?: string;
+  };
+
+  const MEA_RA_SOURCE_DATE = String((meaRegisteredAgentsDataset as any).updatedAsOn || "25-05-2026");
+  const MEA_RA_ENTRIES = ((meaRegisteredAgentsDataset as any).entries || []) as MeaRegisteredAgent[];
+
+  function normalizeAgencyLookup(value: unknown): string {
+    return String(value || "")
+      .toLowerCase()
+      .replace(/https?:\/\//g, " ")
+      .replace(/\b(www|pvt|private|limited|ltd|llp|llc|inc|consultancy|consultants|services|service|travels|travel|international|overseas|agency|agencies|placement|placements|enterprise|enterprises)\b/g, " ")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim()
+      .replace(/\s+/g, " ");
+  }
+
+  function normalizeDomain(value: unknown): string {
+    const raw = String(value || "").trim().toLowerCase();
+    if (!raw) return "";
+    try {
+      const url = new URL(raw.startsWith("http") ? raw : `https://${raw}`);
+      return url.hostname.replace(/^www\./, "");
+    } catch {
+      return raw.replace(/^https?:\/\//, "").replace(/^www\./, "").split(/[/?#]/)[0];
+    }
+  }
+
+  function findMeaRegisteredAgent(fields: Record<string, unknown>, manualText: string) {
+    const agencyName = normalizeAgencyLookup(fields.agencyName);
+    const websiteDomain = normalizeDomain(fields.website);
+    const inputText = `${Object.values(fields).join(" ")} ${manualText || ""}`;
+    const raidMatch = inputText.match(/\bRA\s*[-:]?\s*(\d{3,6})\b/i);
+    const raid = raidMatch ? `RA${raidMatch[1]}`.toUpperCase() : "";
+    const candidates = MEA_RA_ENTRIES.map((entry) => {
+      const entryDomain = normalizeDomain(entry.website);
+      const entryName = normalizeAgencyLookup(entry.name);
+      let score = 0;
+      const reasons: string[] = [];
+      if (raid && String(entry.raid || "").toUpperCase() === raid) {
+        score += 100;
+        reasons.push("RA ID matched");
+      }
+      if (websiteDomain && entryDomain && (websiteDomain === entryDomain || websiteDomain.endsWith(`.${entryDomain}`))) {
+        score += 80;
+        reasons.push("website matched");
+      }
+      if (agencyName && entryName) {
+        const shorter = agencyName.length <= entryName.length ? agencyName : entryName;
+        const longer = agencyName.length > entryName.length ? agencyName : entryName;
+        const agencyTokens = new Set(agencyName.split(" ").filter((token) => token.length > 2));
+        const entryTokens = entryName.split(" ").filter((token) => token.length > 2);
+        const tokenMatches = entryTokens.filter((token) => agencyTokens.has(token)).length;
+        if (shorter.length >= 5 && longer.includes(shorter)) {
+          score += 65;
+          reasons.push("agency name matched");
+        } else if (entryTokens.length && tokenMatches >= Math.min(2, entryTokens.length)) {
+          score += 45;
+          reasons.push("agency name tokens matched");
+        }
+      }
+      return { entry, score, reasons };
+    }).filter((candidate) => candidate.score >= 45).sort((a, b) => b.score - a.score);
+
+    const best = candidates[0];
+    const isIndiaContext = /\b(india|bharat|\+91|\.in\b|delhi|mumbai|kerala|tamil|karnataka|telangana|andhra|punjab|uttar|maharashtra|hyderabad|bangalore|chennai|kochi|ernakulam)\b/i.test(inputText);
+    if (!best) {
+      return {
+        checked: true,
+        source: "MEA/eMigrate Recruiting Agents list",
+        updated_as_on: MEA_RA_SOURCE_DATE,
+        status: "Not found",
+        matched: false,
+        applies_to: "Indian recruiting agents registered under MEA/eMigrate",
+        note: isIndiaContext
+          ? "No matching MEA/eMigrate Recruiting Agent record was found in the uploaded RA list."
+          : "No matching MEA/eMigrate record was found. This list primarily applies to Indian recruiting agents.",
+      };
+    }
+
+    return {
+      checked: true,
+      source: "MEA/eMigrate Recruiting Agents list",
+      updated_as_on: MEA_RA_SOURCE_DATE,
+      matched: true,
+      match_confidence: best.score >= 80 ? "High" : "Possible",
+      match_reasons: best.reasons,
+      raid: best.entry.raid || "",
+      agency_name: best.entry.name || "",
+      status: best.entry.status || "Status not listed",
+      state: best.entry.state || "",
+      district: best.entry.district || "",
+      rc_number: best.entry.rc || "",
+      website: best.entry.website || "",
+      is_active: String(best.entry.status || "").toLowerCase() === "active",
+      note: "Recognized in the MEA/eMigrate Recruiting Agents list. This is a registry signal, not a guarantee of the current offer, person, or payment request.",
+    };
+  }
+
   async function runVisaToolClaudeAnalysis(payload: {
     toolType: string;
     fields: Record<string, unknown>;
@@ -4991,6 +5098,9 @@ export async function registerRoutes(
     const model = process.env.ANTHROPIC_MODEL || "claude-opus-4-5";
     if (!apiKey) throw new Error("Anthropic API key not configured");
 
+    const meaRegistryCheck = payload.toolType === "fake_agency"
+      ? findMeaRegisteredAgent(payload.fields, payload.manualText)
+      : null;
     const promptPayload = {
       tool_type: payload.toolType,
       country: payload.fields.country || payload.fields.destinationCountry || "",
@@ -5004,6 +5114,7 @@ export async function registerRoutes(
         malware_scan_status: "placeholder_not_scanned",
         storage_policy: "private_user_document_reference_only",
       } : null,
+      official_registry_check: meaRegistryCheck,
       analysis_required: [
         "risk_score",
         "risk_level",
@@ -5029,6 +5140,14 @@ export async function registerRoutes(
         "Build a practical reapplication strategy with evidence improvements, documents to fix, profile gaps, and timing.",
         "Return extra JSON keys: real_refusal_reasons, wait_time_guidance, reapplication_strategy, documents_to_fix.",
       ].join(" ")
+      : payload.toolType === "fake_agency"
+        ? [
+          "This is a fake agency detector request.",
+          "Use official_registry_check as an MEA/eMigrate registered recruiting-agent signal when it is present.",
+          "If the agency is matched and status is Active, treat that as a positive indicator, but still assess impersonation, payment demands, unrealistic claims, mismatched contact details, and suspicious documents.",
+          "If the agency is matched but status is not Active, treat the status as a major risk signal.",
+          "If no match is found for an India-based recruiting agency, mention that no MEA/eMigrate RA match was found.",
+        ].join(" ")
       : "";
 
     const content: any[] = [{
@@ -5081,7 +5200,7 @@ export async function registerRoutes(
     if (!jsonText) throw new Error("Claude did not return valid JSON");
     const parsed = JSON.parse(jsonText);
     const riskScore = clampRiskScore(parsed.risk_score);
-    return {
+    const result = {
       risk_score: riskScore,
       risk_level: normalizeRiskLevel(parsed.risk_level, riskScore),
       summary: String(parsed.summary || "AI-assisted fraud risk analysis completed."),
@@ -5095,6 +5214,23 @@ export async function registerRoutes(
       documents_to_fix: Array.isArray(parsed.documents_to_fix) ? parsed.documents_to_fix.map(String).slice(0, 12) : [],
       disclaimer: "This is an AI-assisted risk analysis only. Please verify with official government, employer, registered agency, or qualified immigration sources.",
     };
+    if (meaRegistryCheck) {
+      const registry = meaRegistryCheck as any;
+      const statusLine = registry.matched
+        ? `MEA/eMigrate RA registry match: ${registry.agency_name || "Registered Agent"} (${registry.raid || "RA ID not listed"}) - status: ${registry.status}; source updated as on ${registry.updated_as_on}.`
+        : `MEA/eMigrate RA registry check: ${registry.status}; source updated as on ${registry.updated_as_on}. ${registry.note}`;
+      if (registry.matched && registry.is_active) {
+        result.risk_score = Math.min(result.risk_score, 55);
+        result.risk_level = normalizeRiskLevel("", result.risk_score);
+        result.positive_indicators = [statusLine, ...result.positive_indicators].slice(0, 12);
+      } else {
+        result.risk_score = Math.max(result.risk_score, registry.matched ? 70 : 55);
+        result.risk_level = normalizeRiskLevel("", result.risk_score);
+        result.red_flags = [statusLine, ...result.red_flags].slice(0, 12);
+      }
+      (result as any).official_registry_check = registry;
+    }
+    return result;
   }
 
   // ── OTP Send ─────────────────────────────────────────────────────────────

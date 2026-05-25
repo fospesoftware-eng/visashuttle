@@ -39,6 +39,32 @@ function ToolReport({ check }: { check: VisaToolCheck }) {
 
       <Card className="border-0 shadow-sm">
         <CardContent className="space-y-5 p-5">
+          {output.official_registry_check && (
+            <section className={`rounded-xl border p-4 ${
+              output.official_registry_check.matched && output.official_registry_check.is_active
+                ? "border-emerald-200 bg-emerald-50"
+                : "border-amber-200 bg-amber-50"
+            }`}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-bold text-slate-900">MEA/eMigrate RA Registry</h3>
+                <Badge className={output.official_registry_check.matched && output.official_registry_check.is_active
+                  ? "border-0 bg-emerald-100 text-emerald-700"
+                  : "border-0 bg-amber-100 text-amber-700"
+                }>
+                  {output.official_registry_check.status || "Not found"}
+                </Badge>
+              </div>
+              <p className="mt-2 text-sm leading-6 text-slate-700">
+                {output.official_registry_check.matched
+                  ? `${output.official_registry_check.agency_name || "Agency"} ${output.official_registry_check.raid ? `(${output.official_registry_check.raid})` : ""} is listed in the MEA/eMigrate Recruiting Agents report.`
+                  : output.official_registry_check.note}
+              </p>
+              <p className="mt-2 text-xs text-slate-500">
+                Source updated as on {output.official_registry_check.updated_as_on}. This confirms a registry signal only; verify the exact offer, contact person, payment request, and official government records before proceeding.
+              </p>
+            </section>
+          )}
+
           <section>
             <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-900"><ShieldAlert className="h-4 w-4 text-orange-500" /> Red flags</h3>
             <div className="space-y-2">

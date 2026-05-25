@@ -59,6 +59,32 @@ function ResultPanel({ check }: { check: VisaToolCheck | null }) {
               </div>
             </div>
 
+            {output.official_registry_check && (
+              <section className={`rounded-xl border p-4 ${
+                output.official_registry_check.matched && output.official_registry_check.is_active
+                  ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800/70 dark:bg-emerald-950/30"
+                  : "border-amber-200 bg-amber-50 dark:border-amber-800/70 dark:bg-amber-950/30"
+              }`}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h4 className="text-sm font-bold text-slate-950 dark:text-white">MEA/eMigrate RA Registry</h4>
+                  <Badge className={output.official_registry_check.matched && output.official_registry_check.is_active
+                    ? "border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-200"
+                    : "border-0 bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-200"
+                  }>
+                    {output.official_registry_check.status || "Not found"}
+                  </Badge>
+                </div>
+                <p className="mt-2 text-sm leading-6 text-slate-700 dark:text-slate-300">
+                  {output.official_registry_check.matched
+                    ? `${output.official_registry_check.agency_name || "Agency"} ${output.official_registry_check.raid ? `(${output.official_registry_check.raid})` : ""} is listed in the MEA/eMigrate Recruiting Agents report.`
+                    : output.official_registry_check.note}
+                </p>
+                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                  Source updated as on {output.official_registry_check.updated_as_on}. This confirms a registry signal only; verify the exact offer, contact person, payment request, and official government records before proceeding.
+                </p>
+              </section>
+            )}
+
             <section>
               <h4 className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-950 dark:text-white"><ShieldAlert className="h-4 w-4 text-orange-500" /> Red flags</h4>
               <div className="space-y-2">

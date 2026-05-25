@@ -94,12 +94,13 @@ export const tools: Array<{
   {
     type: "fake_agency",
     title: "Fake Agency Detector",
-    description: "Analyze agency claims, website, contact details, domain patterns and trust indicators.",
+    description: "Analyze agency claims, website, contact details, MEA/eMigrate RA status, domain patterns and trust indicators.",
     icon: Building2,
     gradient: "from-[#00B4D8] to-[#4055FF]",
     textLabel: "Paste brochure, agreement, ad copy, claims or conversation text",
     fields: [
       { key: "agencyName", label: "Agency name", placeholder: "Agency name" },
+      { key: "raId", label: "MEA RA ID optional", placeholder: "RA1234" },
       { key: "website", label: "Website", placeholder: "https://example.com" },
       { key: "phone", label: "Phone number", placeholder: "+91..." },
       { key: "email", label: "Email", placeholder: "contact@example.com" },
