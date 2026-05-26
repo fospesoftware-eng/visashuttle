@@ -191,21 +191,31 @@ export default function LoginPage() {
                 </p>
               </div>
 
-              <div className="mb-6 grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-1">
+              <div className="mb-6 rounded-[1.35rem] bg-gradient-to-r from-[#4055FF]/35 via-[#9033F5]/30 to-[#FF2060]/35 p-px shadow-sm shadow-[#4055FF]/10">
+                <div className="grid grid-cols-2 gap-1.5 rounded-[1.25rem] bg-white/85 p-1.5 backdrop-blur">
                 <button
                   type="button"
                   onClick={() => { setLoginMode("agency"); setError(""); }}
-                  className={`rounded-xl px-3 py-2 text-sm font-black transition ${loginMode === "agency" ? "bg-white text-[#101A4D] shadow-sm" : "text-slate-500 hover:text-slate-900"}`}
+                  className={`rounded-2xl px-3 py-2.5 text-sm font-black transition ${
+                    loginMode === "agency"
+                      ? "bg-gradient-to-r from-[#4055FF] to-[#9033F5] text-white shadow-lg shadow-[#4055FF]/20"
+                      : "bg-white/60 text-transparent bg-clip-text [background-image:linear-gradient(135deg,#4055FF,#9033F5,#FF2060)] hover:bg-white"
+                  }`}
                 >
                   Visa Desk
                 </button>
                 <button
                   type="button"
                   onClick={() => { setLoginMode("growth"); setError(""); setEmail(GROWTH_HUB_DEMO_EMAIL); setPassword(GROWTH_HUB_DEMO_PASSWORD); }}
-                  className={`rounded-xl px-3 py-2 text-sm font-black transition ${loginMode === "growth" ? "bg-white text-[#101A4D] shadow-sm" : "text-slate-500 hover:text-slate-900"}`}
+                  className={`rounded-2xl px-3 py-2.5 text-sm font-black transition ${
+                    loginMode === "growth"
+                      ? "bg-gradient-to-r from-[#9033F5] to-[#FF2060] text-white shadow-lg shadow-[#FF2060]/20"
+                      : "bg-white/60 text-transparent bg-clip-text [background-image:linear-gradient(135deg,#4055FF,#9033F5,#FF2060)] hover:bg-white"
+                  }`}
                 >
                   Growth Hub
                 </button>
+                </div>
               </div>
 
               {loginMode === "growth" && (
