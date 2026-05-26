@@ -7,7 +7,7 @@ import {
   ChevronRight, Brain, User, Plane, CreditCard, Globe, Home,
   Info, RefreshCw, Flag, Star, AlertTriangle, Activity, BookOpen,
   Briefcase, BadgeCheck, BarChart3, ClipboardList, Plus, Trash2, Users,
-  Mail, Loader2
+  Mail, Loader2, Save, Clock3
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +30,7 @@ import { COUNTRIES, VISA_TYPES } from "@/shared/destinations";
 
 const YES_NO = ["Yes", "No"];
 const YES_NO_MAYBE = ["Yes", "No", "Planning to get"];
+const DEEP_CHECK_DRAFT_KEY = "visa_shuttle_deep_check_draft_v2";
 
 const STEPS = [
   { n: 1, title: "Personal Profile", icon: User, bg: "bg-blue-50", color: "text-blue-600" },
@@ -294,6 +295,7 @@ const DEEP_MIN_PROGRESS_MS = 20000;
 const DEEP_STEP_PROGRESS_MS = Math.floor(DEEP_MIN_PROGRESS_MS / DEEP_PROGRESS_STEPS.length);
 
 type VisaHolding = { region: string; status: string };
+type DraftStatus = "idle" | "saving" | "saved" | "restored";
 
 // Countries that officially do not allow dual nationality
 const NO_DUAL_NATIONALITY_COUNTRIES = new Set([
@@ -356,6 +358,19 @@ function isHealthcareOrRegulatedProfession(form: Record<string, string>): boolea
     form.jobSkillLevel,
   ].filter(Boolean).join(" ").toLowerCase();
   return /nurse|nursing|doctor|physician|dentist|pharmacist|health|caregiver|midwife|medical|regulated/.test(text);
+}
+
+function getStepDescription(step: number, visaType = ""): string {
+  if (step === 1) return "Tell us who is applying so the AI can understand age, identity, family context, and passport strength.";
+  if (step === 2) return "Choose the destination and visa route. We adapt the next questions based on the visa type.";
+  if (step === 3 && isStudentVisaType(visaType)) return "Add course, university, academic, funding, and English-test details used in student visa decisions.";
+  if (step === 3 && isWorkVisaType(visaType)) return "Add offer, profession, sponsor, experience, salary, IELTS/OET, and registration details used in work visa decisions.";
+  if (step === 3) return "No extra visa-type screen is needed. Continue with the standard embassy-style profile checks.";
+  if (step === 4) return "Employment, income source, and role stability help the AI measure credibility and return intent.";
+  if (step === 5) return "Bank balance, statements, assets, and funding source help identify financial gaps before applying.";
+  if (step === 6) return "Travel history, refusals, valid visas, and immigration records shape the risk profile.";
+  if (step === 7) return "Document readiness is checked against common embassy expectations for your route.";
+  return "Home ties, dependents, commitments, and destination contacts help complete the final risk picture.";
 }
 
 function selectedTestNeedsScores(testType = ""): boolean {
@@ -461,12 +476,54 @@ export default function DeepCheckPage() {
   const [loadMessage, setLoadMessage] = useState(LOAD_MESSAGES[0]);
   const [analysisStep, setAnalysisStep] = useState(0);
   const [profileApplied, setProfileApplied] = useState(false);
+  const [draftStatus, setDraftStatus] = useState<DraftStatus>("idle");
+  const [draftLoaded, setDraftLoaded] = useState(false);
 
   // Load saved profile
   const { data: savedProfile } = useQuery<any>({
     queryKey: ["/api/b2c/profile"],
     enabled: !!user,
   });
+
+  useEffect(() => {
+    if (!user || draftLoaded) return;
+    try {
+      const raw = localStorage.getItem(DEEP_CHECK_DRAFT_KEY);
+      if (raw) {
+        const draft = JSON.parse(raw);
+        if (draft?.form && typeof draft.form === "object") {
+          setForm({ ...BLANK, ...draft.form });
+          if (Array.isArray(draft.visaHoldings)) setVisaHoldings(draft.visaHoldings);
+          if (typeof draft.step === "number") setStep(Math.min(STEPS.length, Math.max(1, draft.step)));
+          setProfileApplied(true);
+          setDraftStatus("restored");
+        }
+      }
+    } catch (_) {
+      localStorage.removeItem(DEEP_CHECK_DRAFT_KEY);
+    } finally {
+      setDraftLoaded(true);
+    }
+  }, [user, draftLoaded]);
+
+  useEffect(() => {
+    if (!user || !draftLoaded || result || isSubmitting) return;
+    const hasDraftData = Object.values(form).some(Boolean) || visaHoldings.length > 0 || step > 1;
+    if (!hasDraftData) return;
+
+    setDraftStatus("saving");
+    const timer = window.setTimeout(() => {
+      localStorage.setItem(DEEP_CHECK_DRAFT_KEY, JSON.stringify({
+        form,
+        visaHoldings,
+        step,
+        updatedAt: new Date().toISOString(),
+      }));
+      setDraftStatus("saved");
+    }, 650);
+
+    return () => window.clearTimeout(timer);
+  }, [draftLoaded, form, isSubmitting, result, step, user, visaHoldings]);
 
   // Auto pre-fill from saved profile on first load
   useEffect(() => {
@@ -558,6 +615,9 @@ export default function DeepCheckPage() {
     setResultCheckId(null);
     setStep(1);
     setForm({ ...BLANK });
+    setVisaHoldings([]);
+    setDraftStatus("idle");
+    localStorage.removeItem(DEEP_CHECK_DRAFT_KEY);
   };
 
   const downloadDeepCheckReport = () => {
@@ -976,6 +1036,8 @@ export default function DeepCheckPage() {
   const currentStep = STEPS[step - 1];
   const StepIcon = currentStep.icon;
   const progress = ((step - 1) / (STEPS.length - 1)) * 100;
+  const answeredFields = Object.values(form).filter(Boolean).length + visaHoldings.length;
+  const draftLabel = draftStatus === "saving" ? "Saving draft..." : draftStatus === "restored" ? "Draft restored" : draftStatus === "saved" ? "Draft saved" : "Draft ready";
   const workVisaSelected = isWorkVisaType(form.visaType);
   const longStayProfileVisa = isLongStayProfileVisa(form.visaType);
   const workLanguageRelevant = workVisaSelected && (isEnglishLanguageWorkDestination(form.destinationCountry) || isHealthcareOrRegulatedProfession(form));
@@ -1124,6 +1186,8 @@ export default function DeepCheckPage() {
 
       setResult(data.result);
       setResultCheckId(data.check?.id ?? null);
+      localStorage.removeItem(DEEP_CHECK_DRAFT_KEY);
+      setDraftStatus("idle");
       await queryClient.invalidateQueries({ queryKey: ["/api/b2c/checks"] });
 
       // Auto-save profile from form data
@@ -1220,39 +1284,128 @@ export default function DeepCheckPage() {
   }
   return (
     <DashboardLayout title="New Deep Check" subtitle={`Step ${step} of ${STEPS.length} — ${currentStep.title}`}>
-      <div className="max-w-5xl">
-        {/* Pro badge */}
-        <div className="mb-4 flex items-center gap-2 px-3 py-2 rounded-xl bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800">
-          <Crown className="w-4 h-4 text-purple-600 dark:text-purple-400 flex-shrink-0" />
-          <span className="text-sm text-purple-700 dark:text-purple-300 font-medium">Deep Check — AI Analysis</span>
-          <span className="ml-auto text-xs text-purple-500">More thorough than basic check</span>
+      <div className="mx-auto max-w-7xl space-y-5 pb-28 md:pb-8">
+        <div className="relative overflow-hidden rounded-[1.75rem] border border-primary/10 bg-gradient-to-br from-white via-blue-50/70 to-fuchsia-50/60 p-5 shadow-xl shadow-primary/5 dark:from-slate-950 dark:via-blue-950/30 dark:to-fuchsia-950/20 md:p-7">
+          <div className="absolute right-6 top-6 hidden h-28 w-28 rounded-full bg-[#4055FF]/10 blur-3xl md:block" />
+          <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-3xl">
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/15 bg-white/80 px-3 py-1.5 text-xs font-bold text-primary shadow-sm dark:bg-slate-900/70">
+                <Brain className="h-3.5 w-3.5" />
+                Deep Check AI Analysis
+              </div>
+              <h1 className="text-2xl font-black tracking-tight text-slate-950 dark:text-white md:text-4xl">
+                Build a stronger visa profile, step by step.
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300 md:text-base">
+                Answer what you know. Visa Shuttle saves your draft, adapts questions by visa type, and turns your profile into an embassy-style AI risk report.
+              </p>
+            </div>
+            <div className="grid min-w-[220px] gap-3 rounded-2xl border border-white/70 bg-white/75 p-4 shadow-lg backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs font-semibold text-muted-foreground">Completion</span>
+                <span className="text-sm font-black text-foreground">{Math.round(progress)}%</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
+                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, background: "linear-gradient(90deg,#7033F0,#4055FF,#FF2060)" }} />
+              </div>
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{answeredFields} answers captured</span>
+                <span>Step {step}/{STEPS.length}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Step pills */}
-        <div className="mb-5">
-          <div className="flex flex-nowrap md:flex-wrap items-center gap-1.5 overflow-x-auto md:overflow-visible pb-2 mb-3">
-            {STEPS.map(s => {
-              const SIcon = s.icon;
-              const done = s.n < step;
-              const active = s.n === step;
-              return (
-                <div key={s.n} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold flex-shrink-0 transition-all ${done ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400" : active ? `${s.bg} ${s.color} shadow-sm dark:bg-opacity-20` : "bg-white dark:bg-slate-800 text-muted-foreground border border-muted"}`}>
-                  {done ? <CheckCircle className="w-3 h-3" /> : <SIcon className="w-3 h-3" />}
-                  <span className="hidden sm:inline">{s.title}</span>
-                  <span className="sm:hidden">{s.n}</span>
+        <div className="grid gap-5 lg:grid-cols-[290px_minmax(0,1fr)]">
+          <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
+            <Card className="border-primary/10 bg-card/95 shadow-sm">
+              <CardContent className="p-4">
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-primary">Assessment path</p>
+                    <p className="text-sm text-muted-foreground">Your AI profile map</p>
+                  </div>
+                  <Badge variant="outline" className="bg-primary/5 text-primary">8 steps</Badge>
                 </div>
-              );
-            })}
-          </div>
-          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, background: "linear-gradient(90deg,#7033F0,#4055FF,#FF2060)" }} />
-          </div>
-        </div>
+                <div className="space-y-2">
+                  {STEPS.map(s => {
+                    const SIcon = s.icon;
+                    const done = s.n < step;
+                    const active = s.n === step;
+                    return (
+                      <button
+                        key={s.n}
+                        type="button"
+                        onClick={() => { if (s.n <= step) setStep(s.n); }}
+                        className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition-all ${
+                          active
+                            ? "border-primary/30 bg-primary/10 shadow-sm"
+                            : done
+                              ? "border-emerald-200 bg-emerald-50/70 dark:border-emerald-900 dark:bg-emerald-950/20"
+                              : "border-transparent bg-muted/35 text-muted-foreground"
+                        }`}
+                      >
+                        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${done ? "bg-emerald-500 text-white" : active ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}>
+                          {done ? <CheckCircle className="h-4 w-4" /> : <SIcon className="h-4 w-4" />}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-sm font-bold text-foreground">{s.title}</span>
+                          <span className="block text-xs text-muted-foreground">Step {s.n}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-blue-200/70 bg-blue-50/70 shadow-sm dark:border-blue-900 dark:bg-blue-950/20">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-[#4055FF] shadow-sm dark:bg-slate-900">
+                    {draftStatus === "saving" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-blue-950 dark:text-blue-100">{draftLabel}</p>
+                    <p className="mt-1 text-xs leading-5 text-blue-800 dark:text-blue-300">Your Deep Check draft is kept on this device until you submit or start again.</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </aside>
 
-        <Card className="shadow-sm">
-          <CardContent className="p-6 md:p-8">
+          <div className="min-w-0 space-y-4">
+            <div className="rounded-2xl border bg-card/90 p-4 shadow-sm lg:hidden">
+              <div className="mb-3 flex items-center justify-between text-xs font-semibold text-muted-foreground">
+                <span>{currentStep.title}</span>
+                <span>{Math.round(progress)}%</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-muted">
+                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, background: "linear-gradient(90deg,#7033F0,#4055FF,#FF2060)" }} />
+              </div>
+            </div>
+
+            <Card className="overflow-hidden border-primary/10 bg-card/95 shadow-xl shadow-primary/5">
+              <CardHeader className="border-b bg-gradient-to-r from-slate-50 to-white px-5 py-5 dark:from-slate-900 dark:to-slate-950 md:px-8">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex items-start gap-4">
+                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${currentStep.bg} dark:bg-opacity-20`}>
+                      <StepIcon className={`h-6 w-6 ${currentStep.color}`} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Step {step} of {STEPS.length}</p>
+                      <CardTitle className="mt-1 text-xl font-black">{currentStep.title}</CardTitle>
+                      <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{getStepDescription(step, form.visaType)}</p>
+                    </div>
+                  </div>
+                  <Badge className="w-fit border-0 bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-200">
+                    <Clock3 className="mr-1.5 h-3.5 w-3.5" />
+                    5-8 min
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="p-5 md:p-8">
             {/* Step header */}
-            <div className="flex items-center gap-3 mb-6 pb-4 border-b">
+            <div className="hidden">
               <div className={`w-10 h-10 rounded-xl ${currentStep.bg} dark:bg-opacity-20 flex items-center justify-center flex-shrink-0`}>
                 <StepIcon className={`w-5 h-5 ${currentStep.color}`} />
               </div>
@@ -2237,14 +2390,17 @@ export default function DeepCheckPage() {
             )}
 
             {/* Navigation */}
-            <div className="flex items-center justify-between mt-8 pt-5 border-t">
-              <Button variant="outline" onClick={prevStep} disabled={step === 1} className="gap-2">
+            <div className="sticky bottom-0 z-20 -mx-5 -mb-5 mt-8 flex items-center justify-between gap-3 border-t bg-white/95 px-5 py-4 shadow-[0_-12px_32px_rgba(15,23,42,0.08)] backdrop-blur dark:bg-slate-950/95 md:-mx-8 md:-mb-8 md:px-8">
+              <Button variant="outline" onClick={prevStep} disabled={step === 1} className="gap-2 rounded-xl">
                 <ChevronLeft className="w-4 h-4" /> Back
               </Button>
               {step < STEPS.length ? (
-                <Button onClick={nextStep} className="gap-2" disabled={!canAdvance()}>
-                  Next <ChevronRight className="w-4 h-4" />
-                </Button>
+                <div className="flex flex-col items-end gap-1">
+                  <Button onClick={nextStep} className="gap-2 rounded-xl px-5" disabled={!canAdvance()} style={{ background: "linear-gradient(135deg,#4055FF,#FF2060)" }}>
+                    Continue <ChevronRight className="w-4 h-4" />
+                  </Button>
+                  <span className="hidden text-[11px] text-muted-foreground sm:block">{draftLabel}</span>
+                </div>
               ) : (
                 <div className="flex flex-col items-end gap-3">
                   <ConsentCheckbox
@@ -2256,7 +2412,7 @@ export default function DeepCheckPage() {
                 <Button
                   onClick={handleSubmit}
                   disabled={isSubmitting}
-                  className="gap-2 px-6"
+                  className="gap-2 rounded-xl px-6"
                   style={{ background: "linear-gradient(135deg,#7033F0,#4055FF,#FF2060)" }}
                   data-testid="button-run-deep-check"
                 >
@@ -2276,6 +2432,8 @@ export default function DeepCheckPage() {
             </div>
           </CardContent>
         </Card>
+          </div>
+        </div>
       </div>
     </DashboardLayout>
   );
