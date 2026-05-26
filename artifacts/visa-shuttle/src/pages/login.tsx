@@ -6,7 +6,6 @@ import {
   EyeOff,
   FileCheck2,
   Fingerprint,
-  Megaphone,
   Shield,
   Sparkles,
 } from "lucide-react";
@@ -76,7 +75,7 @@ export default function LoginPage() {
 
     if (loginMode === "growth") {
       if (email.trim().toLowerCase() !== GROWTH_HUB_DEMO_EMAIL || password !== GROWTH_HUB_DEMO_PASSWORD) {
-        setError("Invalid Growth Hub demo username or password");
+        setError("Invalid Growth Hub email or password");
         setIsLoading(false);
         return;
       }
@@ -84,7 +83,7 @@ export default function LoginPage() {
       localStorage.setItem("growth_hub_business_name", "Santamonica Study Abroad");
       toast({
         title: "Welcome to Growth Hub",
-        description: "Demo business dashboard loaded with sample leads and campaign data.",
+        description: "Business dashboard loaded with leads and campaign data.",
       });
       setLocation("/growth-hub");
       setIsLoading(false);
@@ -206,7 +205,7 @@ export default function LoginPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setLoginMode("growth"); setError(""); setEmail(GROWTH_HUB_DEMO_EMAIL); setPassword(GROWTH_HUB_DEMO_PASSWORD); }}
+                  onClick={() => { setLoginMode("growth"); setError(""); setEmail(""); setPassword(""); }}
                   className={`rounded-2xl px-3 py-2.5 text-sm font-black transition ${
                     loginMode === "growth"
                       ? "bg-gradient-to-r from-[#9033F5] to-[#FF2060] text-white shadow-lg shadow-[#FF2060]/20"
@@ -217,30 +216,6 @@ export default function LoginPage() {
                 </button>
                 </div>
               </div>
-
-              {loginMode === "growth" && (
-                <div className="mb-5 rounded-2xl border border-[#4055FF]/15 bg-[#4055FF]/5 p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#4055FF]/10 text-[#4055FF]">
-                      <Megaphone className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-black text-slate-800">Growth Hub demo login</p>
-                      <p className="mt-1 text-xs leading-5 text-slate-500">Username: <span className="font-bold text-slate-700">{GROWTH_HUB_DEMO_EMAIL}</span></p>
-                      <p className="text-xs leading-5 text-slate-500">Password: <span className="font-bold text-slate-700">{GROWTH_HUB_DEMO_PASSWORD}</span></p>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="mt-3 h-8 rounded-xl"
-                        onClick={() => { setEmail(GROWTH_HUB_DEMO_EMAIL); setPassword(GROWTH_HUB_DEMO_PASSWORD); }}
-                      >
-                        Use demo credentials
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               <form onSubmit={handleSubmit} className="space-y-5">
                 {error && (
@@ -254,7 +229,7 @@ export default function LoginPage() {
                   <Input
                     id="email"
                     type="email"
-                    placeholder={loginMode === "growth" ? GROWTH_HUB_DEMO_EMAIL : "agency@example.com"}
+                    placeholder={loginMode === "growth" ? "business@example.com" : "agency@example.com"}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -275,7 +250,7 @@ export default function LoginPage() {
                     <Input
                       id="password"
                       type={showPassword ? "text" : "password"}
-                      placeholder={loginMode === "growth" ? GROWTH_HUB_DEMO_PASSWORD : "Enter your password"}
+                      placeholder="Enter your password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
@@ -325,7 +300,7 @@ export default function LoginPage() {
                     <p className="text-sm font-bold text-slate-800">Protected Visa Desk workspace</p>
                     <p className="mt-1 text-xs leading-5 text-slate-500">
                       {loginMode === "growth"
-                        ? "Demo Growth Hub opens with sample leads, campaigns, wallet, analytics, and billing data."
+                        ? "Growth Hub opens your leads, campaigns, wallet, analytics, and billing workspace."
                         : "Your Visa Desk session is secured and routed to the right dashboard based on your role."}
                     </p>
                   </div>
