@@ -34,11 +34,12 @@ const YES_NO_MAYBE = ["Yes", "No", "Planning to get"];
 const STEPS = [
   { n: 1, title: "Personal Profile", icon: User, bg: "bg-blue-50", color: "text-blue-600" },
   { n: 2, title: "Travel Plan", icon: Plane, bg: "bg-purple-50", color: "text-purple-600" },
-  { n: 3, title: "Employment & Income", icon: Briefcase, bg: "bg-emerald-50", color: "text-emerald-600" },
-  { n: 4, title: "Financial Depth", icon: CreditCard, bg: "bg-amber-50", color: "text-amber-600" },
-  { n: 5, title: "History & Visas", icon: Globe, bg: "bg-rose-50", color: "text-rose-600" },
-  { n: 6, title: "Documents", icon: FileText, bg: "bg-orange-50", color: "text-orange-600" },
-  { n: 7, title: "Home Ties & Extra", icon: Home, bg: "bg-teal-50", color: "text-teal-600" },
+  { n: 3, title: "Visa Type Details", icon: BookOpen, bg: "bg-indigo-50", color: "text-indigo-600" },
+  { n: 4, title: "Employment & Income", icon: Briefcase, bg: "bg-emerald-50", color: "text-emerald-600" },
+  { n: 5, title: "Financial Depth", icon: CreditCard, bg: "bg-amber-50", color: "text-amber-600" },
+  { n: 6, title: "History & Visas", icon: Globe, bg: "bg-rose-50", color: "text-rose-600" },
+  { n: 7, title: "Documents", icon: FileText, bg: "bg-orange-50", color: "text-orange-600" },
+  { n: 8, title: "Home Ties & Extra", icon: Home, bg: "bg-teal-50", color: "text-teal-600" },
 ];
 
 type SeverityKey = "critical" | "high" | "medium" | "low";
@@ -145,6 +146,59 @@ function DocToggle({ label, val, onChange, tooltip }: any) {
 
 const BLANK: Record<string, string> = {};
 
+const STUDENT_DETAIL_KEYS = [
+  "institutionName",
+  "studyLevel",
+  "courseName",
+  "courseDuration",
+  "courseStartDate",
+  "hasAcceptanceLetter",
+  "scholarshipAvailable",
+  "annualTuitionFee",
+  "tuitionPaid",
+  "academicHighestQualification",
+  "lastEducationScore",
+  "studyGap",
+  "englishTestType",
+  "ieltsOverall",
+  "ieltsListening",
+  "ieltsReading",
+  "ieltsWriting",
+  "ieltsSpeaking",
+  "educationSponsor",
+  "whyThisCourse",
+  "postStudyPlan",
+  "hasAcademicTranscripts",
+  "hasSop",
+  "hasFeeReceipt",
+  "hasSponsorAffidavit",
+];
+
+const WORK_DETAIL_KEYS = [
+  "currentJobTitle",
+  "currentEmployerName",
+  "totalWorkExperience",
+  "relevantWorkExperience",
+  "currentSalary",
+  "hasJobOffer",
+  "hiringCompanyName",
+  "offeredJobTitle",
+  "offeredSalary",
+  "employmentStartDate",
+  "contractDuration",
+  "jobSkillLevel",
+  "jobMatchesExperience",
+  "employerLicenseStatus",
+  "workPermitSponsor",
+  "recruitmentChannel",
+  "hasSignedContract",
+  "hasEmployerSponsorshipLetter",
+  "hasQualificationProof",
+  "hasExperienceLetters",
+  "roleResponsibilities",
+  "careerReasonForMove",
+];
+
 // ── Date helpers ─────────────────────────────────────────────────────────────
 const TOMORROW = new Date(Date.now() + 86_400_000).toISOString().split("T")[0];
 
@@ -215,6 +269,16 @@ function getTripFundingOpts(empStatus: string): string[] {
   const base = ["Self-funded","Family member","Sponsor / Host","Scholarship / Grant","Business funds"];
   if (EMPLOYED_STATUSES.includes(empStatus)) return ["Self-funded","Employer / Company","Family member","Sponsor / Host","Scholarship / Grant","Business funds"];
   return base;
+}
+
+function isStudentVisaType(visaType = ""): boolean {
+  const normalized = visaType.toLowerCase();
+  return ["student", "study", "f-1", "m-1", "j-1", "tier 4"].some(term => normalized.includes(term));
+}
+
+function isWorkVisaType(visaType = ""): boolean {
+  const normalized = visaType.toLowerCase();
+  return ["work", "employment", "skilled worker", "temporary worker", "h-1b", "h1b", "l-1", "l1", "work permit"].some(term => normalized.includes(term));
 }
 
 export default function DeepCheckPage() {
@@ -304,6 +368,16 @@ export default function DeepCheckPage() {
   if (!user) { setLocation("/sign-in"); return null; }
 
   const set = (key: string) => (val: string) => setForm(prev => ({ ...prev, [key]: val }));
+  const setVisaType = (val: string) => {
+    setForm(prev => {
+      const next = { ...prev, visaType: val, tripDuration: "" };
+      const keepStudent = isStudentVisaType(val);
+      const keepWork = isWorkVisaType(val);
+      if (!keepStudent) STUDENT_DETAIL_KEYS.forEach(key => { next[key] = ""; });
+      if (!keepWork) WORK_DETAIL_KEYS.forEach(key => { next[key] = ""; });
+      return next;
+    });
+  };
 
   const hasAccess = user.deepCheckAccess;
   const deepCheckPrice = formatB2cPrice(getStoredB2cCurrency());
@@ -748,19 +822,43 @@ export default function DeepCheckPage() {
       { key: "visaType", label: "Visa Type" },
       { key: "tripDuration", label: "Trip Duration" },
     ],
-    3: [{ key: "employmentStatus", label: "Employment Status" }],
-    4: [{ key: "bankBalance", label: "Bank Balance" }],
-    5: [{ key: "previousVisaRefusals", label: "Previous Visa Refusals" }],
+    4: [{ key: "employmentStatus", label: "Employment Status" }],
+    5: [{ key: "bankBalance", label: "Bank Balance" }],
+    6: [{ key: "previousVisaRefusals", label: "Previous Visa Refusals" }],
   };
 
   const canAdvance = (): boolean => {
     const required = STEP_REQUIRED[step] ?? [];
     if (!required.every(r => !!form[r.key])) return false;
     if (step === 1 && validateAdultApplicantDob(form.dateOfBirth)) return false;
+    if (step === 3 && isStudentVisaType(form.visaType)) {
+      return Boolean(form.institutionName && form.studyLevel && form.courseName && form.hasAcceptanceLetter);
+    }
+    if (step === 3 && isWorkVisaType(form.visaType)) {
+      return Boolean((form.currentJobTitle || form.jobTitle) && form.totalWorkExperience && form.hasJobOffer && form.hiringCompanyName && form.offeredJobTitle && form.offeredSalary);
+    }
     return true;
   };
 
   const getMissingLabels = (): string => {
+    if (step === 3 && isStudentVisaType(form.visaType)) {
+      return [
+        !form.institutionName && "University / Institution",
+        !form.studyLevel && "Study Level",
+        !form.courseName && "Course / Program Name",
+        !form.hasAcceptanceLetter && "Acceptance Letter Status",
+      ].filter(Boolean).join(", ");
+    }
+    if (step === 3 && isWorkVisaType(form.visaType)) {
+      return [
+        !(form.currentJobTitle || form.jobTitle) && "Current Job Title",
+        !form.totalWorkExperience && "Total Work Experience",
+        !form.hasJobOffer && "Job Offer Letter Status",
+        !form.hiringCompanyName && "Hiring Company Name",
+        !form.offeredJobTitle && "Offered Job Title",
+        !form.offeredSalary && "Offered Salary",
+      ].filter(Boolean).join(", ");
+    }
     const required = STEP_REQUIRED[step] ?? [];
     return required.filter(r => !form[r.key]).map(r => r.label).join(", ");
   };
@@ -797,6 +895,28 @@ export default function DeepCheckPage() {
       currentVisaHoldings: visaHoldings.length > 0
         ? visaHoldings.map(v => `${v.region} (${v.status})`).join("; ")
         : "None",
+      visaTypeSpecificProfile: isStudentVisaType(form.visaType)
+        ? [
+            `Student visa profile`,
+            `Institution: ${form.institutionName || "-"}`,
+            `Course: ${form.courseName || "-"} (${form.studyLevel || "-"})`,
+            `Academic score: ${form.lastEducationScore || "-"}`,
+            `Study gap: ${form.studyGap || "-"}`,
+            `English test: ${form.englishTestType || "-"} ${form.ieltsOverall ? `(IELTS ${form.ieltsOverall})` : ""}`,
+            `Funding: ${form.educationSponsor || "-"}, tuition: ${form.annualTuitionFee || "-"}, paid: ${form.tuitionPaid || "-"}`,
+            `Acceptance letter: ${form.hasAcceptanceLetter || "-"}`,
+          ].join("; ")
+        : isWorkVisaType(form.visaType)
+          ? [
+              `Work visa profile`,
+              `Current role: ${form.currentJobTitle || form.jobTitle || "-"} at ${form.currentEmployerName || form.companyName || "-"}`,
+              `Experience: ${form.totalWorkExperience || "-"} total, ${form.relevantWorkExperience || "-"} relevant`,
+              `Offer: ${form.offeredJobTitle || "-"} at ${form.hiringCompanyName || "-"}, salary ${form.offeredSalary || "-"}`,
+              `Job offer letter: ${form.hasJobOffer || "-"}`,
+              `Sponsor: ${form.workPermitSponsor || "-"}, employer license: ${form.employerLicenseStatus || "-"}`,
+              `Role match: ${form.jobMatchesExperience || "-"}`,
+            ].join("; ")
+          : "Not applicable for selected visa type",
     };
     setIsSubmitting(true);
     try {
@@ -1097,7 +1217,7 @@ export default function DeepCheckPage() {
                       {/* Row 1: Destination Country + info banner (structured) or Visa Type (simple) */}
                       <div className="grid sm:grid-cols-2 gap-4">
                         <div>
-                          <SearchableSelect label="Destination Country *" required value={form.destinationCountry || ""} onChange={val => { set("destinationCountry")(val); set("usVisaCategory")(""); set("visaType")(""); }} options={COUNTRIES} placeholder="Search destination..." />
+                          <SearchableSelect label="Destination Country *" required value={form.destinationCountry || ""} onChange={val => { set("destinationCountry")(val); set("usVisaCategory")(""); setVisaType(""); }} options={COUNTRIES} placeholder="Search destination..." />
                           {form.destinationCountry && form.nationality && form.destinationCountry === form.nationality && (
                             <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
                               <AlertTriangle className="w-3 h-3" /> You are a citizen of {form.nationality} — you do not need a visa to enter your own country.
@@ -1111,7 +1231,7 @@ export default function DeepCheckPage() {
                               <p className="text-xs text-blue-700 dark:text-blue-300 font-medium">{visaConf.regionLabel} — select a category then specific type</p>
                             </div>
                           ) : (
-                            <Sel label="Visa Type *" val={form.visaType || ""} onChange={val => { set("visaType")(val); set("usVisaCategory")(""); set("tripDuration")(""); }} opts={VISA_TYPES.filter(t => t !== "Schengen Visa" && t !== "Other")} />
+                            <Sel label="Visa Type *" val={form.visaType || ""} onChange={val => { set("usVisaCategory")(""); setVisaType(val); }} opts={VISA_TYPES.filter(t => t !== "Schengen Visa" && t !== "Other")} />
                           )}
                         </div>
                       </div>
@@ -1124,7 +1244,7 @@ export default function DeepCheckPage() {
                             val={form.usVisaCategory || ""}
                             onChange={val => {
                               set("usVisaCategory")(val);
-                              set("visaType")("");
+                              setVisaType("");
                             }}
                             opts={Object.keys(visaConf.categories)}
                           />
@@ -1135,7 +1255,7 @@ export default function DeepCheckPage() {
                             <select
                               disabled={!form.usVisaCategory}
                               value={form.visaType || ""}
-                              onChange={e => set("visaType")(e.target.value)}
+                              onChange={e => setVisaType(e.target.value)}
                               className="w-full h-10 px-3 text-sm border rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <option value="">Select visa type…</option>
@@ -1224,35 +1344,6 @@ export default function DeepCheckPage() {
                     </div>
                   </>
                 )}
-                {form.visaType === "Student Visa" && (
-                  <>
-                    <div className="sm:col-span-2">
-                      <SearchableSelect
-                        label="Institution / University Name"
-                        value={form.institutionName || ""}
-                        onChange={set("institutionName")}
-                        options={getUniversitiesForCountry(form.destinationCountry || "")}
-                        placeholder={form.destinationCountry ? "Search or type institution name..." : "Select destination country first"}
-                        allowCustom
-                      />
-                      {form.destinationCountry && getUniversitiesForCountry(form.destinationCountry).length === 0 && (
-                        <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">No suggestions for {form.destinationCountry} — type your institution name directly.</p>
-                      )}
-                    </div>
-                    <Sel label="Study Level" val={form.studyLevel || ""} onChange={set("studyLevel")} opts={["Undergraduate / Bachelor's","Postgraduate / Master's","PhD / Doctoral","Certificate / Diploma","Language Course"]} />
-                    <DocToggle label="Acceptance letter received?" val={form.hasAcceptanceLetter || ""} onChange={set("hasAcceptanceLetter")} />
-                    <Sel label="Scholarship / Financial Aid Available?" val={form.scholarshipAvailable || ""} onChange={set("scholarshipAvailable")} opts={YES_NO} />
-                  </>
-                )}
-                {form.visaType === "Work Visa" && (
-                  <>
-                    <DocToggle label="Formal job offer letter available?" val={form.hasJobOffer || ""} onChange={set("hasJobOffer")} />
-                    <div>
-                      <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Hiring Company Name</Label>
-                      <Input value={form.hiringCompanyName || ""} onChange={e => set("hiringCompanyName")(e.target.value)} placeholder="e.g. TechCorp Ltd" />
-                    </div>
-                  </>
-                )}
                 {form.visaType === "Spouse / Family Visa" && (
                   <>
                     <Sel label="Relationship to Host" val={form.hostRelationship || ""} onChange={set("hostRelationship")} opts={["Spouse / Partner","Parent","Child","Sibling","Other relative"]} />
@@ -1266,8 +1357,183 @@ export default function DeepCheckPage() {
             </div>
             )}
 
-            {/* ===== STEP 3: Employment & Income ===== */}
+            {/* ===== STEP 3: Visa Type Details ===== */}
             {step === 3 && (() => {
+              const studentVisa = isStudentVisaType(form.visaType);
+              const workVisa = isWorkVisaType(form.visaType);
+              const universityOptions = getUniversitiesForCountry(form.destinationCountry || "");
+
+              if (studentVisa) {
+                return (
+                  <div className="space-y-5">
+                    <div className="rounded-2xl border border-indigo-200 bg-indigo-50/70 p-4 dark:border-indigo-800 dark:bg-indigo-950/20">
+                      <div className="flex gap-3">
+                        <BookOpen className="mt-0.5 h-5 w-5 shrink-0 text-indigo-600 dark:text-indigo-400" />
+                        <div>
+                          <p className="text-sm font-bold text-indigo-900 dark:text-indigo-200">Student visa academic profile</p>
+                          <p className="mt-1 text-xs leading-5 text-indigo-700 dark:text-indigo-300">
+                            Immigration officers check whether your course, academic history, English ability, funding, and future plan are credible and consistent.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="sm:col-span-2">
+                        <SearchableSelect
+                          label="University / Institution Applied To *"
+                          required
+                          value={form.institutionName || ""}
+                          onChange={set("institutionName")}
+                          options={universityOptions}
+                          placeholder={form.destinationCountry ? "Search or type university name..." : "Select destination country first"}
+                          allowCustom
+                        />
+                        {form.destinationCountry && universityOptions.length === 0 && (
+                          <p className="mt-1 text-xs text-muted-foreground">No suggestions for {form.destinationCountry} yet — type the institution name directly.</p>
+                        )}
+                      </div>
+                      <Sel label="Study Level *" val={form.studyLevel || ""} onChange={set("studyLevel")} opts={["Undergraduate / Bachelor's","Postgraduate / Master's","PhD / Doctoral","Certificate / Diploma","Language Course","Foundation / Pathway"]} />
+                      <div>
+                        <Label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Course / Program Name *</Label>
+                        <Input value={form.courseName || ""} onChange={e => set("courseName")(e.target.value)} placeholder="e.g. MSc Data Science" />
+                      </div>
+                      <Sel label="Course Duration" val={form.courseDuration || ""} onChange={set("courseDuration")} opts={["Less than 6 months","6–12 months","1 year","2 years","3 years","4+ years"]} />
+                      <div>
+                        <Label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Course Start Date</Label>
+                        <Input type="date" value={form.courseStartDate || ""} min={TOMORROW} onChange={e => set("courseStartDate")(e.target.value)} />
+                      </div>
+                      <Sel label="Highest Completed Qualification" val={form.academicHighestQualification || ""} onChange={set("academicHighestQualification")} opts={["High School / 12th","Diploma","Bachelor's Degree","Master's Degree","PhD / Doctoral","Other"]} />
+                      <div>
+                        <Label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Latest Education Score / GPA</Label>
+                        <Input value={form.lastEducationScore || ""} onChange={e => set("lastEducationScore")(e.target.value)} placeholder="e.g. 72%, 8.1 CGPA, 3.4 GPA" />
+                      </div>
+                      <Sel label="Study Gap After Last Education" val={form.studyGap || ""} onChange={set("studyGap")} opts={["No gap","Less than 1 year","1–2 years","2–5 years","More than 5 years"]} />
+                      <Sel label="English Test Type" val={form.englishTestType || ""} onChange={set("englishTestType")} opts={["IELTS","PTE","TOEFL","Duolingo","Not required","Planning to take","Other"]} />
+                      {form.englishTestType === "IELTS" && (
+                        <>
+                          <div>
+                            <Label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">IELTS Overall Score</Label>
+                            <Input type="number" min="0" max="9" step="0.5" value={form.ieltsOverall || ""} onChange={e => set("ieltsOverall")(e.target.value)} placeholder="e.g. 6.5" />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3 sm:col-span-2 sm:grid-cols-4">
+                            {[
+                              ["ieltsListening", "Listening"],
+                              ["ieltsReading", "Reading"],
+                              ["ieltsWriting", "Writing"],
+                              ["ieltsSpeaking", "Speaking"],
+                            ].map(([key, label]) => (
+                              <div key={key}>
+                                <Label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">{label}</Label>
+                                <Input type="number" min="0" max="9" step="0.5" value={form[key] || ""} onChange={e => set(key)(e.target.value)} placeholder="0–9" />
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                      <Sel label="Education Funding Source" val={form.educationSponsor || ""} onChange={set("educationSponsor")} opts={["Self-funded","Parents / Family","Education loan","Scholarship","Employer sponsored","Mixed funding"]} />
+                      <Sel label="Annual Tuition Fee (USD)" val={form.annualTuitionFee || ""} onChange={set("annualTuitionFee")} opts={["Less than $5,000","$5,000 – $10,000","$10,000 – $20,000","$20,000 – $40,000","More than $40,000"]} />
+                      <Sel label="Tuition Paid / Deposit Status" val={form.tuitionPaid || ""} onChange={set("tuitionPaid")} opts={["Not paid yet","Partial deposit paid","First semester paid","Full year paid","Full course paid"]} />
+                      <DocToggle label="Acceptance / offer letter received? *" val={form.hasAcceptanceLetter || ""} onChange={set("hasAcceptanceLetter")} />
+                      <DocToggle label="Academic transcripts available?" val={form.hasAcademicTranscripts || ""} onChange={set("hasAcademicTranscripts")} />
+                      <DocToggle label="Statement of Purpose prepared?" val={form.hasSop || ""} onChange={set("hasSop")} />
+                      <DocToggle label="Fee receipt / tuition proof available?" val={form.hasFeeReceipt || ""} onChange={set("hasFeeReceipt")} />
+                      <DocToggle label="Sponsor affidavit / financial support letter?" val={form.hasSponsorAffidavit || ""} onChange={set("hasSponsorAffidavit")} />
+                      <Sel label="Scholarship / Financial Aid Available?" val={form.scholarshipAvailable || ""} onChange={set("scholarshipAvailable")} opts={YES_NO} />
+                      <div className="sm:col-span-2">
+                        <Label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Why this course and university?</Label>
+                        <Textarea value={form.whyThisCourse || ""} onChange={e => set("whyThisCourse")(e.target.value)} rows={3} placeholder="Explain academic progression, why this course, why this institution, and why this country..." />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <Label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Post-study plan</Label>
+                        <Textarea value={form.postStudyPlan || ""} onChange={e => set("postStudyPlan")(e.target.value)} rows={3} placeholder="Explain your intended career path and ties/plans after completing the course..." />
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              if (workVisa) {
+                return (
+                  <div className="space-y-5">
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-800 dark:bg-emerald-950/20">
+                      <div className="flex gap-3">
+                        <Briefcase className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                        <div>
+                          <p className="text-sm font-bold text-emerald-900 dark:text-emerald-200">Work visa employment profile</p>
+                          <p className="mt-1 text-xs leading-5 text-emerald-700 dark:text-emerald-300">
+                            Immigration officers check if the role is genuine, your experience matches the job, the salary is realistic, and the employer can sponsor you.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <Label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Current Job Title *</Label>
+                        <Input value={form.currentJobTitle || form.jobTitle || ""} onChange={e => set("currentJobTitle")(e.target.value)} placeholder="e.g. Senior Accountant" />
+                      </div>
+                      <div>
+                        <Label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Current Employer / Company</Label>
+                        <Input value={form.currentEmployerName || form.companyName || ""} onChange={e => set("currentEmployerName")(e.target.value)} placeholder="e.g. ABC Technologies Pvt Ltd" />
+                      </div>
+                      <Sel label="Total Work Experience *" val={form.totalWorkExperience || ""} onChange={set("totalWorkExperience")} opts={["Less than 1 year","1–2 years","2–5 years","5–10 years","10+ years"]} />
+                      <Sel label="Relevant Experience for Offered Role" val={form.relevantWorkExperience || ""} onChange={set("relevantWorkExperience")} opts={["Less than 1 year","1–2 years","2–5 years","5–10 years","10+ years"]} />
+                      <Sel label="Current Monthly Salary (USD)" val={form.currentSalary || ""} onChange={set("currentSalary")} opts={["Less than $500","$500 – $1,000","$1,000 – $2,500","$2,500 – $5,000","$5,000 – $10,000","More than $10,000"]} />
+                      <DocToggle label="Formal job offer letter received? *" val={form.hasJobOffer || ""} onChange={set("hasJobOffer")} />
+                      <div>
+                        <Label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Hiring Company Name *</Label>
+                        <Input value={form.hiringCompanyName || ""} onChange={e => set("hiringCompanyName")(e.target.value)} placeholder="e.g. TechCorp Ltd" />
+                      </div>
+                      <div>
+                        <Label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Offered Job Title *</Label>
+                        <Input value={form.offeredJobTitle || ""} onChange={e => set("offeredJobTitle")(e.target.value)} placeholder="e.g. Software Engineer" />
+                      </div>
+                      <Sel label="Offered Monthly Salary (USD) *" val={form.offeredSalary || ""} onChange={set("offeredSalary")} opts={["Less than $1,000","$1,000 – $2,500","$2,500 – $5,000","$5,000 – $10,000","$10,000 – $20,000","More than $20,000"]} />
+                      <div>
+                        <Label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Employment Start Date</Label>
+                        <Input type="date" value={form.employmentStartDate || ""} min={TOMORROW} onChange={e => set("employmentStartDate")(e.target.value)} />
+                      </div>
+                      <Sel label="Contract Duration" val={form.contractDuration || ""} onChange={set("contractDuration")} opts={["Less than 6 months","6–12 months","1–2 years","2–3 years","Permanent / open-ended"]} />
+                      <Sel label="Job Skill Level" val={form.jobSkillLevel || ""} onChange={set("jobSkillLevel")} opts={["Entry level","Skilled / professional","Managerial","Specialist / shortage occupation","Executive"]} />
+                      <Sel label="Role matches your education and experience?" val={form.jobMatchesExperience || ""} onChange={set("jobMatchesExperience")} opts={["Strong match","Partial match","Career change","Not sure"]} />
+                      <Sel label="Employer license / sponsorship status" val={form.employerLicenseStatus || ""} onChange={set("employerLicenseStatus")} opts={["Licensed sponsor confirmed","Employer says license in process","Not confirmed","Not required for this route","Not sure"]} />
+                      <Sel label="Who sponsors the work permit?" val={form.workPermitSponsor || ""} onChange={set("workPermitSponsor")} opts={["Employer","Recruitment agency","Self-sponsored","Government program","Not sure"]} />
+                      <Sel label="How did you receive this offer?" val={form.recruitmentChannel || ""} onChange={set("recruitmentChannel")} opts={["Direct employer application","LinkedIn / job portal","Recruitment agency","Referral","Internal transfer","Other"]} />
+                      <DocToggle label="Signed employment contract available?" val={form.hasSignedContract || ""} onChange={set("hasSignedContract")} />
+                      <DocToggle label="Employer sponsorship letter available?" val={form.hasEmployerSponsorshipLetter || ""} onChange={set("hasEmployerSponsorshipLetter")} />
+                      <DocToggle label="Qualification proof available?" val={form.hasQualificationProof || ""} onChange={set("hasQualificationProof")} />
+                      <DocToggle label="Experience letters / references available?" val={form.hasExperienceLetters || ""} onChange={set("hasExperienceLetters")} />
+                      <div className="sm:col-span-2">
+                        <Label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Role responsibilities and why employer needs you</Label>
+                        <Textarea value={form.roleResponsibilities || ""} onChange={e => set("roleResponsibilities")(e.target.value)} rows={3} placeholder="Describe the offered role, responsibilities, required skills, and why you are suitable..." />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <Label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Reason for moving for this job</Label>
+                        <Textarea value={form.careerReasonForMove || ""} onChange={e => set("careerReasonForMove")(e.target.value)} rows={3} placeholder="Explain career progression, salary change, employer fit, and long-term plan..." />
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-700 dark:bg-slate-900">
+                  <div className="flex gap-3">
+                    <Info className="mt-0.5 h-5 w-5 shrink-0 text-slate-500" />
+                    <div>
+                      <p className="text-sm font-bold text-slate-800 dark:text-slate-200">No extra wizard required for this visa type</p>
+                      <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                        Continue to employment, finances, history, documents, and home ties. Those answers will still be used for your embassy-style risk analysis.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ===== STEP 4: Employment & Income ===== */}
+            {step === 4 && (() => {
               const isWorking = WORKING_STATUSES.includes(form.employmentStatus);
               const isEmployed = EMPLOYED_STATUSES.includes(form.employmentStatus);
               const isSelfEmployed = form.employmentStatus === "Self-employed / Business Owner" || form.employmentStatus === "Freelancer / Consultant";
@@ -1313,8 +1579,8 @@ export default function DeepCheckPage() {
               );
             })()}
 
-            {/* ===== STEP 4: Financial Depth ===== */}
-            {step === 4 && (
+            {/* ===== STEP 5: Financial Depth ===== */}
+            {step === 5 && (
               <div className="grid sm:grid-cols-2 gap-4">
                 <Sel label="Bank Balance (USD) *" val={form.bankBalance || ""} onChange={set("bankBalance")} opts={["Less than $1,000","$1,000 – $3,000","$3,000 – $7,000","$7,000 – $15,000","$15,000 – $30,000","More than $30,000"]} />
                 <DocToggle label="Bank statement available?" val={form.hasBankStatement || ""} onChange={val => { set("hasBankStatement")(val); if (val === "No") { set("bankStatementDuration")(""); set("hasBankTransactions")(""); set("hasLargeDeposits")(""); } }} />
@@ -1344,8 +1610,8 @@ export default function DeepCheckPage() {
               </div>
             )}
 
-            {/* ===== STEP 5: History & Current Visas ===== */}
-            {step === 5 && (
+            {/* ===== STEP 6: History & Current Visas ===== */}
+            {step === 6 && (
               <div className="grid sm:grid-cols-2 gap-4">
                 <Sel label="Total International Trips (lifetime)" val={form.numberOfTrips || ""} onChange={val => { set("numberOfTrips")(val); if (val === "None") { set("countriesVisited")(""); set("previousVisaApprovals")("None"); set("hasOverstay")("No"); set("hasDeportation")("No"); } }} opts={["None","1–2 trips","3–5 trips","6–10 trips","10+ trips"]} />
                 <div>
@@ -1466,8 +1732,8 @@ export default function DeepCheckPage() {
               </div>
             )}
 
-            {/* ===== STEP 6: Documents ===== */}
-            {step === 6 && (
+            {/* ===== STEP 7: Documents ===== */}
+            {step === 7 && (
               <div className="grid sm:grid-cols-2 gap-4">
                 <DocToggle label="Return / onward ticket booked?" val={form.hasReturnTicket || ""} onChange={set("hasReturnTicket")} />
                 <DocToggle label="Hotel / accommodation booked?" val={form.hasHotelBooking || ""} onChange={set("hasHotelBooking")} />
@@ -1484,8 +1750,8 @@ export default function DeepCheckPage() {
               </div>
             )}
 
-            {/* ===== STEP 7: Home Ties & Extra ===== */}
-            {step === 7 && (
+            {/* ===== STEP 8: Home Ties & Extra ===== */}
+            {step === 8 && (
               <div className="grid sm:grid-cols-2 gap-4">
                 <DocToggle
                   label={form.maritalStatus === "Single" ? "Family members in home country?" : "Spouse / family in home country?"}
