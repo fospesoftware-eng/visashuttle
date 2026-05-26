@@ -7,7 +7,7 @@ import {
   ChevronRight, Brain, User, Plane, CreditCard, Globe, Home,
   Info, RefreshCw, Flag, Star, AlertTriangle, Activity, BookOpen,
   Briefcase, BadgeCheck, BarChart3, ClipboardList, Plus, Trash2, Users,
-  Mail, Loader2, Save, Clock3
+  Mail, Loader2, Save, Clock3, ChevronDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -113,30 +113,45 @@ function DimBar({ label, value, color }: { label: string; value: number; color: 
 }
 
 function Sel({ label, val, onChange, opts, tooltip }: any) {
+  const hasValue = Boolean(val);
   return (
-    <div className="space-y-1.5">
-      <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 block">
-        {label}{tooltip && <span className="text-xs text-muted-foreground ml-1">({tooltip})</span>}
+    <div className="space-y-2">
+      <Label className="flex items-center gap-1.5 text-sm font-semibold text-slate-800 dark:text-slate-200">
+        {label}{tooltip && <span className="text-xs font-medium text-muted-foreground">({tooltip})</span>}
       </Label>
-      <select value={val} onChange={e => onChange(e.target.value)}
-        className="w-full border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary">
-        <option value="">Select…</option>
-        {opts.map((o: string) => <option key={o} value={o}>{o}</option>)}
-      </select>
+      <div className="relative">
+        <select
+          value={val}
+          onChange={e => onChange(e.target.value)}
+          className={`h-12 w-full appearance-none rounded-2xl border px-4 pr-11 text-sm font-semibold shadow-sm transition-all focus:outline-none focus:ring-4 ${
+            hasValue
+              ? "border-primary/35 bg-white text-slate-950 shadow-primary/5 focus:border-primary focus:ring-primary/15 dark:bg-slate-950 dark:text-white"
+              : "border-slate-200 bg-slate-50/80 text-slate-500 hover:border-slate-300 focus:border-primary focus:ring-primary/15 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-slate-600"
+          }`}
+        >
+          <option value="">Select...</option>
+          {opts.map((o: string) => <option key={o} value={o}>{o}</option>)}
+        </select>
+        <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      </div>
     </div>
   );
 }
 
 function DocToggle({ label, val, onChange, tooltip }: any) {
   return (
-    <div className="space-y-1.5">
-      <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 block">
-        {label}{tooltip && <span className="text-xs text-muted-foreground ml-1">({tooltip})</span>}
+    <div className="space-y-2">
+      <Label className="flex items-center gap-1.5 text-sm font-semibold text-slate-800 dark:text-slate-200">
+        {label}{tooltip && <span className="text-xs font-medium text-muted-foreground">({tooltip})</span>}
       </Label>
-      <div className="flex gap-2 flex-wrap">
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
         {YES_NO.map(o => (
           <button key={o} type="button" onClick={() => onChange(o)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium border transition-all ${val === o ? "bg-primary text-white border-primary" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-primary/50"}`}>
+            className={`min-h-10 rounded-xl border px-4 py-2 text-sm font-semibold transition-all ${
+              val === o
+                ? "border-primary bg-primary text-white shadow-md shadow-primary/20"
+                : "border-slate-200 bg-white text-slate-700 hover:border-primary/40 hover:bg-primary/5 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-primary/50"
+            }`}>
             {o}
           </button>
         ))}
@@ -1483,42 +1498,63 @@ export default function DeepCheckPage() {
           </div>
         </div>
 
-        <div className="grid gap-5 lg:grid-cols-[290px_minmax(0,1fr)]">
-          <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
-            <Card className="border-primary/10 bg-card/95 shadow-sm">
-              <CardContent className="p-4">
-                <div className="mb-4 flex items-center justify-between">
+        <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
+          <aside className="hidden space-y-4 lg:sticky lg:top-4 lg:block lg:self-start">
+            <Card className="overflow-hidden border-primary/10 bg-card/95 shadow-lg shadow-primary/5">
+              <CardContent className="p-5">
+                <div className="mb-5 flex items-center justify-between">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-widest text-primary">Assessment path</p>
-                    <p className="text-sm text-muted-foreground">Your AI profile map</p>
+                    <p className="text-sm text-muted-foreground">Your guided AI profile map</p>
                   </div>
-                  <Badge variant="outline" className="bg-primary/5 text-primary">8 steps</Badge>
+                  <Badge variant="outline" className="bg-primary/5 text-primary">{step}/{STEPS.length}</Badge>
                 </div>
-                <div className="space-y-2">
+                <div className="mb-5 rounded-2xl border border-primary/10 bg-gradient-to-br from-primary/10 via-blue-50 to-pink-50 p-4 dark:from-primary/15 dark:via-slate-900 dark:to-pink-950/20">
+                  <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
+                    <span>Profile completion</span>
+                    <span className="text-foreground">{Math.round(progress)}%</span>
+                  </div>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/70 dark:bg-slate-800">
+                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, background: "linear-gradient(90deg,#7033F0,#4055FF,#FF2060)" }} />
+                  </div>
+                  <p className="mt-3 text-xs leading-5 text-muted-foreground">{answeredFields} answers captured. You can return to completed steps anytime.</p>
+                </div>
+                <div className="relative space-y-2">
+                  <div className="absolute bottom-4 left-[1.35rem] top-4 w-px bg-gradient-to-b from-primary/35 via-border to-transparent" />
                   {STEPS.map(s => {
                     const SIcon = s.icon;
                     const done = s.n < step;
                     const active = s.n === step;
+                    const locked = s.n > step;
                     return (
                       <button
                         key={s.n}
                         type="button"
-                        onClick={() => { if (s.n <= step) setStep(s.n); }}
-                        className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition-all ${
+                        disabled={locked}
+                        aria-current={active ? "step" : undefined}
+                        onClick={() => { if (!locked) setStep(s.n); }}
+                        className={`group relative flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition-all ${
                           active
-                            ? "border-primary/30 bg-primary/10 shadow-sm"
+                            ? "border-primary/40 bg-primary/10 shadow-md shadow-primary/10"
                             : done
-                              ? "border-emerald-200 bg-emerald-50/70 dark:border-emerald-900 dark:bg-emerald-950/20"
-                              : "border-transparent bg-muted/35 text-muted-foreground"
+                              ? "border-emerald-200 bg-emerald-50/75 hover:border-emerald-300 dark:border-emerald-900 dark:bg-emerald-950/20"
+                              : "border-transparent bg-muted/30 text-muted-foreground opacity-75"
                         }`}
                       >
-                        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${done ? "bg-emerald-500 text-white" : active ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground"}`}>
-                          {done ? <CheckCircle className="h-4 w-4" /> : <SIcon className="h-4 w-4" />}
+                        <span className={`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border shadow-sm ${
+                          done
+                            ? "border-emerald-500 bg-emerald-500 text-white"
+                            : active
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border bg-background text-muted-foreground"
+                        }`}>
+                          {done ? <CheckCircle className="h-4 w-4" /> : locked ? <Lock className="h-4 w-4" /> : <SIcon className="h-4 w-4" />}
                         </span>
-                        <span className="min-w-0">
+                        <span className="min-w-0 flex-1">
                           <span className="block text-sm font-bold text-foreground">{s.title}</span>
-                          <span className="block text-xs text-muted-foreground">Step {s.n}</span>
+                          <span className="block text-xs text-muted-foreground">{done ? "Completed" : active ? "In progress" : "Unlocks next"}</span>
                         </span>
+                        {active && <span className="h-2 w-2 rounded-full bg-primary shadow-[0_0_0_5px_rgba(64,85,255,0.12)]" />}
                       </button>
                     );
                   })}
@@ -1541,13 +1577,43 @@ export default function DeepCheckPage() {
           </aside>
 
           <div className="min-w-0 space-y-4">
-            <div className="rounded-2xl border bg-card/90 p-4 shadow-sm lg:hidden">
-              <div className="mb-3 flex items-center justify-between text-xs font-semibold text-muted-foreground">
-                <span>{currentStep.title}</span>
-                <span>{Math.round(progress)}%</span>
+            <div className="space-y-3 lg:hidden">
+              <div className="rounded-2xl border bg-card/95 p-4 shadow-sm">
+                <div className="mb-3 flex items-center justify-between text-xs font-semibold text-muted-foreground">
+                  <span>{currentStep.title}</span>
+                  <span>{Math.round(progress)}%</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-muted">
+                  <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, background: "linear-gradient(90deg,#7033F0,#4055FF,#FF2060)" }} />
+                </div>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-muted">
-                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, background: "linear-gradient(90deg,#7033F0,#4055FF,#FF2060)" }} />
+              <div className="overflow-x-auto rounded-2xl border bg-card/95 p-2 shadow-sm">
+                <div className="flex min-w-max gap-2">
+                  {STEPS.map(s => {
+                    const SIcon = s.icon;
+                    const done = s.n < step;
+                    const active = s.n === step;
+                    const locked = s.n > step;
+                    return (
+                      <button
+                        key={s.n}
+                        type="button"
+                        disabled={locked}
+                        onClick={() => { if (!locked) setStep(s.n); }}
+                        className={`flex h-11 items-center gap-2 rounded-xl border px-3 text-xs font-bold transition-all ${
+                          active
+                            ? "border-primary bg-primary text-white shadow-md shadow-primary/20"
+                            : done
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300"
+                              : "border-border bg-muted/40 text-muted-foreground"
+                        }`}
+                      >
+                        {done ? <CheckCircle className="h-3.5 w-3.5" /> : locked ? <Lock className="h-3.5 w-3.5" /> : <SIcon className="h-3.5 w-3.5" />}
+                        <span>Step {s.n}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
