@@ -162,7 +162,7 @@ function BusinessShell({ view, children }: { view: HubView; children: React.Reac
   ] as const;
 
   const Sidebar = ({ mobile = false }: { mobile?: boolean }) => (
-    <aside className={`flex h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300 ${mobile ? "w-64" : collapsed ? "w-16" : "w-64"}`}>
+    <aside className={`flex shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300 ${mobile ? "h-full w-64" : `sticky top-0 h-screen ${collapsed ? "w-16" : "w-64"}`}`}>
       <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
         {collapsed && !mobile ? <LogoMark /> : <Logo size="md" />}
         {!mobile && (
@@ -182,7 +182,7 @@ function BusinessShell({ view, children }: { view: HubView; children: React.Reac
           </Button>
         )}
       </div>
-      <nav className="grid gap-1 p-3">
+      <nav className="grid flex-1 content-start gap-1 overflow-y-auto p-3">
         {nav.map(([key, label, Icon]) => (
           <Link
             key={key}
@@ -196,31 +196,51 @@ function BusinessShell({ view, children }: { view: HubView; children: React.Reac
           </Link>
         ))}
       </nav>
-      <div className={`mt-auto border-t border-sidebar-border p-4 ${collapsed && !mobile ? "hidden" : ""}`}>
-        <div className="rounded-2xl bg-gradient-to-br from-[#4055FF] to-[#00B4D8] p-4 text-white">
-          <p className="text-sm font-bold">Credit Balance</p>
-          <p className="mt-2 text-2xl font-black">2,840</p>
-          <Button size="sm" className="mt-3 w-full bg-white text-[#4055FF] hover:bg-white/90">Add Credits</Button>
-        </div>
-        <div className="mt-3 flex items-center gap-3 rounded-xl px-2 py-2">
-          <Avatar className="h-8 w-8">
-            <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">GH</AvatarFallback>
-          </Avatar>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-sidebar-foreground">Growth Partner</p>
-            <p className="truncate text-xs text-sidebar-foreground/60">growth@visashuttle.com</p>
+      <div className="shrink-0 border-t border-sidebar-border p-4">
+        {collapsed && !mobile ? (
+          <div className="flex flex-col items-center gap-3">
+            <Button size="icon" className="h-9 w-9 border-0 text-white" style={{ background: brand }} aria-label="Add credits">
+              <Plus className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleLogout}
+              aria-label="Logout from Growth Hub"
+              title="Logout"
+              className="h-9 w-9 text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleLogout}
-            aria-label="Logout from Growth Hub"
-            title="Logout"
-            className="h-8 w-8 shrink-0 text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-          >
-            <LogOut className="h-4 w-4" />
-          </Button>
-        </div>
+        ) : (
+          <>
+            <div className="rounded-2xl bg-gradient-to-br from-[#4055FF] to-[#00B4D8] p-4 text-white">
+              <p className="text-sm font-bold">Credit Balance</p>
+              <p className="mt-2 text-2xl font-black">2,840</p>
+              <Button size="sm" className="mt-3 w-full bg-white text-[#4055FF] hover:bg-white/90">Add Credits</Button>
+            </div>
+            <div className="mt-3 flex items-center gap-3 rounded-xl px-2 py-2">
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">GH</AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-sidebar-foreground">Growth Partner</p>
+                <p className="truncate text-xs text-sidebar-foreground/60">growth@visashuttle.com</p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleLogout}
+                aria-label="Logout from Growth Hub"
+                title="Logout"
+                className="h-8 w-8 shrink-0 text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
+          </>
+        )}
       </div>
     </aside>
   );
@@ -256,16 +276,6 @@ function BusinessShell({ view, children }: { view: HubView; children: React.Reac
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">GH</AvatarFallback>
                 </Avatar>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleLogout}
-                className="gap-2"
-                data-testid="button-growth-hub-logout"
-              >
-                <LogOut className="h-4 w-4" />
-                <span className="hidden sm:inline">Logout</span>
               </Button>
             </div>
           </header>
