@@ -197,6 +197,17 @@ const STUDY_LANGUAGE_REQUIREMENTS: Record<string, { language: string; requiremen
   "Malta": { language: "English", requirement: "IELTS" },
 };
 
+const WORK_LANGUAGE_REQUIREMENTS: Record<string, { required: boolean; requirement: string; tests: string[] }> = {
+  "United Kingdom": { required: true, requirement: "English evidence is required for most Skilled Worker, Health and Care Worker, and regulated routes. SELT / IELTS UKVI, IELTS, PTE, or approved equivalents may apply.", tests: ["SELT / IELTS UKVI","IELTS","PTE Academic","OET","Employer / regulator exemption","Other"] },
+  "Canada": { required: true, requirement: "Language evidence is commonly required for immigration-linked work pathways and regulated occupations. IELTS, CELPIP/TEF, or employer/province-specific evidence may apply.", tests: ["IELTS","TEF / French test","Employer / regulator exemption","Other"] },
+  "Australia": { required: true, requirement: "English evidence is commonly required for skilled, sponsored, and many regulated work routes. IELTS, PTE Academic, TOEFL, or OET may apply.", tests: ["IELTS","PTE Academic","TOEFL","OET","Employer / regulator exemption","Other"] },
+  "New Zealand": { required: true, requirement: "English evidence is commonly required for skilled residence-linked routes and regulated occupations. IELTS, PTE, TOEFL, or OET may apply.", tests: ["IELTS","PTE Academic","TOEFL","OET","Employer / regulator exemption","Other"] },
+  "Ireland": { required: true, requirement: "Language evidence is often checked for healthcare, education, and regulated occupations. IELTS, OET, or regulator-specific proof may apply.", tests: ["IELTS","OET","Employer / regulator exemption","Other"] },
+  "United States": { required: false, requirement: "Most temporary employment visas do not require IELTS/TOEFL for the visa itself, but employers, licensing boards, healthcare roles, or academic employers may request proof.", tests: ["IELTS","TOEFL","OET","Employer / regulator exemption","Other"] },
+  "Singapore": { required: false, requirement: "English tests are usually not a visa requirement, but employers or licensing bodies may request proof for regulated roles.", tests: ["IELTS","TOEFL","PTE Academic","Employer / regulator exemption","Other"] },
+  "Malta": { required: true, requirement: "English evidence may be required for some employment and regulated routes. IELTS or approved equivalents may apply.", tests: ["IELTS","Employer / regulator exemption","Other"] },
+};
+
 const BLANK: Record<string, string> = {};
 
 const STUDENT_DETAIL_KEYS = [
@@ -382,17 +393,33 @@ function isLongStayProfileVisa(visaType = ""): boolean {
 }
 
 function isEnglishLanguageWorkDestination(country = ""): boolean {
-  const normalized = country.toLowerCase();
-  return [
-    "united kingdom",
-    "uk",
-    "canada",
-    "australia",
-    "new zealand",
-    "ireland",
-    "united states",
-    "usa",
-  ].some(term => normalized.includes(term));
+  return Boolean(WORK_LANGUAGE_REQUIREMENTS[country]?.required);
+}
+
+function getWorkLanguageRequirement(country = "") {
+  return WORK_LANGUAGE_REQUIREMENTS[country] ?? {
+    required: false,
+    requirement: "Language tests are usually not required for the work visa itself. Some employers, licensing bodies, or regulated occupations may still ask for proof.",
+    tests: ["IELTS","PTE Academic","TOEFL","OET","Employer / regulator exemption","Other"],
+  };
+}
+
+function getWorkLanguageOptions(form: Record<string, string>): string[] {
+  const rule = getWorkLanguageRequirement(form.destinationCountry);
+  if (isHealthcareOrRegulatedProfession(form)) {
+    return Array.from(new Set(["OET", ...rule.tests, "Employer / regulator exemption", "Other"]));
+  }
+  return rule.tests;
+}
+
+function shouldShowWorkLanguageScores(status = ""): boolean {
+  return ["Score available", "Booked / awaiting result", "Planning to take"].includes(status);
+}
+
+function isWorkLanguageRelevant(form: Record<string, string>): boolean {
+  const rule = WORK_LANGUAGE_REQUIREMENTS[form.destinationCountry || ""];
+  if (rule?.required) return true;
+  return Boolean(rule && isHealthcareOrRegulatedProfession(form));
 }
 
 function isHealthcareOrRegulatedProfession(form: Record<string, string>): boolean {
@@ -691,6 +718,36 @@ export default function DeepCheckPage() {
       duolingoProduction: "",
     }));
   }, [form.destinationCountry, form.englishTestType, form.visaType]);
+
+  useEffect(() => {
+    if (!isWorkVisaType(form.visaType) || !form.workEnglishTestType) return;
+    const allowed = getWorkLanguageOptions(form);
+    if (allowed.includes(form.workEnglishTestType)) return;
+    setForm(prev => ({
+      ...prev,
+      workEnglishTestType: "",
+      workIeltsOverall: "",
+      workIeltsListening: "",
+      workIeltsReading: "",
+      workIeltsWriting: "",
+      workIeltsSpeaking: "",
+      workPteOverall: "",
+      workPteListening: "",
+      workPteReading: "",
+      workPteWriting: "",
+      workPteSpeaking: "",
+      workToeflTotal: "",
+      workToeflListening: "",
+      workToeflReading: "",
+      workToeflWriting: "",
+      workToeflSpeaking: "",
+      oetOverallGrade: "",
+      oetListeningGrade: "",
+      oetReadingGrade: "",
+      oetWritingGrade: "",
+      oetSpeakingGrade: "",
+    }));
+  }, [form.destinationCountry, form.occupationSector, form.currentJobTitle, form.offeredJobTitle, form.jobSkillLevel, form.visaType, form.workEnglishTestType]);
 
   if (authLoading) return null;
   if (!user) { setLocation("/sign-in"); return null; }
@@ -1148,7 +1205,7 @@ export default function DeepCheckPage() {
   const draftLabel = draftStatus === "saving" ? "Saving draft..." : draftStatus === "restored" ? "Draft restored" : draftStatus === "saved" ? "Draft saved" : "Draft ready";
   const workVisaSelected = isWorkVisaType(form.visaType);
   const longStayProfileVisa = isLongStayProfileVisa(form.visaType);
-  const workLanguageRelevant = workVisaSelected && (isEnglishLanguageWorkDestination(form.destinationCountry) || isHealthcareOrRegulatedProfession(form));
+  const workLanguageRelevant = workVisaSelected && isWorkLanguageRelevant(form);
 
   // Per-step required-field check
   const STEP_REQUIRED: Record<number, { key: string; label: string }[]> = {
@@ -1186,7 +1243,7 @@ export default function DeepCheckPage() {
         && form.offeredJobTitle
         && form.offeredSalary
         && (!workLanguageRelevant || form.workEnglishTestStatus)
-        && (form.workEnglishTestStatus !== "Score available" || form.workEnglishTestType)
+        && (!shouldShowWorkLanguageScores(form.workEnglishTestStatus) || form.workEnglishTestType)
         && missingWorkLanguageScoreLabels(form).length === 0
       );
     }
@@ -1213,7 +1270,7 @@ export default function DeepCheckPage() {
         !form.offeredSalary && "Offered Salary",
         !form.occupationSector && "Profession / Occupation Sector",
         workLanguageRelevant && !form.workEnglishTestStatus && "English / OET Requirement Status",
-        form.workEnglishTestStatus === "Score available" && !form.workEnglishTestType && "Language Test Type",
+        shouldShowWorkLanguageScores(form.workEnglishTestStatus) && !form.workEnglishTestType && "Language Test Type",
         ...missingWorkLanguageScoreLabels(form),
       ].filter(Boolean).join(", ");
     }
@@ -1275,6 +1332,7 @@ export default function DeepCheckPage() {
               `Job offer letter: ${form.hasJobOffer || "-"}`,
               `Sponsor: ${form.workPermitSponsor || "-"}, employer license: ${form.employerLicenseStatus || "-"}`,
               `Role match: ${form.jobMatchesExperience || "-"}`,
+              `Destination work language rule: ${getWorkLanguageRequirement(form.destinationCountry).requirement}; required: ${getWorkLanguageRequirement(form.destinationCountry).required ? "Yes" : "Usually no"}`,
               `Language evidence: ${form.workEnglishTestStatus || "-"}; test: ${form.workEnglishTestType || "-"}; IELTS ${form.workIeltsOverall || "-"} L${form.workIeltsListening || "-"} R${form.workIeltsReading || "-"} W${form.workIeltsWriting || "-"} S${form.workIeltsSpeaking || "-"}; TOEFL total ${form.workToeflTotal || "-"}; PTE overall ${form.workPteOverall || "-"}; OET grade ${form.oetOverallGrade || "-"}; score report: ${form.hasLanguageScoreReport || "-"}`,
               `Professional registration: ${form.professionalRegistrationStatus || "-"}`,
             ].join("; ")
@@ -2011,6 +2069,10 @@ export default function DeepCheckPage() {
               }
 
               if (workVisa) {
+                const workLanguageRule = getWorkLanguageRequirement(form.destinationCountry || "");
+                const workLanguageOptions = getWorkLanguageOptions(form);
+                const showWorkLanguageScores = shouldShowWorkLanguageScores(form.workEnglishTestStatus);
+
                 return (
                   <div className="space-y-5">
                     <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-800 dark:bg-emerald-950/20">
@@ -2100,10 +2162,17 @@ export default function DeepCheckPage() {
                         <div className="flex gap-3">
                           <BadgeCheck className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
                           <div>
-                            <p className="text-sm font-bold text-blue-900 dark:text-blue-200">Language and professional evidence</p>
-                            <p className="mt-1 text-xs leading-5 text-blue-700 dark:text-blue-300">
-                              Some work routes require English evidence. Healthcare and nursing roles may accept or prefer OET in certain countries, while many skilled-worker routes use IELTS, PTE, TOEFL, or an equivalent exemption.
+                            <p className="text-sm font-bold text-blue-900 dark:text-blue-200">
+                              {form.destinationCountry || "Destination"} work language requirement
                             </p>
+                            <p className="mt-1 text-xs leading-5 text-blue-700 dark:text-blue-300">
+                              {workLanguageRule.requirement}
+                            </p>
+                            {!workLanguageRelevant && (
+                              <p className="mt-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                                Language test is optional for this profile unless your employer, licensing body, or job category asks for it.
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -2124,39 +2193,23 @@ export default function DeepCheckPage() {
                         val={form.workEnglishTestStatus || ""}
                         onChange={val => {
                           set("workEnglishTestStatus")(val);
-                          if (val === "Not required / exempted") {
+                          if (!shouldShowWorkLanguageScores(val)) {
                             set("workEnglishTestType")("");
-                          }
-                        }}
-                        opts={["Score available","Booked / awaiting result","Planning to take","Not required / exempted","Not sure"]}
-                      />
-                      <Sel
-                        label="Language Test Type"
-                        val={form.workEnglishTestType || ""}
-                        onChange={val => {
-                          set("workEnglishTestType")(val);
-                          if (val !== "IELTS") {
                             set("workIeltsOverall")("");
                             set("workIeltsListening")("");
                             set("workIeltsReading")("");
                             set("workIeltsWriting")("");
                             set("workIeltsSpeaking")("");
-                          }
-                          if (val !== "PTE Academic") {
                             set("workPteOverall")("");
                             set("workPteListening")("");
                             set("workPteReading")("");
                             set("workPteWriting")("");
                             set("workPteSpeaking")("");
-                          }
-                          if (val !== "TOEFL") {
                             set("workToeflTotal")("");
                             set("workToeflListening")("");
                             set("workToeflReading")("");
                             set("workToeflWriting")("");
                             set("workToeflSpeaking")("");
-                          }
-                          if (val !== "OET") {
                             set("oetOverallGrade")("");
                             set("oetListeningGrade")("");
                             set("oetReadingGrade")("");
@@ -2164,10 +2217,48 @@ export default function DeepCheckPage() {
                             set("oetSpeakingGrade")("");
                           }
                         }}
-                        opts={isHealthcareOrRegulatedProfession(form)
-                          ? ["OET","IELTS","PTE Academic","TOEFL","Employer / regulator exemption","Other"]
-                          : ["IELTS","PTE Academic","TOEFL","OET","Employer / regulator exemption","Other"]}
+                        opts={workLanguageRelevant
+                          ? ["Score available","Booked / awaiting result","Planning to take","Not required / exempted","Not sure"]
+                          : ["Not required / exempted","Score available","Booked / awaiting result","Planning to take","Not sure"]}
                       />
+                      {showWorkLanguageScores && (
+                        <Sel
+                          label="Language Test Type *"
+                          val={form.workEnglishTestType || ""}
+                          onChange={val => {
+                            set("workEnglishTestType")(val);
+                            if (val !== "IELTS") {
+                              set("workIeltsOverall")("");
+                              set("workIeltsListening")("");
+                              set("workIeltsReading")("");
+                              set("workIeltsWriting")("");
+                              set("workIeltsSpeaking")("");
+                            }
+                            if (val !== "PTE Academic") {
+                              set("workPteOverall")("");
+                              set("workPteListening")("");
+                              set("workPteReading")("");
+                              set("workPteWriting")("");
+                              set("workPteSpeaking")("");
+                            }
+                            if (val !== "TOEFL") {
+                              set("workToeflTotal")("");
+                              set("workToeflListening")("");
+                              set("workToeflReading")("");
+                              set("workToeflWriting")("");
+                              set("workToeflSpeaking")("");
+                            }
+                            if (val !== "OET") {
+                              set("oetOverallGrade")("");
+                              set("oetListeningGrade")("");
+                              set("oetReadingGrade")("");
+                              set("oetWritingGrade")("");
+                              set("oetSpeakingGrade")("");
+                            }
+                          }}
+                          opts={workLanguageOptions}
+                        />
+                      )}
                       {form.workEnglishTestType === "IELTS" && (
                         <>
                           <Sel label="IELTS Overall Band *" val={form.workIeltsOverall || ""} onChange={set("workIeltsOverall")} opts={IELTS_BANDS} />
