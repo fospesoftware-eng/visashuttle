@@ -144,6 +144,13 @@ function DocToggle({ label, val, onChange, tooltip }: any) {
   );
 }
 
+const IELTS_BANDS = ["0.0","0.5","1.0","1.5","2.0","2.5","3.0","3.5","4.0","4.5","5.0","5.5","6.0","6.5","7.0","7.5","8.0","8.5","9.0"];
+const TOEFL_TOTAL_BANDS = ["0–30","31–60","61–80","81–100","101–120"];
+const TOEFL_SECTION_BANDS = ["0–8","9–16","17–24","25–30"];
+const PTE_BANDS = ["10–29","30–42","43–50","51–58","59–65","66–75","76–84","85–90"];
+const DUOLINGO_BANDS = ["10–55","60–85","90–115","120–135","140–160"];
+const OET_GRADES = ["A","B","C+","C","D","E","Awaiting result"];
+
 const BLANK: Record<string, string> = {};
 
 const STUDENT_DETAIL_KEYS = [
@@ -165,6 +172,21 @@ const STUDENT_DETAIL_KEYS = [
   "ieltsReading",
   "ieltsWriting",
   "ieltsSpeaking",
+  "pteOverall",
+  "pteListening",
+  "pteReading",
+  "pteWriting",
+  "pteSpeaking",
+  "toeflTotal",
+  "toeflListening",
+  "toeflReading",
+  "toeflWriting",
+  "toeflSpeaking",
+  "duolingoOverall",
+  "duolingoLiteracy",
+  "duolingoComprehension",
+  "duolingoConversation",
+  "duolingoProduction",
   "educationSponsor",
   "whyThisCourse",
   "postStudyPlan",
@@ -203,6 +225,16 @@ const WORK_DETAIL_KEYS = [
   "workIeltsReading",
   "workIeltsWriting",
   "workIeltsSpeaking",
+  "workPteOverall",
+  "workPteListening",
+  "workPteReading",
+  "workPteWriting",
+  "workPteSpeaking",
+  "workToeflTotal",
+  "workToeflListening",
+  "workToeflReading",
+  "workToeflWriting",
+  "workToeflSpeaking",
   "oetOverallGrade",
   "oetListeningGrade",
   "oetReadingGrade",
@@ -324,6 +356,92 @@ function isHealthcareOrRegulatedProfession(form: Record<string, string>): boolea
     form.jobSkillLevel,
   ].filter(Boolean).join(" ").toLowerCase();
   return /nurse|nursing|doctor|physician|dentist|pharmacist|health|caregiver|midwife|medical|regulated/.test(text);
+}
+
+function selectedTestNeedsScores(testType = ""): boolean {
+  return ["IELTS", "PTE", "PTE Academic", "TOEFL", "Duolingo", "OET"].includes(testType);
+}
+
+function missingStudentLanguageScoreLabels(form: Record<string, string>): string[] {
+  if (!selectedTestNeedsScores(form.englishTestType)) return [];
+  if (form.englishTestType === "IELTS") {
+    return [
+      !form.ieltsOverall && "IELTS Overall",
+      !form.ieltsListening && "IELTS Listening",
+      !form.ieltsReading && "IELTS Reading",
+      !form.ieltsWriting && "IELTS Writing",
+      !form.ieltsSpeaking && "IELTS Speaking",
+    ].filter(Boolean) as string[];
+  }
+  if (form.englishTestType === "TOEFL") {
+    return [
+      !form.toeflTotal && "TOEFL Total",
+      !form.toeflListening && "TOEFL Listening",
+      !form.toeflReading && "TOEFL Reading",
+      !form.toeflWriting && "TOEFL Writing",
+      !form.toeflSpeaking && "TOEFL Speaking",
+    ].filter(Boolean) as string[];
+  }
+  if (form.englishTestType === "PTE") {
+    return [
+      !form.pteOverall && "PTE Overall",
+      !form.pteListening && "PTE Listening",
+      !form.pteReading && "PTE Reading",
+      !form.pteWriting && "PTE Writing",
+      !form.pteSpeaking && "PTE Speaking",
+    ].filter(Boolean) as string[];
+  }
+  if (form.englishTestType === "Duolingo") {
+    return [
+      !form.duolingoOverall && "Duolingo Overall",
+      !form.duolingoLiteracy && "Duolingo Literacy",
+      !form.duolingoComprehension && "Duolingo Comprehension",
+      !form.duolingoConversation && "Duolingo Conversation",
+      !form.duolingoProduction && "Duolingo Production",
+    ].filter(Boolean) as string[];
+  }
+  return [];
+}
+
+function missingWorkLanguageScoreLabels(form: Record<string, string>): string[] {
+  if (!selectedTestNeedsScores(form.workEnglishTestType)) return [];
+  if (form.workEnglishTestType === "IELTS") {
+    return [
+      !form.workIeltsOverall && "IELTS Overall",
+      !form.workIeltsListening && "IELTS Listening",
+      !form.workIeltsReading && "IELTS Reading",
+      !form.workIeltsWriting && "IELTS Writing",
+      !form.workIeltsSpeaking && "IELTS Speaking",
+    ].filter(Boolean) as string[];
+  }
+  if (form.workEnglishTestType === "TOEFL") {
+    return [
+      !form.workToeflTotal && "TOEFL Total",
+      !form.workToeflListening && "TOEFL Listening",
+      !form.workToeflReading && "TOEFL Reading",
+      !form.workToeflWriting && "TOEFL Writing",
+      !form.workToeflSpeaking && "TOEFL Speaking",
+    ].filter(Boolean) as string[];
+  }
+  if (form.workEnglishTestType === "PTE Academic") {
+    return [
+      !form.workPteOverall && "PTE Overall",
+      !form.workPteListening && "PTE Listening",
+      !form.workPteReading && "PTE Reading",
+      !form.workPteWriting && "PTE Writing",
+      !form.workPteSpeaking && "PTE Speaking",
+    ].filter(Boolean) as string[];
+  }
+  if (form.workEnglishTestType === "OET") {
+    return [
+      !form.oetOverallGrade && "OET Overall / Lowest Grade",
+      !form.oetListeningGrade && "OET Listening",
+      !form.oetReadingGrade && "OET Reading",
+      !form.oetWritingGrade && "OET Writing",
+      !form.oetSpeakingGrade && "OET Speaking",
+    ].filter(Boolean) as string[];
+  }
+  return [];
 }
 
 export default function DeepCheckPage() {
@@ -880,7 +998,13 @@ export default function DeepCheckPage() {
     if (!required.every(r => !!form[r.key])) return false;
     if (step === 1 && validateAdultApplicantDob(form.dateOfBirth)) return false;
     if (step === 3 && isStudentVisaType(form.visaType)) {
-      return Boolean(form.institutionName && form.studyLevel && form.courseName && form.hasAcceptanceLetter);
+      return Boolean(
+        form.institutionName
+        && form.studyLevel
+        && form.courseName
+        && form.hasAcceptanceLetter
+        && missingStudentLanguageScoreLabels(form).length === 0
+      );
     }
     if (step === 3 && isWorkVisaType(form.visaType)) {
       return Boolean(
@@ -892,6 +1016,8 @@ export default function DeepCheckPage() {
         && form.offeredJobTitle
         && form.offeredSalary
         && (!workLanguageRelevant || form.workEnglishTestStatus)
+        && (form.workEnglishTestStatus !== "Score available" || form.workEnglishTestType)
+        && missingWorkLanguageScoreLabels(form).length === 0
       );
     }
     return true;
@@ -904,6 +1030,7 @@ export default function DeepCheckPage() {
         !form.studyLevel && "Study Level",
         !form.courseName && "Course / Program Name",
         !form.hasAcceptanceLetter && "Acceptance Letter Status",
+        ...missingStudentLanguageScoreLabels(form),
       ].filter(Boolean).join(", ");
     }
     if (step === 3 && isWorkVisaType(form.visaType)) {
@@ -916,6 +1043,8 @@ export default function DeepCheckPage() {
         !form.offeredSalary && "Offered Salary",
         !form.occupationSector && "Profession / Occupation Sector",
         workLanguageRelevant && !form.workEnglishTestStatus && "English / OET Requirement Status",
+        form.workEnglishTestStatus === "Score available" && !form.workEnglishTestType && "Language Test Type",
+        ...missingWorkLanguageScoreLabels(form),
       ].filter(Boolean).join(", ");
     }
     const required = STEP_REQUIRED[step] ?? [];
@@ -961,7 +1090,7 @@ export default function DeepCheckPage() {
             `Course: ${form.courseName || "-"} (${form.studyLevel || "-"})`,
             `Academic score: ${form.lastEducationScore || "-"}`,
             `Study gap: ${form.studyGap || "-"}`,
-            `English test: ${form.englishTestType || "-"} ${form.ieltsOverall ? `(IELTS ${form.ieltsOverall})` : ""}`,
+            `English test: ${form.englishTestType || "-"}; IELTS ${form.ieltsOverall || "-"} L${form.ieltsListening || "-"} R${form.ieltsReading || "-"} W${form.ieltsWriting || "-"} S${form.ieltsSpeaking || "-"}; TOEFL total ${form.toeflTotal || "-"}; PTE overall ${form.pteOverall || "-"}; Duolingo overall ${form.duolingoOverall || "-"}`,
             `Funding: ${form.educationSponsor || "-"}, tuition: ${form.annualTuitionFee || "-"}, paid: ${form.tuitionPaid || "-"}`,
             `Acceptance letter: ${form.hasAcceptanceLetter || "-"}`,
           ].join("; ")
@@ -975,7 +1104,7 @@ export default function DeepCheckPage() {
               `Job offer letter: ${form.hasJobOffer || "-"}`,
               `Sponsor: ${form.workPermitSponsor || "-"}, employer license: ${form.employerLicenseStatus || "-"}`,
               `Role match: ${form.jobMatchesExperience || "-"}`,
-              `Language evidence: ${form.workEnglishTestStatus || "-"}; test: ${form.workEnglishTestType || "-"}; IELTS overall: ${form.workIeltsOverall || "-"}; OET grade: ${form.oetOverallGrade || "-"}; score report: ${form.hasLanguageScoreReport || "-"}`,
+              `Language evidence: ${form.workEnglishTestStatus || "-"}; test: ${form.workEnglishTestType || "-"}; IELTS ${form.workIeltsOverall || "-"} L${form.workIeltsListening || "-"} R${form.workIeltsReading || "-"} W${form.workIeltsWriting || "-"} S${form.workIeltsSpeaking || "-"}; TOEFL total ${form.workToeflTotal || "-"}; PTE overall ${form.workPteOverall || "-"}; OET grade ${form.oetOverallGrade || "-"}; score report: ${form.hasLanguageScoreReport || "-"}`,
               `Professional registration: ${form.professionalRegistrationStatus || "-"}`,
             ].join("; ")
           : "Not applicable for selected visa type",
@@ -1484,13 +1613,40 @@ export default function DeepCheckPage() {
                         <Input value={form.lastEducationScore || ""} onChange={e => set("lastEducationScore")(e.target.value)} placeholder="e.g. 72%, 8.1 CGPA, 3.4 GPA" />
                       </div>
                       <Sel label="Study Gap After Last Education" val={form.studyGap || ""} onChange={set("studyGap")} opts={["No gap","Less than 1 year","1–2 years","2–5 years","More than 5 years"]} />
-                      <Sel label="English Test Type" val={form.englishTestType || ""} onChange={set("englishTestType")} opts={["IELTS","PTE","TOEFL","Duolingo","Not required","Planning to take","Other"]} />
+                      <Sel
+                        label="English Test Type"
+                        val={form.englishTestType || ""}
+                        onChange={(val: string) => {
+                          setForm(prev => ({
+                            ...prev,
+                            englishTestType: val,
+                            ieltsOverall: val === "IELTS" ? prev.ieltsOverall : "",
+                            ieltsListening: val === "IELTS" ? prev.ieltsListening : "",
+                            ieltsReading: val === "IELTS" ? prev.ieltsReading : "",
+                            ieltsWriting: val === "IELTS" ? prev.ieltsWriting : "",
+                            ieltsSpeaking: val === "IELTS" ? prev.ieltsSpeaking : "",
+                            pteOverall: val === "PTE" ? prev.pteOverall : "",
+                            pteListening: val === "PTE" ? prev.pteListening : "",
+                            pteReading: val === "PTE" ? prev.pteReading : "",
+                            pteWriting: val === "PTE" ? prev.pteWriting : "",
+                            pteSpeaking: val === "PTE" ? prev.pteSpeaking : "",
+                            toeflTotal: val === "TOEFL" ? prev.toeflTotal : "",
+                            toeflListening: val === "TOEFL" ? prev.toeflListening : "",
+                            toeflReading: val === "TOEFL" ? prev.toeflReading : "",
+                            toeflWriting: val === "TOEFL" ? prev.toeflWriting : "",
+                            toeflSpeaking: val === "TOEFL" ? prev.toeflSpeaking : "",
+                            duolingoOverall: val === "Duolingo" ? prev.duolingoOverall : "",
+                            duolingoLiteracy: val === "Duolingo" ? prev.duolingoLiteracy : "",
+                            duolingoComprehension: val === "Duolingo" ? prev.duolingoComprehension : "",
+                            duolingoConversation: val === "Duolingo" ? prev.duolingoConversation : "",
+                            duolingoProduction: val === "Duolingo" ? prev.duolingoProduction : "",
+                          }));
+                        }}
+                        opts={["IELTS","PTE","TOEFL","Duolingo","Not required","Planning to take","Other"]}
+                      />
                       {form.englishTestType === "IELTS" && (
                         <>
-                          <div>
-                            <Label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">IELTS Overall Score</Label>
-                            <Input type="number" min="0" max="9" step="0.5" value={form.ieltsOverall || ""} onChange={e => set("ieltsOverall")(e.target.value)} placeholder="e.g. 6.5" />
-                          </div>
+                          <Sel label="IELTS Overall Band *" val={form.ieltsOverall || ""} onChange={set("ieltsOverall")} opts={IELTS_BANDS} />
                           <div className="grid grid-cols-2 gap-3 sm:col-span-2 sm:grid-cols-4">
                             {[
                               ["ieltsListening", "Listening"],
@@ -1498,10 +1654,52 @@ export default function DeepCheckPage() {
                               ["ieltsWriting", "Writing"],
                               ["ieltsSpeaking", "Speaking"],
                             ].map(([key, label]) => (
-                              <div key={key}>
-                                <Label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">{label}</Label>
-                                <Input type="number" min="0" max="9" step="0.5" value={form[key] || ""} onChange={e => set(key)(e.target.value)} placeholder="0–9" />
-                              </div>
+                              <Sel key={key} label={`${label} Band *`} val={form[key] || ""} onChange={set(key)} opts={IELTS_BANDS} />
+                            ))}
+                          </div>
+                        </>
+                      )}
+                      {form.englishTestType === "TOEFL" && (
+                        <>
+                          <Sel label="TOEFL Total Score *" val={form.toeflTotal || ""} onChange={set("toeflTotal")} opts={TOEFL_TOTAL_BANDS} />
+                          <div className="grid grid-cols-2 gap-3 sm:col-span-2 sm:grid-cols-4">
+                            {[
+                              ["toeflListening", "Listening"],
+                              ["toeflReading", "Reading"],
+                              ["toeflWriting", "Writing"],
+                              ["toeflSpeaking", "Speaking"],
+                            ].map(([key, label]) => (
+                              <Sel key={key} label={`${label} Score *`} val={form[key] || ""} onChange={set(key)} opts={TOEFL_SECTION_BANDS} />
+                            ))}
+                          </div>
+                        </>
+                      )}
+                      {form.englishTestType === "PTE" && (
+                        <>
+                          <Sel label="PTE Overall Score *" val={form.pteOverall || ""} onChange={set("pteOverall")} opts={PTE_BANDS} />
+                          <div className="grid grid-cols-2 gap-3 sm:col-span-2 sm:grid-cols-4">
+                            {[
+                              ["pteListening", "Listening"],
+                              ["pteReading", "Reading"],
+                              ["pteWriting", "Writing"],
+                              ["pteSpeaking", "Speaking"],
+                            ].map(([key, label]) => (
+                              <Sel key={key} label={`${label} Score *`} val={form[key] || ""} onChange={set(key)} opts={PTE_BANDS} />
+                            ))}
+                          </div>
+                        </>
+                      )}
+                      {form.englishTestType === "Duolingo" && (
+                        <>
+                          <Sel label="Duolingo Overall Score *" val={form.duolingoOverall || ""} onChange={set("duolingoOverall")} opts={DUOLINGO_BANDS} />
+                          <div className="grid grid-cols-2 gap-3 sm:col-span-2 sm:grid-cols-4">
+                            {[
+                              ["duolingoLiteracy", "Literacy"],
+                              ["duolingoComprehension", "Comprehension"],
+                              ["duolingoConversation", "Conversation"],
+                              ["duolingoProduction", "Production"],
+                            ].map(([key, label]) => (
+                              <Sel key={key} label={`${label} Score *`} val={form[key] || ""} onChange={set(key)} opts={DUOLINGO_BANDS} />
                             ))}
                           </div>
                         </>
@@ -1660,6 +1858,20 @@ export default function DeepCheckPage() {
                             set("workIeltsWriting")("");
                             set("workIeltsSpeaking")("");
                           }
+                          if (val !== "PTE Academic") {
+                            set("workPteOverall")("");
+                            set("workPteListening")("");
+                            set("workPteReading")("");
+                            set("workPteWriting")("");
+                            set("workPteSpeaking")("");
+                          }
+                          if (val !== "TOEFL") {
+                            set("workToeflTotal")("");
+                            set("workToeflListening")("");
+                            set("workToeflReading")("");
+                            set("workToeflWriting")("");
+                            set("workToeflSpeaking")("");
+                          }
                           if (val !== "OET") {
                             set("oetOverallGrade")("");
                             set("oetListeningGrade")("");
@@ -1674,10 +1886,7 @@ export default function DeepCheckPage() {
                       />
                       {form.workEnglishTestType === "IELTS" && (
                         <>
-                          <div>
-                            <Label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">IELTS Overall Score</Label>
-                            <Input type="number" min="0" max="9" step="0.5" value={form.workIeltsOverall || ""} onChange={e => set("workIeltsOverall")(e.target.value)} placeholder="e.g. 7.0" />
-                          </div>
+                          <Sel label="IELTS Overall Band *" val={form.workIeltsOverall || ""} onChange={set("workIeltsOverall")} opts={IELTS_BANDS} />
                           <div className="grid grid-cols-2 gap-3 sm:col-span-2 sm:grid-cols-4">
                             {[
                               ["workIeltsListening", "Listening"],
@@ -1685,17 +1894,44 @@ export default function DeepCheckPage() {
                               ["workIeltsWriting", "Writing"],
                               ["workIeltsSpeaking", "Speaking"],
                             ].map(([key, label]) => (
-                              <div key={key}>
-                                <Label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">{label}</Label>
-                                <Input type="number" min="0" max="9" step="0.5" value={form[key] || ""} onChange={e => set(key)(e.target.value)} placeholder="0–9" />
-                              </div>
+                              <Sel key={key} label={`${label} Band *`} val={form[key] || ""} onChange={set(key)} opts={IELTS_BANDS} />
+                            ))}
+                          </div>
+                        </>
+                      )}
+                      {form.workEnglishTestType === "TOEFL" && (
+                        <>
+                          <Sel label="TOEFL Total Score *" val={form.workToeflTotal || ""} onChange={set("workToeflTotal")} opts={TOEFL_TOTAL_BANDS} />
+                          <div className="grid grid-cols-2 gap-3 sm:col-span-2 sm:grid-cols-4">
+                            {[
+                              ["workToeflListening", "Listening"],
+                              ["workToeflReading", "Reading"],
+                              ["workToeflWriting", "Writing"],
+                              ["workToeflSpeaking", "Speaking"],
+                            ].map(([key, label]) => (
+                              <Sel key={key} label={`${label} Score *`} val={form[key] || ""} onChange={set(key)} opts={TOEFL_SECTION_BANDS} />
+                            ))}
+                          </div>
+                        </>
+                      )}
+                      {form.workEnglishTestType === "PTE Academic" && (
+                        <>
+                          <Sel label="PTE Overall Score *" val={form.workPteOverall || ""} onChange={set("workPteOverall")} opts={PTE_BANDS} />
+                          <div className="grid grid-cols-2 gap-3 sm:col-span-2 sm:grid-cols-4">
+                            {[
+                              ["workPteListening", "Listening"],
+                              ["workPteReading", "Reading"],
+                              ["workPteWriting", "Writing"],
+                              ["workPteSpeaking", "Speaking"],
+                            ].map(([key, label]) => (
+                              <Sel key={key} label={`${label} Score *`} val={form[key] || ""} onChange={set(key)} opts={PTE_BANDS} />
                             ))}
                           </div>
                         </>
                       )}
                       {form.workEnglishTestType === "OET" && (
                         <>
-                          <Sel label="OET Overall / Lowest Grade" val={form.oetOverallGrade || ""} onChange={set("oetOverallGrade")} opts={["A","B","C+","C","D","E","Awaiting result"]} />
+                          <Sel label="OET Overall / Lowest Grade *" val={form.oetOverallGrade || ""} onChange={set("oetOverallGrade")} opts={OET_GRADES} />
                           <div>
                             <Label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">OET Test Date</Label>
                             <Input type="date" value={form.oetTestDate || ""} onChange={e => set("oetTestDate")(e.target.value)} />
@@ -1707,7 +1943,7 @@ export default function DeepCheckPage() {
                               ["oetWritingGrade", "Writing"],
                               ["oetSpeakingGrade", "Speaking"],
                             ].map(([key, label]) => (
-                              <Sel key={key} label={label} val={form[key] || ""} onChange={set(key)} opts={["A","B","C+","C","D","E","Awaiting result"]} />
+                              <Sel key={key} label={`${label} Grade *`} val={form[key] || ""} onChange={set(key)} opts={OET_GRADES} />
                             ))}
                           </div>
                         </>
