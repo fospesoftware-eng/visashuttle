@@ -19,6 +19,7 @@ import {
   Inbox,
   LineChart as LineChartIcon,
   Lock,
+  LogOut,
   Megaphone,
   Menu,
   MoreHorizontal,
@@ -140,8 +141,15 @@ function Metric({ title, value, hint, icon: Icon }: { title: string; value: stri
 }
 
 function BusinessShell({ view, children }: { view: HubView; children: React.ReactNode }) {
+  const [, setLocation] = useLocation();
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const handleLogout = () => {
+    localStorage.removeItem("growth_hub_demo_session");
+    localStorage.removeItem("growth_hub_business_name");
+    setOpen(false);
+    setLocation("/growth-hub/login");
+  };
   const nav = [
     ["dashboard", "Dashboard", Gauge],
     ["leads", "Leads", Inbox],
@@ -198,10 +206,20 @@ function BusinessShell({ view, children }: { view: HubView; children: React.Reac
           <Avatar className="h-8 w-8">
             <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">GH</AvatarFallback>
           </Avatar>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-sidebar-foreground">Growth Partner</p>
             <p className="truncate text-xs text-sidebar-foreground/60">growth@visashuttle.com</p>
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleLogout}
+            aria-label="Logout from Growth Hub"
+            title="Logout"
+            className="h-8 w-8 shrink-0 text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+          >
+            <LogOut className="h-4 w-4" />
+          </Button>
         </div>
       </div>
     </aside>
@@ -234,10 +252,20 @@ function BusinessShell({ view, children }: { view: HubView; children: React.Reac
               <Badge className="hidden border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 sm:inline-flex">Wallet 2,840</Badge>
               <Button size="sm" className="hidden border-0 text-white sm:inline-flex" style={{ background: brand }}><Plus className="mr-1 h-4 w-4" /> Add Credits</Button>
               <Button variant="ghost" size="icon"><Bell className="h-5 w-5" /></Button>
-              <Button variant="ghost" size="icon" className="rounded-full">
+              <Button variant="ghost" size="icon" className="rounded-full" aria-label="Growth Hub account">
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary">GH</AvatarFallback>
                 </Avatar>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLogout}
+                className="gap-2"
+                data-testid="button-growth-hub-logout"
+              >
+                <LogOut className="h-4 w-4" />
+                <span className="hidden sm:inline">Logout</span>
               </Button>
             </div>
           </header>
