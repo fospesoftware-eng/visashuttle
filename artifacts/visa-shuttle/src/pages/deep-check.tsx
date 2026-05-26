@@ -152,6 +152,51 @@ const PTE_BANDS = ["10–29","30–42","43–50","51–58","59–65","66–75","
 const DUOLINGO_BANDS = ["10–55","60–85","90–115","120–135","140–160"];
 const OET_GRADES = ["A","B","C+","C","D","E","Awaiting result"];
 
+const STUDY_LANGUAGE_REQUIREMENTS: Record<string, { language: string; requirement: string }> = {
+  "United States": { language: "English", requirement: "IELTS / TOEFL / Duolingo / PTE" },
+  "Canada": { language: "English / French", requirement: "IELTS / TOEFL / PTE / TEF" },
+  "United Kingdom": { language: "English", requirement: "IELTS UKVI / SELT / PTE" },
+  "Australia": { language: "English", requirement: "IELTS / PTE / TOEFL" },
+  "New Zealand": { language: "English", requirement: "IELTS / PTE" },
+  "Ireland": { language: "English", requirement: "IELTS / TOEFL" },
+  "Germany": { language: "German / English", requirement: "TestDaF / DSH / Goethe / IELTS / TOEFL / MOI" },
+  "France": { language: "French / English", requirement: "DELF / DALF / TCF / IELTS" },
+  "Italy": { language: "Italian / English", requirement: "CILS / CELI / IELTS" },
+  "Spain": { language: "Spanish / English", requirement: "DELE / SIELE / IELTS" },
+  "Portugal": { language: "Portuguese / English", requirement: "IELTS" },
+  "Netherlands": { language: "English / Dutch", requirement: "IELTS / TOEFL" },
+  "Belgium": { language: "Dutch / French / English", requirement: "IELTS or local language proof" },
+  "Sweden": { language: "English", requirement: "IELTS / TOEFL" },
+  "Norway": { language: "Norwegian / English", requirement: "IELTS / TOEFL" },
+  "Denmark": { language: "Danish / English", requirement: "IELTS / TOEFL" },
+  "Finland": { language: "Finnish / English", requirement: "IELTS / TOEFL" },
+  "Austria": { language: "German", requirement: "German certificate or IELTS" },
+  "Switzerland": { language: "German / French / Italian / English", requirement: "Depends on university language" },
+  "Poland": { language: "Polish / English", requirement: "IELTS / MOI" },
+  "Hungary": { language: "Hungarian / English", requirement: "IELTS / MOI" },
+  "Czech Republic": { language: "Czech / English", requirement: "IELTS / MOI" },
+  "Lithuania": { language: "English", requirement: "IELTS / MOI" },
+  "Latvia": { language: "English", requirement: "IELTS / MOI" },
+  "Estonia": { language: "English", requirement: "IELTS" },
+  "Russia": { language: "Russian / English", requirement: "TORFL / IELTS" },
+  "Turkey": { language: "Turkish / English", requirement: "IELTS / TOEFL" },
+  "Georgia": { language: "English", requirement: "MOI / Interview / Often No IELTS" },
+  "Armenia": { language: "English", requirement: "MOI / Interview" },
+  "United Arab Emirates": { language: "English / Arabic", requirement: "IELTS / Internal Test" },
+  "Saudi Arabia": { language: "Arabic / English", requirement: "IELTS for international universities" },
+  "Qatar": { language: "English / Arabic", requirement: "IELTS / TOEFL" },
+  "Singapore": { language: "English", requirement: "IELTS / TOEFL / PTE" },
+  "Malaysia": { language: "English", requirement: "IELTS / MOI" },
+  "Japan": { language: "Japanese / English", requirement: "JLPT / IELTS" },
+  "South Korea": { language: "Korean / English", requirement: "TOPIK / IELTS" },
+  "China": { language: "Chinese / English", requirement: "HSK / IELTS" },
+  "Thailand": { language: "Thai / English", requirement: "IELTS for international programs" },
+  "Vietnam": { language: "Vietnamese / English", requirement: "IELTS sometimes required" },
+  "Philippines": { language: "English", requirement: "Usually No IELTS" },
+  "Cyprus": { language: "English / Greek", requirement: "IELTS / MOI" },
+  "Malta": { language: "English", requirement: "IELTS" },
+};
+
 const BLANK: Record<string, string> = {};
 
 const STUDENT_DETAIL_KEYS = [
@@ -374,12 +419,45 @@ function getStepDescription(step: number, visaType = ""): string {
 }
 
 function selectedTestNeedsScores(testType = ""): boolean {
-  return ["IELTS", "PTE", "PTE Academic", "TOEFL", "Duolingo", "OET"].includes(testType);
+  return ["IELTS", "SELT / IELTS UKVI", "PTE", "PTE Academic", "TOEFL", "Duolingo", "OET"].includes(testType);
+}
+
+function getStudyLanguageRequirement(country = "") {
+  return STUDY_LANGUAGE_REQUIREMENTS[country] ?? null;
+}
+
+function getStudyLanguageOptions(country = ""): string[] {
+  const requirement = getStudyLanguageRequirement(country)?.requirement ?? "";
+  const normalized = requirement.toLowerCase();
+  const options: string[] = [];
+
+  if (/ielts/.test(normalized)) options.push("IELTS");
+  if (/pte/.test(normalized)) options.push("PTE");
+  if (/toefl/.test(normalized)) options.push("TOEFL");
+  if (/duolingo/.test(normalized)) options.push("Duolingo");
+  if (/moi|medium of instruction/.test(normalized)) options.push("MOI / Medium of Instruction");
+  if (/internal test/.test(normalized)) options.push("University internal test");
+  if (/interview/.test(normalized)) options.push("University interview");
+  if (/local language|german certificate|testdaf|dsh|goethe|delf|dalf|tcf|cils|celi|dele|siele|torfl|jlpt|topik|hsk|tef/.test(normalized)) {
+    options.push("Local language certificate");
+  }
+  if (/selt|ukvi/.test(normalized)) options.push("SELT / IELTS UKVI");
+  if (/no ielts|not required|usually no|often no|sometimes required|depends on university/.test(normalized)) {
+    options.push("Not required / university exemption");
+  }
+  options.push("Planning to take", "Other");
+
+  return Array.from(new Set(options.length ? options : ["IELTS", "TOEFL", "PTE", "Not required / university exemption", "Planning to take", "Other"]));
+}
+
+function isStudyLanguageUsuallyOptional(country = ""): boolean {
+  const requirement = getStudyLanguageRequirement(country)?.requirement.toLowerCase() ?? "";
+  return /no ielts|usually no|often no|sometimes required|depends on university|moi|interview/.test(requirement);
 }
 
 function missingStudentLanguageScoreLabels(form: Record<string, string>): string[] {
   if (!selectedTestNeedsScores(form.englishTestType)) return [];
-  if (form.englishTestType === "IELTS") {
+  if (form.englishTestType === "IELTS" || form.englishTestType === "SELT / IELTS UKVI") {
     return [
       !form.ieltsOverall && "IELTS Overall",
       !form.ieltsListening && "IELTS Listening",
@@ -583,6 +661,36 @@ export default function DeepCheckPage() {
 
     return () => clearInterval(tick);
   }, [isSubmitting]);
+
+  useEffect(() => {
+    if (!isStudentVisaType(form.visaType) || !form.englishTestType) return;
+    const allowed = getStudyLanguageOptions(form.destinationCountry || "");
+    if (allowed.includes(form.englishTestType)) return;
+    setForm(prev => ({
+      ...prev,
+      englishTestType: "",
+      ieltsOverall: "",
+      ieltsListening: "",
+      ieltsReading: "",
+      ieltsWriting: "",
+      ieltsSpeaking: "",
+      pteOverall: "",
+      pteListening: "",
+      pteReading: "",
+      pteWriting: "",
+      pteSpeaking: "",
+      toeflTotal: "",
+      toeflListening: "",
+      toeflReading: "",
+      toeflWriting: "",
+      toeflSpeaking: "",
+      duolingoOverall: "",
+      duolingoLiteracy: "",
+      duolingoComprehension: "",
+      duolingoConversation: "",
+      duolingoProduction: "",
+    }));
+  }, [form.destinationCountry, form.englishTestType, form.visaType]);
 
   if (authLoading) return null;
   if (!user) { setLocation("/sign-in"); return null; }
@@ -1152,6 +1260,7 @@ export default function DeepCheckPage() {
             `Course: ${form.courseName || "-"} (${form.studyLevel || "-"})`,
             `Academic score: ${form.lastEducationScore || "-"}`,
             `Study gap: ${form.studyGap || "-"}`,
+            `Destination language rule: ${getStudyLanguageRequirement(form.destinationCountry)?.requirement || "-"}; main language: ${getStudyLanguageRequirement(form.destinationCountry)?.language || "-"}`,
             `English test: ${form.englishTestType || "-"}; IELTS ${form.ieltsOverall || "-"} L${form.ieltsListening || "-"} R${form.ieltsReading || "-"} W${form.ieltsWriting || "-"} S${form.ieltsSpeaking || "-"}; TOEFL total ${form.toeflTotal || "-"}; PTE overall ${form.pteOverall || "-"}; Duolingo overall ${form.duolingoOverall || "-"}`,
             `Funding: ${form.educationSponsor || "-"}, tuition: ${form.annualTuitionFee || "-"}, paid: ${form.tuitionPaid || "-"}`,
             `Acceptance letter: ${form.hasAcceptanceLetter || "-"}`,
@@ -1719,6 +1828,8 @@ export default function DeepCheckPage() {
               const studentVisa = isStudentVisaType(form.visaType);
               const workVisa = isWorkVisaType(form.visaType);
               const universityOptions = getUniversitiesForCountry(form.destinationCountry || "");
+              const studyLanguageRule = getStudyLanguageRequirement(form.destinationCountry || "");
+              const studyLanguageOptions = getStudyLanguageOptions(form.destinationCountry || "");
 
               if (studentVisa) {
                 return (
@@ -1766,6 +1877,26 @@ export default function DeepCheckPage() {
                         <Input value={form.lastEducationScore || ""} onChange={e => set("lastEducationScore")(e.target.value)} placeholder="e.g. 72%, 8.1 CGPA, 3.4 GPA" />
                       </div>
                       <Sel label="Study Gap After Last Education" val={form.studyGap || ""} onChange={set("studyGap")} opts={["No gap","Less than 1 year","1–2 years","2–5 years","More than 5 years"]} />
+                      <div className="sm:col-span-2 rounded-2xl border border-blue-200 bg-blue-50/70 p-4 dark:border-blue-800 dark:bg-blue-950/20">
+                        <div className="flex gap-3">
+                          <Globe className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
+                          <div>
+                            <p className="text-sm font-bold text-blue-950 dark:text-blue-100">
+                              {form.destinationCountry || "Destination"} language requirement
+                            </p>
+                            <p className="mt-1 text-xs leading-5 text-blue-800 dark:text-blue-300">
+                              {studyLanguageRule
+                                ? `Main study language: ${studyLanguageRule.language}. Common requirement: ${studyLanguageRule.requirement}.`
+                                : "Select a destination country to see country-specific language-test guidance."}
+                            </p>
+                            {form.destinationCountry && isStudyLanguageUsuallyOptional(form.destinationCountry) && (
+                              <p className="mt-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                                This destination may accept MOI, interview, internal test, or university exemption instead of IELTS. Confirm with the university before applying.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                       <Sel
                         label="English Test Type"
                         val={form.englishTestType || ""}
@@ -1773,11 +1904,11 @@ export default function DeepCheckPage() {
                           setForm(prev => ({
                             ...prev,
                             englishTestType: val,
-                            ieltsOverall: val === "IELTS" ? prev.ieltsOverall : "",
-                            ieltsListening: val === "IELTS" ? prev.ieltsListening : "",
-                            ieltsReading: val === "IELTS" ? prev.ieltsReading : "",
-                            ieltsWriting: val === "IELTS" ? prev.ieltsWriting : "",
-                            ieltsSpeaking: val === "IELTS" ? prev.ieltsSpeaking : "",
+                            ieltsOverall: (val === "IELTS" || val === "SELT / IELTS UKVI") ? prev.ieltsOverall : "",
+                            ieltsListening: (val === "IELTS" || val === "SELT / IELTS UKVI") ? prev.ieltsListening : "",
+                            ieltsReading: (val === "IELTS" || val === "SELT / IELTS UKVI") ? prev.ieltsReading : "",
+                            ieltsWriting: (val === "IELTS" || val === "SELT / IELTS UKVI") ? prev.ieltsWriting : "",
+                            ieltsSpeaking: (val === "IELTS" || val === "SELT / IELTS UKVI") ? prev.ieltsSpeaking : "",
                             pteOverall: val === "PTE" ? prev.pteOverall : "",
                             pteListening: val === "PTE" ? prev.pteListening : "",
                             pteReading: val === "PTE" ? prev.pteReading : "",
@@ -1795,11 +1926,11 @@ export default function DeepCheckPage() {
                             duolingoProduction: val === "Duolingo" ? prev.duolingoProduction : "",
                           }));
                         }}
-                        opts={["IELTS","PTE","TOEFL","Duolingo","Not required","Planning to take","Other"]}
+                        opts={studyLanguageOptions}
                       />
-                      {form.englishTestType === "IELTS" && (
+                      {form.englishTestType === "IELTS" || form.englishTestType === "SELT / IELTS UKVI" ? (
                         <>
-                          <Sel label="IELTS Overall Band *" val={form.ieltsOverall || ""} onChange={set("ieltsOverall")} opts={IELTS_BANDS} />
+                          <Sel label={`${form.englishTestType === "SELT / IELTS UKVI" ? "SELT / IELTS UKVI" : "IELTS"} Overall Band *`} val={form.ieltsOverall || ""} onChange={set("ieltsOverall")} opts={IELTS_BANDS} />
                           <div className="grid grid-cols-2 gap-3 sm:col-span-2 sm:grid-cols-4">
                             {[
                               ["ieltsListening", "Listening"],
@@ -1811,7 +1942,7 @@ export default function DeepCheckPage() {
                             ))}
                           </div>
                         </>
-                      )}
+                      ) : null}
                       {form.englishTestType === "TOEFL" && (
                         <>
                           <Sel label="TOEFL Total Score *" val={form.toeflTotal || ""} onChange={set("toeflTotal")} opts={TOEFL_TOTAL_BANDS} />
