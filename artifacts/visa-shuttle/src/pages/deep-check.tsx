@@ -177,6 +177,7 @@ const STUDENT_DETAIL_KEYS = [
 const WORK_DETAIL_KEYS = [
   "currentJobTitle",
   "currentEmployerName",
+  "occupationSector",
   "totalWorkExperience",
   "relevantWorkExperience",
   "currentSalary",
@@ -195,6 +196,22 @@ const WORK_DETAIL_KEYS = [
   "hasEmployerSponsorshipLetter",
   "hasQualificationProof",
   "hasExperienceLetters",
+  "workEnglishTestStatus",
+  "workEnglishTestType",
+  "workIeltsOverall",
+  "workIeltsListening",
+  "workIeltsReading",
+  "workIeltsWriting",
+  "workIeltsSpeaking",
+  "oetOverallGrade",
+  "oetListeningGrade",
+  "oetReadingGrade",
+  "oetWritingGrade",
+  "oetSpeakingGrade",
+  "oetTestDate",
+  "hasLanguageScoreReport",
+  "professionalRegistrationStatus",
+  "languageRequirementNotes",
   "roleResponsibilities",
   "careerReasonForMove",
 ];
@@ -279,6 +296,34 @@ function isStudentVisaType(visaType = ""): boolean {
 function isWorkVisaType(visaType = ""): boolean {
   const normalized = visaType.toLowerCase();
   return ["work", "employment", "skilled worker", "temporary worker", "h-1b", "h1b", "l-1", "l1", "work permit"].some(term => normalized.includes(term));
+}
+
+function isLongStayProfileVisa(visaType = ""): boolean {
+  return isStudentVisaType(visaType) || isWorkVisaType(visaType);
+}
+
+function isEnglishLanguageWorkDestination(country = ""): boolean {
+  const normalized = country.toLowerCase();
+  return [
+    "united kingdom",
+    "uk",
+    "canada",
+    "australia",
+    "new zealand",
+    "ireland",
+    "united states",
+    "usa",
+  ].some(term => normalized.includes(term));
+}
+
+function isHealthcareOrRegulatedProfession(form: Record<string, string>): boolean {
+  const text = [
+    form.occupationSector,
+    form.currentJobTitle,
+    form.offeredJobTitle,
+    form.jobSkillLevel,
+  ].filter(Boolean).join(" ").toLowerCase();
+  return /nurse|nursing|doctor|physician|dentist|pharmacist|health|caregiver|midwife|medical|regulated/.test(text);
 }
 
 export default function DeepCheckPage() {
@@ -813,6 +858,9 @@ export default function DeepCheckPage() {
   const currentStep = STEPS[step - 1];
   const StepIcon = currentStep.icon;
   const progress = ((step - 1) / (STEPS.length - 1)) * 100;
+  const workVisaSelected = isWorkVisaType(form.visaType);
+  const longStayProfileVisa = isLongStayProfileVisa(form.visaType);
+  const workLanguageRelevant = workVisaSelected && (isEnglishLanguageWorkDestination(form.destinationCountry) || isHealthcareOrRegulatedProfession(form));
 
   // Per-step required-field check
   const STEP_REQUIRED: Record<number, { key: string; label: string }[]> = {
@@ -820,7 +868,7 @@ export default function DeepCheckPage() {
     2: [
       { key: "destinationCountry", label: "Destination Country" },
       { key: "visaType", label: "Visa Type" },
-      { key: "tripDuration", label: "Trip Duration" },
+      ...(!longStayProfileVisa ? [{ key: "tripDuration", label: "Trip Duration" }] : []),
     ],
     4: [{ key: "employmentStatus", label: "Employment Status" }],
     5: [{ key: "bankBalance", label: "Bank Balance" }],
@@ -835,7 +883,16 @@ export default function DeepCheckPage() {
       return Boolean(form.institutionName && form.studyLevel && form.courseName && form.hasAcceptanceLetter);
     }
     if (step === 3 && isWorkVisaType(form.visaType)) {
-      return Boolean((form.currentJobTitle || form.jobTitle) && form.totalWorkExperience && form.hasJobOffer && form.hiringCompanyName && form.offeredJobTitle && form.offeredSalary);
+      return Boolean(
+        (form.currentJobTitle || form.jobTitle)
+        && form.occupationSector
+        && form.totalWorkExperience
+        && form.hasJobOffer
+        && form.hiringCompanyName
+        && form.offeredJobTitle
+        && form.offeredSalary
+        && (!workLanguageRelevant || form.workEnglishTestStatus)
+      );
     }
     return true;
   };
@@ -857,6 +914,8 @@ export default function DeepCheckPage() {
         !form.hiringCompanyName && "Hiring Company Name",
         !form.offeredJobTitle && "Offered Job Title",
         !form.offeredSalary && "Offered Salary",
+        !form.occupationSector && "Profession / Occupation Sector",
+        workLanguageRelevant && !form.workEnglishTestStatus && "English / OET Requirement Status",
       ].filter(Boolean).join(", ");
     }
     const required = STEP_REQUIRED[step] ?? [];
@@ -910,11 +969,14 @@ export default function DeepCheckPage() {
           ? [
               `Work visa profile`,
               `Current role: ${form.currentJobTitle || form.jobTitle || "-"} at ${form.currentEmployerName || form.companyName || "-"}`,
+              `Profession: ${form.occupationSector || "-"}; professional registration: ${form.professionalRegistrationStatus || "-"}`,
               `Experience: ${form.totalWorkExperience || "-"} total, ${form.relevantWorkExperience || "-"} relevant`,
               `Offer: ${form.offeredJobTitle || "-"} at ${form.hiringCompanyName || "-"}, salary ${form.offeredSalary || "-"}`,
               `Job offer letter: ${form.hasJobOffer || "-"}`,
               `Sponsor: ${form.workPermitSponsor || "-"}, employer license: ${form.employerLicenseStatus || "-"}`,
               `Role match: ${form.jobMatchesExperience || "-"}`,
+              `Language evidence: ${form.workEnglishTestStatus || "-"}; test: ${form.workEnglishTestType || "-"}; IELTS overall: ${form.workIeltsOverall || "-"}; OET grade: ${form.oetOverallGrade || "-"}; score report: ${form.hasLanguageScoreReport || "-"}`,
+              `Professional registration: ${form.professionalRegistrationStatus || "-"}`,
             ].join("; ")
           : "Not applicable for selected visa type",
     };
@@ -1298,19 +1360,32 @@ export default function DeepCheckPage() {
 
                 {/* Remaining Travel Plan fields */}
                 <div className="grid sm:grid-cols-2 gap-4">
-                  <div>
-                  <Sel label="Trip Duration *" val={form.tripDuration || ""} onChange={set("tripDuration")}
-                    opts={form.visaType === "Transit Visa"
-                      ? ["1–3 days","4–7 days"]
-                      : ["1–3 days","4–7 days","8–14 days","15–30 days","1–3 months","More than 3 months"]} />
-                  {form.visaType === "Transit Visa" && TRANSIT_LONG_DURATIONS.includes(form.tripDuration) && (
-                    <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
-                      <AlertTriangle className="w-3 h-3" /> Transit visas are for short stays only (typically 24–72 hours). Please correct the duration.
-                    </p>
+                  {!isLongStayProfileVisa(form.visaType) ? (
+                    <div>
+                      <Sel label="Trip Duration *" val={form.tripDuration || ""} onChange={set("tripDuration")}
+                        opts={form.visaType === "Transit Visa"
+                          ? ["1–3 days","4–7 days"]
+                          : ["1–3 days","4–7 days","8–14 days","15–30 days","1–3 months","More than 3 months"]} />
+                      {form.visaType === "Transit Visa" && TRANSIT_LONG_DURATIONS.includes(form.tripDuration) && (
+                        <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" /> Transit visas are for short stays only (typically 24–72 hours). Please correct the duration.
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-indigo-200 bg-indigo-50/70 p-3 dark:border-indigo-800 dark:bg-indigo-950/20">
+                      <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-200">
+                        {isStudentVisaType(form.visaType) ? "Study duration is captured next" : "Employment duration is captured next"}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-indigo-700 dark:text-indigo-300">
+                        Trip duration is not used for {isStudentVisaType(form.visaType) ? "student" : "work"} visas. The next step captures course length, contract duration, start date, and sponsor details.
+                      </p>
+                    </div>
                   )}
-                </div>
                 <div>
-                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">Planned Travel Date</Label>
+                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 block">
+                    {isLongStayProfileVisa(form.visaType) ? "Planned Arrival Date" : "Planned Travel Date"}
+                  </Label>
                   <Input type="date" value={form.plannedTravelDate || ""} min={TOMORROW}
                     onChange={e => set("plannedTravelDate")(e.target.value)} />
                   {form.plannedTravelDate && form.plannedTravelDate < TODAY_ISO && (
@@ -1477,6 +1552,41 @@ export default function DeepCheckPage() {
                         <Label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Current Employer / Company</Label>
                         <Input value={form.currentEmployerName || form.companyName || ""} onChange={e => set("currentEmployerName")(e.target.value)} placeholder="e.g. ABC Technologies Pvt Ltd" />
                       </div>
+                      <Sel
+                        label="Profession / Occupation Sector *"
+                        val={form.occupationSector || ""}
+                        onChange={val => {
+                          set("occupationSector")(val);
+                          if (!/health|nursing|medical|doctor|dentist|pharmacist|caregiver|regulated/i.test(val)) {
+                            set("oetOverallGrade")("");
+                            set("oetListeningGrade")("");
+                            set("oetReadingGrade")("");
+                            set("oetWritingGrade")("");
+                            set("oetSpeakingGrade")("");
+                          }
+                        }}
+                        opts={[
+                          "Healthcare / Nursing",
+                          "Doctor / Medical Practitioner",
+                          "Dentist / Pharmacist / Allied Health",
+                          "Caregiver / Aged Care",
+                          "IT / Software",
+                          "Engineering",
+                          "Finance / Accounting",
+                          "Hospitality / Tourism",
+                          "Construction / Skilled Trades",
+                          "Education / Teaching",
+                          "Management / Executive",
+                          "Other Regulated Profession",
+                          "Other",
+                        ]}
+                      />
+                      <Sel
+                        label="Professional Registration / License Status"
+                        val={form.professionalRegistrationStatus || ""}
+                        onChange={set("professionalRegistrationStatus")}
+                        opts={["Not applicable","Registered in home country","Applied in destination country","Destination registration approved","Registration not started","Not sure"]}
+                      />
                       <Sel label="Total Work Experience *" val={form.totalWorkExperience || ""} onChange={set("totalWorkExperience")} opts={["Less than 1 year","1–2 years","2–5 years","5–10 years","10+ years"]} />
                       <Sel label="Relevant Experience for Offered Role" val={form.relevantWorkExperience || ""} onChange={set("relevantWorkExperience")} opts={["Less than 1 year","1–2 years","2–5 years","5–10 years","10+ years"]} />
                       <Sel label="Current Monthly Salary (USD)" val={form.currentSalary || ""} onChange={set("currentSalary")} opts={["Less than $500","$500 – $1,000","$1,000 – $2,500","$2,500 – $5,000","$5,000 – $10,000","More than $10,000"]} />
@@ -1504,6 +1614,109 @@ export default function DeepCheckPage() {
                       <DocToggle label="Employer sponsorship letter available?" val={form.hasEmployerSponsorshipLetter || ""} onChange={set("hasEmployerSponsorshipLetter")} />
                       <DocToggle label="Qualification proof available?" val={form.hasQualificationProof || ""} onChange={set("hasQualificationProof")} />
                       <DocToggle label="Experience letters / references available?" val={form.hasExperienceLetters || ""} onChange={set("hasExperienceLetters")} />
+                      <div className="sm:col-span-2 rounded-2xl border border-blue-200 bg-blue-50/70 p-4 dark:border-blue-800 dark:bg-blue-950/20">
+                        <div className="flex gap-3">
+                          <BadgeCheck className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
+                          <div>
+                            <p className="text-sm font-bold text-blue-900 dark:text-blue-200">Language and professional evidence</p>
+                            <p className="mt-1 text-xs leading-5 text-blue-700 dark:text-blue-300">
+                              Some work routes require English evidence. Healthcare and nursing roles may accept or prefer OET in certain countries, while many skilled-worker routes use IELTS, PTE, TOEFL, or an equivalent exemption.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      {workLanguageRelevant && (
+                        <div className="sm:col-span-2 rounded-xl border border-amber-200 bg-amber-50/80 p-3 dark:border-amber-800 dark:bg-amber-950/20">
+                          <p className="text-xs font-semibold text-amber-900 dark:text-amber-200">
+                            Language evidence likely matters for this profile
+                          </p>
+                          <p className="mt-1 text-xs leading-5 text-amber-800 dark:text-amber-300">
+                            {isHealthcareOrRegulatedProfession(form)
+                              ? "Because this looks like healthcare, nursing, or another regulated profession, include IELTS/OET or destination registration evidence if available."
+                              : `${form.destinationCountry || "This destination"} commonly checks English language evidence for many sponsored work routes.`}
+                          </p>
+                        </div>
+                      )}
+                      <Sel
+                        label={workLanguageRelevant ? "English / OET Requirement Status *" : "English / OET Requirement Status"}
+                        val={form.workEnglishTestStatus || ""}
+                        onChange={val => {
+                          set("workEnglishTestStatus")(val);
+                          if (val === "Not required / exempted") {
+                            set("workEnglishTestType")("");
+                          }
+                        }}
+                        opts={["Score available","Booked / awaiting result","Planning to take","Not required / exempted","Not sure"]}
+                      />
+                      <Sel
+                        label="Language Test Type"
+                        val={form.workEnglishTestType || ""}
+                        onChange={val => {
+                          set("workEnglishTestType")(val);
+                          if (val !== "IELTS") {
+                            set("workIeltsOverall")("");
+                            set("workIeltsListening")("");
+                            set("workIeltsReading")("");
+                            set("workIeltsWriting")("");
+                            set("workIeltsSpeaking")("");
+                          }
+                          if (val !== "OET") {
+                            set("oetOverallGrade")("");
+                            set("oetListeningGrade")("");
+                            set("oetReadingGrade")("");
+                            set("oetWritingGrade")("");
+                            set("oetSpeakingGrade")("");
+                          }
+                        }}
+                        opts={isHealthcareOrRegulatedProfession(form)
+                          ? ["OET","IELTS","PTE Academic","TOEFL","Employer / regulator exemption","Other"]
+                          : ["IELTS","PTE Academic","TOEFL","OET","Employer / regulator exemption","Other"]}
+                      />
+                      {form.workEnglishTestType === "IELTS" && (
+                        <>
+                          <div>
+                            <Label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">IELTS Overall Score</Label>
+                            <Input type="number" min="0" max="9" step="0.5" value={form.workIeltsOverall || ""} onChange={e => set("workIeltsOverall")(e.target.value)} placeholder="e.g. 7.0" />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3 sm:col-span-2 sm:grid-cols-4">
+                            {[
+                              ["workIeltsListening", "Listening"],
+                              ["workIeltsReading", "Reading"],
+                              ["workIeltsWriting", "Writing"],
+                              ["workIeltsSpeaking", "Speaking"],
+                            ].map(([key, label]) => (
+                              <div key={key}>
+                                <Label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">{label}</Label>
+                                <Input type="number" min="0" max="9" step="0.5" value={form[key] || ""} onChange={e => set(key)(e.target.value)} placeholder="0–9" />
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                      {form.workEnglishTestType === "OET" && (
+                        <>
+                          <Sel label="OET Overall / Lowest Grade" val={form.oetOverallGrade || ""} onChange={set("oetOverallGrade")} opts={["A","B","C+","C","D","E","Awaiting result"]} />
+                          <div>
+                            <Label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">OET Test Date</Label>
+                            <Input type="date" value={form.oetTestDate || ""} onChange={e => set("oetTestDate")(e.target.value)} />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3 sm:col-span-2 sm:grid-cols-4">
+                            {[
+                              ["oetListeningGrade", "Listening"],
+                              ["oetReadingGrade", "Reading"],
+                              ["oetWritingGrade", "Writing"],
+                              ["oetSpeakingGrade", "Speaking"],
+                            ].map(([key, label]) => (
+                              <Sel key={key} label={label} val={form[key] || ""} onChange={set(key)} opts={["A","B","C+","C","D","E","Awaiting result"]} />
+                            ))}
+                          </div>
+                        </>
+                      )}
+                      <DocToggle label="Language score report / exemption proof available?" val={form.hasLanguageScoreReport || ""} onChange={set("hasLanguageScoreReport")} />
+                      <div>
+                        <Label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Language / Registration Notes</Label>
+                        <Input value={form.languageRequirementNotes || ""} onChange={e => set("languageRequirementNotes")(e.target.value)} placeholder="e.g. NMC CBT booked, OET B in all bands, IELTS waived by employer" />
+                      </div>
                       <div className="sm:col-span-2">
                         <Label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">Role responsibilities and why employer needs you</Label>
                         <Textarea value={form.roleResponsibilities || ""} onChange={e => set("roleResponsibilities")(e.target.value)} rows={3} placeholder="Describe the offered role, responsibilities, required skills, and why you are suitable..." />
