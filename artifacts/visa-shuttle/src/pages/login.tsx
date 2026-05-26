@@ -148,7 +148,7 @@ export default function LoginPage() {
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-[#4055FF]/12 bg-white/70 px-4 py-2 text-sm font-bold text-[#4055FF]">
                 <span className="h-2 w-2 rounded-full bg-[#FF2060]" />
-                Visa Shuttle {loginMode === "growth" ? "Growth Hub" : "Agency"}
+                Visa Shuttle {loginMode === "growth" ? "Growth Hub" : "Visa Desk"}
               </div>
               <h1 className="mt-8 max-w-lg text-5xl font-black leading-[1] tracking-tight text-[#101A4D]">
                 {loginMode === "growth" ? "Turn visa intent into business growth." : "One quiet place to run every visa case."}
@@ -156,7 +156,7 @@ export default function LoginPage() {
               <p className="mt-5 max-w-md text-base leading-7 text-slate-600">
                 {loginMode === "growth"
                   ? "Lead exchange, display campaigns, credit wallet, and analytics for travel and immigration businesses."
-                  : "Leads, proposals, documents, payments, and customer portals arranged into a focused agency workspace."}
+                  : "Leads, proposals, documents, payments, and customer portals arranged into a focused Visa Desk workspace."}
               </p>
             </div>
 
@@ -179,7 +179,7 @@ export default function LoginPage() {
               <div className="mb-7 flex items-center gap-4 lg:hidden">
                 <AgencyLoginMark compact />
                 <div>
-                  <p className="text-sm font-bold uppercase text-[#4055FF]">{loginMode === "growth" ? "Growth Hub login" : "Agency login"}</p>
+                  <p className="text-sm font-bold uppercase text-[#4055FF]">{loginMode === "growth" ? "Growth Hub login" : "Visa Desk login"}</p>
                   <h1 className="text-2xl font-black tracking-tight">Visa Shuttle</h1>
                 </div>
               </div>
@@ -187,7 +187,7 @@ export default function LoginPage() {
               <div className="mb-7">
                 <h2 className="text-4xl font-black tracking-tight text-[#101A4D]">Log in</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-500">
-                  {loginMode === "growth" ? "Access your Growth Hub business dashboard." : "Access your agency dashboard."}
+                  {loginMode === "growth" ? "Access your Growth Hub business dashboard." : "Access your Visa Desk workspace."}
                 </p>
               </div>
 
@@ -312,21 +312,21 @@ export default function LoginPage() {
                     <Shield className="h-4 w-4" />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-slate-800">Protected agency workspace</p>
+                    <p className="text-sm font-bold text-slate-800">Protected Visa Desk workspace</p>
                     <p className="mt-1 text-xs leading-5 text-slate-500">
                       {loginMode === "growth"
                         ? "Demo Growth Hub opens with sample leads, campaigns, wallet, analytics, and billing data."
-                        : "Your agency session is secured and routed to the right dashboard based on your role."}
+                        : "Your Visa Desk session is secured and routed to the right dashboard based on your role."}
                     </p>
                   </div>
                 </div>
               </div>
 
               <p className="mt-6 text-center text-sm text-slate-500">
-                {loginMode === "growth" ? "Need Growth Hub access? " : "New agency? "}
+                {loginMode === "growth" ? "Need Growth Hub access? " : "Need Visa Desk access? "}
                 <Link href={loginMode === "growth" ? "/business/growth-hub" : "/business/visa-desk/signup"}>
                   <a className="font-bold text-[#4055FF] hover:underline" data-testid="link-signup">
-                    {loginMode === "growth" ? "View Growth Hub" : "Create agency account"}
+                    {loginMode === "growth" ? "View Growth Hub" : "Start Visa Desk"}
                   </a>
                 </Link>
               </p>

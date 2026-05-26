@@ -175,10 +175,10 @@ export default function SignInPage() {
             </p>
 
             <div className="mt-8 pt-6 border-t">
-              <p className="text-xs text-center text-muted-foreground mb-3">Are you a travel agency?</p>
+              <p className="text-xs text-center text-muted-foreground mb-3">Business workspace access</p>
               <Link href="/login">
                 <Button variant="outline" size="sm" className="w-full" data-testid="button-agency-login">
-                  Agency / Staff Login
+                  Visa Desk / Growth Hub Login
                 </Button>
               </Link>
             </div>

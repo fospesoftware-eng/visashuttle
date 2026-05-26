@@ -131,9 +131,9 @@ const agencySteps: Step[] = [
   },
   {
     num: 2,
-    title: "Sign in to the agency dashboard",
+    title: "Sign in to Visa Desk",
     body:
-      "From any sign-in page click \"Agency / Staff Login\". You'll land on /app — your operational hub for leads, customers, cases and invoices.",
+      "From any sign-in page click \"Visa Desk / Growth Hub Login\". You'll land on /app — your operational hub for leads, customers, cases and invoices.",
     bullets: [
       "Cross-tenant safe — staff only see their agency's data",
       "Role-based access: Owner, Manager, Staff",
