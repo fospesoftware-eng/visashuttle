@@ -84,6 +84,69 @@ const SCHOLARSHIP_COUNTRIES = [
   "United Arab Emirates",
 ];
 
+const SCHOLARSHIP_NATIONALITIES = [
+  "India",
+  "United Arab Emirates",
+  "United States",
+  "Canada",
+  "United Kingdom",
+  "Australia",
+  "New Zealand",
+  "Singapore",
+  "South Korea",
+  "Japan",
+  "Sri Lanka",
+  "Bangladesh",
+  "Nepal",
+  "Pakistan",
+  "Philippines",
+  "Indonesia",
+  "Malaysia",
+  "Thailand",
+  "Vietnam",
+  "China",
+  "Nigeria",
+  "Kenya",
+  "South Africa",
+  "Ghana",
+  "Egypt",
+  "Saudi Arabia",
+  "Qatar",
+  "Kuwait",
+  "Oman",
+  "Bahrain",
+];
+
+const VISA_TOOL_TYPE_ALIASES: Record<string, string> = {
+  fakevisa: "fake_visa",
+  "fake-visa": "fake_visa",
+  fake_visa_detector: "fake_visa",
+  "fake-visa-detector": "fake_visa",
+  rejectionrecovery: "rejection_recovery",
+  "rejection-recovery": "rejection_recovery",
+  fakeemploymentoffer: "fake_employment_offer",
+  "fake-employment-offer": "fake_employment_offer",
+  fake_employment_detector: "fake_employment_offer",
+  "fake-employment-detector": "fake_employment_offer",
+  fakeagency: "fake_agency",
+  "fake-agency": "fake_agency",
+  fake_agency_detector: "fake_agency",
+  "fake-agency-detector": "fake_agency",
+  fakevisascheme: "fake_visa_scheme",
+  "fake-visa-scheme": "fake_visa_scheme",
+  "fake-visa-schemes": "fake_visa_scheme",
+  scholarshipfinder: "scholarship_finder",
+  "scholarship-finder": "scholarship_finder",
+  scholorship_finder: "scholarship_finder",
+  "scholorship-finder": "scholarship_finder",
+};
+
+function normalizeVisaToolType(value?: string | null) {
+  const raw = String(value || "").trim().toLowerCase();
+  const normalized = raw.replace(/\s+/g, "_");
+  return VISA_TOOL_TYPE_ALIASES[normalized] || VISA_TOOL_TYPE_ALIASES[normalized.replace(/_/g, "-")] || normalized;
+}
+
 const SCHOLARSHIP_FIELD_OPTIONS = [
   "Computer Science / AI / Data Science",
   "Engineering",
@@ -258,10 +321,7 @@ function ScholarshipFinderForm({
           <Label>Student name</Label>
           <Input value={fields.studentName || ""} onChange={(event) => update("studentName", event.target.value)} placeholder="Student full name" />
         </div>
-        <div className="space-y-1.5">
-          <Label>Nationality</Label>
-          <Input value={fields.nationality || ""} onChange={(event) => update("nationality", event.target.value)} placeholder="India" />
-        </div>
+        <ScholarshipSelect label="Nationality" value={fields.nationality} placeholder="Select nationality" options={SCHOLARSHIP_NATIONALITIES} onChange={(value) => update("nationality", value)} />
         <ScholarshipSelect label="Current education level" value={fields.currentEducation} placeholder="Select current education" options={SCHOLARSHIP_PROFILE_OPTIONS.currentEducation} onChange={(value) => update("currentEducation", value)} />
         <ScholarshipSelect label="Target degree" value={fields.targetDegree} placeholder="Select target degree" options={SCHOLARSHIP_PROFILE_OPTIONS.degree} onChange={(value) => update("targetDegree", value)} />
         <ScholarshipSelect label="Field of study" value={fields.fieldOfStudy} placeholder="Select field" options={SCHOLARSHIP_FIELD_OPTIONS} onChange={(value) => update("fieldOfStudy", value)} />
@@ -791,7 +851,8 @@ export default function VisaToolCheckPage() {
   const [, params] = useRoute<{ toolType: string }>("/visa-tools/:toolType");
   const { user, isLoading } = useB2cAuth();
   const { toast } = useToast();
-  const activeTool = tools.find((tool) => tool.type === params?.toolType);
+  const normalizedToolType = normalizeVisaToolType(params?.toolType);
+  const activeTool = tools.find((tool) => tool.type === normalizedToolType);
   const [fields, setFields] = useState<Record<string, string>>({});
   const [agencySearch, setAgencySearch] = useState("");
   const [agencyManualMode, setAgencyManualMode] = useState(false);

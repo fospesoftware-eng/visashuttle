@@ -5190,6 +5190,35 @@ export async function registerRoutes(
     "fake_visa_scheme",
     "scholarship_finder",
   ]);
+  const VISA_TOOL_ALIASES: Record<string, string> = {
+    fakevisa: "fake_visa",
+    "fake-visa": "fake_visa",
+    fake_visa_detector: "fake_visa",
+    "fake-visa-detector": "fake_visa",
+    rejectionrecovery: "rejection_recovery",
+    "rejection-recovery": "rejection_recovery",
+    fakeemploymentoffer: "fake_employment_offer",
+    "fake-employment-offer": "fake_employment_offer",
+    fake_employment_detector: "fake_employment_offer",
+    "fake-employment-detector": "fake_employment_offer",
+    fakeagency: "fake_agency",
+    "fake-agency": "fake_agency",
+    fake_agency_detector: "fake_agency",
+    "fake-agency-detector": "fake_agency",
+    fakevisascheme: "fake_visa_scheme",
+    "fake-visa-scheme": "fake_visa_scheme",
+    "fake-visa-schemes": "fake_visa_scheme",
+    scholarshipfinder: "scholarship_finder",
+    "scholarship-finder": "scholarship_finder",
+    scholorship_finder: "scholarship_finder",
+    "scholorship-finder": "scholarship_finder",
+  };
+  function normalizeVisaToolType(value: unknown): string {
+    const raw = String(value || "").trim().toLowerCase();
+    if (!raw) return "";
+    const normalized = raw.replace(/\s+/g, "_");
+    return VISA_TOOL_ALIASES[normalized] || VISA_TOOL_ALIASES[normalized.replace(/_/g, "-")] || normalized;
+  }
   const VISA_TOOL_LABELS: Record<string, string> = {
     fake_visa: "Fake Visa Detector",
     rejection_recovery: "Rejection Recovery",
@@ -7610,7 +7639,7 @@ export async function registerRoutes(
       return res.status(429).json({ error: "Visa Tools usage limit reached. Please try again later." });
     }
 
-    const toolType = String(req.body.toolType || "");
+    const toolType = normalizeVisaToolType(req.body.toolType);
     if (!VISA_TOOL_TYPES.has(toolType)) {
       return res.status(400).json({ error: "Invalid Visa Tools check type" });
     }
