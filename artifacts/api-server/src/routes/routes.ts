@@ -5211,8 +5211,9 @@ export async function registerRoutes(
     manualText: string;
     file?: { name: string; type: string; size: number; base64: string } | null;
   }) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    const model = process.env.ANTHROPIC_MODEL || "claude-opus-4-5";
+    const aiConfig = await storage.getPlatformAiConfig();
+    const apiKey = aiConfig?.anthropicApiKey || process.env.ANTHROPIC_API_KEY;
+    const model = aiConfig?.anthropicModel || process.env.ANTHROPIC_MODEL || "claude-opus-4-5";
     if (!apiKey) throw new Error("Anthropic API key not configured");
 
     const meaRegistryCheck = payload.toolType === "fake_agency"
@@ -7387,7 +7388,7 @@ export async function registerRoutes(
     } catch (err: any) {
       console.error("[Visa Tools] Error:", err);
       const message = err?.message === "Anthropic API key not configured"
-        ? "Visa Tools AI service is not configured. Please set ANTHROPIC_API_KEY."
+        ? "Visa Tools AI service is not configured. Add the Anthropic API key in SaaS Admin > Settings > AI, or set ANTHROPIC_API_KEY in Replit Secrets."
         : "Failed to analyze this item. Please try again.";
       res.status(500).json({ error: message });
     }
