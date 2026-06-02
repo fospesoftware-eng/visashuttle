@@ -5,14 +5,25 @@ import { runVisaCheck, runDeepCheck, scanPassportImage, isPassportScanConfigured
 import { registerApiPlatformRoutes } from "./api-platform";
 import { registerPlatformExtensions } from "./platform-extensions";
 import express from "express";
+import { db } from "../db";
 import { sendOtp, verifyOtp, getSmsProviderStatus } from "../sms";
 import { getEntryRequirement } from "../shared/visa-free";
 import indiaVisaChanceDataset from "../shared/india_visa_chance_dataset_non_visa_free_2026.json" assert { type: "json" };
 import meaRegisteredAgentsDataset from "../shared/mea_registered_agents_2026_05_25.json" assert { type: "json" };
 import meaUnregisteredAgencyGrievancesDataset from "../shared/mea_unregistered_agencies_grievances_2026_05_25.json" assert { type: "json" };
+import {
+  counsellingAdmissions,
+  counsellingAiAssessments,
+  counsellingDocuments,
+  counsellingSessions,
+  counsellingShortlists,
+  counsellingStudents,
+  counsellingTasks,
+} from "@workspace/db";
 import bcrypt from "bcryptjs";
 import rateLimit from "express-rate-limit";
 import { randomUUID, randomBytes } from "crypto";
+import { and, desc, eq, sql } from "drizzle-orm";
 
 type DocumentRequirement = {
   type: string;
@@ -38,6 +49,102 @@ function sanitizeProposalDraftPayload(raw: unknown) {
     passportFileName: typeof draft.passportFileName === "string" ? draft.passportFileName.slice(0, 240) : "",
     paymentChoice: ["online", "offline", "later"].includes(String(draft.paymentChoice)) ? draft.paymentChoice : "later",
     offlinePaymentReference: typeof draft.offlinePaymentReference === "string" ? draft.offlinePaymentReference.slice(0, 500) : "",
+  };
+}
+
+const COUNSELLING_DOCUMENT_TYPES = [
+  "Passport",
+  "Academic certificates",
+  "Transcripts",
+  "English test score",
+  "CV",
+  "SOP",
+  "LOR",
+  "Bank statement",
+  "Sponsor documents",
+  "Work experience letter",
+  "Previous refusal letter",
+  "Offer letter",
+  "Fee receipt",
+  "Country-specific documents",
+];
+
+function textValue(input: unknown, max = 500) {
+  if (input === null || input === undefined) return null;
+  const value = String(input).trim();
+  return value ? value.slice(0, max) : null;
+}
+
+function arrayValue(input: unknown, max = 8) {
+  if (Array.isArray(input)) return input.map((v) => String(v).trim()).filter(Boolean).slice(0, max);
+  const value = textValue(input, 1000);
+  if (!value) return [];
+  return value.split(",").map((v) => v.trim()).filter(Boolean).slice(0, max);
+}
+
+function dateValue(input: unknown) {
+  const value = textValue(input, 80);
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function jsonObjectValue(input: unknown) {
+  if (input && typeof input === "object" && !Array.isArray(input)) return input as Record<string, unknown>;
+  return {};
+}
+
+function sanitizeCounsellingStudentPayload(body: any, tenantId: string, existing: any = {}) {
+  const fullName = textValue(body?.fullName ?? body?.name ?? existing.fullName, 160);
+  if (!fullName) throw new Error("Student full name is required");
+  return {
+    tenantId,
+    fullName,
+    email: textValue(body?.email, 160),
+    phone: textValue(body?.phone, 60),
+    whatsappNumber: textValue(body?.whatsappNumber, 60),
+    dateOfBirth: textValue(body?.dateOfBirth, 40),
+    nationality: textValue(body?.nationality, 80),
+    currentCountry: textValue(body?.currentCountry, 80),
+    preferredDestinations: arrayValue(body?.preferredDestinations),
+    preferredIntake: textValue(body?.preferredIntake, 80),
+    preferredCourse: textValue(body?.preferredCourse, 160),
+    budgetRange: textValue(body?.budgetRange, 120),
+    academicHistory: jsonObjectValue(body?.academicHistory),
+    englishTests: jsonObjectValue(body?.englishTests),
+    workExperience: textValue(body?.workExperience, 1000),
+    educationGap: textValue(body?.educationGap, 500),
+    previousVisaRefusals: textValue(body?.previousVisaRefusals, 500),
+    travelHistory: textValue(body?.travelHistory, 1000),
+    sponsorDetails: jsonObjectValue(body?.sponsorDetails),
+    counsellorAssigned: textValue(body?.counsellorAssigned, 120),
+    leadSource: textValue(body?.leadSource, 120),
+    status: textValue(body?.status, 80) ?? "new_enquiry",
+  };
+}
+
+function calculateCounsellingScores(student: any, docs: any[] = []) {
+  let profile = 25;
+  if (student.email && student.phone) profile += 10;
+  if (student.preferredCourse) profile += 10;
+  if ((student.preferredDestinations ?? []).length > 0) profile += 10;
+  if (student.academicHistory && Object.keys(student.academicHistory).length > 0) profile += 15;
+  if (student.englishTests && Object.keys(student.englishTests).length > 0) profile += 10;
+  if (student.sponsorDetails && Object.keys(student.sponsorDetails).length > 0) profile += 10;
+  if (student.previousVisaRefusals) profile -= 10;
+  if (student.educationGap) profile -= 5;
+
+  const receivedRequired = docs.filter((d) => d.required && d.status === "received").length;
+  const required = Math.max(1, docs.filter((d) => d.required).length || COUNSELLING_DOCUMENT_TYPES.length);
+  const documentScore = Math.round((receivedRequired / required) * 35);
+  const admission = Math.min(100, Math.max(0, profile + documentScore - 10));
+  const visa = Math.min(100, Math.max(0, profile + documentScore - (student.previousVisaRefusals ? 15 : 0)));
+  const risk = visa >= 75 ? "low" : visa >= 50 ? "medium" : "high";
+  return {
+    profileStrengthScore: Math.min(100, Math.max(0, profile)),
+    admissionReadinessScore: admission,
+    visaReadinessScore: visa,
+    riskLevel: risk,
   };
 }
 
@@ -8357,6 +8464,212 @@ export async function registerRoutes(
       const { password: _, ...safeUser } = user;
       res.status(201).json({ tenant, user: safeUser, tenantSlug: tenant.slug });
     });
+  });
+
+  // === VisaDesk Counselling beta ===
+  app.get("/api/tenants/:tenantId/counselling/students", requireAgencyAuth, async (req, res) => {
+    const tenantId = req.params.tenantId;
+    const students = await db.select().from(counsellingStudents)
+      .where(eq(counsellingStudents.tenantId, tenantId))
+      .orderBy(desc(counsellingStudents.updatedAt));
+    res.json(students);
+  });
+
+  app.get("/api/tenants/:tenantId/counselling/stats", requireAgencyAuth, async (req, res) => {
+    const tenantId = req.params.tenantId;
+    const [students, tasks, sessions, docs] = await Promise.all([
+      db.select().from(counsellingStudents).where(eq(counsellingStudents.tenantId, tenantId)),
+      db.select().from(counsellingTasks).where(eq(counsellingTasks.tenantId, tenantId)),
+      db.select().from(counsellingSessions).where(eq(counsellingSessions.tenantId, tenantId)),
+      db.select().from(counsellingDocuments).where(eq(counsellingDocuments.tenantId, tenantId)),
+    ]);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dueToday = tasks.filter((task) => task.dueDate && new Date(task.dueDate) >= today && new Date(task.dueDate) < tomorrow && task.status !== "done");
+    const upcoming = sessions.filter((session) => session.scheduledAt && new Date(session.scheduledAt) >= new Date() && session.status !== "completed");
+    res.json({
+      totalLeads: students.length,
+      newEnquiries: students.filter((s) => s.status === "new_enquiry").length,
+      activeCases: students.filter((s) => !["closed_not_interested", "visa_approved", "visa_refused"].includes(s.status)).length,
+      awaitingDocuments: students.filter((s) => s.status === "documents_pending").length,
+      admissionReady: students.filter((s) => s.status === "admission_application_ready").length,
+      visaReady: students.filter((s) => s.status === "visa_ready").length,
+      highRisk: students.filter((s) => s.riskLevel === "high").length,
+      followUpsDueToday: dueToday.length,
+      upcomingAppointments: upcoming.length,
+      pendingDocuments: docs.filter((d) => d.status === "pending" && d.required).length,
+    });
+  });
+
+  app.post("/api/tenants/:tenantId/counselling/students", requireAgencyAuth, async (req, res) => {
+    const tenantId = req.params.tenantId;
+    try {
+      const payload = sanitizeCounsellingStudentPayload(req.body, tenantId);
+      const scores = calculateCounsellingScores(payload, []);
+      const [student] = await db.insert(counsellingStudents).values({ ...payload, ...scores } as any).returning();
+      if (student) {
+        await db.insert(counsellingDocuments).values(COUNSELLING_DOCUMENT_TYPES.map((documentType) => ({
+          tenantId,
+          studentId: student.id,
+          documentType,
+          required: true,
+          status: "pending",
+        } as any)));
+      }
+      res.status(201).json(student);
+    } catch (error: any) {
+      res.status(400).json({ error: error?.message || "Unable to create counselling student" });
+    }
+  });
+
+  app.get("/api/tenants/:tenantId/counselling/students/:studentId", requireAgencyAuth, async (req, res) => {
+    const { tenantId, studentId } = req.params;
+    const [student] = await db.select().from(counsellingStudents).where(and(eq(counsellingStudents.tenantId, tenantId), eq(counsellingStudents.id, studentId))).limit(1);
+    if (!student) return res.status(404).json({ error: "Counselling student not found" });
+    const [sessions, shortlists, admissions, documents, tasks, assessments] = await Promise.all([
+      db.select().from(counsellingSessions).where(and(eq(counsellingSessions.tenantId, tenantId), eq(counsellingSessions.studentId, studentId))).orderBy(desc(counsellingSessions.createdAt)),
+      db.select().from(counsellingShortlists).where(and(eq(counsellingShortlists.tenantId, tenantId), eq(counsellingShortlists.studentId, studentId))).orderBy(desc(counsellingShortlists.createdAt)),
+      db.select().from(counsellingAdmissions).where(and(eq(counsellingAdmissions.tenantId, tenantId), eq(counsellingAdmissions.studentId, studentId))).orderBy(desc(counsellingAdmissions.createdAt)),
+      db.select().from(counsellingDocuments).where(and(eq(counsellingDocuments.tenantId, tenantId), eq(counsellingDocuments.studentId, studentId))).orderBy(desc(counsellingDocuments.createdAt)),
+      db.select().from(counsellingTasks).where(and(eq(counsellingTasks.tenantId, tenantId), eq(counsellingTasks.studentId, studentId))).orderBy(desc(counsellingTasks.createdAt)),
+      db.select().from(counsellingAiAssessments).where(and(eq(counsellingAiAssessments.tenantId, tenantId), eq(counsellingAiAssessments.studentId, studentId))).orderBy(desc(counsellingAiAssessments.createdAt)),
+    ]);
+    res.json({ student, sessions, shortlists, admissions, documents, tasks, assessments });
+  });
+
+  app.patch("/api/tenants/:tenantId/counselling/students/:studentId", requireAgencyAuth, async (req, res) => {
+    const { tenantId, studentId } = req.params;
+    const [existing] = await db.select().from(counsellingStudents).where(and(eq(counsellingStudents.tenantId, tenantId), eq(counsellingStudents.id, studentId))).limit(1);
+    if (!existing) return res.status(404).json({ error: "Counselling student not found" });
+    try {
+      const docs = await db.select().from(counsellingDocuments).where(and(eq(counsellingDocuments.tenantId, tenantId), eq(counsellingDocuments.studentId, studentId)));
+      const payload = sanitizeCounsellingStudentPayload({ ...existing, ...req.body }, tenantId, existing);
+      const scores = calculateCounsellingScores(payload, docs);
+      const [student] = await db.update(counsellingStudents)
+        .set({ ...payload, ...scores, updatedAt: new Date() } as any)
+        .where(and(eq(counsellingStudents.tenantId, tenantId), eq(counsellingStudents.id, studentId)))
+        .returning();
+      res.json(student);
+    } catch (error: any) {
+      res.status(400).json({ error: error?.message || "Unable to update counselling student" });
+    }
+  });
+
+  app.post("/api/tenants/:tenantId/counselling/students/:studentId/:collection", requireAgencyAuth, async (req, res) => {
+    const { tenantId, studentId, collection } = req.params;
+    const [student] = await db.select().from(counsellingStudents).where(and(eq(counsellingStudents.tenantId, tenantId), eq(counsellingStudents.id, studentId))).limit(1);
+    if (!student) return res.status(404).json({ error: "Counselling student not found" });
+    const userId = req.session.userId ?? null;
+    const collections: Record<string, any> = { sessions: counsellingSessions, shortlists: counsellingShortlists, admissions: counsellingAdmissions, documents: counsellingDocuments, tasks: counsellingTasks };
+    const table = collections[collection];
+    if (!table) return res.status(404).json({ error: "Unknown counselling collection" });
+    const body = req.body ?? {};
+    const base = { tenantId, studentId };
+    const payloadByCollection: Record<string, any> = {
+      sessions: { ...base, scheduledAt: dateValue(body.scheduledAt), mode: textValue(body.mode, 40) ?? "video", status: textValue(body.status, 40) ?? "scheduled", meetingNotes: textValue(body.meetingNotes, 4000), studentGoals: textValue(body.studentGoals, 2000), preferredCountries: arrayValue(body.preferredCountries), preferredCourses: arrayValue(body.preferredCourses), recommendations: textValue(body.recommendations, 4000), nextAction: textValue(body.nextAction, 1000), followUpDate: dateValue(body.followUpDate), attachments: Array.isArray(body.attachments) ? body.attachments.slice(0, 12) : [], sharedWithStudent: Boolean(body.sharedWithStudent), createdBy: userId },
+      shortlists: { ...base, destinationCountry: textValue(body.destinationCountry, 80) ?? student.preferredDestinations?.[0] ?? "Not selected", institutionName: textValue(body.institutionName, 160) ?? "Institution", courseName: textValue(body.courseName, 160) ?? student.preferredCourse ?? "Course", intake: textValue(body.intake, 80), duration: textValue(body.duration, 80), tuitionFee: textValue(body.tuitionFee, 80), applicationFee: textValue(body.applicationFee, 80), scholarshipAvailable: Boolean(body.scholarshipAvailable), eligibilityNotes: textValue(body.eligibilityNotes, 2000), admissionProbability: Math.max(0, Math.min(100, Number(body.admissionProbability ?? 50))), visaRiskNotes: textValue(body.visaRiskNotes, 2000), status: textValue(body.status, 40) ?? "suggested" },
+      admissions: { ...base, shortlistId: textValue(body.shortlistId, 120), applicationStatus: textValue(body.applicationStatus, 80) ?? "not_started", documentsSubmitted: Boolean(body.documentsSubmitted), applicationDate: dateValue(body.applicationDate), offerLetterStatus: textValue(body.offerLetterStatus, 80) ?? "not_received", conditionalOfferConditions: textValue(body.conditionalOfferConditions, 2000), feePaymentStatus: textValue(body.feePaymentStatus, 80) ?? "pending", countryDocumentStatus: textValue(body.countryDocumentStatus, 120), admissionDeadline: dateValue(body.admissionDeadline), notes: textValue(body.notes, 3000) },
+      documents: { ...base, documentType: textValue(body.documentType, 120) ?? "Country-specific documents", required: body.required !== false, status: textValue(body.status, 40) ?? "pending", fileUrl: textValue(body.fileUrl, 4000), fileName: textValue(body.fileName, 240), expiryDate: dateValue(body.expiryDate), notes: textValue(body.notes, 1000), extractedData: jsonObjectValue(body.extractedData), uploadedBy: userId },
+      tasks: { ...base, title: textValue(body.title, 180) ?? "Follow-up", taskType: textValue(body.taskType, 80) ?? "follow_up", assignedTo: textValue(body.assignedTo, 120) ?? student.counsellorAssigned, dueDate: dateValue(body.dueDate), status: textValue(body.status, 40) ?? "open", notes: textValue(body.notes, 1000) },
+    };
+    const [record] = await db.insert(table).values(payloadByCollection[collection]).returning();
+    const docs = await db.select().from(counsellingDocuments).where(and(eq(counsellingDocuments.tenantId, tenantId), eq(counsellingDocuments.studentId, studentId)));
+    const scores = calculateCounsellingScores(student, docs);
+    await db.update(counsellingStudents).set({ ...scores, updatedAt: new Date() } as any).where(and(eq(counsellingStudents.tenantId, tenantId), eq(counsellingStudents.id, studentId)));
+    res.status(201).json(record);
+  });
+
+  app.patch("/api/tenants/:tenantId/counselling/:collection/:id", requireAgencyAuth, async (req, res) => {
+    const { tenantId, collection, id } = req.params;
+    const collections: Record<string, any> = { sessions: counsellingSessions, shortlists: counsellingShortlists, admissions: counsellingAdmissions, documents: counsellingDocuments, tasks: counsellingTasks };
+    const table = collections[collection];
+    if (!table) return res.status(404).json({ error: "Unknown counselling collection" });
+    const [record] = await db.update(table).set({ ...req.body, updatedAt: new Date() }).where(and(eq(table.tenantId, tenantId), eq(table.id, id))).returning();
+    if (!record) return res.status(404).json({ error: "Record not found" });
+    res.json(record);
+  });
+
+  app.post("/api/tenants/:tenantId/counselling/students/:studentId/ai-assessment", requireAgencyAuth, async (req, res) => {
+    const { tenantId, studentId } = req.params;
+    const [student] = await db.select().from(counsellingStudents).where(and(eq(counsellingStudents.tenantId, tenantId), eq(counsellingStudents.id, studentId))).limit(1);
+    if (!student) return res.status(404).json({ error: "Counselling student not found" });
+    const docs = await db.select().from(counsellingDocuments).where(and(eq(counsellingDocuments.tenantId, tenantId), eq(counsellingDocuments.studentId, studentId)));
+    const scores = calculateCounsellingScores(student, docs);
+    const missingDocuments = docs.filter((d) => d.required && d.status !== "received").map((d) => d.documentType);
+    const responseJson = {
+      aiConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
+      profileStrengthSummary: `${student.fullName} has a ${scores.riskLevel} risk profile with ${scores.visaReadinessScore}% visa readiness.`,
+      suitableDestinations: student.preferredDestinations?.length ? student.preferredDestinations : ["Canada", "Australia", "United Kingdom"],
+      courseSuitability: student.preferredCourse ? `Good fit for ${student.preferredCourse} if academic continuity is clear.` : "Add preferred course details to improve matching.",
+      riskFactors: [student.previousVisaRefusals ? "Previous visa refusal requires a strong explanation." : null, student.educationGap ? "Education gap needs evidence and narrative." : null, missingDocuments.length ? `${missingDocuments.length} required documents are pending.` : null].filter(Boolean),
+      missingInformation: missingDocuments,
+      recommendedNextSteps: ["Complete required document checklist.", "Shortlist 3-5 realistic institutions.", "Prepare SOP and sponsor evidence before visa filing."],
+      disclaimer: "Beta AI-assisted guidance only. Counsellor review is required before use.",
+    };
+    const [assessment] = await db.insert(counsellingAiAssessments).values({ tenantId, studentId, assessmentType: "profile_assessment", admissionReadinessScore: scores.admissionReadinessScore, visaReadinessScore: scores.visaReadinessScore, riskLevel: scores.riskLevel, responseJson, generatedText: null, createdBy: req.session.userId ?? null } as any).returning();
+    await db.update(counsellingStudents).set({ ...scores, updatedAt: new Date() } as any).where(and(eq(counsellingStudents.tenantId, tenantId), eq(counsellingStudents.id, studentId)));
+    res.json(assessment);
+  });
+
+  app.post("/api/tenants/:tenantId/counselling/students/:studentId/sop-draft", requireAgencyAuth, async (req, res) => {
+    const { tenantId, studentId } = req.params;
+    const [student] = await db.select().from(counsellingStudents).where(and(eq(counsellingStudents.tenantId, tenantId), eq(counsellingStudents.id, studentId))).limit(1);
+    if (!student) return res.status(404).json({ error: "Counselling student not found" });
+    const target = req.body?.shortlist || {};
+    const country = textValue(target.destinationCountry, 80) ?? student.preferredDestinations?.[0] ?? "the destination country";
+    const institution = textValue(target.institutionName, 160) ?? "the selected institution";
+    const course = textValue(target.courseName, 160) ?? student.preferredCourse ?? "the selected program";
+    const draft = [`Statement of Purpose draft for ${student.fullName}`, "", `I am applying for ${course} at ${institution} in ${country}. My academic background and career goals have led me to choose this pathway because it aligns with my long-term professional plan.`, "", `Academic background: ${textValue(JSON.stringify(student.academicHistory || {}), 800) || "Please add academic details."}`, `Work experience: ${student.workExperience || "Please add work experience or explain if not applicable."}`, `Financial background: ${textValue(JSON.stringify(student.sponsorDetails || {}), 800) || "Please add sponsor and financial evidence."}`, "", "Counsellor editable notes: strengthen course relevance, explain any education gap/refusal history, and add institution-specific details before final use."].join("\n");
+    const [assessment] = await db.insert(counsellingAiAssessments).values({ tenantId, studentId, assessmentType: "sop_draft", admissionReadinessScore: student.admissionReadinessScore ?? 0, visaReadinessScore: student.visaReadinessScore ?? 0, riskLevel: student.riskLevel ?? "medium", responseJson: { aiConfigured: Boolean(process.env.ANTHROPIC_API_KEY), editable: true, country, institution, course }, generatedText: draft, createdBy: req.session.userId ?? null } as any).returning();
+    res.json(assessment);
+  });
+
+  app.post("/api/tenants/:tenantId/counselling/students/:studentId/portal", requireAgencyAuth, async (req, res) => {
+    const { tenantId, studentId } = req.params;
+    const portalToken = randomBytes(18).toString("base64url");
+    const [student] = await db.update(counsellingStudents).set({ portalEnabled: true, portalToken, updatedAt: new Date() } as any).where(and(eq(counsellingStudents.tenantId, tenantId), eq(counsellingStudents.id, studentId))).returning();
+    if (!student) return res.status(404).json({ error: "Counselling student not found" });
+    res.json({ student, portalUrl: `/student-counselling/${portalToken}` });
+  });
+
+  app.get("/api/counselling-portal/:token", async (req, res) => {
+    const token = String(req.params.token || "").trim();
+    const [student] = await db.select().from(counsellingStudents)
+      .where(and(eq(counsellingStudents.portalToken, token), eq(counsellingStudents.portalEnabled, true)))
+      .limit(1);
+    if (!student) return res.status(404).json({ error: "Student portal link is unavailable" });
+    const [sessions, shortlists, admissions, documents, tasks, assessments, tenant] = await Promise.all([
+      db.select().from(counsellingSessions).where(and(eq(counsellingSessions.tenantId, student.tenantId), eq(counsellingSessions.studentId, student.id), eq(counsellingSessions.sharedWithStudent, true))).orderBy(desc(counsellingSessions.createdAt)),
+      db.select().from(counsellingShortlists).where(and(eq(counsellingShortlists.tenantId, student.tenantId), eq(counsellingShortlists.studentId, student.id))).orderBy(desc(counsellingShortlists.createdAt)),
+      db.select().from(counsellingAdmissions).where(and(eq(counsellingAdmissions.tenantId, student.tenantId), eq(counsellingAdmissions.studentId, student.id))).orderBy(desc(counsellingAdmissions.createdAt)),
+      db.select().from(counsellingDocuments).where(and(eq(counsellingDocuments.tenantId, student.tenantId), eq(counsellingDocuments.studentId, student.id))).orderBy(desc(counsellingDocuments.createdAt)),
+      db.select().from(counsellingTasks).where(and(eq(counsellingTasks.tenantId, student.tenantId), eq(counsellingTasks.studentId, student.id))).orderBy(desc(counsellingTasks.createdAt)),
+      db.select().from(counsellingAiAssessments).where(and(eq(counsellingAiAssessments.tenantId, student.tenantId), eq(counsellingAiAssessments.studentId, student.id))).orderBy(desc(counsellingAiAssessments.createdAt)),
+      storage.getTenant(student.tenantId),
+    ]);
+    res.json({ student, sessions, shortlists, admissions, documents, tasks, assessments, tenant });
+  });
+
+  app.patch("/api/counselling-portal/:token/documents/:documentId", async (req, res) => {
+    const token = String(req.params.token || "").trim();
+    const [student] = await db.select().from(counsellingStudents)
+      .where(and(eq(counsellingStudents.portalToken, token), eq(counsellingStudents.portalEnabled, true)))
+      .limit(1);
+    if (!student) return res.status(404).json({ error: "Student portal link is unavailable" });
+    const [document] = await db.update(counsellingDocuments)
+      .set({
+        status: "received",
+        fileName: textValue(req.body?.fileName, 240),
+        fileUrl: textValue(req.body?.fileUrl, 4000),
+        notes: textValue(req.body?.notes, 1000),
+        updatedAt: new Date(),
+      } as any)
+      .where(and(eq(counsellingDocuments.tenantId, student.tenantId), eq(counsellingDocuments.studentId, student.id), eq(counsellingDocuments.id, req.params.documentId)))
+      .returning();
+    if (!document) return res.status(404).json({ error: "Document not found" });
+    res.json(document);
   });
 
   // === Tenant Staff Management ===

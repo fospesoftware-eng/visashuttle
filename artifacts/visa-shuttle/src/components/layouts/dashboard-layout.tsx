@@ -7,7 +7,7 @@ import {
   Menu, X, Building2, ShieldCheck, Database, Activity, Globe, CreditCard,
   CheckCircle, AlertCircle, Inbox, Receipt, Banknote, ClipboardList,
   Send, Stamp, Loader2, XCircle, UserSquare2, KeyRound, BookOpen, LayoutDashboard,
-  LifeBuoy, Wallet, Sparkles, FileSearch, Newspaper, GitBranch
+  LifeBuoy, Wallet, Sparkles, FileSearch, Newspaper, GitBranch, GraduationCap
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -68,6 +68,7 @@ const agencyNavItems: NavItem[] = [
   { icon: Home, label: "Dashboard", href: "/app" },
   { icon: Users, label: "Leads", href: "/app/leads" },
   { icon: UserSquare2, label: "Customers", href: "/app/customers" },
+  { icon: GraduationCap, label: "Counselling", href: "/app/counselling", badge: "Beta" },
   { icon: Send, label: "Proposals", href: "/app/proposals" },
   { icon: Briefcase, label: "Applications", href: "/app/cases" },
   {

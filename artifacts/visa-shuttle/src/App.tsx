@@ -46,6 +46,7 @@ import AgencyDashboard from "@/pages/agency/dashboard";
 import LeadsPage from "@/pages/agency/leads";
 import CustomersPage from "@/pages/agency/customers";
 import CustomerDetailPage from "@/pages/agency/customer-detail";
+import CounsellingPage from "@/pages/agency/counselling";
 import ProposalsPage from "@/pages/agency/proposals";
 import ProposalApplyPage from "@/pages/proposal-apply";
 import InvoicePayPage from "@/pages/public/invoice-pay";
@@ -91,6 +92,7 @@ import AdminPagesPage from "@/pages/admin/pages";
 import AdminUpdatesPage from "@/pages/admin/updates";
 import AdminVersionLogsPage from "@/pages/admin/version-logs";
 import AgencySupportPage from "@/pages/agency/support";
+import StudentCounsellingPortalPage from "@/pages/student-counselling-portal";
 
 import AgencyRegisterPage from "@/pages/agency-register";
 import PrivacyPolicyPage from "@/pages/privacy-policy";
@@ -189,6 +191,7 @@ function Router() {
       <Route path="/login" component={LoginPage} />
       <Route path="/signup" component={SignupPage} />
       <Route path="/agency-register" component={AgencyRegisterPage} />
+      <Route path="/student-counselling/:token" component={StudentCounsellingPortalPage} />
       <Route path="/privacy-policy" component={PrivacyPolicyPage} />
       <Route path="/terms-and-conditions" component={TermsAndConditionsPage} />
       <Route path="/refund-policy" component={RefundPolicyPage} />
@@ -214,6 +217,7 @@ function Router() {
       <Route path="/app/leads" component={LeadsPage} />
       <Route path="/app/customers" component={CustomersPage} />
       <Route path="/app/customers/:id" component={CustomerDetailPage} />
+      <Route path="/app/counselling" component={CounsellingPage} />
       <Route path="/app/proposals" component={ProposalsPage} />
 
       {/* Public, tokenized proposal apply page — no auth, token IS the

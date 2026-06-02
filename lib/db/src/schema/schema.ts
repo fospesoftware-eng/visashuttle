@@ -1215,3 +1215,186 @@ export const contacts = pgTable("contacts", {
 export const insertContactSchema = createInsertSchema(contacts).omit({ id: true, createdAt: true });
 export type InsertContact = z.infer<typeof insertContactSchema>;
 export type Contact = typeof contacts.$inferSelect;
+
+// ── VisaDesk Counselling beta ────────────────────────────────────────────────
+export const COUNSELLING_STATUSES = [
+  "new_enquiry",
+  "profile_created",
+  "counselling_scheduled",
+  "counselling_completed",
+  "course_shortlisted",
+  "university_shortlisted",
+  "documents_pending",
+  "admission_application_ready",
+  "admission_applied",
+  "offer_received",
+  "fee_payment_pending",
+  "visa_preparation",
+  "visa_ready",
+  "visa_applied",
+  "visa_approved",
+  "visa_refused",
+  "closed_not_interested",
+] as const;
+export type CounsellingStatus = typeof COUNSELLING_STATUSES[number];
+
+export const counsellingStudents = pgTable("counselling_students", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull(),
+  fullName: text("full_name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  whatsappNumber: text("whatsapp_number"),
+  dateOfBirth: text("date_of_birth"),
+  nationality: text("nationality"),
+  currentCountry: text("current_country"),
+  preferredDestinations: text("preferred_destinations").array().default(sql`'{}'::text[]`),
+  preferredIntake: text("preferred_intake"),
+  preferredCourse: text("preferred_course"),
+  budgetRange: text("budget_range"),
+  academicHistory: jsonb("academic_history").default(sql`'{}'::jsonb`),
+  englishTests: jsonb("english_tests").default(sql`'{}'::jsonb`),
+  workExperience: text("work_experience"),
+  educationGap: text("education_gap"),
+  previousVisaRefusals: text("previous_visa_refusals"),
+  travelHistory: text("travel_history"),
+  sponsorDetails: jsonb("sponsor_details").default(sql`'{}'::jsonb`),
+  counsellorAssigned: varchar("counsellor_assigned"),
+  leadSource: text("lead_source"),
+  status: text("status").notNull().default("new_enquiry"),
+  profileStrengthScore: integer("profile_strength_score").default(0),
+  admissionReadinessScore: integer("admission_readiness_score").default(0),
+  visaReadinessScore: integer("visa_readiness_score").default(0),
+  riskLevel: text("risk_level").default("medium"),
+  portalEnabled: boolean("portal_enabled").notNull().default(false),
+  portalToken: text("portal_token"),
+  convertedCustomerId: varchar("converted_customer_id"),
+  convertedCaseId: varchar("converted_case_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export const insertCounsellingStudentSchema = createInsertSchema(counsellingStudents).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertCounsellingStudent = z.infer<typeof insertCounsellingStudentSchema>;
+export type CounsellingStudent = typeof counsellingStudents.$inferSelect;
+
+export const counsellingSessions = pgTable("counselling_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull(),
+  studentId: varchar("student_id").notNull(),
+  scheduledAt: timestamp("scheduled_at"),
+  mode: text("mode").default("video"),
+  status: text("status").notNull().default("scheduled"),
+  meetingNotes: text("meeting_notes"),
+  studentGoals: text("student_goals"),
+  preferredCountries: text("preferred_countries").array().default(sql`'{}'::text[]`),
+  preferredCourses: text("preferred_courses").array().default(sql`'{}'::text[]`),
+  recommendations: text("recommendations"),
+  nextAction: text("next_action"),
+  followUpDate: timestamp("follow_up_date"),
+  attachments: jsonb("attachments").default(sql`'[]'::jsonb`),
+  sharedWithStudent: boolean("shared_with_student").notNull().default(false),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export const insertCounsellingSessionSchema = createInsertSchema(counsellingSessions).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertCounsellingSession = z.infer<typeof insertCounsellingSessionSchema>;
+export type CounsellingSession = typeof counsellingSessions.$inferSelect;
+
+export const counsellingShortlists = pgTable("counselling_shortlists", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull(),
+  studentId: varchar("student_id").notNull(),
+  destinationCountry: text("destination_country").notNull(),
+  institutionName: text("institution_name").notNull(),
+  courseName: text("course_name").notNull(),
+  intake: text("intake"),
+  duration: text("duration"),
+  tuitionFee: text("tuition_fee"),
+  applicationFee: text("application_fee"),
+  scholarshipAvailable: boolean("scholarship_available").default(false),
+  eligibilityNotes: text("eligibility_notes"),
+  admissionProbability: integer("admission_probability").default(50),
+  visaRiskNotes: text("visa_risk_notes"),
+  status: text("status").notNull().default("suggested"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export const insertCounsellingShortlistSchema = createInsertSchema(counsellingShortlists).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertCounsellingShortlist = z.infer<typeof insertCounsellingShortlistSchema>;
+export type CounsellingShortlist = typeof counsellingShortlists.$inferSelect;
+
+export const counsellingAdmissions = pgTable("counselling_admissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull(),
+  studentId: varchar("student_id").notNull(),
+  shortlistId: varchar("shortlist_id"),
+  applicationStatus: text("application_status").notNull().default("not_started"),
+  documentsSubmitted: boolean("documents_submitted").notNull().default(false),
+  applicationDate: timestamp("application_date"),
+  offerLetterStatus: text("offer_letter_status").default("not_received"),
+  conditionalOfferConditions: text("conditional_offer_conditions"),
+  feePaymentStatus: text("fee_payment_status").default("pending"),
+  countryDocumentStatus: text("country_document_status"),
+  admissionDeadline: timestamp("admission_deadline"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export const insertCounsellingAdmissionSchema = createInsertSchema(counsellingAdmissions).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertCounsellingAdmission = z.infer<typeof insertCounsellingAdmissionSchema>;
+export type CounsellingAdmission = typeof counsellingAdmissions.$inferSelect;
+
+export const counsellingDocuments = pgTable("counselling_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull(),
+  studentId: varchar("student_id").notNull(),
+  documentType: text("document_type").notNull(),
+  required: boolean("required").notNull().default(true),
+  status: text("status").notNull().default("pending"),
+  fileUrl: text("file_url"),
+  fileName: text("file_name"),
+  expiryDate: timestamp("expiry_date"),
+  notes: text("notes"),
+  extractedData: jsonb("extracted_data").default(sql`'{}'::jsonb`),
+  uploadedBy: varchar("uploaded_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export const insertCounsellingDocumentSchema = createInsertSchema(counsellingDocuments).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertCounsellingDocument = z.infer<typeof insertCounsellingDocumentSchema>;
+export type CounsellingDocument = typeof counsellingDocuments.$inferSelect;
+
+export const counsellingTasks = pgTable("counselling_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull(),
+  studentId: varchar("student_id").notNull(),
+  title: text("title").notNull(),
+  taskType: text("task_type").notNull().default("follow_up"),
+  assignedTo: varchar("assigned_to"),
+  dueDate: timestamp("due_date"),
+  status: text("status").notNull().default("open"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export const insertCounsellingTaskSchema = createInsertSchema(counsellingTasks).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertCounsellingTask = z.infer<typeof insertCounsellingTaskSchema>;
+export type CounsellingTask = typeof counsellingTasks.$inferSelect;
+
+export const counsellingAiAssessments = pgTable("counselling_ai_assessments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull(),
+  studentId: varchar("student_id").notNull(),
+  assessmentType: text("assessment_type").notNull().default("profile_assessment"),
+  admissionReadinessScore: integer("admission_readiness_score").default(0),
+  visaReadinessScore: integer("visa_readiness_score").default(0),
+  riskLevel: text("risk_level").default("medium"),
+  responseJson: jsonb("response_json").default(sql`'{}'::jsonb`),
+  generatedText: text("generated_text"),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export const insertCounsellingAiAssessmentSchema = createInsertSchema(counsellingAiAssessments).omit({ id: true, createdAt: true });
+export type InsertCounsellingAiAssessment = z.infer<typeof insertCounsellingAiAssessmentSchema>;
+export type CounsellingAiAssessment = typeof counsellingAiAssessments.$inferSelect;
