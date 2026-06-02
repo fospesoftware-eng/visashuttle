@@ -18,6 +18,7 @@ import { queryClient } from "@/lib/queryClient";
 
 const GROWTH_HUB_DEMO_EMAIL = "growth@visashuttle.com";
 const GROWTH_HUB_DEMO_PASSWORD = "Growth@123";
+const VISA_DESK_DEMO_EMAILS = ["admin@visashuttle.com", "owner@demoagency.com", "customer@demo.com"];
 
 function AgencyLoginMark({ compact = false }: { compact?: boolean }) {
   if (compact) {
@@ -73,9 +74,14 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     setError("");
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedPassword = password.trim();
+    const isVisaDeskDemoEmail = VISA_DESK_DEMO_EMAILS.includes(normalizedEmail);
+    const isGrowthHubDemo = normalizedEmail === GROWTH_HUB_DEMO_EMAIL
+      && [GROWTH_HUB_DEMO_PASSWORD, "Growth@12345", "Demo@12345"].includes(normalizedPassword);
 
-    if (loginMode === "growth") {
-      if (email.trim().toLowerCase() !== GROWTH_HUB_DEMO_EMAIL || password !== GROWTH_HUB_DEMO_PASSWORD) {
+    if (loginMode === "growth" && !isVisaDeskDemoEmail) {
+      if (!isGrowthHubDemo) {
         setError("Invalid Growth Hub email or password");
         setIsLoading(false);
         return;
@@ -96,7 +102,7 @@ export default function LoginPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: normalizedEmail, password }),
       });
 
       const data = await res.json();
@@ -124,7 +130,7 @@ export default function LoginPage() {
       const role = data.user.role;
       if (role === "saas_admin") {
         setLocation("/admin");
-      } else if (role === "agency_owner" || role === "agency_staff") {
+      } else if (role === "agency_owner" || role === "agency_manager" || role === "agency_staff") {
         setLocation("/app");
       } else if (role === "customer") {
         setLocation("/customer");
