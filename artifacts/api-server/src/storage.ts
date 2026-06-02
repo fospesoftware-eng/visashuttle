@@ -3200,17 +3200,17 @@ class HybridStorage extends MemStorage {
         avatarUrl: null,
         permissions: [],
       });
-      return;
+    } else {
+      const admin = existing[0];
+      await db.update(usersTable)
+        .set({
+          password: adminPassword,
+          role: "saas_admin",
+          tenantId: null,
+          permissions: [],
+        } as any)
+        .where(eq(usersTable.id, admin.id));
     }
-    const admin = existing[0];
-    await db.update(usersTable)
-      .set({
-        password: adminPassword,
-        role: "saas_admin",
-        tenantId: null,
-        permissions: [],
-      } as any)
-      .where(eq(usersTable.id, admin.id));
 
     const agencyDemoUsers = [
       {

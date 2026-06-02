@@ -1210,7 +1210,13 @@ export async function registerRoutes(
     if (typeof email !== "string" || typeof password !== "string" || !email || !password) {
       return res.status(400).json({ error: "Email and password are required" });
     }
-    const user = await storage.getUserByEmail(email);
+    const normalizedEmail = email.toLowerCase().trim();
+    if (["admin@visashuttle.com", "owner@demoagency.com", "customer@demo.com"].includes(normalizedEmail)) {
+      await Promise.resolve((storage as any).seedDemoUsersToDb?.()).catch((err) => {
+        req.log.warn({ err }, "[auth/login] demo account repair seed failed");
+      });
+    }
+    const user = await storage.getUserByEmail(normalizedEmail);
     if (!user) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
@@ -6153,7 +6159,13 @@ export async function registerRoutes(
     if (!email || !password) {
       return res.status(400).json({ error: "Email and password are required" });
     }
-    const user = await storage.getB2cUserByEmail(email.trim());
+    const normalizedEmail = String(email).toLowerCase().trim();
+    if (["demo@visashuttle.com", "test@visashuttle.com"].includes(normalizedEmail)) {
+      await Promise.resolve((storage as any).seedDemoUsersToDb?.()).catch((err) => {
+        req.log.warn({ err }, "[b2c/auth/login] demo account repair seed failed");
+      });
+    }
+    const user = await storage.getB2cUserByEmail(normalizedEmail);
     if (!user) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
