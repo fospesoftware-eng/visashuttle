@@ -3139,6 +3139,53 @@ class HybridStorage extends MemStorage {
   // Seed platform + demo users into PostgreSQL on startup so production always
   // has a recoverable SaaS admin account and demo B2C accounts persist.
   async seedPlatformUsersToDb(): Promise<void> {
+    const demoTenant = {
+      id: "tenant-1",
+      name: "Demo Travel Agency",
+      slug: "demo-agency",
+      logoUrl: "https://api.dicebear.com/7.x/initials/svg?seed=DTA&backgroundColor=00B4D8&textColor=ffffff",
+      plan: "go",
+      status: "active",
+      primaryColor: "#00B4D8",
+      secondaryColor: "#E056A0",
+      accentColor: "#0096C7",
+      contactEmail: "info@demoagency.com",
+      contactPhone: "+1 234 567 8900",
+      activities: ["VISA Services", "Tours & Travels"],
+      address: "Demo Street",
+      country: "India",
+      pinCode: null,
+      state: null,
+      district: null,
+      whatsappNumber: "+1 234 567 8900",
+      showPoweredBy: true,
+      authMethod: "otp",
+    };
+    const existingTenant = await db.select({ id: tenantsTable.id }).from(tenantsTable).where(eq(tenantsTable.slug, demoTenant.slug)).limit(1);
+    if (!existingTenant[0]) {
+      await db.insert(tenantsTable).values(demoTenant);
+    } else {
+      await db.update(tenantsTable)
+        .set({
+          name: demoTenant.name,
+          plan: demoTenant.plan,
+          status: demoTenant.status,
+          logoUrl: demoTenant.logoUrl,
+          primaryColor: demoTenant.primaryColor,
+          secondaryColor: demoTenant.secondaryColor,
+          accentColor: demoTenant.accentColor,
+          contactEmail: demoTenant.contactEmail,
+          contactPhone: demoTenant.contactPhone,
+          activities: demoTenant.activities,
+          address: demoTenant.address,
+          country: demoTenant.country,
+          whatsappNumber: demoTenant.whatsappNumber,
+          showPoweredBy: demoTenant.showPoweredBy,
+          authMethod: demoTenant.authMethod,
+        } as any)
+        .where(eq(tenantsTable.id, existingTenant[0].id));
+    }
+
     const adminEmail = "admin@visashuttle.com";
     const adminPassword = bcrypt.hashSync("Admin@12345", 10);
     const existing = await db.select().from(usersTable).where(eq(usersTable.email, adminEmail)).limit(1);
@@ -3164,6 +3211,47 @@ class HybridStorage extends MemStorage {
         permissions: [],
       } as any)
       .where(eq(usersTable.id, admin.id));
+
+    const agencyDemoUsers = [
+      {
+        id: "user-owner",
+        email: "owner@demoagency.com",
+        password: bcrypt.hashSync("Demo@12345", 10),
+        name: "Sarah Agent",
+        role: "agency_owner",
+        tenantId: existingTenant[0]?.id || demoTenant.id,
+        avatarUrl: null,
+        permissions: [],
+      },
+      {
+        id: "user-customer",
+        email: "customer@demo.com",
+        password: bcrypt.hashSync("Demo@12345", 10),
+        name: "John Smith",
+        role: "customer",
+        tenantId: existingTenant[0]?.id || demoTenant.id,
+        avatarUrl: null,
+        permissions: [],
+      },
+    ];
+
+    for (const demoUser of agencyDemoUsers) {
+      const existingDemoUser = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.email, demoUser.email)).limit(1);
+      if (!existingDemoUser[0]) {
+        await db.insert(usersTable).values(demoUser);
+      } else {
+        await db.update(usersTable)
+          .set({
+            password: demoUser.password,
+            name: demoUser.name,
+            role: demoUser.role,
+            tenantId: demoUser.tenantId,
+            avatarUrl: demoUser.avatarUrl,
+            permissions: demoUser.permissions,
+          } as any)
+          .where(eq(usersTable.id, existingDemoUser[0].id));
+      }
+    }
   }
 
   async seedDemoUsersToDb(): Promise<void> {
