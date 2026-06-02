@@ -1164,7 +1164,7 @@ export async function registerRoutes(
 ): Promise<Server> {
   // Health check — must be first so deployment probes always get a 200
   app.get("/api/healthz", (_req, res) => {
-    res.json({ status: "ok" });
+    res.json({ status: "ok", apiBuild: "demo-owner-login-f407cdd" });
   });
 
   // Seed demo B2C users into PostgreSQL on startup. Fire-and-forget — we
