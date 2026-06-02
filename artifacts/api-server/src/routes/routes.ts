@@ -1162,9 +1162,63 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  const demoAgencyOwnerEmail = "owner@demoagency.com";
+  const demoAgencyOwnerPassword = "Demo@12345";
+
+  async function restoreDemoAgencyOwner() {
+    const demoTenant = {
+      name: "Demo Travel Agency",
+      slug: "demo-agency",
+      logoUrl: "https://api.dicebear.com/7.x/initials/svg?seed=DTA&backgroundColor=00B4D8&textColor=ffffff",
+      plan: "go",
+      status: "active",
+      primaryColor: "#00B4D8",
+      secondaryColor: "#E056A0",
+      accentColor: "#0096C7",
+      contactEmail: "info@demoagency.com",
+      contactPhone: "+1 234 567 8900",
+      activities: ["VISA Services", "Tours & Travels"],
+      address: "Demo Street",
+      country: "India",
+      pinCode: null,
+      state: null,
+      district: null,
+      whatsappNumber: "+1 234 567 8900",
+      showPoweredBy: true,
+      authMethod: "otp",
+    };
+
+    let tenant = await storage.getTenantBySlug(demoTenant.slug);
+    if (!tenant) {
+      tenant = await storage.createTenant(demoTenant as any);
+    } else {
+      tenant = await storage.updateTenant(tenant.id, demoTenant as any) ?? tenant;
+    }
+
+    const hashedPassword = await bcrypt.hash(demoAgencyOwnerPassword, 10);
+    let user = await storage.getUserByEmail(demoAgencyOwnerEmail);
+    const demoUser = {
+      email: demoAgencyOwnerEmail,
+      password: hashedPassword,
+      name: "Sarah Agent",
+      role: "agency_owner",
+      tenantId: tenant.id,
+      avatarUrl: null,
+      permissions: [],
+    };
+
+    if (!user) {
+      user = await storage.createUser(demoUser as any);
+    } else {
+      user = await storage.updateUser(user.id, demoUser as any) ?? user;
+    }
+
+    return { tenant, user };
+  }
+
   // Health check — must be first so deployment probes always get a 200
   app.get("/api/healthz", (_req, res) => {
-    res.json({ status: "ok", apiBuild: "demo-owner-login-f407cdd" });
+    res.json({ status: "ok", apiBuild: "demo-owner-direct-restore" });
   });
 
   // Seed demo B2C users into PostgreSQL on startup. Fire-and-forget — we
@@ -1174,6 +1228,10 @@ export async function registerRoutes(
     // Use console here because the request-scoped logger isn't available at boot.
     // eslint-disable-next-line no-console
     console.error("[Boot] seedDemoUsersToDb failed:", err);
+  });
+  void restoreDemoAgencyOwner().catch((err) => {
+    // eslint-disable-next-line no-console
+    console.error("[Boot] restoreDemoAgencyOwner failed:", err);
   });
 
   // === Site Password Protection ===
@@ -1220,7 +1278,12 @@ export async function registerRoutes(
     if (originalEmail === "growth@visashuttle.com" && ["Growth@123", "Growth@12345"].includes(password)) {
       submittedPassword = "Demo@12345";
     }
-    const isKnownDemoOwnerLogin = normalizedEmail === "owner@demoagency.com" && submittedPassword === "Demo@12345";
+    const isKnownDemoOwnerLogin = normalizedEmail === demoAgencyOwnerEmail && submittedPassword === demoAgencyOwnerPassword;
+    if (isKnownDemoOwnerLogin) {
+      await restoreDemoAgencyOwner().catch((err) => {
+        req.log.warn({ err }, "[auth/login] direct demo owner restore failed");
+      });
+    }
     if (["admin@visashuttle.com", "owner@demoagency.com", "customer@demo.com"].includes(normalizedEmail)) {
       await Promise.resolve((storage as any).seedDemoUsersToDb?.()).catch((err) => {
         req.log.warn({ err }, "[auth/login] demo account repair seed failed");
@@ -1255,7 +1318,7 @@ export async function registerRoutes(
         }
         user = await storage.createUser({
           email: normalizedEmail,
-          password: await bcrypt.hash(submittedPassword, 10),
+          password: await bcrypt.hash(demoAgencyOwnerPassword, 10),
           name: "Sarah Agent",
           role: "agency_owner",
           tenantId: tenant.id,
@@ -7762,7 +7825,46 @@ export async function registerRoutes(
 
   // Update tenant (admin)
   app.patch("/api/admin/tenants/:id", requireAdminAuth, async (req, res) => {
-    const tenant = await storage.updateTenant(req.params.id, req.body);
+    const allowedFields = [
+      "name",
+      "slug",
+      "logoUrl",
+      "plan",
+      "status",
+      "primaryColor",
+      "secondaryColor",
+      "accentColor",
+      "contactEmail",
+      "contactPhone",
+      "activities",
+      "address",
+      "country",
+      "pinCode",
+      "state",
+      "district",
+      "whatsappNumber",
+      "showPoweredBy",
+      "authMethod",
+    ];
+    const body = req.body ?? {};
+    const data: Record<string, unknown> = {};
+    for (const field of allowedFields) {
+      if (Object.prototype.hasOwnProperty.call(body, field)) {
+        data[field] = body[field];
+      }
+    }
+    if (typeof data.name === "string") data.name = data.name.trim();
+    if (typeof data.slug === "string") {
+      data.slug = data.slug.toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+      if (!data.slug) return res.status(400).json({ error: "Invalid agency slug" });
+      const existing = await storage.getTenantBySlug(data.slug);
+      if (existing && existing.id !== req.params.id) {
+        return res.status(409).json({ error: "That agency URL is already taken" });
+      }
+    }
+    if (typeof data.contactEmail === "string") data.contactEmail = data.contactEmail.trim() || null;
+    if (Array.isArray(data.activities)) data.activities = data.activities.map((a) => String(a).trim()).filter(Boolean).slice(0, 12);
+    const tenant = await storage.updateTenant(req.params.id, data as any);
     if (!tenant) return res.status(404).json({ error: "Tenant not found" });
     await storage.createActivityLog({
       tenantId: null,
@@ -7770,7 +7872,7 @@ export async function registerRoutes(
       action: "admin.tenant.updated",
       entityType: "tenant",
       entityId: req.params.id,
-      details: req.body,
+      details: data,
     });
     res.json(tenant);
   });
@@ -7799,33 +7901,32 @@ export async function registerRoutes(
 
   // Restore demo agency owner (admin)
   app.post("/api/admin/demo-agency/restore-owner", requireAdminAuth, async (req, res) => {
-    await Promise.resolve((storage as any).seedDemoUsersToDb?.());
-    const [tenant, user] = await Promise.all([
-      storage.getTenantBySlug("demo-agency"),
-      storage.getUserByEmail("owner@demoagency.com"),
-    ]);
+    const restored = await restoreDemoAgencyOwner().catch((err) => {
+      req.log.error({ err }, "[admin/demo-agency/restore-owner] restore failed");
+      return null;
+    });
 
-    if (!tenant || !user) {
+    if (!restored?.tenant || !restored?.user) {
       return res.status(500).json({ error: "Unable to restore demo agency owner. Please restart and try again." });
     }
 
     await storage.createActivityLog({
-      tenantId: tenant.id,
+      tenantId: restored.tenant.id,
       userId: req.session.userId ?? null,
       action: "admin.demo_agency_owner.restored",
       entityType: "user",
-      entityId: user.id,
-      details: { email: user.email, tenantSlug: tenant.slug },
+      entityId: restored.user.id,
+      details: { email: restored.user.email, tenantSlug: restored.tenant.slug },
     });
 
-    const { password: _, ...safeUser } = user;
+    const { password: _, ...safeUser } = restored.user;
     res.json({
       success: true,
-      tenant,
+      tenant: restored.tenant,
       user: safeUser,
       credentials: {
-        email: "owner@demoagency.com",
-        password: "Demo@12345",
+        email: demoAgencyOwnerEmail,
+        password: demoAgencyOwnerPassword,
       },
     });
   });
