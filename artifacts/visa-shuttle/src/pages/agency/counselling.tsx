@@ -87,7 +87,7 @@ function splitList(value: string) {
 
 export default function CounsellingPage() {
   const { data: current } = useCurrentUser();
-  const tenantId = current?.user?.tenantId;
+  const tenantId = current?.user?.tenantId || current?.tenant?.id;
   const qc = useQueryClient();
   const { toast } = useToast();
   const [activeMenu, setActiveMenu] = useState<(typeof COUNSELLING_MENUS)[number]["key"]>("dashboard");
@@ -422,24 +422,30 @@ export default function CounsellingPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              {filtered.map((student) => (
-                <button key={student.id} onClick={() => setSelectedId(student.id)} className={`w-full rounded-lg border p-4 text-left transition hover:border-primary/50 hover:bg-primary/5 ${selectedId === student.id ? "border-primary bg-primary/5" : "border-border"}`}>
-                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                      <p className="font-semibold">{student.fullName}</p>
-                      <p className="text-xs text-muted-foreground">{student.email || "No email"} · {student.phone || "No phone"}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">{student.preferredCourse || "Course not selected"} · {(student.preferredDestinations ?? []).join(", ") || "Destination pending"}</p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="outline" className="capitalize">{statusLabel(student.status)}</Badge>
-                      <Badge className={riskClass[student.riskLevel] ?? riskClass.medium}>{student.riskLevel || "medium"} risk</Badge>
-                      <span className={`text-sm font-bold ${scoreTone(student.visaReadinessScore ?? 0)}`}>{student.visaReadinessScore ?? 0}% visa ready</span>
-                    </div>
-                  </div>
-                </button>
-              ))}
-              {!studentsQuery.isLoading && filtered.length === 0 && (
-                <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">No counselling students found.</div>
+              {activeMenu === "dashboard" || activeMenu === "students" ? (
+                <>
+                  {filtered.map((student) => (
+                    <button key={student.id} onClick={() => setSelectedId(student.id)} className={`w-full rounded-lg border p-4 text-left transition hover:border-primary/50 hover:bg-primary/5 ${selectedId === student.id ? "border-primary bg-primary/5" : "border-border"}`}>
+                      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                        <div>
+                          <p className="font-semibold">{student.fullName}</p>
+                          <p className="text-xs text-muted-foreground">{student.email || "No email"} · {student.phone || "No phone"}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{student.preferredCourse || "Course not selected"} · {(student.preferredDestinations ?? []).join(", ") || "Destination pending"}</p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline" className="capitalize">{statusLabel(student.status)}</Badge>
+                          <Badge className={riskClass[student.riskLevel] ?? riskClass.medium}>{student.riskLevel || "medium"} risk</Badge>
+                          <span className={`text-sm font-bold ${scoreTone(student.visaReadinessScore ?? 0)}`}>{student.visaReadinessScore ?? 0}% visa ready</span>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                  {!studentsQuery.isLoading && filtered.length === 0 && (
+                    <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">No counselling students found.</div>
+                  )}
+                </>
+              ) : (
+                <CounsellingMenuWorkspace activeMenu={activeMenu} selected={selected} students={filtered} onSelectStudent={setSelectedId} />
               )}
             </CardContent>
           </Card>
@@ -557,6 +563,179 @@ function Field({ label, value, onChange, placeholder }: { label: string; value: 
     <div className="space-y-1.5">
       <Label>{label}</Label>
       <Input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />
+    </div>
+  );
+}
+
+function CounsellingMenuWorkspace({ activeMenu, selected, students, onSelectStudent }: {
+  activeMenu: string;
+  selected: any;
+  students: any[];
+  onSelectStudent: (id: string) => void;
+}) {
+  if (!selected) {
+    return (
+      <div className="space-y-3">
+        <div className="rounded-2xl border border-dashed bg-muted/30 p-6 text-center">
+          <p className="font-semibold">Select a student to open this module</p>
+          <p className="mt-1 text-sm text-muted-foreground">The {COUNSELLING_MENUS.find((item) => item.key === activeMenu)?.label} workspace is student-specific.</p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          {students.slice(0, 6).map((student) => (
+            <button key={student.id} onClick={() => onSelectStudent(student.id)} className="rounded-xl border bg-card p-3 text-left transition hover:border-primary/50 hover:bg-primary/5">
+              <p className="font-semibold">{student.fullName}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{student.preferredCourse || "Course pending"} · {(student.preferredDestinations ?? []).join(", ") || "Destination pending"}</p>
+              <div className="mt-2 flex items-center justify-between">
+                <Badge variant="outline">{statusLabel(student.status)}</Badge>
+                <span className={`text-xs font-bold ${scoreTone(student.visaReadinessScore ?? 0)}`}>{student.visaReadinessScore ?? 0}% ready</span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const student = selected.student;
+  const rowsByMenu: Record<string, { title: string; description: string; icon: any; rows: any[]; empty: string; render: (item: any) => JSX.Element }> = {
+    sessions: {
+      title: "Counselling appointments",
+      description: "Calls, notes, recommendations and next actions.",
+      icon: CalendarClock,
+      rows: selected.sessions ?? [],
+      empty: "No counselling sessions yet.",
+      render: (item) => (
+        <RecordCard key={item.id} title={item.nextAction || item.status || "Counselling session"} meta={[item.mode, item.scheduledAt ? new Date(item.scheduledAt).toLocaleString() : "No date"].filter(Boolean).join(" · ")} badge={item.status} text={item.meetingNotes || item.recommendations} />
+      ),
+    },
+    shortlists: {
+      title: "Course and university shortlist",
+      description: "Program options, admission probability and visa notes.",
+      icon: GraduationCap,
+      rows: selected.shortlists ?? [],
+      empty: "No course shortlist yet.",
+      render: (item) => (
+        <RecordCard key={item.id} title={item.institutionName} meta={`${item.courseName} · ${item.destinationCountry}`} badge={`${item.admissionProbability ?? 50}%`} text={item.eligibilityNotes || item.visaRiskNotes} />
+      ),
+    },
+    admissions: {
+      title: "Admissions workflow",
+      description: "Application status, offer letter, fee and deadlines.",
+      icon: ClipboardCheck,
+      rows: selected.admissions ?? [],
+      empty: "No admission tracker yet.",
+      render: (item) => (
+        <RecordCard key={item.id} title={item.applicationStatus?.replace(/_/g, " ") || "Admission"} meta={item.admissionDeadline ? `Deadline ${new Date(item.admissionDeadline).toLocaleDateString()}` : "No deadline"} badge={item.offerLetterStatus} text={item.notes || item.countryDocumentStatus} />
+      ),
+    },
+    documents: {
+      title: "Document checklist",
+      description: "Required student documents and upload status.",
+      icon: FileText,
+      rows: selected.documents ?? [],
+      empty: "No document checklist yet.",
+      render: (item) => (
+        <RecordCard key={item.id} title={item.documentType} meta={item.required ? "Required" : "Optional"} badge={item.status} text={item.notes || item.fileName} />
+      ),
+    },
+    tasks: {
+      title: "Tasks and follow-ups",
+      description: "Counsellor actions needed to move the case forward.",
+      icon: ListChecks,
+      rows: selected.tasks ?? [],
+      empty: "No tasks yet.",
+      render: (item) => (
+        <RecordCard key={item.id} title={item.title} meta={item.dueDate ? `Due ${new Date(item.dueDate).toLocaleString()}` : item.taskType} badge={item.status} text={item.notes} />
+      ),
+    },
+    ai: {
+      title: "AI assessment outputs",
+      description: "Profile assessment and editable SOP drafts.",
+      icon: Brain,
+      rows: selected.assessments ?? [],
+      empty: "No AI assessments yet.",
+      render: (item) => (
+        <RecordCard key={item.id} title={item.assessmentType?.replace(/_/g, " ") || "AI output"} meta={`${item.admissionReadinessScore ?? 0}% admission · ${item.visaReadinessScore ?? 0}% visa`} badge={item.riskLevel} text={item.generatedText || item.responseJson?.summary || item.responseJson?.profileStrengthSummary} />
+      ),
+    },
+    portal: {
+      title: "Student portal",
+      description: "Student-facing checklist and shared updates.",
+      icon: BookOpen,
+      rows: [{ id: "portal", ...student }],
+      empty: "Portal details unavailable.",
+      render: (item) => (
+        <RecordCard key="portal" title={item.portalEnabled ? "Portal enabled" : "Portal disabled"} meta={item.portalToken ? `/student-counselling/${item.portalToken}` : "Generate portal link from the detail panel"} badge={item.portalEnabled ? "Active" : "Inactive"} text="Students can view shared sessions, shortlists, admission progress, document checklist and AI guidance from the portal." />
+      ),
+    },
+  };
+
+  if (activeMenu === "readiness") {
+    const scores = [
+      ["Profile strength", student.profileStrengthScore ?? 0, "bg-[#4055FF]"],
+      ["Admission readiness", student.admissionReadinessScore ?? 0, "bg-[#00B4D8]"],
+      ["Visa readiness", student.visaReadinessScore ?? 0, "bg-emerald-500"],
+    ] as const;
+    return (
+      <div className="space-y-4">
+        <div className="rounded-2xl border bg-gradient-to-br from-primary/10 via-background to-emerald-500/10 p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="font-bold">Visa readiness for {student.fullName}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">Risk level, scoring dimensions and improvement focus.</p>
+            </div>
+            <Badge className={riskClass[student.riskLevel] ?? riskClass.medium}>{student.riskLevel || "medium"} risk</Badge>
+          </div>
+        </div>
+        {scores.map(([label, score, color]) => (
+          <div key={label} className="rounded-xl border p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="font-semibold">{label}</span>
+              <span className={`font-bold ${scoreTone(score)}`}>{score}%</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-muted">
+              <div className={`h-full rounded-full ${color} transition-all duration-700`} style={{ width: `${score}%` }} />
+            </div>
+          </div>
+        ))}
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800/70 dark:bg-amber-950/35 dark:text-amber-200">
+          Improve readiness by completing required documents, reviewing sponsor proof, and adding course-specific SOP notes.
+        </div>
+      </div>
+    );
+  }
+
+  const config = rowsByMenu[activeMenu] ?? rowsByMenu.documents;
+  const Icon = config.icon;
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl border bg-gradient-to-br from-primary/10 via-background to-[#FF2060]/10 p-5">
+        <div className="flex items-center gap-3">
+          <div className="rounded-xl bg-primary/10 p-2 text-primary"><Icon className="h-5 w-5" /></div>
+          <div>
+            <h3 className="font-bold">{config.title}</h3>
+            <p className="text-sm text-muted-foreground">{config.description}</p>
+          </div>
+        </div>
+      </div>
+      {config.rows.length ? config.rows.map(config.render) : (
+        <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">{config.empty}</div>
+      )}
+    </div>
+  );
+}
+
+function RecordCard({ title, meta, badge, text }: { title: string; meta?: string; badge?: string; text?: string }) {
+  return (
+    <div className="rounded-xl border bg-card p-4 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold capitalize">{title}</p>
+          {meta && <p className="mt-1 text-xs text-muted-foreground">{meta}</p>}
+        </div>
+        {badge && <Badge variant="outline" className="capitalize">{String(badge).replace(/_/g, " ")}</Badge>}
+      </div>
+      {text && <p className="mt-3 line-clamp-4 text-sm leading-6 text-muted-foreground">{text}</p>}
     </div>
   );
 }

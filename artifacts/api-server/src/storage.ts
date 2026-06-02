@@ -2366,6 +2366,161 @@ export class MemStorage implements IStorage {
 // development can still fall back to seeded in-memory data if a newly added
 // optional table has not been pushed yet.
 class HybridStorage extends MemStorage {
+  async ensureCounsellingTablesToDb(): Promise<void> {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS counselling_students (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id varchar NOT NULL,
+        full_name text NOT NULL,
+        email text,
+        phone text,
+        whatsapp_number text,
+        date_of_birth text,
+        nationality text,
+        current_country text,
+        preferred_destinations text[] DEFAULT '{}'::text[],
+        preferred_intake text,
+        preferred_course text,
+        budget_range text,
+        academic_history jsonb DEFAULT '{}'::jsonb,
+        english_tests jsonb DEFAULT '{}'::jsonb,
+        work_experience text,
+        education_gap text,
+        previous_visa_refusals text,
+        travel_history text,
+        sponsor_details jsonb DEFAULT '{}'::jsonb,
+        counsellor_assigned varchar,
+        lead_source text,
+        status text NOT NULL DEFAULT 'new_enquiry',
+        profile_strength_score integer DEFAULT 0,
+        admission_readiness_score integer DEFAULT 0,
+        visa_readiness_score integer DEFAULT 0,
+        risk_level text DEFAULT 'medium',
+        portal_enabled boolean NOT NULL DEFAULT false,
+        portal_token text,
+        converted_customer_id varchar,
+        converted_case_id varchar,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS counselling_sessions (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id varchar NOT NULL,
+        student_id varchar NOT NULL,
+        scheduled_at timestamp,
+        mode text DEFAULT 'video',
+        status text NOT NULL DEFAULT 'scheduled',
+        meeting_notes text,
+        student_goals text,
+        preferred_countries text[] DEFAULT '{}'::text[],
+        preferred_courses text[] DEFAULT '{}'::text[],
+        recommendations text,
+        next_action text,
+        follow_up_date timestamp,
+        attachments jsonb DEFAULT '[]'::jsonb,
+        shared_with_student boolean NOT NULL DEFAULT false,
+        created_by varchar,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS counselling_shortlists (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id varchar NOT NULL,
+        student_id varchar NOT NULL,
+        destination_country text NOT NULL,
+        institution_name text NOT NULL,
+        course_name text NOT NULL,
+        intake text,
+        duration text,
+        tuition_fee text,
+        application_fee text,
+        scholarship_available boolean DEFAULT false,
+        eligibility_notes text,
+        admission_probability integer DEFAULT 50,
+        visa_risk_notes text,
+        status text NOT NULL DEFAULT 'suggested',
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS counselling_admissions (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id varchar NOT NULL,
+        student_id varchar NOT NULL,
+        shortlist_id varchar,
+        application_status text NOT NULL DEFAULT 'not_started',
+        documents_submitted boolean NOT NULL DEFAULT false,
+        application_date timestamp,
+        offer_letter_status text DEFAULT 'not_received',
+        conditional_offer_conditions text,
+        fee_payment_status text DEFAULT 'pending',
+        country_document_status text,
+        admission_deadline timestamp,
+        notes text,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS counselling_documents (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id varchar NOT NULL,
+        student_id varchar NOT NULL,
+        document_type text NOT NULL,
+        required boolean NOT NULL DEFAULT true,
+        status text NOT NULL DEFAULT 'pending',
+        file_url text,
+        file_name text,
+        expiry_date timestamp,
+        notes text,
+        extracted_data jsonb DEFAULT '{}'::jsonb,
+        uploaded_by varchar,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS counselling_tasks (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id varchar NOT NULL,
+        student_id varchar NOT NULL,
+        title text NOT NULL,
+        task_type text NOT NULL DEFAULT 'follow_up',
+        assigned_to varchar,
+        due_date timestamp,
+        status text NOT NULL DEFAULT 'open',
+        notes text,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS counselling_ai_assessments (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id varchar NOT NULL,
+        student_id varchar NOT NULL,
+        assessment_type text NOT NULL DEFAULT 'profile_assessment',
+        admission_readiness_score integer DEFAULT 0,
+        visa_readiness_score integer DEFAULT 0,
+        risk_level text DEFAULT 'medium',
+        response_json jsonb DEFAULT '{}'::jsonb,
+        generated_text text,
+        created_by varchar,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS counselling_students_tenant_idx ON counselling_students (tenant_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS counselling_students_portal_token_idx ON counselling_students (portal_token)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS counselling_sessions_student_idx ON counselling_sessions (tenant_id, student_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS counselling_documents_student_idx ON counselling_documents (tenant_id, student_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS counselling_tasks_student_idx ON counselling_tasks (tenant_id, student_id)`);
+  }
+
   async getUser(id: string): Promise<User | undefined> {
     const rows = await db.select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
     return rows[0];
@@ -3261,6 +3416,7 @@ class HybridStorage extends MemStorage {
   }
 
   async seedThomasCookDemoWorkspaceToDb(): Promise<void> {
+    await this.ensureCounsellingTablesToDb();
     const tenantSeed = {
       name: "Thomas Cook Visa Desk",
       slug: "thomas-cook-visa-desk",

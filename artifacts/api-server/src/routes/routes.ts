@@ -1507,7 +1507,7 @@ export async function registerRoutes(
     if (!user) {
       return res.status(401).json({ authenticated: false });
     }
-    if (user.email === "antony@thomascook.com" && !user.tenantId) {
+    if (user.email === "antony@thomascook.com") {
       await Promise.resolve((storage as any).seedThomasCookDemoWorkspaceToDb?.()).catch((err) => {
         req.log.warn({ err }, "[auth/me] thomas cook tenant repair seed failed");
       });
@@ -8533,9 +8533,14 @@ export async function registerRoutes(
   });
 
   // === VisaDesk Counselling beta ===
+  async function ensureCounsellingReady() {
+    await (storage as any).ensureCounsellingTablesToDb?.();
+  }
+
   app.get("/api/tenants/:tenantId/counselling/students", requireAgencyAuth, async (req, res) => {
     const tenantId = req.params.tenantId;
     try {
+      await ensureCounsellingReady();
       const students = await db.select().from(counsellingStudents)
         .where(eq(counsellingStudents.tenantId, tenantId))
         .orderBy(desc(counsellingStudents.updatedAt));
@@ -8551,6 +8556,7 @@ export async function registerRoutes(
   app.get("/api/tenants/:tenantId/counselling/stats", requireAgencyAuth, async (req, res) => {
     const tenantId = req.params.tenantId;
     try {
+      await ensureCounsellingReady();
       const [students, tasks, sessions, docs] = await Promise.all([
         db.select().from(counsellingStudents).where(eq(counsellingStudents.tenantId, tenantId)),
         db.select().from(counsellingTasks).where(eq(counsellingTasks.tenantId, tenantId)),
@@ -8586,6 +8592,7 @@ export async function registerRoutes(
   app.post("/api/tenants/:tenantId/counselling/students", requireAgencyAuth, async (req, res) => {
     const tenantId = req.params.tenantId;
     try {
+      await ensureCounsellingReady();
       const payload = sanitizeCounsellingStudentPayload(req.body, tenantId);
       const scores = calculateCounsellingScores(payload, []);
       const [student] = await db.insert(counsellingStudents).values({ ...payload, ...scores } as any).returning();
@@ -8609,6 +8616,7 @@ export async function registerRoutes(
 
   app.get("/api/tenants/:tenantId/counselling/students/:studentId", requireAgencyAuth, async (req, res) => {
     const { tenantId, studentId } = req.params;
+    await ensureCounsellingReady();
     const [student] = await db.select().from(counsellingStudents).where(and(eq(counsellingStudents.tenantId, tenantId), eq(counsellingStudents.id, studentId))).limit(1);
     if (!student) return res.status(404).json({ error: "Counselling student not found" });
     const [sessions, shortlists, admissions, documents, tasks, assessments] = await Promise.all([
@@ -8624,6 +8632,7 @@ export async function registerRoutes(
 
   app.patch("/api/tenants/:tenantId/counselling/students/:studentId", requireAgencyAuth, async (req, res) => {
     const { tenantId, studentId } = req.params;
+    await ensureCounsellingReady();
     const [existing] = await db.select().from(counsellingStudents).where(and(eq(counsellingStudents.tenantId, tenantId), eq(counsellingStudents.id, studentId))).limit(1);
     if (!existing) return res.status(404).json({ error: "Counselling student not found" });
     try {
@@ -8642,6 +8651,7 @@ export async function registerRoutes(
 
   app.post("/api/tenants/:tenantId/counselling/students/:studentId/:collection", requireAgencyAuth, async (req, res) => {
     const { tenantId, studentId, collection } = req.params;
+    await ensureCounsellingReady();
     const [student] = await db.select().from(counsellingStudents).where(and(eq(counsellingStudents.tenantId, tenantId), eq(counsellingStudents.id, studentId))).limit(1);
     if (!student) return res.status(404).json({ error: "Counselling student not found" });
     const userId = req.session.userId ?? null;
@@ -8666,6 +8676,7 @@ export async function registerRoutes(
 
   app.patch("/api/tenants/:tenantId/counselling/:collection/:id", requireAgencyAuth, async (req, res) => {
     const { tenantId, collection, id } = req.params;
+    await ensureCounsellingReady();
     const collections: Record<string, any> = { sessions: counsellingSessions, shortlists: counsellingShortlists, admissions: counsellingAdmissions, documents: counsellingDocuments, tasks: counsellingTasks };
     const table = collections[collection];
     if (!table) return res.status(404).json({ error: "Unknown counselling collection" });
@@ -8676,6 +8687,7 @@ export async function registerRoutes(
 
   app.post("/api/tenants/:tenantId/counselling/students/:studentId/ai-assessment", requireAgencyAuth, async (req, res) => {
     const { tenantId, studentId } = req.params;
+    await ensureCounsellingReady();
     const [student] = await db.select().from(counsellingStudents).where(and(eq(counsellingStudents.tenantId, tenantId), eq(counsellingStudents.id, studentId))).limit(1);
     if (!student) return res.status(404).json({ error: "Counselling student not found" });
     const docs = await db.select().from(counsellingDocuments).where(and(eq(counsellingDocuments.tenantId, tenantId), eq(counsellingDocuments.studentId, studentId)));
@@ -8698,6 +8710,7 @@ export async function registerRoutes(
 
   app.post("/api/tenants/:tenantId/counselling/students/:studentId/sop-draft", requireAgencyAuth, async (req, res) => {
     const { tenantId, studentId } = req.params;
+    await ensureCounsellingReady();
     const [student] = await db.select().from(counsellingStudents).where(and(eq(counsellingStudents.tenantId, tenantId), eq(counsellingStudents.id, studentId))).limit(1);
     if (!student) return res.status(404).json({ error: "Counselling student not found" });
     const target = req.body?.shortlist || {};
@@ -8711,6 +8724,7 @@ export async function registerRoutes(
 
   app.post("/api/tenants/:tenantId/counselling/students/:studentId/portal", requireAgencyAuth, async (req, res) => {
     const { tenantId, studentId } = req.params;
+    await ensureCounsellingReady();
     const portalToken = randomBytes(18).toString("base64url");
     const [student] = await db.update(counsellingStudents).set({ portalEnabled: true, portalToken, updatedAt: new Date() } as any).where(and(eq(counsellingStudents.tenantId, tenantId), eq(counsellingStudents.id, studentId))).returning();
     if (!student) return res.status(404).json({ error: "Counselling student not found" });
@@ -8718,6 +8732,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/counselling-portal/:token", async (req, res) => {
+    await ensureCounsellingReady();
     const token = String(req.params.token || "").trim();
     const [student] = await db.select().from(counsellingStudents)
       .where(and(eq(counsellingStudents.portalToken, token), eq(counsellingStudents.portalEnabled, true)))
@@ -8736,6 +8751,7 @@ export async function registerRoutes(
   });
 
   app.patch("/api/counselling-portal/:token/documents/:documentId", async (req, res) => {
+    await ensureCounsellingReady();
     const token = String(req.params.token || "").trim();
     const [student] = await db.select().from(counsellingStudents)
       .where(and(eq(counsellingStudents.portalToken, token), eq(counsellingStudents.portalEnabled, true)))
