@@ -1,9 +1,12 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  BarChart3,
   Brain,
+  BookOpen,
   CalendarClock,
   CheckCircle2,
+  ClipboardCheck,
   FileText,
   GraduationCap,
   ListChecks,
@@ -11,7 +14,10 @@ import {
   Search,
   ShieldAlert,
   Sparkles,
+  Target,
+  TrendingUp,
   UserRound,
+  Users,
 } from "lucide-react";
 
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
@@ -49,16 +55,16 @@ const STATUSES = [
 ] as const;
 
 const COUNSELLING_MENUS = [
-  { key: "dashboard", label: "Dashboard", description: "Overview metrics and pipeline" },
-  { key: "students", label: "Students", description: "Profiles and enquiries" },
-  { key: "sessions", label: "Sessions", description: "Counselling appointments" },
-  { key: "shortlists", label: "Shortlists", description: "Courses and universities" },
-  { key: "admissions", label: "Admissions", description: "Offer and application workflow" },
-  { key: "documents", label: "Documents", description: "Student document checklist" },
-  { key: "readiness", label: "Visa Readiness", description: "Risk and action plan" },
-  { key: "tasks", label: "Tasks", description: "Follow-ups and reminders" },
-  { key: "ai", label: "AI Assessment", description: "Profile and SOP outputs" },
-  { key: "portal", label: "Student Portal", description: "Secure student-facing link" },
+  { key: "dashboard", label: "Dashboard", description: "Overview metrics and pipeline", icon: BarChart3 },
+  { key: "students", label: "Students", description: "Profiles and enquiries", icon: Users },
+  { key: "sessions", label: "Sessions", description: "Counselling appointments", icon: CalendarClock },
+  { key: "shortlists", label: "Shortlists", description: "Courses and universities", icon: GraduationCap },
+  { key: "admissions", label: "Admissions", description: "Offer and application workflow", icon: ClipboardCheck },
+  { key: "documents", label: "Documents", description: "Student document checklist", icon: FileText },
+  { key: "readiness", label: "Visa Readiness", description: "Risk and action plan", icon: ShieldAlert },
+  { key: "tasks", label: "Tasks", description: "Follow-ups and reminders", icon: ListChecks },
+  { key: "ai", label: "AI Assessment", description: "Profile and SOP outputs", icon: Brain },
+  { key: "portal", label: "Student Portal", description: "Secure student-facing link", icon: BookOpen },
 ] as const;
 
 const statusLabel = (value: string) => STATUSES.find(([key]) => key === value)?.[1] ?? value.replace(/_/g, " ");
@@ -202,6 +208,26 @@ export default function CounsellingPage() {
 
   const students = studentsQuery.data ?? [];
   const stats = statsQuery.data ?? {};
+  const statusSummary = useMemo(() => STATUSES.map(([value, label]) => ({
+    value,
+    label,
+    count: students.filter((student) => student.status === value).length,
+  })).filter((item) => item.count > 0).slice(0, 7), [students]);
+  const destinationSummary = useMemo(() => {
+    const counts = new Map<string, number>();
+    students.forEach((student) => (student.preferredDestinations ?? []).forEach((country: string) => {
+      counts.set(country, (counts.get(country) ?? 0) + 1);
+    }));
+    return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  }, [students]);
+  const readinessSummary = useMemo(() => {
+    const buckets = [
+      { label: "High readiness", color: "bg-emerald-500", count: students.filter((student) => (student.visaReadinessScore ?? 0) >= 75).length },
+      { label: "Moderate", color: "bg-amber-500", count: students.filter((student) => (student.visaReadinessScore ?? 0) >= 50 && (student.visaReadinessScore ?? 0) < 75).length },
+      { label: "Needs work", color: "bg-red-500", count: students.filter((student) => (student.visaReadinessScore ?? 0) < 50).length },
+    ];
+    return buckets;
+  }, [students]);
   const filtered = useMemo(() => students.filter((student) => {
     const haystack = `${student.fullName} ${student.email ?? ""} ${student.phone ?? ""} ${student.preferredCourse ?? ""}`.toLowerCase();
     return haystack.includes(search.toLowerCase()) && (statusFilter === "all" || student.status === statusFilter);
@@ -215,14 +241,14 @@ export default function CounsellingPage() {
   const activeMenuMeta = COUNSELLING_MENUS.find((item) => item.key === activeMenu) ?? COUNSELLING_MENUS[0];
 
   const statCards = [
-    ["Total counselling leads", stats.totalLeads ?? 0, UserRound],
-    ["New enquiries", stats.newEnquiries ?? 0, Sparkles],
-    ["Active cases", stats.activeCases ?? 0, GraduationCap],
-    ["Awaiting documents", stats.awaitingDocuments ?? 0, FileText],
-    ["Admission ready", stats.admissionReady ?? 0, CheckCircle2],
-    ["Visa-ready students", stats.visaReady ?? 0, ShieldAlert],
-    ["High-risk profiles", stats.highRisk ?? 0, ShieldAlert],
-    ["Follow-ups due today", stats.followUpsDueToday ?? 0, CalendarClock],
+    ["Total counselling leads", stats.totalLeads ?? 0, UserRound, "from-[#4055FF]/15 to-[#00B4D8]/10"],
+    ["New enquiries", stats.newEnquiries ?? 0, Sparkles, "from-[#FF2060]/15 to-[#9033F5]/10"],
+    ["Active cases", stats.activeCases ?? 0, GraduationCap, "from-emerald-500/15 to-[#4055FF]/10"],
+    ["Awaiting documents", stats.awaitingDocuments ?? 0, FileText, "from-amber-500/15 to-orange-500/10"],
+    ["Admission ready", stats.admissionReady ?? 0, CheckCircle2, "from-cyan-500/15 to-emerald-500/10"],
+    ["Visa-ready students", stats.visaReady ?? 0, ShieldAlert, "from-violet-500/15 to-[#4055FF]/10"],
+    ["High-risk profiles", stats.highRisk ?? 0, ShieldAlert, "from-red-500/15 to-[#FF2060]/10"],
+    ["Follow-ups due today", stats.followUpsDueToday ?? 0, CalendarClock, "from-sky-500/15 to-indigo-500/10"],
   ] as const;
 
   return (
@@ -252,7 +278,10 @@ export default function CounsellingPage() {
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
-                <span className="block text-sm font-bold">{item.label}</span>
+                <span className="flex items-center gap-2 text-sm font-bold">
+                  <item.icon className="h-4 w-4" />
+                  {item.label}
+                </span>
                 <span className={`mt-0.5 block truncate text-[11px] ${activeMenu === item.key ? "text-primary-foreground/75" : "text-muted-foreground"}`}>
                   {item.description}
                 </span>
@@ -269,10 +298,11 @@ export default function CounsellingPage() {
         )}
 
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {statCards.map(([label, value, Icon]) => (
-            <Card key={label} className="overflow-hidden">
-              <CardContent className="flex items-center gap-3 p-4">
-                <div className="rounded-lg bg-primary/10 p-2 text-primary"><Icon className="h-4 w-4" /></div>
+          {statCards.map(([label, value, Icon, gradient]) => (
+            <Card key={label} className="overflow-hidden border-border/70 shadow-sm">
+              <CardContent className={`relative flex items-center gap-3 bg-gradient-to-br ${gradient} p-4`}>
+                <div className="pointer-events-none absolute -right-6 -top-8 h-20 w-20 rounded-full bg-white/25 blur-2xl dark:bg-white/5" />
+                <div className="rounded-xl bg-background/80 p-2 text-primary shadow-sm"><Icon className="h-4 w-4" /></div>
                 <div>
                   <p className="text-xl font-bold">{value}</p>
                   <p className="text-xs text-muted-foreground">{label}</p>
@@ -280,6 +310,94 @@ export default function CounsellingPage() {
               </CardContent>
             </Card>
           ))}
+        </div>
+
+        <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+          <Card className="overflow-hidden border-border/70 shadow-sm">
+            <CardHeader>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-primary" />Counselling pipeline</CardTitle>
+                  <CardDescription>Live status spread across student enquiries and active counselling files.</CardDescription>
+                </div>
+                <Badge variant="secondary">{students.length} students</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {(statusSummary.length ? statusSummary : [{ label: "No status data", count: 0, value: "empty" }]).map((item, index) => {
+                const max = Math.max(...statusSummary.map((row) => row.count), 1);
+                const width = item.count ? Math.max(12, Math.round((item.count / max) * 100)) : 5;
+                return (
+                  <div key={item.value} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold">{item.label}</span>
+                      <span className="text-muted-foreground">{item.count}</span>
+                    </div>
+                    <div className="h-2.5 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-[#4055FF] via-[#9033F5] to-[#FF2060] transition-all duration-700"
+                        style={{ width: `${width}%`, transitionDelay: `${index * 60}ms` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+
+          <Card className="overflow-hidden border-border/70 shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Target className="h-5 w-5 text-primary" />Destination mix</CardTitle>
+              <CardDescription>Most requested student destinations in this agency workspace.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {destinationSummary.length ? destinationSummary.map(([country, count], index) => {
+                const max = Math.max(...destinationSummary.map(([, value]) => value), 1);
+                return (
+                  <div key={country} className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-sm font-black text-primary">{index + 1}</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="truncate font-semibold">{country}</span>
+                        <span className="text-muted-foreground">{count}</span>
+                      </div>
+                      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted">
+                        <div className="h-full rounded-full bg-gradient-to-r from-[#00B4D8] to-emerald-500 transition-all duration-700" style={{ width: `${Math.max(18, Math.round((count / max) * 100))}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              }) : (
+                <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">Create students to see destination trends.</div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid gap-5 lg:grid-cols-3">
+          {readinessSummary.map((bucket) => {
+            const total = Math.max(students.length, 1);
+            const percent = Math.round((bucket.count / total) * 100);
+            return (
+              <Card key={bucket.label} className="border-border/70 shadow-sm">
+                <CardContent className="p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div>
+                      <p className="font-bold">{bucket.label}</p>
+                      <p className="text-xs text-muted-foreground">{bucket.count} student{bucket.count === 1 ? "" : "s"}</p>
+                    </div>
+                    <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+                      <div className={`absolute inset-0 rounded-full ${bucket.color} opacity-20`} />
+                      <span className="relative text-sm font-black">{percent}%</span>
+                    </div>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-muted">
+                    <div className={`h-full rounded-full ${bucket.color} transition-all duration-700`} style={{ width: `${percent}%` }} />
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
 
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">

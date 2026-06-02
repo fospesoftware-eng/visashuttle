@@ -65,6 +65,13 @@ import {
   payments as paymentsTable,
   tenantDocumentChecklists as tenantDocumentChecklistsTable,
   proposals as proposalsTable,
+  counsellingStudents as counsellingStudentsTable,
+  counsellingSessions as counsellingSessionsTable,
+  counsellingShortlists as counsellingShortlistsTable,
+  counsellingAdmissions as counsellingAdmissionsTable,
+  counsellingDocuments as counsellingDocumentsTable,
+  counsellingTasks as counsellingTasksTable,
+  counsellingAiAssessments as counsellingAiAssessmentsTable,
 } from "@workspace/db";
 import { and, eq, desc, asc, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -3253,8 +3260,231 @@ class HybridStorage extends MemStorage {
     }
   }
 
+  async seedThomasCookDemoWorkspaceToDb(): Promise<void> {
+    const tenantSeed = {
+      name: "Thomas Cook Visa Desk",
+      slug: "thomas-cook-visa-desk",
+      logoUrl: "https://api.dicebear.com/7.x/initials/svg?seed=TC&backgroundColor=4055FF&textColor=ffffff",
+      plan: "power",
+      status: "active",
+      primaryColor: "#4055FF",
+      secondaryColor: "#9033F5",
+      accentColor: "#FF2060",
+      contactEmail: "antony@thomascook.com",
+      contactPhone: "+91 98470 00000",
+      activities: ["VISA Services", "Immigration Consultancy", "Student Counselling", "Tours & Travels"],
+      address: "Level 8, Tower I, UBB, Cessna Business Park, ORR, Bangalore",
+      country: "India",
+      pinCode: "560103",
+      state: "Karnataka",
+      district: "Bangalore",
+      whatsappNumber: "+91 98470 00000",
+      showPoweredBy: false,
+      authMethod: "otp",
+    };
+    const existingTenant = await db.select({ id: tenantsTable.id }).from(tenantsTable).where(eq(tenantsTable.slug, tenantSeed.slug)).limit(1);
+    let tenantId = existingTenant[0]?.id;
+    if (!tenantId) {
+      const inserted = await db.insert(tenantsTable).values(tenantSeed as any).returning({ id: tenantsTable.id });
+      tenantId = inserted[0]?.id;
+    } else {
+      await db.update(tenantsTable).set(tenantSeed as any).where(eq(tenantsTable.id, tenantId));
+    }
+    if (!tenantId) throw new Error("Thomas Cook demo tenant seed failed");
+
+    const ownerEmail = "antony@thomascook.com";
+    const existingOwner = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.email, ownerEmail)).limit(1);
+    const ownerPassword = bcrypt.hashSync("Thomas@12345", 10);
+    let ownerId = existingOwner[0]?.id;
+    const ownerPayload = {
+      email: ownerEmail,
+      password: ownerPassword,
+      name: "Aster Antony",
+      role: "agency_owner",
+      tenantId,
+      avatarUrl: null,
+      permissions: [],
+    };
+    if (!ownerId) {
+      const inserted = await db.insert(usersTable).values(ownerPayload as any).returning({ id: usersTable.id });
+      ownerId = inserted[0]?.id;
+    } else {
+      await db.update(usersTable)
+        .set({
+          name: ownerPayload.name,
+          role: ownerPayload.role,
+          tenantId,
+          avatarUrl: ownerPayload.avatarUrl,
+          permissions: ownerPayload.permissions,
+        } as any)
+        .where(eq(usersTable.id, ownerId));
+    }
+    if (!ownerId) throw new Error("Thomas Cook demo owner seed failed");
+
+    const staffEmail = "counsellor@thomascook.com";
+    const staff = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.email, staffEmail)).limit(1);
+    if (!staff[0]) {
+      await db.insert(usersTable).values({
+        email: staffEmail,
+        password: bcrypt.hashSync("Thomas@12345", 10),
+        name: "Maya Counsellor",
+        role: "agency_manager",
+        tenantId,
+        avatarUrl: null,
+        permissions: ["leads", "cases", "documents", "accounting", "analytics", "settings"],
+      } as any);
+    }
+
+    const leadSeeds = [
+      { email: "riya.menon.demo@visashuttle.com", name: "Riya Menon", phone: "+91 98765 10001", source: "Website", destinationCountry: "Canada", visaType: "Student Visa", stage: "proposal", notes: "Interested in Fall 2026 business analytics masters. IELTS ready.", assignedTo: ownerId },
+      { email: "arjun.nair.demo@visashuttle.com", name: "Arjun Nair", phone: "+91 98765 10002", source: "Walk-in", destinationCountry: "Germany", visaType: "Student Visa", stage: "qualified", notes: "Engineering profile, needs shortlist and blocked-account guidance.", assignedTo: ownerId },
+      { email: "meera.jose.demo@visashuttle.com", name: "Meera Jose", phone: "+91 98765 10003", source: "Referral", destinationCountry: "Australia", visaType: "Visitor Visa", stage: "contacted", notes: "Family visit case with moderate documentation risk.", assignedTo: ownerId },
+      { email: "daniel.kuriakose.demo@visashuttle.com", name: "Daniel Kuriakose", phone: "+91 98765 10004", source: "Growth Hub", destinationCountry: "United Kingdom", visaType: "Work Visa", stage: "new", notes: "Healthcare offer letter verification pending.", assignedTo: ownerId },
+    ];
+    for (const lead of leadSeeds) {
+      const existing = await db.select({ id: leadsTable.id }).from(leadsTable).where(and(eq(leadsTable.tenantId, tenantId), eq(leadsTable.email, lead.email))).limit(1);
+      if (!existing[0]) await db.insert(leadsTable).values({ tenantId, ...lead } as any);
+    }
+
+    const customerSeeds = [
+      { email: "riya.menon.demo@visashuttle.com", phone: "+91 98765 10001", name: "Riya Menon", isVerified: true },
+      { email: "arjun.nair.demo@visashuttle.com", phone: "+91 98765 10002", name: "Arjun Nair", isVerified: true },
+      { email: "meera.jose.demo@visashuttle.com", phone: "+91 98765 10003", name: "Meera Jose", isVerified: false },
+    ];
+    const customerIds = new Map<string, string>();
+    for (const customer of customerSeeds) {
+      const existing = await db.select({ id: customerAccountsTable.id }).from(customerAccountsTable).where(eq(customerAccountsTable.email, customer.email)).limit(1);
+      let customerId = existing[0]?.id;
+      if (!customerId) {
+        const inserted = await db.insert(customerAccountsTable).values(customer as any).returning({ id: customerAccountsTable.id });
+        customerId = inserted[0]?.id;
+      } else {
+        await db.update(customerAccountsTable).set(customer as any).where(eq(customerAccountsTable.id, customerId));
+      }
+      if (customerId) {
+        customerIds.set(customer.email, customerId);
+        const link = await db.select({ id: customerTenantLinksTable.id }).from(customerTenantLinksTable).where(and(eq(customerTenantLinksTable.customerAccountId, customerId), eq(customerTenantLinksTable.tenantId, tenantId))).limit(1);
+        if (!link[0]) await db.insert(customerTenantLinksTable).values({ customerAccountId: customerId, tenantId, role: "customer" } as any);
+      }
+    }
+
+    const caseSeeds = [
+      { caseNumber: "TC-2026-001", referenceId: "TCSTU001", applicantName: "Riya Menon", applicantDob: "2004-07-16", customerAccountId: customerIds.get("riya.menon.demo@visashuttle.com"), visaType: "Student Visa", destinationCountry: "Canada", status: "documents_required", priority: "high", assignedTo: ownerId, notes: "SOP and proof of funds need final review.", readinessScore: 78, visaStage: "not_started" },
+      { caseNumber: "TC-2026-002", referenceId: "TCSTU002", applicantName: "Arjun Nair", applicantDob: "2003-11-02", customerAccountId: customerIds.get("arjun.nair.demo@visashuttle.com"), visaType: "Student Visa", destinationCountry: "Germany", status: "in_progress", priority: "normal", assignedTo: ownerId, notes: "University shortlist ready; APS guidance pending.", readinessScore: 64, visaStage: "not_started" },
+      { caseNumber: "TC-2026-003", referenceId: "TCVIS003", applicantName: "Meera Jose", applicantDob: "1986-03-25", customerAccountId: customerIds.get("meera.jose.demo@visashuttle.com"), visaType: "Visitor Visa", destinationCountry: "Australia", status: "under_review", priority: "normal", assignedTo: ownerId, notes: "Travel history and sponsor invitation uploaded.", readinessScore: 72, visaStage: "processing", visaProcessingStatus: "biometrics_scheduled" },
+    ];
+    for (const seed of caseSeeds) {
+      const existing = await db.select({ id: casesTable.id }).from(casesTable).where(and(eq(casesTable.tenantId, tenantId), eq(casesTable.referenceId, seed.referenceId))).limit(1);
+      if (!existing[0]) await db.insert(casesTable).values({ tenantId, ...seed } as any);
+    }
+
+    const proposalSeeds = [
+      { token: "tc-riya-study-canada-demo", customerName: "Riya Menon", customerEmail: "riya.menon.demo@visashuttle.com", customerPhone: "+91 98765 10001", destinationCountry: "Canada", visaType: "Student Visa", notes: "Includes counselling, admission filing and visa document support.", estimateAmountCents: 4500000, status: "viewed", createdBy: ownerId },
+      { token: "tc-arjun-germany-demo", customerName: "Arjun Nair", customerEmail: "arjun.nair.demo@visashuttle.com", customerPhone: "+91 98765 10002", destinationCountry: "Germany", visaType: "Student Visa", notes: "Shortlist, APS checklist and blocked-account support.", estimateAmountCents: 3800000, status: "sent", createdBy: ownerId },
+    ];
+    for (const proposal of proposalSeeds) {
+      const existing = await db.select({ id: proposalsTable.id }).from(proposalsTable).where(eq(proposalsTable.token, proposal.token)).limit(1);
+      if (!existing[0]) await db.insert(proposalsTable).values({ tenantId, ...proposal } as any);
+    }
+
+    const invoiceSeeds = [
+      { invoiceNumber: "TC-INV-2026-001", customerName: "Riya Menon", customerEmail: "riya.menon.demo@visashuttle.com", customerPhone: "+91 98765 10001", destinationCountry: "Canada", visaType: "Student Visa", status: "partial", paymentType: "advance", advancePercent: 50, subtotal: 4500000, taxAmount: 810000, total: 5310000, paidAmount: 2655000, currency: "INR", notes: "Admission and visa counselling package.", publicToken: "tc-inv-riya-demo" },
+      { invoiceNumber: "TC-INV-2026-002", customerName: "Arjun Nair", customerEmail: "arjun.nair.demo@visashuttle.com", customerPhone: "+91 98765 10002", destinationCountry: "Germany", visaType: "Student Visa", status: "sent", paymentType: "upfront", subtotal: 3800000, taxAmount: 684000, total: 4484000, paidAmount: 0, currency: "INR", notes: "Germany admission support and visa file preparation.", publicToken: "tc-inv-arjun-demo" },
+    ];
+    for (const invoice of invoiceSeeds) {
+      const existing = await db.select({ id: invoicesTable.id }).from(invoicesTable).where(and(eq(invoicesTable.tenantId, tenantId), eq(invoicesTable.invoiceNumber, invoice.invoiceNumber))).limit(1);
+      if (!existing[0]) {
+        const inserted = await db.insert(invoicesTable).values({ tenantId, ...invoice } as any).returning({ id: invoicesTable.id });
+        const invoiceId = inserted[0]?.id;
+        if (invoiceId) {
+          await db.insert(invoiceItemsTable).values([
+            { invoiceId, description: "Agency counselling and visa file service", category: "agency_fee", quantity: 1, unitPrice: invoice.subtotal, amount: invoice.subtotal, sortOrder: 1, taxRate: 1800, taxable: true },
+          ] as any);
+          if (invoice.paidAmount > 0) {
+            await db.insert(paymentsTable).values({ invoiceId, tenantId, amount: invoice.paidAmount, method: "upi", reference: "DEMO-UPI-ADVANCE", notes: "Demo advance payment" } as any);
+          }
+        }
+      }
+    }
+
+    await this.seedThomasCookCounsellingData(tenantId, ownerId);
+  }
+
+  private async seedThomasCookCounsellingData(tenantId: string, ownerId: string): Promise<void> {
+    try {
+      const existing = await db.select({ id: counsellingStudentsTable.id }).from(counsellingStudentsTable).where(and(eq(counsellingStudentsTable.tenantId, tenantId), eq(counsellingStudentsTable.email, "riya.menon.demo@visashuttle.com"))).limit(1);
+      if (existing[0]) return;
+
+      const students = [
+        { fullName: "Riya Menon", email: "riya.menon.demo@visashuttle.com", phone: "+91 98765 10001", whatsappNumber: "+91 98765 10001", dateOfBirth: "2004-07-16", nationality: "India", currentCountry: "India", preferredDestinations: ["Canada", "United Kingdom"], preferredIntake: "Fall 2026", preferredCourse: "MSc Business Analytics", budgetRange: "INR 25-35 lakh", academicHistory: { highest: "BCom", percentage: "82%", backlog: "None" }, englishTests: { IELTS: "7.0 overall" }, workExperience: "6 month internship in analytics", educationGap: "No major gap", previousVisaRefusals: "None", travelHistory: "UAE, Singapore", sponsorDetails: { sponsor: "Parents", income: "INR 18 lakh/year" }, counsellorAssigned: ownerId, leadSource: "Website", status: "documents_pending", profileStrengthScore: 82, admissionReadinessScore: 74, visaReadinessScore: 78, riskLevel: "low", portalEnabled: true, portalToken: "tc-riya-student-portal-demo" },
+        { fullName: "Arjun Nair", email: "arjun.nair.demo@visashuttle.com", phone: "+91 98765 10002", whatsappNumber: "+91 98765 10002", dateOfBirth: "2003-11-02", nationality: "India", currentCountry: "India", preferredDestinations: ["Germany"], preferredIntake: "Winter 2026", preferredCourse: "MEng Mechanical Engineering", budgetRange: "INR 15-22 lakh", academicHistory: { highest: "BTech", cgpa: "7.6" }, englishTests: { IELTS: "6.5 overall" }, workExperience: "Final-year project in EV drivetrain", educationGap: "None", previousVisaRefusals: "None", travelHistory: "No prior travel", sponsorDetails: { sponsor: "Father + education loan" }, counsellorAssigned: ownerId, leadSource: "Walk-in", status: "course_shortlisted", profileStrengthScore: 70, admissionReadinessScore: 67, visaReadinessScore: 62, riskLevel: "medium", portalEnabled: true, portalToken: "tc-arjun-student-portal-demo" },
+        { fullName: "Sara Mathew", email: "sara.mathew.demo@visashuttle.com", phone: "+91 98765 10005", whatsappNumber: "+91 98765 10005", dateOfBirth: "2002-04-09", nationality: "India", currentCountry: "India", preferredDestinations: ["Australia", "New Zealand"], preferredIntake: "Feb 2027", preferredCourse: "Bachelor of Nursing", budgetRange: "INR 30-40 lakh", academicHistory: { highest: "Plus Two", percentage: "88%" }, englishTests: { OET: "Planned" }, workExperience: "Hospital volunteer experience", educationGap: "1 year", previousVisaRefusals: "None", travelHistory: "None", sponsorDetails: { sponsor: "Parents" }, counsellorAssigned: ownerId, leadSource: "Referral", status: "counselling_scheduled", profileStrengthScore: 76, admissionReadinessScore: 58, visaReadinessScore: 54, riskLevel: "medium", portalEnabled: false },
+      ];
+      const insertedStudents = await db.insert(counsellingStudentsTable).values(students.map((student) => ({ tenantId, ...student })) as any).returning({ id: counsellingStudentsTable.id, email: counsellingStudentsTable.email });
+
+      for (const student of insertedStudents) {
+        const isRiya = student.email === "riya.menon.demo@visashuttle.com";
+        await db.insert(counsellingSessionsTable).values({
+          tenantId,
+          studentId: student.id,
+          scheduledAt: new Date(Date.now() + (isRiya ? 2 : 5) * 24 * 60 * 60 * 1000),
+          mode: "video",
+          status: isRiya ? "completed" : "scheduled",
+          meetingNotes: isRiya ? "Discussed Canada options and finance documents." : "Initial profile discovery call.",
+          studentGoals: "Strong university admission with manageable visa risk.",
+          preferredCountries: isRiya ? ["Canada", "United Kingdom"] : ["Germany", "Australia"],
+          preferredCourses: isRiya ? ["Business Analytics", "Management"] : ["Engineering", "Nursing"],
+          recommendations: "Collect academic transcripts, language test and sponsor proof.",
+          nextAction: isRiya ? "Review SOP and bank statement" : "Complete counselling questionnaire",
+          followUpDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+          sharedWithStudent: true,
+          createdBy: ownerId,
+        } as any);
+        await db.insert(counsellingDocumentsTable).values([
+          { tenantId, studentId: student.id, documentType: "Passport", required: true, status: "received", notes: "Valid passport copy uploaded.", uploadedBy: ownerId },
+          { tenantId, studentId: student.id, documentType: "Academic transcripts", required: true, status: isRiya ? "received" : "pending", notes: isRiya ? "Degree marksheet received." : "Awaiting latest transcript.", uploadedBy: ownerId },
+          { tenantId, studentId: student.id, documentType: "Bank statement / sponsor proof", required: true, status: isRiya ? "review" : "pending", notes: "Financial document review needed.", uploadedBy: ownerId },
+          { tenantId, studentId: student.id, documentType: "English test score", required: true, status: isRiya ? "received" : "pending", notes: "Language proof based on destination rules.", uploadedBy: ownerId },
+        ] as any);
+        await db.insert(counsellingTasksTable).values([
+          { tenantId, studentId: student.id, title: isRiya ? "Finalize Canada SOP" : "Collect missing academic documents", taskType: "follow_up", assignedTo: ownerId, dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), status: "open", notes: "Demo task for counselling workflow." },
+          { tenantId, studentId: student.id, title: "Send student portal reminder", taskType: "portal", assignedTo: ownerId, dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000), status: isRiya ? "completed" : "open", notes: "Keep student moving through checklist." },
+        ] as any);
+        await db.insert(counsellingShortlistsTable).values([
+          { tenantId, studentId: student.id, destinationCountry: isRiya ? "Canada" : "Germany", institutionName: isRiya ? "University of Windsor" : "Technical University of Munich", courseName: isRiya ? "MSc Business Analytics" : "MSc Mechanical Engineering", intake: isRiya ? "Fall 2026" : "Winter 2026", duration: "2 years", tuitionFee: isRiya ? "CAD 32,000/year" : "Low tuition + semester contribution", applicationFee: isRiya ? "CAD 125" : "EUR 75", scholarshipAvailable: isRiya, eligibilityNotes: "Good academic fit; verify program-specific prerequisites.", admissionProbability: isRiya ? 78 : 64, visaRiskNotes: "Financial proof and purpose statement are key.", status: isRiya ? "shortlisted" : "suggested" },
+        ] as any);
+        await db.insert(counsellingAdmissionsTable).values({
+          tenantId,
+          studentId: student.id,
+          applicationStatus: isRiya ? "ready_to_apply" : "not_started",
+          documentsSubmitted: isRiya,
+          offerLetterStatus: "not_received",
+          feePaymentStatus: "pending",
+          countryDocumentStatus: isRiya ? "SOP and bank statement review pending" : "Initial checklist pending",
+          admissionDeadline: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000),
+          notes: "Demo admission tracker row.",
+        } as any);
+        await db.insert(counsellingAiAssessmentsTable).values({
+          tenantId,
+          studentId: student.id,
+          assessmentType: "profile_assessment",
+          admissionReadinessScore: isRiya ? 74 : 62,
+          visaReadinessScore: isRiya ? 78 : 58,
+          riskLevel: isRiya ? "low" : "medium",
+          responseJson: { summary: "Demo AI counselling assessment", strengths: ["Clear course goal", "Good academic profile"], gaps: ["Financial proof needs review", "SOP needs country-specific alignment"] },
+          generatedText: "Demo assessment: profile is promising. Focus on documentary proof, course rationale, and sponsor consistency before submission.",
+          createdBy: ownerId,
+        } as any);
+      }
+    } catch (error) {
+      if (isMissingRelationError(error)) return;
+      throw error;
+    }
+  }
+
   async seedDemoUsersToDb(): Promise<void> {
     await this.seedPlatformUsersToDb();
+    await this.seedThomasCookDemoWorkspaceToDb();
     const demoAccounts = [
       {
         id: "b2c-demo",

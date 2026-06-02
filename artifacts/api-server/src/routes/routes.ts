@@ -1391,7 +1391,7 @@ export async function registerRoutes(
         req.log.warn({ err }, "[auth/login] direct demo owner restore failed");
       });
     }
-    if (["admin@visashuttle.com", "owner@demoagency.com", "customer@demo.com"].includes(normalizedEmail)) {
+    if (["admin@visashuttle.com", "owner@demoagency.com", "customer@demo.com", "antony@thomascook.com"].includes(normalizedEmail)) {
       await Promise.resolve((storage as any).seedDemoUsersToDb?.()).catch((err) => {
         req.log.warn({ err }, "[auth/login] demo account repair seed failed");
       });
@@ -1503,9 +1503,19 @@ export async function registerRoutes(
     if (!req.session?.userId) {
       return res.status(401).json({ authenticated: false });
     }
-    const user = await storage.getUser(req.session.userId);
+    let user = await storage.getUser(req.session.userId);
     if (!user) {
       return res.status(401).json({ authenticated: false });
+    }
+    if (user.email === "antony@thomascook.com" && !user.tenantId) {
+      await Promise.resolve((storage as any).seedThomasCookDemoWorkspaceToDb?.()).catch((err) => {
+        req.log.warn({ err }, "[auth/me] thomas cook tenant repair seed failed");
+      });
+      user = await storage.getUser(req.session.userId);
+      if (user?.tenantId) {
+        req.session.userTenantId = user.tenantId;
+        req.session.userRole = user.role;
+      }
     }
     let tenantSlug: string | null = null;
     let tenant = null;
