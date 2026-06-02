@@ -46,6 +46,8 @@ const PLAN_COLORS: Record<string, string> = {
   pro: "bg-primary/10 text-primary",
 };
 
+const NO_AGENCY_VALUE = "__no_agency__";
+
 export default function AdminUsersPage() {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -500,10 +502,13 @@ export default function AdminUsersPage() {
               </div>
               <div className="space-y-1.5">
                 <Label>Agency</Label>
-                <Select value={editUser.tenantId ?? ""} onValueChange={v => setEditUser({ ...editUser, tenantId: v || null })}>
+                <Select
+                  value={editUser.tenantId ?? NO_AGENCY_VALUE}
+                  onValueChange={v => setEditUser({ ...editUser, tenantId: v === NO_AGENCY_VALUE ? null : v })}
+                >
                   <SelectTrigger><SelectValue placeholder="No agency (Platform Admin)" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No Agency</SelectItem>
+                    <SelectItem value={NO_AGENCY_VALUE}>No Agency</SelectItem>
                     {tenants.map((t: any) => (
                       <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                     ))}
