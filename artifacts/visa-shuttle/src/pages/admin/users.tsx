@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Search, MoreVertical, User, Mail, Trash2, Edit2, Users, Globe, Shield, Coins } from "lucide-react";
+import { Plus, Search, MoreVertical, User, Mail, Trash2, Edit2, Users, Globe, Shield, Coins, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -77,6 +77,20 @@ export default function AdminUsersPage() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  const restoreDemoOwnerMutation = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/api/admin/demo-agency/restore-owner")).json(),
+    onSuccess: (data: any) => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/tenants"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      toast({
+        title: "Demo owner restored",
+        description: `${data?.credentials?.email ?? "owner@demoagency.com"} / ${data?.credentials?.password ?? "Demo@12345"}`,
+      });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: any) => apiRequest("PATCH", `/api/admin/users/${id}`, data),
     onSuccess: () => {
@@ -150,10 +164,22 @@ export default function AdminUsersPage() {
             <h1 className="text-2xl font-bold" data-testid="text-page-title">User Management</h1>
             <p className="text-muted-foreground text-sm mt-1">Manage agency staff accounts and B2C visa checker users.</p>
           </div>
-          <Button className="gap-2" onClick={() => setCreateOpen(true)} data-testid="button-add-user">
-            <Plus className="w-4 h-4" />
-            Add User
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => restoreDemoOwnerMutation.mutate()}
+              disabled={restoreDemoOwnerMutation.isPending}
+              data-testid="button-restore-demo-owner"
+            >
+              <RotateCcw className="w-4 h-4" />
+              {restoreDemoOwnerMutation.isPending ? "Restoring..." : "Restore Demo Owner"}
+            </Button>
+            <Button className="gap-2" onClick={() => setCreateOpen(true)} data-testid="button-add-user">
+              <Plus className="w-4 h-4" />
+              Add User
+            </Button>
+          </div>
         </div>
 
         {/* Summary cards */}

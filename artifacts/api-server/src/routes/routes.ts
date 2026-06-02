@@ -7797,6 +7797,39 @@ export async function registerRoutes(
     res.json(safe.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0)));
   });
 
+  // Restore demo agency owner (admin)
+  app.post("/api/admin/demo-agency/restore-owner", requireAdminAuth, async (req, res) => {
+    await Promise.resolve((storage as any).seedDemoUsersToDb?.());
+    const [tenant, user] = await Promise.all([
+      storage.getTenantBySlug("demo-agency"),
+      storage.getUserByEmail("owner@demoagency.com"),
+    ]);
+
+    if (!tenant || !user) {
+      return res.status(500).json({ error: "Unable to restore demo agency owner. Please restart and try again." });
+    }
+
+    await storage.createActivityLog({
+      tenantId: tenant.id,
+      userId: req.session.userId ?? null,
+      action: "admin.demo_agency_owner.restored",
+      entityType: "user",
+      entityId: user.id,
+      details: { email: user.email, tenantSlug: tenant.slug },
+    });
+
+    const { password: _, ...safeUser } = user;
+    res.json({
+      success: true,
+      tenant,
+      user: safeUser,
+      credentials: {
+        email: "owner@demoagency.com",
+        password: "Demo@12345",
+      },
+    });
+  });
+
   // Create agency user (admin)
   app.post("/api/admin/users", requireAdminAuth, async (req, res) => {
     const { email, name, role, tenantId, password } = req.body;
