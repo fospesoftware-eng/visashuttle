@@ -62,7 +62,8 @@ function AgencyLoginMark({ compact = false }: { compact?: boolean }) {
 export default function LoginPage() {
   const [, setLocation] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
-  const initialMode = typeof window !== "undefined" && window.location.pathname.startsWith("/growth-hub/login") ? "growth" : "agency";
+  const isGrowthHubLogin = typeof window !== "undefined" && window.location.pathname.startsWith("/growth-hub/login");
+  const initialMode = isGrowthHubLogin ? "growth" : "agency";
   const [loginMode, setLoginMode] = useState<"agency" | "growth">(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -148,9 +149,9 @@ export default function LoginPage() {
     <div className="relative min-h-screen overflow-hidden bg-[#F8FAFF] text-slate-950">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(64,85,255,0.10),transparent_31%),radial-gradient(circle_at_82%_76%,rgba(255,32,96,0.08),transparent_28%),linear-gradient(180deg,#FFFFFF_0%,#F8FAFF_60%,#EEF3FF_100%)]" />
 
-      <div className="relative z-20">
+      {isGrowthHubLogin && <div className="relative z-20">
         <SiteHeader />
-      </div>
+      </div>}
 
       <main className="relative z-10 flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 py-8 sm:px-6 lg:px-10">
         <div className="grid w-full max-w-6xl items-center gap-10 lg:grid-cols-[1fr_0.86fr]">
