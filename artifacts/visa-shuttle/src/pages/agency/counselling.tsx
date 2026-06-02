@@ -48,6 +48,19 @@ const STATUSES = [
   ["closed_not_interested", "Closed / Not Interested"],
 ] as const;
 
+const COUNSELLING_MENUS = [
+  { key: "dashboard", label: "Dashboard", description: "Overview metrics and pipeline" },
+  { key: "students", label: "Students", description: "Profiles and enquiries" },
+  { key: "sessions", label: "Sessions", description: "Counselling appointments" },
+  { key: "shortlists", label: "Shortlists", description: "Courses and universities" },
+  { key: "admissions", label: "Admissions", description: "Offer and application workflow" },
+  { key: "documents", label: "Documents", description: "Student document checklist" },
+  { key: "readiness", label: "Visa Readiness", description: "Risk and action plan" },
+  { key: "tasks", label: "Tasks", description: "Follow-ups and reminders" },
+  { key: "ai", label: "AI Assessment", description: "Profile and SOP outputs" },
+  { key: "portal", label: "Student Portal", description: "Secure student-facing link" },
+] as const;
+
 const statusLabel = (value: string) => STATUSES.find(([key]) => key === value)?.[1] ?? value.replace(/_/g, " ");
 
 const riskClass: Record<string, string> = {
@@ -71,6 +84,7 @@ export default function CounsellingPage() {
   const tenantId = current?.user?.tenantId;
   const qc = useQueryClient();
   const { toast } = useToast();
+  const [activeMenu, setActiveMenu] = useState<(typeof COUNSELLING_MENUS)[number]["key"]>("dashboard");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [createOpen, setCreateOpen] = useState(false);
@@ -95,7 +109,10 @@ export default function CounsellingPage() {
     queryKey: ["/api/tenants", tenantId, "counselling", "students"],
     queryFn: async () => {
       const res = await fetch(`/api/tenants/${tenantId}/counselling/students`, { credentials: "include" });
-      if (!res.ok) throw new Error("Could not load counselling students");
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Could not load counselling students");
+      }
       return res.json();
     },
     enabled: !!tenantId,
@@ -105,7 +122,10 @@ export default function CounsellingPage() {
     queryKey: ["/api/tenants", tenantId, "counselling", "stats"],
     queryFn: async () => {
       const res = await fetch(`/api/tenants/${tenantId}/counselling/stats`, { credentials: "include" });
-      if (!res.ok) throw new Error("Could not load counselling stats");
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Could not load counselling stats");
+      }
       return res.json();
     },
     enabled: !!tenantId,
@@ -127,10 +147,13 @@ export default function CounsellingPage() {
   };
 
   const createMutation = useMutation({
-    mutationFn: async () => (await apiRequest("POST", `/api/tenants/${tenantId}/counselling/students`, {
-      ...form,
-      preferredDestinations: splitList(form.preferredDestinations),
-    })).json(),
+    mutationFn: async () => {
+      if (!tenantId) throw new Error("Agency account is not linked to a tenant. Please sign in again.");
+      return (await apiRequest("POST", `/api/tenants/${tenantId}/counselling/students`, {
+        ...form,
+        preferredDestinations: splitList(form.preferredDestinations),
+      })).json();
+    },
     onSuccess: (student: any) => {
       setCreateOpen(false);
       setSelectedId(student.id);
@@ -184,6 +207,12 @@ export default function CounsellingPage() {
     return haystack.includes(search.toLowerCase()) && (statusFilter === "all" || student.status === statusFilter);
   }), [students, search, statusFilter]);
   const selected = detailQuery.data;
+  const setupError = studentsQuery.error instanceof Error
+    ? studentsQuery.error.message
+    : statsQuery.error instanceof Error
+      ? statsQuery.error.message
+      : "";
+  const activeMenuMeta = COUNSELLING_MENUS.find((item) => item.key === activeMenu) ?? COUNSELLING_MENUS[0];
 
   const statCards = [
     ["Total counselling leads", stats.totalLeads ?? 0, UserRound],
@@ -210,6 +239,35 @@ export default function CounsellingPage() {
           <Button className="gap-2" onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4" />New student</Button>
         </div>
 
+        <div className="rounded-2xl border bg-card p-2 shadow-sm">
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {COUNSELLING_MENUS.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setActiveMenu(item.key)}
+                className={`min-w-[145px] rounded-xl px-3 py-2 text-left transition ${
+                  activeMenu === item.key
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+              >
+                <span className="block text-sm font-bold">{item.label}</span>
+                <span className={`mt-0.5 block truncate text-[11px] ${activeMenu === item.key ? "text-primary-foreground/75" : "text-muted-foreground"}`}>
+                  {item.description}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {setupError && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900 dark:border-amber-800/70 dark:bg-amber-950/35 dark:text-amber-200">
+            <p className="font-bold">Counselling setup is not complete</p>
+            <p className="mt-1">{setupError}</p>
+          </div>
+        )}
+
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {statCards.map(([label, value, Icon]) => (
             <Card key={label} className="overflow-hidden">
@@ -228,8 +286,8 @@ export default function CounsellingPage() {
           <Card>
             <CardHeader className="space-y-4">
               <div>
-                <CardTitle>Student Pipeline</CardTitle>
-                <CardDescription>Status-based counselling workflow for enquiries through visa outcome.</CardDescription>
+                <CardTitle>{activeMenuMeta.label}</CardTitle>
+                <CardDescription>{activeMenuMeta.description}. Status-based counselling workflow for enquiries through visa outcome.</CardDescription>
               </div>
               <div className="flex flex-col gap-3 sm:flex-row">
                 <div className="relative flex-1">

@@ -8496,38 +8496,52 @@ export async function registerRoutes(
   // === VisaDesk Counselling beta ===
   app.get("/api/tenants/:tenantId/counselling/students", requireAgencyAuth, async (req, res) => {
     const tenantId = req.params.tenantId;
-    const students = await db.select().from(counsellingStudents)
-      .where(eq(counsellingStudents.tenantId, tenantId))
-      .orderBy(desc(counsellingStudents.updatedAt));
-    res.json(students);
+    try {
+      const students = await db.select().from(counsellingStudents)
+        .where(eq(counsellingStudents.tenantId, tenantId))
+        .orderBy(desc(counsellingStudents.updatedAt));
+      res.json(students);
+    } catch (error) {
+      if (isMissingRelationError(error)) {
+        return res.status(503).json({ error: "Counselling database tables are not created yet. Please run the database schema push after pulling latest GitHub changes." });
+      }
+      throw error;
+    }
   });
 
   app.get("/api/tenants/:tenantId/counselling/stats", requireAgencyAuth, async (req, res) => {
     const tenantId = req.params.tenantId;
-    const [students, tasks, sessions, docs] = await Promise.all([
-      db.select().from(counsellingStudents).where(eq(counsellingStudents.tenantId, tenantId)),
-      db.select().from(counsellingTasks).where(eq(counsellingTasks.tenantId, tenantId)),
-      db.select().from(counsellingSessions).where(eq(counsellingSessions.tenantId, tenantId)),
-      db.select().from(counsellingDocuments).where(eq(counsellingDocuments.tenantId, tenantId)),
-    ]);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const dueToday = tasks.filter((task) => task.dueDate && new Date(task.dueDate) >= today && new Date(task.dueDate) < tomorrow && task.status !== "done");
-    const upcoming = sessions.filter((session) => session.scheduledAt && new Date(session.scheduledAt) >= new Date() && session.status !== "completed");
-    res.json({
-      totalLeads: students.length,
-      newEnquiries: students.filter((s) => s.status === "new_enquiry").length,
-      activeCases: students.filter((s) => !["closed_not_interested", "visa_approved", "visa_refused"].includes(s.status)).length,
-      awaitingDocuments: students.filter((s) => s.status === "documents_pending").length,
-      admissionReady: students.filter((s) => s.status === "admission_application_ready").length,
-      visaReady: students.filter((s) => s.status === "visa_ready").length,
-      highRisk: students.filter((s) => s.riskLevel === "high").length,
-      followUpsDueToday: dueToday.length,
-      upcomingAppointments: upcoming.length,
-      pendingDocuments: docs.filter((d) => d.status === "pending" && d.required).length,
-    });
+    try {
+      const [students, tasks, sessions, docs] = await Promise.all([
+        db.select().from(counsellingStudents).where(eq(counsellingStudents.tenantId, tenantId)),
+        db.select().from(counsellingTasks).where(eq(counsellingTasks.tenantId, tenantId)),
+        db.select().from(counsellingSessions).where(eq(counsellingSessions.tenantId, tenantId)),
+        db.select().from(counsellingDocuments).where(eq(counsellingDocuments.tenantId, tenantId)),
+      ]);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const dueToday = tasks.filter((task) => task.dueDate && new Date(task.dueDate) >= today && new Date(task.dueDate) < tomorrow && task.status !== "done");
+      const upcoming = sessions.filter((session) => session.scheduledAt && new Date(session.scheduledAt) >= new Date() && session.status !== "completed");
+      res.json({
+        totalLeads: students.length,
+        newEnquiries: students.filter((s) => s.status === "new_enquiry").length,
+        activeCases: students.filter((s) => !["closed_not_interested", "visa_approved", "visa_refused"].includes(s.status)).length,
+        awaitingDocuments: students.filter((s) => s.status === "documents_pending").length,
+        admissionReady: students.filter((s) => s.status === "admission_application_ready").length,
+        visaReady: students.filter((s) => s.status === "visa_ready").length,
+        highRisk: students.filter((s) => s.riskLevel === "high").length,
+        followUpsDueToday: dueToday.length,
+        upcomingAppointments: upcoming.length,
+        pendingDocuments: docs.filter((d) => d.status === "pending" && d.required).length,
+      });
+    } catch (error) {
+      if (isMissingRelationError(error)) {
+        return res.status(503).json({ error: "Counselling database tables are not created yet. Please run the database schema push after pulling latest GitHub changes." });
+      }
+      throw error;
+    }
   });
 
   app.post("/api/tenants/:tenantId/counselling/students", requireAgencyAuth, async (req, res) => {
@@ -8547,6 +8561,9 @@ export async function registerRoutes(
       }
       res.status(201).json(student);
     } catch (error: any) {
+      if (isMissingRelationError(error)) {
+        return res.status(503).json({ error: "Counselling database tables are not created yet. Please run the database schema push after pulling latest GitHub changes." });
+      }
       res.status(400).json({ error: error?.message || "Unable to create counselling student" });
     }
   });
