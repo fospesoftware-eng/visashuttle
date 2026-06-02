@@ -3140,7 +3140,6 @@ class HybridStorage extends MemStorage {
   // has a recoverable SaaS admin account and demo B2C accounts persist.
   async seedPlatformUsersToDb(): Promise<void> {
     const demoTenant = {
-      id: "tenant-1",
       name: "Demo Travel Agency",
       slug: "demo-agency",
       logoUrl: "https://api.dicebear.com/7.x/initials/svg?seed=DTA&backgroundColor=00B4D8&textColor=ffffff",
@@ -3162,8 +3161,10 @@ class HybridStorage extends MemStorage {
       authMethod: "otp",
     };
     const existingTenant = await db.select({ id: tenantsTable.id }).from(tenantsTable).where(eq(tenantsTable.slug, demoTenant.slug)).limit(1);
+    let demoTenantId = existingTenant[0]?.id;
     if (!existingTenant[0]) {
-      await db.insert(tenantsTable).values(demoTenant);
+      const inserted = await db.insert(tenantsTable).values(demoTenant).returning({ id: tenantsTable.id });
+      demoTenantId = inserted[0]?.id;
     } else {
       await db.update(tenantsTable)
         .set({
@@ -3185,13 +3186,13 @@ class HybridStorage extends MemStorage {
         } as any)
         .where(eq(tenantsTable.id, existingTenant[0].id));
     }
+    if (!demoTenantId) throw new Error("Demo tenant seed failed");
 
     const adminEmail = "admin@visashuttle.com";
     const adminPassword = bcrypt.hashSync("Admin@12345", 10);
     const existing = await db.select().from(usersTable).where(eq(usersTable.email, adminEmail)).limit(1);
     if (!existing[0]) {
       await db.insert(usersTable).values({
-        id: "user-admin",
         email: adminEmail,
         password: adminPassword,
         name: "System Admin",
@@ -3214,22 +3215,20 @@ class HybridStorage extends MemStorage {
 
     const agencyDemoUsers = [
       {
-        id: "user-owner",
         email: "owner@demoagency.com",
         password: bcrypt.hashSync("Demo@12345", 10),
         name: "Sarah Agent",
         role: "agency_owner",
-        tenantId: existingTenant[0]?.id || demoTenant.id,
+        tenantId: demoTenantId,
         avatarUrl: null,
         permissions: [],
       },
       {
-        id: "user-customer",
         email: "customer@demo.com",
         password: bcrypt.hashSync("Demo@12345", 10),
         name: "John Smith",
         role: "customer",
-        tenantId: existingTenant[0]?.id || demoTenant.id,
+        tenantId: demoTenantId,
         avatarUrl: null,
         permissions: [],
       },
