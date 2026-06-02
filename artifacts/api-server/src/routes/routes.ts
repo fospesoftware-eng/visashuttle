@@ -5178,6 +5178,7 @@ export async function registerRoutes(
     "fake_employment_offer",
     "fake_agency",
     "fake_visa_scheme",
+    "scholarship_finder",
   ]);
   const VISA_TOOL_LABELS: Record<string, string> = {
     fake_visa: "Fake Visa Detector",
@@ -5185,6 +5186,7 @@ export async function registerRoutes(
     fake_employment_offer: "Fake Employment Offer Letter Detector",
     fake_agency: "Fake Agency Detector",
     fake_visa_scheme: "Fake Visa Schemes",
+    scholarship_finder: "Scholarship Finder",
   };
   const VISA_TOOL_ALLOWED_MIME = new Set(["application/pdf", "image/jpeg", "image/png"]);
   const VISA_TOOL_MAX_FILE_BYTES = 8 * 1024 * 1024;
@@ -5493,6 +5495,15 @@ export async function registerRoutes(
           "reapplication_strategy",
           "documents_to_fix",
         ] : []),
+        ...(payload.toolType === "scholarship_finder" ? [
+          "student_capacity_score",
+          "scholarship_fit_level",
+          "recommended_countries",
+          "scholarship_matches",
+          "eligibility_gaps",
+          "funding_strategy",
+          "application_timeline",
+        ] : []),
         "disclaimer",
       ],
     };
@@ -5513,6 +5524,15 @@ export async function registerRoutes(
           "Use unregistered_agency_grievance_check as a strong negative signal when matched. Clearly mention the grievance count and status in red flags and next steps.",
           "If an agency appears in both sources, the unregistered grievance match must remain a serious negative risk factor, but still mention the registered-agent signal separately.",
           "If no match is found for an India-based recruiting agency, mention that no MEA/eMigrate RA match was found.",
+        ].join(" ")
+      : payload.toolType === "scholarship_finder"
+        ? [
+          "This is a scholarship finder and student capacity assessment.",
+          "Assess the student's academic, language, budget, achievements, work/research and destination fit.",
+          "Use risk_score as an inverse scholarship opportunity risk: 0 means excellent funding fit, 100 means very weak funding fit. Also return student_capacity_score from 0 to 100 where higher means stronger scholarship capacity.",
+          "List realistic scholarship opportunities across the world by country, funding type and likely eligibility. Do not invent guaranteed scholarships or exact awards unless generally known; use cautious wording such as 'possible fit', 'likely eligible if criteria are met', or 'research further'.",
+          "Return extra JSON keys: student_capacity_score, scholarship_fit_level, recommended_countries, scholarship_matches, eligibility_gaps, funding_strategy, application_timeline.",
+          "Each scholarship_matches item should include country, scholarship_name, provider, funding_type, estimated_coverage, fit_score, eligibility_notes, deadline_guidance, official_search_terms.",
         ].join(" ")
       : "";
 
@@ -5648,6 +5668,13 @@ export async function registerRoutes(
       wait_time_guidance: String(parsed.wait_time_guidance || ""),
       reapplication_strategy: Array.isArray(parsed.reapplication_strategy) ? parsed.reapplication_strategy.map(String).slice(0, 10) : [],
       documents_to_fix: Array.isArray(parsed.documents_to_fix) ? parsed.documents_to_fix.map(String).slice(0, 12) : [],
+      student_capacity_score: clampRiskScore(parsed.student_capacity_score),
+      scholarship_fit_level: String(parsed.scholarship_fit_level || ""),
+      recommended_countries: Array.isArray(parsed.recommended_countries) ? parsed.recommended_countries.map(String).slice(0, 12) : [],
+      scholarship_matches: Array.isArray(parsed.scholarship_matches) ? parsed.scholarship_matches.slice(0, 12) : [],
+      eligibility_gaps: Array.isArray(parsed.eligibility_gaps) ? parsed.eligibility_gaps.map(String).slice(0, 12) : [],
+      funding_strategy: Array.isArray(parsed.funding_strategy) ? parsed.funding_strategy.map(String).slice(0, 10) : [],
+      application_timeline: Array.isArray(parsed.application_timeline) ? parsed.application_timeline.map(String).slice(0, 10) : [],
       disclaimer: "This is an AI-assisted risk analysis only. Please verify with official government, employer, registered agency, or qualified immigration sources.",
     };
     return applyAgencySignals(result);

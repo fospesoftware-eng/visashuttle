@@ -218,15 +218,107 @@ function ResultPanel({ check }: { check: VisaToolCheck | null }) {
             <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-5 dark:border-slate-800 dark:from-slate-950/80 dark:to-slate-900">
               <div className="flex items-end justify-between">
                 <div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">Risk score</p>
-                  <p className="text-5xl font-black text-slate-950 dark:text-white">{check.riskScore ?? output.risk_score ?? 0}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    {check.toolType === "scholarship_finder" ? "Scholarship fit score" : "Risk score"}
+                  </p>
+                  <p className="text-5xl font-black text-slate-950 dark:text-white">
+                    {check.toolType === "scholarship_finder" ? (100 - (check.riskScore ?? output.risk_score ?? 0)) : (check.riskScore ?? output.risk_score ?? 0)}
+                  </p>
                 </div>
-                <div className="text-right text-sm text-slate-500 dark:text-slate-400">0 lower risk<br />100 highest risk</div>
+                <div className="text-right text-sm text-slate-500 dark:text-slate-400">
+                  {check.toolType === "scholarship_finder" ? "Higher means stronger scholarship fit" : <>0 lower risk<br />100 highest risk</>}
+                </div>
               </div>
               <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-amber-400 to-red-500" style={{ width: `${check.riskScore ?? output.risk_score ?? 0}%` }} />
+                <div
+                  className={`h-full rounded-full ${check.toolType === "scholarship_finder" ? "bg-gradient-to-r from-[#4055FF] via-[#00B4D8] to-emerald-500" : "bg-gradient-to-r from-emerald-400 via-amber-400 to-red-500"}`}
+                  style={{ width: `${check.toolType === "scholarship_finder" ? (100 - (check.riskScore ?? output.risk_score ?? 0)) : (check.riskScore ?? output.risk_score ?? 0)}%` }}
+                />
               </div>
             </div>
+
+            {check.toolType === "scholarship_finder" && (
+              <section className="rounded-xl border border-[#4055FF]/20 bg-[#4055FF]/5 p-4 dark:border-[#4055FF]/30 dark:bg-[#4055FF]/10">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-950 dark:text-white">Student scholarship capacity</h4>
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{output.scholarship_fit_level || "AI-assisted capacity assessment"}</p>
+                  </div>
+                  <Badge className="border-0 bg-[#4055FF] text-white">{output.student_capacity_score ?? (100 - (check.riskScore ?? 50))}% capacity</Badge>
+                </div>
+                {(output.recommended_countries || []).length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {(output.recommended_countries || []).map((country: string) => (
+                      <Badge key={country} variant="outline">{country}</Badge>
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {check.toolType === "scholarship_finder" && (output.scholarship_matches || []).length > 0 && (
+              <section>
+                <h4 className="mb-2 text-sm font-bold text-slate-950 dark:text-white">Scholarship availability matches</h4>
+                <div className="grid gap-3">
+                  {(output.scholarship_matches || []).map((item: any, index: number) => (
+                    <div key={`${item.scholarship_name || item.country || index}`} className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950/60">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="font-bold text-slate-950 dark:text-white">{item.scholarship_name || "Scholarship opportunity"}</p>
+                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{[item.country, item.provider, item.funding_type].filter(Boolean).join(" · ")}</p>
+                        </div>
+                        <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-200">{item.fit_score ?? "Fit"}%</Badge>
+                      </div>
+                      <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{item.eligibility_notes || item.estimated_coverage || "Review official eligibility criteria before applying."}</p>
+                      <div className="mt-3 grid gap-2 text-xs text-slate-500 dark:text-slate-400 sm:grid-cols-2">
+                        <span>Coverage: {item.estimated_coverage || "Varies"}</span>
+                        <span>Deadline: {item.deadline_guidance || "Check official page"}</span>
+                        <span className="sm:col-span-2">Search: {item.official_search_terms || "official scholarship page"}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {check.toolType === "scholarship_finder" && (output.eligibility_gaps || []).length > 0 && (
+              <section>
+                <h4 className="mb-2 text-sm font-bold text-slate-950 dark:text-white">Eligibility gaps to improve</h4>
+                <div className="space-y-2">
+                  {(output.eligibility_gaps || []).map((item: string) => (
+                    <div key={item} className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800/70 dark:bg-amber-950/40 dark:text-amber-200">{item}</div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {check.toolType === "scholarship_finder" && (output.funding_strategy || []).length > 0 && (
+              <section>
+                <h4 className="mb-2 text-sm font-bold text-slate-950 dark:text-white">Funding strategy</h4>
+                <div className="space-y-2">
+                  {(output.funding_strategy || []).map((item: string) => (
+                    <div key={item} className="flex gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">
+                      <ArrowRight className="mt-0.5 h-4 w-4 shrink-0 text-[#4055FF]" />
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {check.toolType === "scholarship_finder" && (output.application_timeline || []).length > 0 && (
+              <section>
+                <h4 className="mb-2 text-sm font-bold text-slate-950 dark:text-white">Application timeline</h4>
+                <div className="space-y-2">
+                  {(output.application_timeline || []).map((item: string) => (
+                    <div key={item} className="flex gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">
+                      <FileText className="mt-0.5 h-4 w-4 shrink-0 text-[#4055FF]" />
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
 
             {output.official_registry_check && (
               <section className={`rounded-xl border p-4 ${

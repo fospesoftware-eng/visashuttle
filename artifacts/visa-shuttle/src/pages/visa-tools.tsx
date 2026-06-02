@@ -8,6 +8,7 @@ import {
   Building2,
   FileText,
   Globe2,
+  GraduationCap,
   Loader2,
   RefreshCcw,
   ShieldCheck,
@@ -19,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 
-type ToolType = "fake_visa" | "rejection_recovery" | "fake_employment_offer" | "fake_agency" | "fake_visa_scheme";
+type ToolType = "fake_visa" | "rejection_recovery" | "fake_employment_offer" | "fake_agency" | "fake_visa_scheme" | "scholarship_finder";
 
 export type VisaToolType = ToolType;
 
@@ -121,6 +122,28 @@ export const tools: Array<{
       { key: "schemeTitle", label: "Scheme title / name", placeholder: "Guaranteed work visa package" },
       { key: "feesRequested", label: "Fees requested", placeholder: "INR 2,50,000 advance" },
       { key: "processingTime", label: "Promised processing time", placeholder: "7 days" },
+    ],
+  },
+  {
+    type: "scholarship_finder",
+    title: "Scholarship Finder",
+    description: "Assess student capacity and shortlist scholarship availability across countries, universities and funding types.",
+    icon: GraduationCap,
+    gradient: "from-[#4055FF] via-[#00B4D8] to-[#10B981]",
+    textLabel: "Paste academic background, achievements, SOP summary, target countries, course goals, budget limits, or scholarship notes",
+    fields: [
+      { key: "studentName", label: "Student name", placeholder: "Aisha Thomas" },
+      { key: "nationality", label: "Nationality", placeholder: "India" },
+      { key: "currentCountry", label: "Current country", placeholder: "India" },
+      { key: "targetDegree", label: "Target degree", placeholder: "Masters / Bachelors / PhD" },
+      { key: "fieldOfStudy", label: "Field of study", placeholder: "Computer Science, Nursing, Business..." },
+      { key: "preferredCountries", label: "Preferred countries", placeholder: "Canada, UK, Australia, Germany" },
+      { key: "gpaOrPercentage", label: "GPA / percentage", placeholder: "8.2 CGPA or 78%" },
+      { key: "englishTest", label: "English test scores", placeholder: "IELTS 7.0 / PTE 65 / TOEFL 95" },
+      { key: "budgetPerYear", label: "Budget per year", placeholder: "USD 12,000 / INR 10 lakh" },
+      { key: "achievements", label: "Achievements", placeholder: "Research, awards, sports, volunteering, leadership" },
+      { key: "workExperience", label: "Work / research experience", placeholder: "2 years software engineer / internship / papers" },
+      { key: "intake", label: "Target intake", placeholder: "Fall 2026" },
     ],
   },
 ];
