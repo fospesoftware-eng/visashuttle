@@ -14,6 +14,7 @@ import NotFound from "@/pages/not-found";
 import HomePage from "@/pages/home";
 import BusinessPage from "@/pages/business";
 import VisaDeskPage from "@/pages/visa-desk";
+import StudentCounsellingPage from "@/pages/student-counselling";
 import GrowthHubPage from "@/pages/growth-hub";
 import { AdminGrowthHubPage, GrowthHubDashboardPage } from "@/pages/growth-hub-dashboard";
 import { AgenticVisaAiPage, BusinessApiDetailPage, EnterpriseSolutionsPage, WhitelabelSolutionsPage } from "@/pages/business-detail";
@@ -139,6 +140,7 @@ function Router() {
       <Route path="/" component={HomePage} />
       <Route path="/business/visa-desk/signup" component={VisaDeskSignupPage} />
       <Route path="/business/visa-desk" component={VisaDeskPage} />
+      <Route path="/business/student-counselling" component={StudentCounsellingPage} />
       <Route path="/business/api/signup" component={BusinessApiSignupPage} />
       <Route path="/business/api" component={BusinessApiDetailPage} />
       <Route path="/business/enterprise/signup" component={EnterpriseSignupPage} />

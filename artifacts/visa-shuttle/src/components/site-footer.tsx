@@ -19,6 +19,7 @@ const footerColumns = [
     title: "For Business",
     links: [
       { label: "Visa Desk", href: "/business/visa-desk" },
+      { label: "Student Counselling", href: "/business/student-counselling" },
       { label: "Growth Hub", href: "/business/growth-hub" },
       { label: "Business API", href: "/business/api" },
       { label: "Enterprise Solutions", href: "/business/enterprise" },
