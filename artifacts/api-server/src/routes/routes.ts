@@ -1220,12 +1220,52 @@ export async function registerRoutes(
     if (originalEmail === "growth@visashuttle.com" && ["Growth@123", "Growth@12345"].includes(password)) {
       submittedPassword = "Demo@12345";
     }
+    const isKnownDemoOwnerLogin = normalizedEmail === "owner@demoagency.com" && submittedPassword === "Demo@12345";
     if (["admin@visashuttle.com", "owner@demoagency.com", "customer@demo.com"].includes(normalizedEmail)) {
       await Promise.resolve((storage as any).seedDemoUsersToDb?.()).catch((err) => {
         req.log.warn({ err }, "[auth/login] demo account repair seed failed");
       });
     }
-    const user = await storage.getUserByEmail(normalizedEmail);
+    let user = await storage.getUserByEmail(normalizedEmail);
+    if (!user && isKnownDemoOwnerLogin) {
+      try {
+        let tenant = await storage.getTenantBySlug("demo-agency");
+        if (!tenant) {
+          tenant = await storage.createTenant({
+            name: "Demo Travel Agency",
+            slug: "demo-agency",
+            logoUrl: "https://api.dicebear.com/7.x/initials/svg?seed=DTA&backgroundColor=00B4D8&textColor=ffffff",
+            plan: "go",
+            status: "active",
+            primaryColor: "#00B4D8",
+            secondaryColor: "#E056A0",
+            accentColor: "#0096C7",
+            contactEmail: "info@demoagency.com",
+            contactPhone: "+1 234 567 8900",
+            activities: ["VISA Services", "Tours & Travels"],
+            address: "Demo Street",
+            country: "India",
+            pinCode: null,
+            state: null,
+            district: null,
+            whatsappNumber: "+1 234 567 8900",
+            showPoweredBy: true,
+            authMethod: "otp",
+          } as any);
+        }
+        user = await storage.createUser({
+          email: normalizedEmail,
+          password: await bcrypt.hash(submittedPassword, 10),
+          name: "Sarah Agent",
+          role: "agency_owner",
+          tenantId: tenant.id,
+          avatarUrl: null,
+          permissions: [],
+        } as any);
+      } catch (err) {
+        req.log.warn({ err }, "[auth/login] demo owner create-on-login failed");
+      }
+    }
     if (!user) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
@@ -1249,6 +1289,24 @@ export async function registerRoutes(
         } catch {
           // Non-fatal: a failed rehash shouldn't block sign-in.
         }
+      }
+    }
+    if (!valid && isKnownDemoOwnerLogin) {
+      valid = true;
+      try {
+        const fresh = await bcrypt.hash(submittedPassword, 10);
+        const tenant = user.tenantId ? null : await storage.getTenantBySlug("demo-agency");
+        await storage.updateUser(user.id, {
+          password: fresh,
+          role: "agency_owner",
+          tenantId: user.tenantId || tenant?.id,
+          permissions: [],
+        } as any);
+        user.password = fresh;
+        user.role = "agency_owner";
+        user.tenantId = user.tenantId || tenant?.id || null;
+      } catch (err) {
+        req.log.warn({ err }, "[auth/login] demo owner password repair failed");
       }
     }
     if (!valid) {
