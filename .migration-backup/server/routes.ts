@@ -4872,11 +4872,17 @@ export async function registerRoutes(
         entityType: "tenant",
         entityId: tenant.id,
         details: { name: cleanName, plan: selectedPlan, email: cleanEmail || null },
+      }).catch((logError: any) => {
+        console.warn("[admin/tenants] activity log skipped", logError);
       });
       res.status(201).json(tenant);
     } catch (error: any) {
       console.error("[admin/tenants] create failed", error);
-      res.status(500).json({ error: error?.message || "Unable to create agency" });
+      res.status(500).json({
+        error: "Unable to create agency",
+        detail: error?.message || "Unknown database error",
+        code: error?.code ?? null,
+      });
     }
   });
 

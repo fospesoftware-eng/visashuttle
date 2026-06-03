@@ -8071,15 +8071,20 @@ export async function registerRoutes(
       let temporaryPassword: string | null = null;
       if (cleanEmail) {
         temporaryPassword = `VisaDesk@${randomBytes(3).toString("hex")}`;
-        ownerUser = await storage.createUser({
-          email: cleanEmail,
-          password: await bcrypt.hash(temporaryPassword, 10),
-          name: cleanName,
-          role: "agency_owner",
-          tenantId: tenant.id,
-          avatarUrl: null,
-          permissions: [],
-        } as any);
+        try {
+          ownerUser = await storage.createUser({
+            email: cleanEmail,
+            password: await bcrypt.hash(temporaryPassword, 10),
+            name: cleanName,
+            role: "agency_owner",
+            tenantId: tenant.id,
+            avatarUrl: null,
+            permissions: [],
+          } as any);
+        } catch (ownerError: any) {
+          req.log.warn({ err: ownerError, tenantId: tenant.id, email: cleanEmail }, "[admin/tenants] owner user creation skipped");
+          temporaryPassword = null;
+        }
       }
 
       await storage.createActivityLog({
@@ -8089,6 +8094,8 @@ export async function registerRoutes(
         entityType: "tenant",
         entityId: tenant.id,
         details: { name: cleanName, plan: selectedPlan, email: cleanEmail || null, ownerUserId: ownerUser?.id ?? null },
+      }).catch((logError: any) => {
+        req.log.warn({ err: logError, tenantId: tenant.id }, "[admin/tenants] activity log skipped");
       });
       const { password: _ignoredPassword, ...safeOwner } = ownerUser ?? {};
       res.status(201).json({ ...tenant, ownerUser: ownerUser ? safeOwner : null, temporaryPassword });
@@ -8096,7 +8103,11 @@ export async function registerRoutes(
       req.log.error({ err: error }, "[admin/tenants] create failed");
       if (error?.code === "23505") return res.status(409).json({ error: "Agency URL or admin email already exists" });
       if (isMissingRelationError(error)) return res.status(503).json({ error: "Database tables are not ready. Please restart the app or run the database schema push." });
-      res.status(500).json({ error: error?.message || "Unable to create agency" });
+      res.status(500).json({
+        error: "Unable to create agency",
+        detail: error?.message || "Unknown database error",
+        code: error?.code ?? null,
+      });
     }
   });
 

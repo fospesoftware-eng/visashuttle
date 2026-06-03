@@ -5,7 +5,8 @@ async function throwIfResNotOk(res: Response) {
     const text = (await res.text()) || res.statusText;
     try {
       const data = JSON.parse(text);
-      throw new Error(data?.error || data?.message || `${res.status}: ${res.statusText}`);
+      const message = [data?.error || data?.message, data?.detail].filter(Boolean).join(": ");
+      throw new Error(message || `${res.status}: ${res.statusText}`);
     } catch (err) {
       if (err instanceof Error && err.message !== text) throw err;
       throw new Error(`${res.status}: ${text}`);
