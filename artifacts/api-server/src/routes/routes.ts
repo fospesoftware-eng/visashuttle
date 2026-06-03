@@ -7636,8 +7636,23 @@ export async function registerRoutes(
       const PDFDocument = PDFDocumentMod.default ?? PDFDocumentMod;
       const output: any = check.claudeResponseJson || {};
       const toolLabel = output.tool_label || VISA_TOOL_LABELS[check.toolType] || check.toolType;
-      const riskScore = check.riskScore ?? output.risk_score ?? 0;
-      const riskLevel = check.riskLevel || output.risk_level || "Unknown";
+      const rawRiskScore = Number(check.riskScore ?? output.risk_score ?? 0);
+      const normalizedRiskScore = Number.isFinite(rawRiskScore) ? Math.max(0, Math.min(100, Math.round(rawRiskScore))) : 0;
+      const displayScore = Math.max(0, Math.min(100, 100 - normalizedRiskScore));
+      const scoreTitle = check.toolType === "scholarship_finder" ? "Scholarship Fit Score" : "Safety Score";
+      const scoreHelp = check.toolType === "scholarship_finder" ? "Higher means stronger scholarship fit" : "Higher means safer to proceed";
+      const displayLevel = (() => {
+        if (check.toolType === "scholarship_finder") {
+          if (displayScore >= 80) return "Strong fit";
+          if (displayScore >= 65) return "Good fit";
+          if (displayScore >= 40) return "Needs work";
+          return "Low fit";
+        }
+        if (displayScore >= 80) return "Good to go";
+        if (displayScore >= 65) return "Low risk";
+        if (displayScore >= 40) return "Needs review";
+        return "High risk";
+      })();
       const filename = `visa-tools-${String(check.toolType || "report").replace(/[^a-z0-9_-]+/gi, "-")}-${check.id}.pdf`;
 
       res.setHeader("Content-Type", "application/pdf");
@@ -7682,9 +7697,10 @@ export async function registerRoutes(
       doc.moveDown(0.5);
       line();
 
-      section(check.toolType === "scholarship_finder" ? "Fit Score" : "Risk Score");
-      doc.fontSize(30).fillColor("#0F172A").text(`${riskScore}`, { continued: true });
-      doc.fontSize(12).fillColor("#64748B").text(` / 100 · ${riskLevel}`);
+      section(scoreTitle);
+      doc.fontSize(30).fillColor("#0F172A").text(`${displayScore}`, { continued: true });
+      doc.fontSize(12).fillColor("#64748B").text(` / 100 · ${displayLevel}`);
+      paragraph(`${scoreHelp}. 80+ is a positive signal. This is still AI-assisted and must be verified with official sources.`);
       paragraph(check.inputSummary || output.summary || "Visa Tools check");
 
       section("Summary");

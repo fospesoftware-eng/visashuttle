@@ -47,7 +47,16 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { riskColor, stripDataPrefix, tools, type VisaToolCheck } from "@/pages/visa-tools";
+import {
+  stripDataPrefix,
+  tools,
+  visaToolDisplayScore,
+  visaToolScoreColor,
+  visaToolScoreHelp,
+  visaToolScoreLabel,
+  visaToolScoreTitle,
+  type VisaToolCheck,
+} from "@/pages/visa-tools";
 
 type AgencySuggestion = {
   name: string;
@@ -584,6 +593,7 @@ function AgencyNameDropdown({
 
 function ResultPanel({ check }: { check: VisaToolCheck | null }) {
   const output = check?.claudeResponseJson || {};
+  const displayScore = check ? visaToolDisplayScore(check) : 0;
 
   return (
     <Card className="border border-slate-200 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
@@ -593,7 +603,11 @@ function ResultPanel({ check }: { check: VisaToolCheck | null }) {
             <h3 className="text-lg font-black text-slate-950 dark:text-white">Result</h3>
             <p className="text-sm text-slate-500 dark:text-slate-400">Confidence score, red flags and next steps</p>
           </div>
-          {check && <Badge className={riskColor(check.riskLevel)}>{check.riskLevel || "Risk"}</Badge>}
+          {check && (
+            <Badge className={visaToolScoreColor(check.toolType, displayScore)}>
+              {visaToolScoreLabel(check.toolType, displayScore)}
+            </Badge>
+          )}
         </div>
 
         {!check ? (
@@ -607,20 +621,21 @@ function ResultPanel({ check }: { check: VisaToolCheck | null }) {
               <div className="flex items-end justify-between">
                 <div>
                   <p className="text-sm text-slate-500 dark:text-slate-400">
-                    {check.toolType === "scholarship_finder" ? "Scholarship fit score" : "Risk score"}
+                    {visaToolScoreTitle(check.toolType)}
                   </p>
                   <p className="text-5xl font-black text-slate-950 dark:text-white">
-                    {check.toolType === "scholarship_finder" ? (100 - (check.riskScore ?? output.risk_score ?? 0)) : (check.riskScore ?? output.risk_score ?? 0)}
+                    {displayScore}
                   </p>
                 </div>
                 <div className="text-right text-sm text-slate-500 dark:text-slate-400">
-                  {check.toolType === "scholarship_finder" ? "Higher means stronger scholarship fit" : <>0 lower risk<br />100 highest risk</>}
+                  {visaToolScoreHelp(check.toolType)}<br />
+                  80+ is a positive signal
                 </div>
               </div>
               <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                 <div
-                  className={`h-full rounded-full ${check.toolType === "scholarship_finder" ? "bg-gradient-to-r from-[#4055FF] via-[#00B4D8] to-emerald-500" : "bg-gradient-to-r from-emerald-400 via-amber-400 to-red-500"}`}
-                  style={{ width: `${check.toolType === "scholarship_finder" ? (100 - (check.riskScore ?? output.risk_score ?? 0)) : (check.riskScore ?? output.risk_score ?? 0)}%` }}
+                  className="h-full rounded-full bg-gradient-to-r from-[#4055FF] via-[#00B4D8] to-emerald-500"
+                  style={{ width: `${displayScore}%` }}
                 />
               </div>
             </div>

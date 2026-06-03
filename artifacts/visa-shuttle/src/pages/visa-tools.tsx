@@ -156,6 +156,52 @@ export function riskColor(level?: string | null) {
   return "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/45 dark:text-emerald-200 dark:border-emerald-800/70";
 }
 
+function clampScore(value: unknown) {
+  const score = Number(value ?? 0);
+  if (!Number.isFinite(score)) return 0;
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+export function visaToolDisplayScore(check: Pick<VisaToolCheck, "toolType" | "riskScore" | "claudeResponseJson">) {
+  const outputScore = check.claudeResponseJson?.risk_score;
+  const riskScore = clampScore(check.riskScore ?? outputScore);
+  return clampScore(100 - riskScore);
+}
+
+export function visaToolScoreTitle(toolType?: string | null) {
+  return toolType === "scholarship_finder" ? "Scholarship fit score" : "Safety score";
+}
+
+export function visaToolScoreHelp(toolType?: string | null) {
+  return toolType === "scholarship_finder" ? "Higher means stronger scholarship fit" : "Higher means safer to proceed";
+}
+
+export function visaToolScoreLabel(toolType: string | null | undefined, score: number) {
+  if (toolType === "scholarship_finder") {
+    if (score >= 80) return "Strong fit";
+    if (score >= 65) return "Good fit";
+    if (score >= 40) return "Needs work";
+    return "Low fit";
+  }
+  if (score >= 80) return "Good to go";
+  if (score >= 65) return "Low risk";
+  if (score >= 40) return "Needs review";
+  return "High risk";
+}
+
+export function visaToolScoreColor(toolType: string | null | undefined, score: number) {
+  if (toolType === "scholarship_finder") {
+    if (score >= 80) return "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/45 dark:text-emerald-200 dark:border-emerald-800/70";
+    if (score >= 65) return "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/45 dark:text-blue-200 dark:border-blue-800/70";
+    if (score >= 40) return "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/45 dark:text-amber-200 dark:border-amber-800/70";
+    return "bg-red-100 text-red-700 border-red-200 dark:bg-red-950/45 dark:text-red-200 dark:border-red-800/70";
+  }
+  if (score >= 80) return "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/45 dark:text-emerald-200 dark:border-emerald-800/70";
+  if (score >= 65) return "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/45 dark:text-blue-200 dark:border-blue-800/70";
+  if (score >= 40) return "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/45 dark:text-amber-200 dark:border-amber-800/70";
+  return "bg-red-100 text-red-700 border-red-200 dark:bg-red-950/45 dark:text-red-200 dark:border-red-800/70";
+}
+
 export function stripDataPrefix(dataUrl: string) {
   return dataUrl.replace(/^data:[^;]+;base64,/, "");
 }
@@ -272,7 +318,9 @@ export default function VisaToolsPage() {
                 <button key={check.id} onClick={() => setLocation(`/visa-tools/history/${check.id}`)} className="rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-[#4055FF] dark:border-slate-800 dark:bg-slate-950/50 dark:hover:border-[#4055FF]">
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <Badge variant="secondary">{tools.find((t) => t.type === check.toolType)?.title || check.toolType}</Badge>
-                    <Badge className={riskColor(check.riskLevel)}>{check.riskLevel}</Badge>
+                    <Badge className={visaToolScoreColor(check.toolType, visaToolDisplayScore(check))}>
+                      {visaToolScoreLabel(check.toolType, visaToolDisplayScore(check))}
+                    </Badge>
                   </div>
                   <div className="flex items-center gap-3">
                     <FileText className="h-5 w-5 text-[#4055FF]" />

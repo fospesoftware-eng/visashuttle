@@ -7,7 +7,15 @@ import { useB2cAuth } from "@/hooks/use-b2c-auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { riskColor, tools, type VisaToolCheck } from "@/pages/visa-tools";
+import {
+  tools,
+  visaToolDisplayScore,
+  visaToolScoreColor,
+  visaToolScoreHelp,
+  visaToolScoreLabel,
+  visaToolScoreTitle,
+  type VisaToolCheck,
+} from "@/pages/visa-tools";
 
 function downloadVisaToolReportPdf(checkId: string) {
   const link = document.createElement("a");
@@ -21,19 +29,23 @@ function downloadVisaToolReportPdf(checkId: string) {
 
 function ToolReport({ check }: { check: VisaToolCheck }) {
   const output = check.claudeResponseJson || {};
+  const displayScore = visaToolDisplayScore(check);
 
   return (
     <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
       <Card className="border-0 shadow-sm">
         <CardContent className="p-5">
-          <Badge className={riskColor(check.riskLevel)}>{check.riskLevel || "Risk"}</Badge>
+          <Badge className={visaToolScoreColor(check.toolType, displayScore)}>
+            {visaToolScoreLabel(check.toolType, displayScore)}
+          </Badge>
           <h2 className="mt-4 text-2xl font-black tracking-tight text-slate-900">{tools.find((tool) => tool.type === check.toolType)?.title || check.toolType}</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">{check.inputSummary || "Visa Tools check"}</p>
           <div className="mt-5 rounded-2xl border bg-gradient-to-br from-slate-50 to-white p-5">
-            <p className="text-sm text-slate-500">Risk score</p>
-            <p className="text-6xl font-black text-slate-900">{check.riskScore ?? output.risk_score ?? 0}</p>
+            <p className="text-sm text-slate-500">{visaToolScoreTitle(check.toolType)}</p>
+            <p className="text-6xl font-black text-slate-900">{displayScore}</p>
+            <p className="mt-1 text-xs text-slate-500">{visaToolScoreHelp(check.toolType)}. 80+ is a positive signal.</p>
             <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100">
-              <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-amber-400 to-red-500" style={{ width: `${check.riskScore ?? output.risk_score ?? 0}%` }} />
+              <div className="h-full rounded-full bg-gradient-to-r from-[#4055FF] via-[#00B4D8] to-emerald-500" style={{ width: `${displayScore}%` }} />
             </div>
           </div>
           <div className="mt-4 flex items-center gap-2 text-xs text-slate-500">
@@ -194,7 +206,9 @@ export default function VisaToolsHistoryPage() {
                   <button key={check.id} onClick={() => setLocation(`/visa-tools/history/${check.id}`)} className="rounded-xl border bg-white p-4 text-left transition hover:border-[#4055FF] hover:shadow-sm">
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <Badge variant="secondary">{tools.find((tool) => tool.type === check.toolType)?.title || check.toolType}</Badge>
-                      <Badge className={riskColor(check.riskLevel)}>{check.riskLevel || "Risk"}</Badge>
+                      <Badge className={visaToolScoreColor(check.toolType, visaToolDisplayScore(check))}>
+                        {visaToolScoreLabel(check.toolType, visaToolDisplayScore(check))}
+                      </Badge>
                     </div>
                     <div className="flex items-center gap-3">
                       <FileText className="h-5 w-5 text-[#4055FF]" />
