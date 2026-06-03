@@ -1,6 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { pool } from "./db";
 import { runVisaCheck, runDeepCheck, scanPassportImage, isPassportScanConfigured } from "./ai";
 import express from "express";
 import { sendOtp, verifyOtp, getSmsProviderStatus } from "./sms";
@@ -4775,33 +4776,108 @@ export async function registerRoutes(
 
   // Create tenant (admin)
   app.post("/api/admin/tenants", requireAdminAuth, async (req, res) => {
-    const { name, email, plan, status } = req.body;
-    if (!name) return res.status(400).json({ error: "Agency name is required" });
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-    const tenant = await storage.createTenant({
-      name,
-      slug,
-      plan: plan ?? "starter",
-      status: status ?? "active",
-      contactEmail: email ?? null,
-      logoUrl: null,
-      primaryColor: "#4055FF",
-      secondaryColor: "#FF2060",
-      accentColor: "#7033F0",
-      contactPhone: null,
-      whatsappNumber: null,
-      showPoweredBy: true,
-      authMethod: "otp",
-    });
-    await storage.createActivityLog({
-      tenantId: null,
-      userId: req.session.userId ?? null,
-      action: "admin.tenant.created",
-      entityType: "tenant",
-      entityId: tenant.id,
-      details: { name, plan, email },
-    });
-    res.status(201).json(tenant);
+    try {
+      const { name, email, plan, status } = req.body;
+      const cleanName = String(name || "").trim();
+      const cleanEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+      if (!cleanName) return res.status(400).json({ error: "Agency name is required" });
+      if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+        return res.status(400).json({ error: "Enter a valid agency admin email address" });
+      }
+
+      const selectedPlan = plan === "go" || plan === "professional"
+        ? "professional"
+        : plan === "power" || plan === "enterprise"
+          ? "enterprise"
+          : "starter";
+      const selectedStatus = ["active", "pending", "suspended"].includes(String(status))
+        ? String(status)
+        : "active";
+      const tenantId = randomUUID();
+      const baseSlug = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") || `agency-${Date.now()}`;
+      let slug = baseSlug;
+      for (let index = 2; await storage.getTenantBySlug(slug); index++) {
+        slug = `${baseSlug}-${index}`;
+      }
+
+      let tenant: any;
+      if (pool) {
+        await pool.query(`alter table tenants add column if not exists logo_url text`);
+        await pool.query(`alter table tenants add column if not exists primary_color text default '#00B4D8'`);
+        await pool.query(`alter table tenants add column if not exists secondary_color text default '#E056A0'`);
+        await pool.query(`alter table tenants add column if not exists accent_color text default '#0096C7'`);
+        await pool.query(`alter table tenants add column if not exists contact_email text`);
+        await pool.query(`alter table tenants add column if not exists contact_phone text`);
+        await pool.query(`alter table tenants add column if not exists activities text[] default '{}'::text[]`);
+        await pool.query(`alter table tenants add column if not exists address text`);
+        await pool.query(`alter table tenants add column if not exists country text`);
+        await pool.query(`alter table tenants add column if not exists pin_code text`);
+        await pool.query(`alter table tenants add column if not exists state text`);
+        await pool.query(`alter table tenants add column if not exists district text`);
+        await pool.query(`alter table tenants add column if not exists whatsapp_number text`);
+        await pool.query(`alter table tenants add column if not exists show_powered_by boolean default true`);
+        await pool.query(`alter table tenants add column if not exists auth_method text default 'otp'`);
+        await pool.query(`alter table tenants add column if not exists created_at timestamp default now()`);
+
+        const result = await pool.query(
+          `insert into tenants (
+            id, name, slug, plan, status, primary_color, secondary_color, accent_color,
+            contact_email, show_powered_by, auth_method
+          ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning *`,
+          [tenantId, cleanName, slug, selectedPlan, selectedStatus, "#4055FF", "#FF2060", "#7033F0", cleanEmail || null, true, "otp"]
+        );
+        const row = result.rows[0];
+        tenant = {
+          id: row.id,
+          name: row.name,
+          slug: row.slug,
+          logoUrl: row.logo_url ?? null,
+          plan: row.plan,
+          status: row.status,
+          primaryColor: row.primary_color ?? null,
+          secondaryColor: row.secondary_color ?? null,
+          accentColor: row.accent_color ?? null,
+          contactEmail: row.contact_email ?? null,
+          contactPhone: row.contact_phone ?? null,
+          activities: row.activities ?? [],
+          address: row.address ?? null,
+          country: row.country ?? null,
+          pinCode: row.pin_code ?? null,
+          state: row.state ?? null,
+          district: row.district ?? null,
+          whatsappNumber: row.whatsapp_number ?? null,
+          showPoweredBy: row.show_powered_by ?? true,
+          authMethod: row.auth_method ?? "otp",
+          createdAt: row.created_at ?? null,
+        };
+      } else {
+        tenant = await storage.createTenant({
+          id: tenantId,
+          name: cleanName,
+          slug,
+          plan: selectedPlan,
+          status: selectedStatus,
+          contactEmail: cleanEmail || null,
+          primaryColor: "#4055FF",
+          secondaryColor: "#FF2060",
+          accentColor: "#7033F0",
+          showPoweredBy: true,
+          authMethod: "otp",
+        } as any);
+      }
+      await storage.createActivityLog({
+        tenantId: null,
+        userId: req.session.userId ?? null,
+        action: "admin.tenant.created",
+        entityType: "tenant",
+        entityId: tenant.id,
+        details: { name: cleanName, plan: selectedPlan, email: cleanEmail || null },
+      });
+      res.status(201).json(tenant);
+    } catch (error: any) {
+      console.error("[admin/tenants] create failed", error);
+      res.status(500).json({ error: error?.message || "Unable to create agency" });
+    }
   });
 
   // Update tenant (admin)

@@ -33,7 +33,7 @@ import {
   tenantPaymentGatewayConfig as tenantPaymentGatewayConfigTable,
   tenantSmsConfig as tenantSmsConfigTable,
 } from "@shared/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
 import { db, hasDatabase } from "./db";
@@ -1898,6 +1898,29 @@ export class MemStorage implements IStorage {
 
 // HybridStorage: uses MemStorage for agency/seed data, PostgreSQL for B2C user data
 class HybridStorage extends MemStorage {
+  private tenantSchemaReady = false;
+
+  async ensureTenantTableShape(): Promise<void> {
+    if (this.tenantSchemaReady) return;
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS logo_url text`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS primary_color text DEFAULT '#00B4D8'`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS secondary_color text DEFAULT '#E056A0'`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS accent_color text DEFAULT '#0096C7'`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS contact_email text`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS contact_phone text`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS activities text[] DEFAULT '{}'::text[]`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS address text`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS country text`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS pin_code text`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS state text`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS district text`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS whatsapp_number text`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS show_powered_by boolean DEFAULT true`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS auth_method text DEFAULT 'otp'`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS created_at timestamp DEFAULT now()`);
+    this.tenantSchemaReady = true;
+  }
+
   // Seed demo users into PostgreSQL on startup so they persist reliably
   async seedDemoUsersToDb(): Promise<void> {
     const demoAccounts = [
