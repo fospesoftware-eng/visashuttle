@@ -101,7 +101,7 @@ export default function AdminTenantsPage() {
       (t.contactEmail ?? "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       t.slug.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || t.status === statusFilter;
-    const matchesPlan = planFilter === "all" || t.plan === planFilter;
+    const matchesPlan = planFilter === "all" || normalizeAgencyPlan(t.plan) === planFilter;
     return matchesSearch && matchesStatus && matchesPlan;
   });
 
@@ -195,7 +195,9 @@ export default function AdminTenantsPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full capitalize ${PLAN_COLORS[tenant.plan] ?? ""}`}>{tenant.plan}</span>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${PLAN_COLORS[tenant.plan] ?? ""}`}>
+                          {agencyPlanLabel(tenant.plan)}
+                        </span>
                       </TableCell>
                       <TableCell><StatusBadge status={tenant.status} /></TableCell>
                       <TableCell className="text-center">{tenant.userCount ?? 0}</TableCell>
@@ -384,8 +386,16 @@ export default function AdminTenantsPage() {
 }
 
 function normalizeAgencyPlan(plan?: string | null) {
+  if (plan === "starter") return "lite";
   if (plan === "professional") return "go";
   if (plan === "enterprise") return "power";
   if (plan === "go" || plan === "power") return plan;
   return "lite";
+}
+
+function agencyPlanLabel(plan?: string | null) {
+  const normalized = normalizeAgencyPlan(plan);
+  if (normalized === "go") return "Go";
+  if (normalized === "power") return "Power";
+  return "Lite";
 }

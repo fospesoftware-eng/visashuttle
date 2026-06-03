@@ -7757,6 +7757,14 @@ export async function registerRoutes(
     return PLAN_PRICING_USD[plan ?? ""] ?? 0;
   }
 
+  function toTenantStoragePlan(plan: unknown) {
+    const value = String(plan || "").trim().toLowerCase();
+    if (value === "lite" || value === "starter") return "starter";
+    if (value === "go" || value === "professional") return "professional";
+    if (value === "power" || value === "enterprise") return "enterprise";
+    return "starter";
+  }
+
   // Shared calendar-day window helper. A "days=N" window covers the last N
   // *full* calendar days ending tomorrow at 00:00 (i.e. today is included).
   // Returns symmetric current and previous windows so period-over-period
@@ -7975,9 +7983,7 @@ export async function registerRoutes(
       if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
         return res.status(400).json({ error: "Enter a valid agency admin email address" });
       }
-      const selectedPlan = ["lite", "go", "power", "starter", "professional", "enterprise"].includes(String(plan))
-        ? String(plan)
-        : "lite";
+      const selectedPlan = toTenantStoragePlan(plan);
       const selectedStatus = ["active", "pending", "suspended"].includes(String(status))
         ? String(status)
         : "active";
@@ -8081,6 +8087,7 @@ export async function registerRoutes(
       }
     }
     if (typeof data.contactEmail === "string") data.contactEmail = data.contactEmail.trim() || null;
+    if (Object.prototype.hasOwnProperty.call(data, "plan")) data.plan = toTenantStoragePlan(data.plan);
     if (Array.isArray(data.activities)) data.activities = data.activities.map((a) => String(a).trim()).filter(Boolean).slice(0, 12);
     const tenant = await storage.updateTenant(req.params.id, data as any);
     if (!tenant) return res.status(404).json({ error: "Tenant not found" });
