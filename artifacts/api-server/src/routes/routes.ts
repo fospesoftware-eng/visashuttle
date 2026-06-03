@@ -1,6 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "../storage";
+import { storage, isMissingRelationError } from "../storage";
 import { runVisaCheck, runDeepCheck, scanPassportImage, isPassportScanConfigured } from "../ai";
 import { registerApiPlatformRoutes } from "./api-platform";
 import { registerPlatformExtensions } from "./platform-extensions";

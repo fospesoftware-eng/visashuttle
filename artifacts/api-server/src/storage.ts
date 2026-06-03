@@ -89,7 +89,7 @@ function normalizePhone(input: string | null | undefined): string {
   return input.replace(/[^\d]/g, "");
 }
 
-function isMissingRelationError(error: unknown): boolean {
+export function isMissingRelationError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const err = error as { code?: string; message?: string; cause?: unknown };
   if (err.code === "42P01") return true;
@@ -104,7 +104,7 @@ function isMissingRelationError(error: unknown): boolean {
   return isMissingRelationError(err.cause);
 }
 
-function isMissingColumnError(error: unknown): boolean {
+export function isMissingColumnError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const err = error as { code?: string; message?: string; cause?: unknown };
   if (err.code === "42703") return true;
@@ -3967,7 +3967,7 @@ class HybridStorage extends MemStorage {
         enabled boolean NOT NULL DEFAULT false,
         updated_at timestamp DEFAULT now()
       )
-	    `);
+            `);
     await db.execute(sql`ALTER TABLE zeptomail_config ADD COLUMN IF NOT EXISTS domain text NOT NULL DEFAULT 'visashuttle.com'`);
     await db.execute(sql`ALTER TABLE zeptomail_config ADD COLUMN IF NOT EXISTS host text NOT NULL DEFAULT 'api.zeptomail.com'`);
     await db.execute(sql`ALTER TABLE zeptomail_config ADD COLUMN IF NOT EXISTS agent_alias text DEFAULT '448141e4788dab46'`);
