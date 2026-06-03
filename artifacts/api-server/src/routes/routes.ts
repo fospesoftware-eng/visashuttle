@@ -5,7 +5,7 @@ import { runVisaCheck, runDeepCheck, scanPassportImage, isPassportScanConfigured
 import { registerApiPlatformRoutes } from "./api-platform";
 import { registerPlatformExtensions } from "./platform-extensions";
 import express from "express";
-import { db } from "../db";
+import { db, pool } from "../db";
 import { sendOtp, verifyOtp, getSmsProviderStatus } from "../sms";
 import { getEntryRequirement } from "../shared/visa-free";
 import indiaVisaChanceDataset from "../shared/india_visa_chance_dataset_non_visa_free_2026.json" assert { type: "json" };
@@ -8001,49 +8001,50 @@ export async function registerRoutes(
         }
       }
 
-      const tenantRows: any = await db.execute(sql`
-        INSERT INTO tenants (
-          name,
+      let insertedTenant: any;
+      if (pool) {
+        const columnRows = await pool.query<{ column_name: string }>(
+          "select column_name from information_schema.columns where table_schema = current_schema() and table_name = 'tenants'"
+        );
+        const existingColumns = new Set(columnRows.rows.map((row) => row.column_name));
+        const insertValues: Record<string, unknown> = {
+          name: cleanName,
           slug,
-          plan,
-          status,
-          primary_color,
-          secondary_color,
-          accent_color,
-          contact_email,
-          show_powered_by,
-          auth_method
-        )
-        VALUES (
-          ${cleanName},
-          ${slug},
-          ${selectedPlan},
-          ${selectedStatus},
-          ${"#4055FF"},
-          ${"#FF2060"},
-          ${"#7033F0"},
-          ${cleanEmail || null},
-          ${true},
-          ${"otp"}
-        )
-        RETURNING
-          id,
-          name,
+          plan: selectedPlan,
+          status: selectedStatus,
+          primary_color: "#4055FF",
+          secondary_color: "#FF2060",
+          accent_color: "#7033F0",
+          contact_email: cleanEmail || null,
+          show_powered_by: true,
+          auth_method: "otp",
+        };
+        const insertColumns = Object.keys(insertValues).filter((column) => existingColumns.has(column));
+        if (!insertColumns.includes("name") || !insertColumns.includes("slug")) {
+          throw new Error("Tenants table is missing required agency columns");
+        }
+        const params = insertColumns.map((column) => insertValues[column]);
+        const quotedColumns = insertColumns.map((column) => `"${column}"`).join(", ");
+        const placeholders = insertColumns.map((_, index) => `$${index + 1}`).join(", ");
+        const result = await pool.query(
+          `insert into "tenants" (${quotedColumns}) values (${placeholders}) returning *`,
+          params
+        );
+        insertedTenant = result.rows[0];
+      } else {
+        insertedTenant = await storage.createTenant({
+          name: cleanName,
           slug,
-          logo_url,
-          plan,
-          status,
-          primary_color,
-          secondary_color,
-          accent_color,
-          contact_email,
-          contact_phone,
-          whatsapp_number,
-          show_powered_by,
-          auth_method,
-          created_at
-      `);
-      const insertedTenant = tenantRows?.rows?.[0] ?? tenantRows?.[0];
+          plan: selectedPlan,
+          status: selectedStatus,
+          contactEmail: cleanEmail || null,
+          primaryColor: "#4055FF",
+          secondaryColor: "#FF2060",
+          accentColor: "#7033F0",
+          showPoweredBy: true,
+          authMethod: "otp",
+        } as any);
+      }
       if (!insertedTenant) throw new Error("Agency could not be created");
       const tenant = {
         id: insertedTenant.id,
