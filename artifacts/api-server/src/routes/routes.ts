@@ -7975,6 +7975,12 @@ export async function registerRoutes(
       if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
         return res.status(400).json({ error: "Enter a valid agency admin email address" });
       }
+      const selectedPlan = ["lite", "go", "power", "starter", "professional", "enterprise"].includes(String(plan))
+        ? String(plan)
+        : "lite";
+      const selectedStatus = ["active", "pending", "suspended"].includes(String(status))
+        ? String(status)
+        : "active";
 
       const baseSlug = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") || `agency-${Date.now()}`;
       let slug = baseSlug;
@@ -7992,21 +7998,12 @@ export async function registerRoutes(
       const tenant = await storage.createTenant({
         name: cleanName,
         slug,
-        plan: plan ?? "lite",
-        status: status ?? "active",
+        plan: selectedPlan,
+        status: selectedStatus,
         contactEmail: cleanEmail || null,
-        logoUrl: null,
         primaryColor: "#4055FF",
         secondaryColor: "#FF2060",
         accentColor: "#7033F0",
-        contactPhone: null,
-        activities: [],
-        address: null,
-        country: null,
-        pinCode: null,
-        state: null,
-        district: null,
-        whatsappNumber: null,
         showPoweredBy: true,
         authMethod: "otp",
       } as any);
@@ -8032,7 +8029,7 @@ export async function registerRoutes(
         action: "admin.tenant.created",
         entityType: "tenant",
         entityId: tenant.id,
-        details: { name: cleanName, plan, email: cleanEmail || null, ownerUserId: ownerUser?.id ?? null },
+        details: { name: cleanName, plan: selectedPlan, email: cleanEmail || null, ownerUserId: ownerUser?.id ?? null },
       });
       const { password: _ignoredPassword, ...safeOwner } = ownerUser ?? {};
       res.status(201).json({ ...tenant, ownerUser: ownerUser ? safeOwner : null, temporaryPassword });
