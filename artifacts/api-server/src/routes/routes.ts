@@ -8001,18 +8001,67 @@ export async function registerRoutes(
         }
       }
 
-      const tenant = await storage.createTenant({
-        name: cleanName,
-        slug,
-        plan: selectedPlan,
-        status: selectedStatus,
-        contactEmail: cleanEmail || null,
-        primaryColor: "#4055FF",
-        secondaryColor: "#FF2060",
-        accentColor: "#7033F0",
-        showPoweredBy: true,
-        authMethod: "otp",
-      } as any);
+      const tenantRows: any = await db.execute(sql`
+        INSERT INTO tenants (
+          name,
+          slug,
+          plan,
+          status,
+          primary_color,
+          secondary_color,
+          accent_color,
+          contact_email,
+          show_powered_by,
+          auth_method
+        )
+        VALUES (
+          ${cleanName},
+          ${slug},
+          ${selectedPlan},
+          ${selectedStatus},
+          ${"#4055FF"},
+          ${"#FF2060"},
+          ${"#7033F0"},
+          ${cleanEmail || null},
+          ${true},
+          ${"otp"}
+        )
+        RETURNING
+          id,
+          name,
+          slug,
+          logo_url,
+          plan,
+          status,
+          primary_color,
+          secondary_color,
+          accent_color,
+          contact_email,
+          contact_phone,
+          whatsapp_number,
+          show_powered_by,
+          auth_method,
+          created_at
+      `);
+      const insertedTenant = tenantRows?.rows?.[0] ?? tenantRows?.[0];
+      if (!insertedTenant) throw new Error("Agency could not be created");
+      const tenant = {
+        id: insertedTenant.id,
+        name: insertedTenant.name,
+        slug: insertedTenant.slug,
+        logoUrl: insertedTenant.logo_url ?? null,
+        plan: insertedTenant.plan,
+        status: insertedTenant.status,
+        primaryColor: insertedTenant.primary_color ?? null,
+        secondaryColor: insertedTenant.secondary_color ?? null,
+        accentColor: insertedTenant.accent_color ?? null,
+        contactEmail: insertedTenant.contact_email ?? null,
+        contactPhone: insertedTenant.contact_phone ?? null,
+        whatsappNumber: insertedTenant.whatsapp_number ?? null,
+        showPoweredBy: insertedTenant.show_powered_by ?? true,
+        authMethod: insertedTenant.auth_method ?? "otp",
+        createdAt: insertedTenant.created_at ?? null,
+      };
 
       let ownerUser: any = null;
       let temporaryPassword: string | null = null;
