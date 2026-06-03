@@ -7979,6 +7979,7 @@ export async function registerRoutes(
       const { name, email, plan, status } = req.body;
       const cleanName = String(name || "").trim();
       const cleanEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+      const tenantId = randomUUID();
       if (!cleanName) return res.status(400).json({ error: "Agency name is required" });
       if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
         return res.status(400).json({ error: "Enter a valid agency admin email address" });
@@ -8008,6 +8009,7 @@ export async function registerRoutes(
         );
         const existingColumns = new Set(columnRows.rows.map((row) => row.column_name));
         const insertValues: Record<string, unknown> = {
+          id: tenantId,
           name: cleanName,
           slug,
           plan: selectedPlan,
@@ -8033,6 +8035,7 @@ export async function registerRoutes(
         insertedTenant = result.rows[0];
       } else {
         insertedTenant = await storage.createTenant({
+          id: tenantId,
           name: cleanName,
           slug,
           plan: selectedPlan,

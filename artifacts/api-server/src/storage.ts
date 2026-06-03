@@ -2366,6 +2366,29 @@ export class MemStorage implements IStorage {
 // development can still fall back to seeded in-memory data if a newly added
 // optional table has not been pushed yet.
 class HybridStorage extends MemStorage {
+  private tenantSchemaReady = false;
+
+  async ensureTenantTableShape(): Promise<void> {
+    if (this.tenantSchemaReady) return;
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS logo_url text`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS primary_color text DEFAULT '#00B4D8'`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS secondary_color text DEFAULT '#E056A0'`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS accent_color text DEFAULT '#0096C7'`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS contact_email text`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS contact_phone text`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS activities text[] DEFAULT '{}'::text[]`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS address text`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS country text`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS pin_code text`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS state text`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS district text`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS whatsapp_number text`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS show_powered_by boolean DEFAULT true`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS auth_method text DEFAULT 'otp'`);
+    await db.execute(sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS created_at timestamp DEFAULT now()`);
+    this.tenantSchemaReady = true;
+  }
+
   async ensureCounsellingTablesToDb(): Promise<void> {
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS counselling_students (
@@ -2572,7 +2595,11 @@ class HybridStorage extends MemStorage {
   }
 
   async createTenant(tenant: InsertTenant): Promise<Tenant> {
-    const rows = await db.insert(tenantsTable).values(tenant).returning();
+    await this.ensureTenantTableShape();
+    const rows = await db.insert(tenantsTable).values({
+      id: randomUUID(),
+      ...tenant,
+    } as any).returning();
     return rows[0];
   }
 
