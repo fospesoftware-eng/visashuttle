@@ -54,13 +54,18 @@ export default function AdminTenantsPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/admin/tenants", data),
-    onSuccess: () => {
+    mutationFn: async (data: any) => (await apiRequest("POST", "/api/admin/tenants", data)).json(),
+    onSuccess: (created: any) => {
       qc.invalidateQueries({ queryKey: ["/api/admin/tenants"] });
       qc.invalidateQueries({ queryKey: ["/api/admin/stats"] });
       setIsCreateOpen(false);
       setForm({ name: "", email: "", plan: "lite", status: "active" });
-      toast({ title: "Agency created", description: "The agency has been created and is ready to use." });
+      toast({
+        title: "Agency created",
+        description: created?.temporaryPassword
+          ? `Owner login created. Temporary password: ${created.temporaryPassword}`
+          : "The agency has been created and is ready to use.",
+      });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });

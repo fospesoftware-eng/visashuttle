@@ -7967,33 +7967,81 @@ export async function registerRoutes(
 
   // Create tenant (admin)
   app.post("/api/admin/tenants", requireAdminAuth, async (req, res) => {
-    const { name, email, plan, status } = req.body;
-    if (!name) return res.status(400).json({ error: "Agency name is required" });
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-    const tenant = await storage.createTenant({
-      name,
-      slug,
-      plan: plan ?? "lite",
-      status: status ?? "active",
-      contactEmail: email ?? null,
-      logoUrl: null,
-      primaryColor: "#4055FF",
-      secondaryColor: "#FF2060",
-      accentColor: "#7033F0",
-      contactPhone: null,
-      whatsappNumber: null,
-      showPoweredBy: true,
-      authMethod: "otp",
-    });
-    await storage.createActivityLog({
-      tenantId: null,
-      userId: req.session.userId ?? null,
-      action: "admin.tenant.created",
-      entityType: "tenant",
-      entityId: tenant.id,
-      details: { name, plan, email },
-    });
-    res.status(201).json(tenant);
+    try {
+      const { name, email, plan, status } = req.body;
+      const cleanName = String(name || "").trim();
+      const cleanEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+      if (!cleanName) return res.status(400).json({ error: "Agency name is required" });
+      if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+        return res.status(400).json({ error: "Enter a valid agency admin email address" });
+      }
+
+      const baseSlug = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") || `agency-${Date.now()}`;
+      let slug = baseSlug;
+      for (let index = 2; await storage.getTenantBySlug(slug); index++) {
+        slug = `${baseSlug}-${index}`;
+      }
+
+      if (cleanEmail) {
+        const existingUser = await storage.getUserByEmail(cleanEmail);
+        if (existingUser) {
+          return res.status(409).json({ error: "A user with this agency admin email already exists. Use a different email or edit that user." });
+        }
+      }
+
+      const tenant = await storage.createTenant({
+        name: cleanName,
+        slug,
+        plan: plan ?? "lite",
+        status: status ?? "active",
+        contactEmail: cleanEmail || null,
+        logoUrl: null,
+        primaryColor: "#4055FF",
+        secondaryColor: "#FF2060",
+        accentColor: "#7033F0",
+        contactPhone: null,
+        activities: [],
+        address: null,
+        country: null,
+        pinCode: null,
+        state: null,
+        district: null,
+        whatsappNumber: null,
+        showPoweredBy: true,
+        authMethod: "otp",
+      } as any);
+
+      let ownerUser: any = null;
+      let temporaryPassword: string | null = null;
+      if (cleanEmail) {
+        temporaryPassword = `VisaDesk@${randomBytes(3).toString("hex")}`;
+        ownerUser = await storage.createUser({
+          email: cleanEmail,
+          password: await bcrypt.hash(temporaryPassword, 10),
+          name: cleanName,
+          role: "agency_owner",
+          tenantId: tenant.id,
+          avatarUrl: null,
+          permissions: [],
+        } as any);
+      }
+
+      await storage.createActivityLog({
+        tenantId: null,
+        userId: req.session.userId ?? null,
+        action: "admin.tenant.created",
+        entityType: "tenant",
+        entityId: tenant.id,
+        details: { name: cleanName, plan, email: cleanEmail || null, ownerUserId: ownerUser?.id ?? null },
+      });
+      const { password: _ignoredPassword, ...safeOwner } = ownerUser ?? {};
+      res.status(201).json({ ...tenant, ownerUser: ownerUser ? safeOwner : null, temporaryPassword });
+    } catch (error: any) {
+      req.log.error({ err: error }, "[admin/tenants] create failed");
+      if (error?.code === "23505") return res.status(409).json({ error: "Agency URL or admin email already exists" });
+      if (isMissingRelationError(error)) return res.status(503).json({ error: "Database tables are not ready. Please restart the app or run the database schema push." });
+      res.status(500).json({ error: error?.message || "Unable to create agency" });
+    }
   });
 
   // Update tenant (admin)
