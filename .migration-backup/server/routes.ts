@@ -4796,7 +4796,11 @@ export async function registerRoutes(
       const tenantId = randomUUID();
       const baseSlug = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") || `agency-${Date.now()}`;
       let slug = baseSlug;
-      for (let index = 2; await storage.getTenantBySlug(slug); index++) {
+      for (let index = 2; ; index++) {
+        const existingSlug = pool
+          ? (await pool.query("select id from tenants where slug = $1 limit 1", [slug])).rows[0]
+          : await storage.getTenantBySlug(slug);
+        if (!existingSlug) break;
         slug = `${baseSlug}-${index}`;
       }
 
@@ -4819,14 +4823,26 @@ export async function registerRoutes(
         await pool.query(`alter table tenants add column if not exists auth_method text default 'otp'`);
         await pool.query(`alter table tenants add column if not exists created_at timestamp default now()`);
 
-        const result = await pool.query(
-          `insert into tenants (
-            id, name, slug, plan, status, primary_color, secondary_color, accent_color,
-            contact_email, show_powered_by, auth_method
-          ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning *`,
-          [tenantId, cleanName, slug, selectedPlan, selectedStatus, "#4055FF", "#FF2060", "#7033F0", cleanEmail || null, true, "otp"]
-        );
-        const row = result.rows[0];
+        const planCandidates = Array.from(new Set([selectedPlan, String(plan || "").trim().toLowerCase(), "lite", "starter", "go", "professional", "power", "enterprise"].filter(Boolean)));
+        let row: any = null;
+        let lastInsertError: any = null;
+        for (const candidatePlan of planCandidates) {
+          try {
+            const result = await pool.query(
+              `insert into tenants (
+                id, name, slug, plan, status, primary_color, secondary_color, accent_color,
+                contact_email, show_powered_by, auth_method
+              ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) returning *`,
+              [tenantId, cleanName, slug, candidatePlan, selectedStatus, "#4055FF", "#FF2060", "#7033F0", cleanEmail || null, true, "otp"]
+            );
+            row = result.rows[0];
+            break;
+          } catch (insertError: any) {
+            lastInsertError = insertError;
+            if (!["23514", "23502"].includes(String(insertError?.code))) throw insertError;
+          }
+        }
+        if (!row && lastInsertError) throw lastInsertError;
         tenant = {
           id: row.id,
           name: row.name,

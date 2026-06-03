@@ -7991,14 +7991,22 @@ export async function registerRoutes(
 
       const baseSlug = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") || `agency-${Date.now()}`;
       let slug = baseSlug;
-      for (let index = 2; await storage.getTenantBySlug(slug); index++) {
+      for (let index = 2; ; index++) {
+        const existingSlug = pool
+          ? (await pool.query("select id from tenants where slug = $1 limit 1", [slug])).rows[0]
+          : await storage.getTenantBySlug(slug);
+        if (!existingSlug) break;
         slug = `${baseSlug}-${index}`;
       }
 
-      if (cleanEmail) {
-        const existingUser = await storage.getUserByEmail(cleanEmail);
-        if (existingUser) {
-          return res.status(409).json({ error: "A user with this agency admin email already exists. Use a different email or edit that user." });
+      if (cleanEmail && pool) {
+        try {
+          const existingUser = (await pool.query("select id from users where lower(email) = lower($1) limit 1", [cleanEmail])).rows[0];
+          if (existingUser) {
+            req.log.warn({ email: cleanEmail }, "[admin/tenants] owner email already exists; agency will be created without owner user");
+          }
+        } catch (userLookupError: any) {
+          req.log.warn({ err: userLookupError, email: cleanEmail }, "[admin/tenants] owner duplicate lookup skipped");
         }
       }
 
@@ -8008,11 +8016,10 @@ export async function registerRoutes(
           "select column_name from information_schema.columns where table_schema = current_schema() and table_name = 'tenants'"
         );
         const existingColumns = new Set(columnRows.rows.map((row) => row.column_name));
-        const insertValues: Record<string, unknown> = {
+        const baseInsertValues: Record<string, unknown> = {
           id: tenantId,
           name: cleanName,
           slug,
-          plan: selectedPlan,
           status: selectedStatus,
           primary_color: "#4055FF",
           secondary_color: "#FF2060",
@@ -8021,18 +8028,32 @@ export async function registerRoutes(
           show_powered_by: true,
           auth_method: "otp",
         };
-        const insertColumns = Object.keys(insertValues).filter((column) => existingColumns.has(column));
-        if (!insertColumns.includes("name") || !insertColumns.includes("slug")) {
-          throw new Error("Tenants table is missing required agency columns");
+        const planCandidates = Array.from(new Set([selectedPlan, String(plan || "").trim().toLowerCase(), "lite", "starter", "go", "professional", "power", "enterprise"].filter(Boolean)));
+        let lastInsertError: any = null;
+        for (const candidatePlan of planCandidates) {
+          const insertValues = { ...baseInsertValues, plan: candidatePlan };
+          const insertColumns = Object.keys(insertValues).filter((column) => existingColumns.has(column));
+          if (!insertColumns.includes("name") || !insertColumns.includes("slug")) {
+            throw new Error("Tenants table is missing required agency columns");
+          }
+          const params = insertColumns.map((column) => insertValues[column]);
+          const quotedColumns = insertColumns.map((column) => `"${column}"`).join(", ");
+          const placeholders = insertColumns.map((_, index) => `$${index + 1}`).join(", ");
+          try {
+            const result = await pool.query(
+              `insert into "tenants" (${quotedColumns}) values (${placeholders}) returning *`,
+              params
+            );
+            insertedTenant = result.rows[0];
+            break;
+          } catch (insertError: any) {
+            lastInsertError = insertError;
+            if (!["23514", "23502"].includes(String(insertError?.code))) throw insertError;
+          }
         }
-        const params = insertColumns.map((column) => insertValues[column]);
-        const quotedColumns = insertColumns.map((column) => `"${column}"`).join(", ");
-        const placeholders = insertColumns.map((_, index) => `$${index + 1}`).join(", ");
-        const result = await pool.query(
-          `insert into "tenants" (${quotedColumns}) values (${placeholders}) returning *`,
-          params
-        );
-        insertedTenant = result.rows[0];
+        if (!insertedTenant && lastInsertError) {
+          throw lastInsertError;
+        }
       } else {
         insertedTenant = await storage.createTenant({
           id: tenantId,
