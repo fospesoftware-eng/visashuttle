@@ -5348,6 +5348,10 @@ export async function registerRoutes(
     return /\bactive\b/.test(value);
   }
 
+  function isActiveRegistryCheck(registry: any): boolean {
+    return Boolean(registry?.matched && (registry.is_active === true || isMeaActiveStatus(registry.status)));
+  }
+
   function findMeaUnregisteredAgencyGrievance(fields: Record<string, unknown>, manualText: string) {
     const agencyName = normalizeAgencyLookup(fields.agencyName);
     const inputText = `${Object.values(fields).join(" ")} ${manualText || ""}`;
@@ -5629,11 +5633,21 @@ export async function registerRoutes(
         if (grievance.matched) {
           const grievanceCount = Number(grievance.grievance_count || 0);
           const grievanceLine = `Unregistered-agency grievance list match: ${grievance.agency_name || "Agency"} - status: ${grievance.status}; grievance count: ${grievance.grievance_count ?? "listed"}; source updated as on ${grievance.updated_as_on}.`;
-          result.risk_score = Math.min(result.risk_score, grievanceCount >= 3 ? 10 : grievanceCount >= 2 ? 15 : 20);
+          const activeRegistryMatched = isActiveRegistryCheck(result.official_registry_check);
+          result.risk_score = activeRegistryMatched
+            ? Math.max(result.risk_score, 85)
+            : Math.min(result.risk_score, grievanceCount >= 3 ? 10 : grievanceCount >= 2 ? 15 : 20);
           result.risk_level = normalizeRiskLevel("", result.risk_score);
-          result.red_flags = [grievanceLine, ...result.red_flags].slice(0, 12);
+          result.red_flags = [
+            activeRegistryMatched
+              ? `${grievanceLine} The agency also has an active MEA/eMigrate RA match, so the official active registry status is treated as the primary score signal; still verify the exact branch/contact/payment details.`
+              : grievanceLine,
+            ...result.red_flags,
+          ].slice(0, 12);
           result.recommended_next_steps = [
-            `Treat the grievance-list match as a serious negative signal${grievance.grievance_count ? ` (${grievance.grievance_count} grievance${grievance.grievance_count === 1 ? "" : "s"} recorded)` : ""}; do not make any payment until independently verified.`,
+            activeRegistryMatched
+              ? "Because an active MEA/eMigrate RA match was found, verify the exact RA ID, office, contact person, and payment account before proceeding."
+              : `Treat the grievance-list match as a serious negative signal${grievance.grievance_count ? ` (${grievance.grievance_count} grievance${grievance.grievance_count === 1 ? "" : "s"} recorded)` : ""}; do not make any payment until independently verified.`,
             "Verify the agency directly through official MEA/eMigrate channels and confirm the exact contact person, bank account, and offer details.",
             ...result.recommended_next_steps,
           ].slice(0, 10);
@@ -7644,11 +7658,13 @@ export async function registerRoutes(
       let displayScore = check.toolType === "scholarship_finder" && Number.isFinite(rawCapacityScore)
         ? Math.max(0, Math.min(100, Math.round(rawCapacityScore)))
         : normalizedRiskScore;
-      if (check.toolType === "fake_agency" && grievance?.matched) {
+      if (check.toolType === "fake_agency" && isActiveRegistryCheck(registry)) {
+        displayScore = Math.max(displayScore, 85);
+      } else if (check.toolType === "fake_agency" && grievance?.matched) {
         const grievanceCount = Number(grievance.grievance_count || 0);
         displayScore = Math.min(displayScore, grievanceCount >= 3 ? 10 : grievanceCount >= 2 ? 15 : 20);
       } else if (check.toolType === "fake_agency" && registry?.matched) {
-        displayScore = registry.is_active ? Math.max(displayScore, 85) : Math.min(displayScore, 40);
+        displayScore = Math.min(displayScore, 40);
       }
       const scoreTitle = check.toolType === "scholarship_finder" ? "Scholarship Fit Score" : "Safety Score";
       const scoreHelp = check.toolType === "scholarship_finder" ? "Higher means stronger scholarship fit" : "Higher means safer to proceed";

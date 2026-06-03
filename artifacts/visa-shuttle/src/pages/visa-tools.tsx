@@ -162,6 +162,11 @@ function clampScore(value: unknown) {
   return Math.max(0, Math.min(100, Math.round(score)));
 }
 
+function isActiveRegistryMatch(registry: any) {
+  const status = String(registry?.status || "").toLowerCase();
+  return Boolean(registry?.matched && (registry?.is_active === true || /\bactive\b/.test(status)) && !/\b(expired|dormant|cancelled|canceled|suspended|de-activated|deactivated)\b/.test(status));
+}
+
 export function visaToolDisplayScore(check: Pick<VisaToolCheck, "toolType" | "riskScore" | "claudeResponseJson">) {
   const outputScore = check.claudeResponseJson?.risk_score;
   const score = clampScore(check.riskScore ?? outputScore);
@@ -172,13 +177,16 @@ export function visaToolDisplayScore(check: Pick<VisaToolCheck, "toolType" | "ri
     return clampScore(check.claudeResponseJson.student_capacity_score);
   }
 
+  if (check.toolType === "fake_agency" && isActiveRegistryMatch(registry)) {
+    return clampScore(Math.max(score, 85));
+  }
+
   if (check.toolType === "fake_agency" && grievance?.matched) {
     const grievanceCount = Number(grievance.grievance_count || 0);
     return clampScore(Math.min(score, grievanceCount >= 3 ? 10 : grievanceCount >= 2 ? 15 : 20));
   }
 
   if (check.toolType === "fake_agency" && registry?.matched) {
-    if (registry.is_active) return clampScore(Math.max(score, 85));
     return clampScore(Math.min(score, 40));
   }
 
