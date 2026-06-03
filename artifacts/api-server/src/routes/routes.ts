@@ -5277,14 +5277,12 @@ export async function registerRoutes(
 
   function normalizeRiskLevel(value: unknown, score: number): string {
     const raw = String(value || "").toLowerCase();
-    if (raw.includes("critical")) return "Critical";
-    if (raw.includes("high")) return "High";
-    if (raw.includes("medium")) return "Medium";
-    if (raw.includes("low")) return "Low";
-    if (score >= 85) return "Critical";
-    if (score >= 65) return "High";
-    if (score >= 35) return "Medium";
-    return "Low";
+    if (score >= 85) return "Good to go";
+    if (score >= 65) return "Good";
+    if (score >= 40) return "Needs Review";
+    if (score >= 20) return "High Risk";
+    if (raw.includes("good to go") || raw.includes("strong") || raw.includes("low risk")) return "Needs Review";
+    return "Critical Risk";
   }
 
   function summarizeVisaToolInput(toolType: string, fields: Record<string, unknown>, manualText: string): string {
@@ -5558,6 +5556,7 @@ export async function registerRoutes(
       : payload.toolType === "fake_agency"
         ? [
           "This is a fake agency detector request.",
+          "For Visa Shuttle, risk_score must be used as a trust/safety score from 0 to 100: 0 means extremely suspicious, 100 means strongest positive trust signal. Higher is better.",
           "The agencyName field is the primary agency identity selected from the dropdown or entered manually. Always consider that agency name in the analysis.",
           "Use official_registry_check as a positive reputed MEA/eMigrate registered recruiting-agent signal whenever matched, but check and mention the current status. Active status should improve the trust assessment. Dormant, expired, or non-active status should be treated as a caution even though the name is listed.",
           "Use unregistered_agency_grievance_check as a strong negative signal when matched. Clearly mention the grievance count and status in red flags and next steps.",
@@ -5568,7 +5567,7 @@ export async function registerRoutes(
         ? [
           "This is a scholarship finder and student capacity assessment.",
           "Assess the student's academic, language, budget, achievements, work/research and destination fit.",
-          "Use risk_score as an inverse scholarship opportunity risk: 0 means excellent funding fit, 100 means very weak funding fit. Also return student_capacity_score from 0 to 100 where higher means stronger scholarship capacity.",
+          "For Visa Shuttle, risk_score must be used as a scholarship fit score from 0 to 100: 0 means very weak funding fit, 100 means excellent scholarship capacity. Higher is better. Also return student_capacity_score from 0 to 100 where higher means stronger scholarship capacity.",
           "List realistic scholarship opportunities across the world by country, funding type and likely eligibility. Do not invent guaranteed scholarships or exact awards unless generally known; use cautious wording such as 'possible fit', 'likely eligible if criteria are met', or 'research further'.",
           "Return extra JSON keys: student_capacity_score, scholarship_fit_level, recommended_countries, scholarship_matches, eligibility_gaps, funding_strategy, application_timeline.",
           "Each scholarship_matches item should include country, scholarship_name, provider, funding_type, estimated_coverage, fit_score, eligibility_notes, deadline_guidance, official_search_terms.",
@@ -5580,6 +5579,7 @@ export async function registerRoutes(
       text: [
         "Analyze this Visa Shuttle AI check request. Return strict JSON only, matching the expected schema.",
         "Never say the document, agency, offer, or scheme is 100% fake or 100% genuine. Use risk-based language only.",
+        "Important scoring rule: risk_score is displayed to users as a positive safety/confidence score. 0 means very risky or weak. 100 means strongest positive signal. Higher is better.",
         toolSpecificInstruction,
         JSON.stringify(promptPayload, null, 2),
       ].join("\n\n"),
@@ -5607,7 +5607,7 @@ export async function registerRoutes(
           ? `MEA/eMigrate reputed RA registry match: ${registry.agency_name || "Registered Agent"} (${registry.raid || "RA ID not listed"}) - status: ${registry.status}; source updated as on ${registry.updated_as_on}.`
           : `MEA/eMigrate RA registry check: ${registry.status}; source updated as on ${registry.updated_as_on}. ${registry.note}`;
         if (registry.matched) {
-          result.risk_score = Math.min(result.risk_score, registry.is_active ? 45 : 60);
+          result.risk_score = registry.is_active ? Math.max(result.risk_score, 85) : Math.min(result.risk_score, 40);
           result.risk_level = normalizeRiskLevel("", result.risk_score);
           result.positive_indicators = [statusLine, ...result.positive_indicators].slice(0, 12);
           if (!registry.is_active) {
@@ -5617,7 +5617,7 @@ export async function registerRoutes(
             ].slice(0, 12);
           }
         } else {
-          result.risk_score = Math.max(result.risk_score, 55);
+          result.risk_score = Math.min(result.risk_score, 55);
           result.risk_level = normalizeRiskLevel("", result.risk_score);
           result.red_flags = [statusLine, ...result.red_flags].slice(0, 12);
         }
@@ -5629,7 +5629,7 @@ export async function registerRoutes(
         if (grievance.matched) {
           const grievanceCount = Number(grievance.grievance_count || 0);
           const grievanceLine = `Unregistered-agency grievance list match: ${grievance.agency_name || "Agency"} - status: ${grievance.status}; grievance count: ${grievance.grievance_count ?? "listed"}; source updated as on ${grievance.updated_as_on}.`;
-          result.risk_score = Math.max(result.risk_score, grievanceCount >= 3 ? 95 : grievanceCount >= 2 ? 90 : 85);
+          result.risk_score = Math.min(result.risk_score, grievanceCount >= 3 ? 10 : grievanceCount >= 2 ? 15 : 20);
           result.risk_level = normalizeRiskLevel("", result.risk_score);
           result.red_flags = [grievanceLine, ...result.red_flags].slice(0, 12);
           result.recommended_next_steps = [
@@ -7638,7 +7638,18 @@ export async function registerRoutes(
       const toolLabel = output.tool_label || VISA_TOOL_LABELS[check.toolType] || check.toolType;
       const rawRiskScore = Number(check.riskScore ?? output.risk_score ?? 0);
       const normalizedRiskScore = Number.isFinite(rawRiskScore) ? Math.max(0, Math.min(100, Math.round(rawRiskScore))) : 0;
-      const displayScore = Math.max(0, Math.min(100, 100 - normalizedRiskScore));
+      const registry = output.official_registry_check;
+      const grievance = output.unregistered_agency_grievance_check;
+      const rawCapacityScore = Number(output.student_capacity_score);
+      let displayScore = check.toolType === "scholarship_finder" && Number.isFinite(rawCapacityScore)
+        ? Math.max(0, Math.min(100, Math.round(rawCapacityScore)))
+        : normalizedRiskScore;
+      if (check.toolType === "fake_agency" && grievance?.matched) {
+        const grievanceCount = Number(grievance.grievance_count || 0);
+        displayScore = Math.min(displayScore, grievanceCount >= 3 ? 10 : grievanceCount >= 2 ? 15 : 20);
+      } else if (check.toolType === "fake_agency" && registry?.matched) {
+        displayScore = registry.is_active ? Math.max(displayScore, 85) : Math.min(displayScore, 40);
+      }
       const scoreTitle = check.toolType === "scholarship_finder" ? "Scholarship Fit Score" : "Safety Score";
       const scoreHelp = check.toolType === "scholarship_finder" ? "Higher means stronger scholarship fit" : "Higher means safer to proceed";
       const displayLevel = (() => {
@@ -7688,7 +7699,7 @@ export async function registerRoutes(
 
       doc.rect(0, 0, doc.page.width, 92).fill("#F8FAFC");
       doc.fillColor("#4055FF").fontSize(10).text("Visa Shuttle", 48, 28, { width: pageWidth });
-      doc.fillColor("#0F172A").fontSize(22).text("Visa Tools AI Risk Report", 48, 45, { width: pageWidth });
+      doc.fillColor("#0F172A").fontSize(22).text("Visa Tools AI Safety Report", 48, 45, { width: pageWidth });
       doc.moveDown(2.6);
 
       doc.fontSize(15).fillColor("#0F172A").text(toolLabel, { width: pageWidth });
@@ -7822,7 +7833,7 @@ export async function registerRoutes(
     const suspicious = checks.filter((check) => {
       const score = check.riskScore ?? 0;
       const level = String(check.riskLevel || "").toLowerCase();
-      return score >= 65 || level === "high" || level === "critical";
+      return score < 40 || level.includes("high risk") || level.includes("critical");
     });
     const usageByTool = checks.reduce<Record<string, number>>((acc, check) => {
       const label = VISA_TOOL_LABELS[check.toolType] || check.toolType;

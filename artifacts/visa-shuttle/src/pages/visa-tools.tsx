@@ -164,8 +164,25 @@ function clampScore(value: unknown) {
 
 export function visaToolDisplayScore(check: Pick<VisaToolCheck, "toolType" | "riskScore" | "claudeResponseJson">) {
   const outputScore = check.claudeResponseJson?.risk_score;
-  const riskScore = clampScore(check.riskScore ?? outputScore);
-  return clampScore(100 - riskScore);
+  const score = clampScore(check.riskScore ?? outputScore);
+  const registry = check.claudeResponseJson?.official_registry_check;
+  const grievance = check.claudeResponseJson?.unregistered_agency_grievance_check;
+
+  if (check.toolType === "scholarship_finder" && check.claudeResponseJson?.student_capacity_score !== undefined) {
+    return clampScore(check.claudeResponseJson.student_capacity_score);
+  }
+
+  if (check.toolType === "fake_agency" && grievance?.matched) {
+    const grievanceCount = Number(grievance.grievance_count || 0);
+    return clampScore(Math.min(score, grievanceCount >= 3 ? 10 : grievanceCount >= 2 ? 15 : 20));
+  }
+
+  if (check.toolType === "fake_agency" && registry?.matched) {
+    if (registry.is_active) return clampScore(Math.max(score, 85));
+    return clampScore(Math.min(score, 40));
+  }
+
+  return score;
 }
 
 export function visaToolScoreTitle(toolType?: string | null) {

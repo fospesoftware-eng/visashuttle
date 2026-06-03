@@ -647,7 +647,7 @@ function ResultPanel({ check }: { check: VisaToolCheck | null }) {
                     <h4 className="text-sm font-bold text-slate-950 dark:text-white">Student scholarship capacity</h4>
                     <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{output.scholarship_fit_level || "AI-assisted capacity assessment"}</p>
                   </div>
-                  <Badge className="border-0 bg-[#4055FF] text-white">{output.student_capacity_score ?? (100 - (check.riskScore ?? 50))}% capacity</Badge>
+                  <Badge className="border-0 bg-[#4055FF] text-white">{output.student_capacity_score ?? displayScore}% capacity</Badge>
                 </div>
                 {(output.recommended_countries || []).length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2">
