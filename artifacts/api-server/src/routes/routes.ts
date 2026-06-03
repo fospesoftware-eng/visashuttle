@@ -7624,6 +7624,96 @@ export async function registerRoutes(
     res.json(check);
   });
 
+  app.get("/api/b2c/visa-tools/checks/:id/pdf", requireB2cAuth, async (req, res) => {
+    const userId = req.session.b2cUserId!;
+    const check = await storage.getVisaToolCheck(req.params.id);
+    if (!check || check.userId !== userId) {
+      return res.status(404).json({ error: "Visa tool check not found" });
+    }
+
+    try {
+      const PDFDocumentMod: any = await import("pdfkit");
+      const PDFDocument = PDFDocumentMod.default ?? PDFDocumentMod;
+      const output: any = check.claudeResponseJson || {};
+      const toolLabel = output.tool_label || VISA_TOOL_LABELS[check.toolType] || check.toolType;
+      const riskScore = check.riskScore ?? output.risk_score ?? 0;
+      const riskLevel = check.riskLevel || output.risk_level || "Unknown";
+      const filename = `visa-tools-${String(check.toolType || "report").replace(/[^a-z0-9_-]+/gi, "-")}-${check.id}.pdf`;
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+      const doc = new PDFDocument({ size: "A4", margin: 48 });
+      doc.pipe(res);
+
+      const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+      const line = () => {
+        doc.moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.margins.left + pageWidth, doc.y).strokeColor("#E2E8F0").stroke();
+      };
+      const section = (title: string) => {
+        doc.moveDown(0.8);
+        doc.fontSize(13).fillColor("#0F172A").text(title, { width: pageWidth });
+        doc.moveDown(0.35);
+      };
+      const paragraph = (value: unknown) => {
+        const text = String(value || "").trim();
+        if (!text) return;
+        doc.fontSize(10).fillColor("#475569").text(text, { width: pageWidth, lineGap: 3 });
+      };
+      const bulletList = (items: unknown) => {
+        const list = Array.isArray(items) ? items : [];
+        if (!list.length) {
+          paragraph("No items listed.");
+          return;
+        }
+        for (const item of list.slice(0, 20)) {
+          doc.fontSize(10).fillColor("#475569").text(`• ${String(item)}`, { width: pageWidth, lineGap: 3 });
+        }
+      };
+
+      doc.rect(0, 0, doc.page.width, 92).fill("#F8FAFC");
+      doc.fillColor("#4055FF").fontSize(10).text("Visa Shuttle", 48, 28, { width: pageWidth });
+      doc.fillColor("#0F172A").fontSize(22).text("Visa Tools AI Risk Report", 48, 45, { width: pageWidth });
+      doc.moveDown(2.6);
+
+      doc.fontSize(15).fillColor("#0F172A").text(toolLabel, { width: pageWidth });
+      doc.moveDown(0.25);
+      doc.fontSize(10).fillColor("#64748B").text(`Generated: ${new Date(check.createdAt || Date.now()).toLocaleString()}`, { width: pageWidth });
+      doc.moveDown(0.5);
+      line();
+
+      section(check.toolType === "scholarship_finder" ? "Fit Score" : "Risk Score");
+      doc.fontSize(30).fillColor("#0F172A").text(`${riskScore}`, { continued: true });
+      doc.fontSize(12).fillColor("#64748B").text(` / 100 · ${riskLevel}`);
+      paragraph(check.inputSummary || output.summary || "Visa Tools check");
+
+      section("Summary");
+      paragraph(output.summary || output.explanation || "No summary available.");
+
+      section("Red Flags");
+      bulletList(output.red_flags);
+
+      section("Positive Indicators");
+      bulletList(output.positive_indicators);
+
+      section("Recommended Next Steps");
+      bulletList(output.recommended_next_steps || output.next_steps);
+
+      if (Array.isArray(output.documents_to_fix) && output.documents_to_fix.length) {
+        section("Documents To Fix");
+        bulletList(output.documents_to_fix);
+      }
+
+      section("Disclaimer");
+      paragraph(output.disclaimer || "This is an AI-assisted risk analysis only. Please verify with official government, employer, institution, or agency sources. It must not be treated as legal or government verification.");
+
+      doc.end();
+    } catch (err: any) {
+      console.error("[Visa Tools PDF] Error:", err);
+      if (!res.headersSent) res.status(500).json({ error: err?.message || "Failed to generate Visa Tools PDF" });
+    }
+  });
+
   app.post("/api/b2c/visa-tools/analyze", requireB2cAuth, async (req, res) => {
     const userId = req.session.b2cUserId!;
     const user = await storage.getB2cUser(userId);

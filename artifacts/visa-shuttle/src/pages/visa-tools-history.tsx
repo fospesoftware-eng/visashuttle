@@ -9,6 +9,16 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { riskColor, tools, type VisaToolCheck } from "@/pages/visa-tools";
 
+function downloadVisaToolReportPdf(checkId: string) {
+  const link = document.createElement("a");
+  link.href = `/api/b2c/visa-tools/checks/${checkId}/pdf`;
+  link.download = "";
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
 function ToolReport({ check }: { check: VisaToolCheck }) {
   const output = check.claudeResponseJson || {};
 
@@ -30,7 +40,7 @@ function ToolReport({ check }: { check: VisaToolCheck }) {
             <Clock className="h-3.5 w-3.5" />
             {new Date(check.createdAt).toLocaleString()}
           </div>
-          <Button variant="outline" className="mt-5 gap-2" onClick={() => window.print()}>
+          <Button variant="outline" className="mt-5 gap-2" onClick={() => downloadVisaToolReportPdf(check.id)}>
             <Download className="h-4 w-4" />
             Download Report PDF
           </Button>

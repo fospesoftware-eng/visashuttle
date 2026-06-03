@@ -141,6 +141,16 @@ const VISA_TOOL_TYPE_ALIASES: Record<string, string> = {
   "scholorship-finder": "scholarship_finder",
 };
 
+function downloadVisaToolReportPdf(checkId: string) {
+  const link = document.createElement("a");
+  link.href = `/api/b2c/visa-tools/checks/${checkId}/pdf`;
+  link.download = "";
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
 function normalizeVisaToolType(value?: string | null) {
   const raw = String(value || "").trim().toLowerCase();
   const normalized = raw.replace(/\s+/g, "_");
@@ -835,7 +845,7 @@ function ResultPanel({ check }: { check: VisaToolCheck | null }) {
               {output.disclaimer || "This is an AI-assisted risk analysis only. Please verify with official government or employer sources."}
             </div>
 
-            <Button variant="outline" className="gap-2 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-100 dark:hover:bg-slate-800" onClick={() => window.print()}>
+            <Button variant="outline" className="gap-2 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-100 dark:hover:bg-slate-800" onClick={() => downloadVisaToolReportPdf(check.id)}>
               <Download className="h-4 w-4" />
               Download Report PDF
             </Button>
