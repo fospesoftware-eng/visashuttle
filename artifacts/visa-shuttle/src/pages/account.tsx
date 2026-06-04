@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import {
   PlaneTakeoff, Crown, User, Clock, TrendingUp, CheckCircle, AlertCircle,
   ArrowRight, Plus, Brain, BarChart3, Zap, FileText, Bell, ChevronRight, BookUser,
-  MailCheck, X
+  MailCheck
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -193,7 +193,6 @@ function OnboardingModal({ onDone }: { onDone: () => void }) {
 export default function AccountPage() {
   const { user, isLoading: authLoading, checksRemaining, canCheck } = useB2cAuth();
   const [, setLocation] = useLocation();
-  const [emailBannerDismissed, setEmailBannerDismissed] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const { toast } = useToast();
 
@@ -239,35 +238,9 @@ export default function AccountPage() {
     !user.deepCheckAccess && { type: "tip", msg: `Deep Check reveals embassy-style risk analysis for ${deepCheckPrice}.` },
   ].filter(Boolean) as { type: string; msg: string }[];
 
-  const showEmailBanner = user && !user.emailVerified && !emailBannerDismissed;
-
   return (
     <>
     {showOnboarding && <OnboardingModal onDone={() => {}} />}
-    {showEmailBanner && (
-      <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-white px-4 py-3 flex items-center gap-3 shadow-md">
-        <MailCheck className="w-5 h-5 shrink-0" />
-        <div className="flex-1 text-sm font-medium">
-          {emailSent
-            ? "Verification email sent! Check your inbox and spam/junk folder."
-            : <>Verify your email to use Basic Check, Deep Check &amp; Visa Tools. <span className="underline underline-offset-2 opacity-80">Check spam/junk</span> if not received.</>
-          }
-        </div>
-        {!emailSent && (
-          <button
-            onClick={() => sendVerificationMutation.mutate()}
-            disabled={sendVerificationMutation.isPending}
-            className="shrink-0 bg-white text-amber-600 font-semibold text-xs px-3 py-1.5 rounded-lg hover:bg-amber-50 disabled:opacity-60 transition"
-          >
-            {sendVerificationMutation.isPending ? "Sending…" : "Send Verification Email"}
-          </button>
-        )}
-        <button onClick={() => setEmailBannerDismissed(true)} className="shrink-0 p-1 hover:opacity-70 transition">
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-    )}
-    {showEmailBanner && <div className="h-12" />}{/* spacer for fixed banner */}
     <DashboardLayout title={`Welcome back, ${(user.fullName || "there").split(" ")[0]}`} subtitle="Your visa intelligence dashboard">
       <div className="max-w-5xl space-y-6">
 
@@ -437,6 +410,37 @@ export default function AccountPage() {
 
           {/* Right column */}
           <div className="space-y-4">
+
+            {/* Email verification alert */}
+            {!(user as any).emailVerified && (
+              <Card className="border-amber-200 bg-amber-50 dark:border-amber-800/50 dark:bg-amber-950/30">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center shrink-0 mt-0.5">
+                      <MailCheck className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-0.5">Verify your email</p>
+                      <p className="text-xs text-amber-700 dark:text-amber-400 leading-4 mb-3">
+                        Required to use Basic Check, Deep Check &amp; Visa Tools. Check <span className="font-medium">spam/junk</span> if not received.
+                      </p>
+                      {emailSent ? (
+                        <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">✓ Email sent — check your inbox &amp; spam folder.</p>
+                      ) : (
+                        <button
+                          onClick={() => sendVerificationMutation.mutate()}
+                          disabled={sendVerificationMutation.isPending}
+                          className="w-full text-xs font-semibold bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white py-2 rounded-lg transition"
+                        >
+                          {sendVerificationMutation.isPending ? "Sending…" : "Send Verification Email"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Profile completion */}
             <Card className="bg-white border-slate-100">
               <CardContent className="p-5">
