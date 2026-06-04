@@ -6773,14 +6773,13 @@ export async function registerRoutes(
         to: normalizedEmail,
         toName: user.fullName,
         subject: "Verify your new Visa Shuttle email address",
-        html: `
-          buildVerificationEmail({
-            name: user.fullName,
-            verifyUrl,
-            title: "Verify your new email address",
-            bodyText: "Your email address was updated. Please verify the new address to restore full access to Visa Shuttle.",
-            buttonText: "Verify New Email",
-          }),
+        html: buildVerificationEmail({
+          name: user.fullName,
+          verifyUrl,
+          title: "Verify your new email address",
+          bodyText: "Your email address was updated. Please verify the new address to restore full access to Visa Shuttle.",
+          buttonText: "Verify New Email",
+        }),
         text: `Hi ${user.fullName},\n\nVerify your new Visa Shuttle email:\n${verifyUrl}\n\nCheck spam/junk if not received.`,
       });
 
