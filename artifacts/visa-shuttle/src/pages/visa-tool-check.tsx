@@ -13,7 +13,9 @@ import {
   Coins,
   Download,
   FileText,
+  Globe,
   Loader2,
+  MessageSquareWarning,
   SearchCheck,
   ShieldAlert,
   Sparkles,
@@ -807,6 +809,64 @@ function ResultPanel({ check }: { check: VisaToolCheck | null }) {
                 ))}
               </div>
             </section>
+
+            {output.online_reputation_check?.searched && (() => {
+              const rep = output.online_reputation_check;
+              const severityColors: Record<string, string> = {
+                none: "border-emerald-100 bg-emerald-50 dark:border-emerald-800/50 dark:bg-emerald-950/30",
+                low: "border-blue-100 bg-blue-50 dark:border-blue-800/50 dark:bg-blue-950/30",
+                medium: "border-amber-100 bg-amber-50 dark:border-amber-800/50 dark:bg-amber-950/30",
+                high: "border-orange-100 bg-orange-50 dark:border-orange-800/50 dark:bg-orange-950/30",
+                critical: "border-red-100 bg-red-50 dark:border-red-800/50 dark:bg-red-950/30",
+              };
+              const severityLabel: Record<string, string> = {
+                none: "Clean",
+                low: "Minor",
+                medium: "Moderate",
+                high: "High Complaints",
+                critical: "Critical",
+              };
+              const severity = rep.complaint_severity || "none";
+              const scoreColor = rep.reputation_score >= 75 ? "text-emerald-600" : rep.reputation_score >= 50 ? "text-amber-600" : "text-red-600";
+              return (
+                <section className={`rounded-xl border p-4 ${severityColors[severity] || severityColors.none}`}>
+                  <h4 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-950 dark:text-white">
+                    <Globe className="h-4 w-4 text-blue-500" /> Online Reputation Check
+                  </h4>
+                  <div className="mb-3 grid grid-cols-3 gap-3 text-center text-sm">
+                    <div className="rounded-lg border border-slate-200 bg-white/70 p-2 dark:border-slate-700 dark:bg-slate-900/50">
+                      <p className={`text-lg font-bold ${scoreColor}`}>{rep.reputation_score}/100</p>
+                      <p className="text-xs text-slate-500">Reputation Score</p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-white/70 p-2 dark:border-slate-700 dark:bg-slate-900/50">
+                      <p className="text-lg font-bold text-slate-800 dark:text-slate-100">{rep.complaint_count_estimate ?? 0}</p>
+                      <p className="text-xs text-slate-500">Complaints Found</p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-white/70 p-2 dark:border-slate-700 dark:bg-slate-900/50">
+                      <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{severityLabel[severity] || "N/A"}</p>
+                      <p className="text-xs text-slate-500">Severity</p>
+                    </div>
+                  </div>
+                  <p className="mb-3 text-sm leading-5 text-slate-700 dark:text-slate-300">{rep.reputation_summary}</p>
+                  {rep.platforms_checked?.length > 0 && (
+                    <p className="mb-2 text-xs text-slate-500">
+                      <span className="font-medium">Platforms checked:</span> {rep.platforms_checked.join(", ")}
+                    </p>
+                  )}
+                  {rep.complaint_sources?.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 flex items-center gap-1"><MessageSquareWarning className="h-3.5 w-3.5" /> Complaint sources found:</p>
+                      {rep.complaint_sources.map((src: any, i: number) => (
+                        <div key={i} className="rounded border border-slate-200 bg-white/60 px-2.5 py-1.5 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300">
+                          <span className="font-medium">{src.platform}:</span> {src.summary}
+                          {src.url_hint && <span className="ml-1 text-slate-400"> — {src.url_hint}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              );
+            })()}
 
             <section className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/50">
               <h4 className="mb-2 text-sm font-bold text-slate-950 dark:text-white">Explanation</h4>

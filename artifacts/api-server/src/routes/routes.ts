@@ -5561,16 +5561,28 @@ export async function registerRoutes(
         ? [
           "This is a fake agency detector request.",
           "risk_score is a trust/safety score from 0 to 100. 0 = extremely suspicious / very high fraud risk. 100 = strongest positive trust signal / safe to proceed. Higher is always better.",
-          "SCORING RULES (the post-processing layer will also enforce these, but your initial score must reflect them):",
-          "- If official_registry_check.matched=true AND official_registry_check.is_active=true AND unregistered_agency_grievance_check.matched=false: assign risk_score >= 85. This agency is MEA/eMigrate registered and active with no grievances — it is 'Good to go'.",
-          "- If official_registry_check.matched=true AND official_registry_check.is_active=true AND unregistered_agency_grievance_check.matched=true: assign risk_score between 60-75. Active registry is a strong positive but grievances must be flagged.",
-          "- If official_registry_check.matched=true AND official_registry_check.is_active=false: assign risk_score <= 40. Registration is expired/dormant/cancelled.",
-          "- If official_registry_check.matched=false AND agency is India-based: assign risk_score <= 55. No MEA registration found — needs caution.",
-          "- If unregistered_agency_grievance_check.matched=true AND no active registry match: assign risk_score <= 20. Grievance-listed unregistered agency — high risk.",
-          "Always base positive_indicators on MEA registration status, website presence, and verifiable contact details.",
-          "Always base red_flags on grievances, mismatched details, missing registration, or suspicious patterns in the submitted text/document.",
+          "",
+          "STEP 1 — WEB REPUTATION SEARCH: Before scoring, use your web_search tool to actively search for public complaints, reviews, and mentions about this agency. Perform ALL of these searches:",
+          `1. Search: "${String(payload.fields.agencyName || "agency")} complaints fraud cheated"`,
+          `2. Search: "${String(payload.fields.agencyName || "agency")} reviews reddit site:reddit.com"`,
+          `3. Search: "${String(payload.fields.agencyName || "agency")} fake agency scam"`,
+          "Collect findings from Google results, Reddit threads, consumer complaint forums (consumercomplaints.in, MouthShut, Trustpilot, Google reviews), social media, and news articles.",
+          "",
+          "STEP 2 — Return a strict JSON object with these exact keys:",
+          "online_reputation_check: { searched: true, complaint_count_estimate: number (0 if none found), complaint_severity: 'none'|'low'|'medium'|'high'|'critical', platforms_checked: string[], complaint_sources: [{platform, summary, url_hint}] (max 5), reputation_score: 0-100 (100=excellent, 0=very bad), reputation_summary: string }",
+          "",
+          "SCORING RULES (apply after web search findings):",
+          "- Active MEA registered + no grievances + no online complaints: risk_score >= 88",
+          "- Active MEA registered + no grievances + minor online complaints (1-2, old): risk_score >= 80",
+          "- Active MEA registered + no grievances + serious online complaints: risk_score 55-70",
+          "- Active MEA registered + grievances matched + online complaints: risk_score 45-65",
+          "- No MEA registration + no complaints: risk_score <= 55",
+          "- No MEA registration + online complaints found: risk_score <= 35",
+          "- Grievance-listed + online complaints: risk_score <= 15",
+          "- online_reputation_check.reputation_score also independently contributes: weight it 20% in final risk_score",
+          "",
+          "Always include online complaint details in red_flags. Include positive review signals in positive_indicators.",
           "The agencyName field is the primary agency identity. Always analyze it as the main subject.",
-          "If no MEA match for an India-based agency, state clearly that no MEA/eMigrate RA match was found and recommend official verification.",
         ].join(" ")
       : payload.toolType === "scholarship_finder"
         ? [
@@ -5667,6 +5679,33 @@ export async function registerRoutes(
           ].slice(0, 10);
         }
       }
+
+      // Apply online reputation score impact (20% weight adjustment)
+      if (result.online_reputation_check?.searched) {
+        const rep = result.online_reputation_check;
+        const severity = rep.complaint_severity;
+        if (severity === "critical") {
+          result.risk_score = Math.min(result.risk_score, 20);
+          result.red_flags = [`Online reputation: Critical — multiple serious complaints found across platforms (${rep.complaint_count_estimate}+ complaints). ${rep.reputation_summary}`, ...result.red_flags].slice(0, 12);
+        } else if (severity === "high") {
+          result.risk_score = Math.min(result.risk_score, 35);
+          result.red_flags = [`Online reputation: High risk — significant complaints found online (${rep.complaint_count_estimate}+ complaints). ${rep.reputation_summary}`, ...result.red_flags].slice(0, 12);
+        } else if (severity === "medium") {
+          result.risk_score = Math.min(result.risk_score, 60);
+          result.red_flags = [`Online reputation: Medium concern — some complaints or mixed reviews found. ${rep.reputation_summary}`, ...result.red_flags].slice(0, 12);
+        } else if (severity === "low") {
+          result.risk_score = Math.min(result.risk_score, 80);
+          result.positive_indicators = [`Online reputation: Low complaint volume — mostly positive or neutral online presence. ${rep.reputation_summary}`, ...result.positive_indicators].slice(0, 12);
+        } else {
+          // none — boost slightly if no complaints found
+          if (rep.complaint_count_estimate === 0) {
+            result.risk_score = Math.min(100, result.risk_score + 3);
+            result.positive_indicators = [`Online reputation: No complaints or fraud reports found across Google, Reddit, and social media. ${rep.reputation_summary}`, ...result.positive_indicators].slice(0, 12);
+          }
+        }
+        result.risk_level = normalizeRiskLevel("", result.risk_score);
+      }
+
       return result;
     };
 
@@ -5688,21 +5727,30 @@ export async function registerRoutes(
       disclaimer: "This is an AI-assisted risk analysis only. Please verify with official government, employer, registered agency, or qualified immigration sources.",
     });
 
+    const isFakeAgency = payload.toolType === "fake_agency";
+
     let parsed: any;
     try {
+      const requestBody: any = {
+        model,
+        max_tokens: isFakeAgency ? 6000 : 4096,
+        system: "You are a visa risk and rejection recovery analysis assistant for Visa Shuttle. You do not provide legal confirmation, immigration advice, or government verification. You analyze submitted text/documents for refusal reasons, missing evidence, inconsistencies, fraud indicators, formatting issues, suspicious claims, and risk signals. When using web_search, search thoroughly for public complaints, reviews, and fraud reports about the agency. Always return strict JSON only as your final response.",
+        messages: [{ role: "user", content }],
+      };
+
+      if (isFakeAgency) {
+        requestBody.tools = [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }];
+      }
+
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-api-key": apiKey,
           "anthropic-version": "2023-06-01",
+          ...(isFakeAgency ? { "anthropic-beta": "web-search-2025-03-05" } : {}),
         },
-        body: JSON.stringify({
-          model,
-          max_tokens: 4096,
-          system: "You are a visa risk and rejection recovery analysis assistant for Visa Shuttle. You do not provide legal confirmation, immigration advice, or government verification. You analyze submitted text/documents for refusal reasons, missing evidence, inconsistencies, fraud indicators, formatting issues, suspicious claims, and risk signals. Always return strict JSON only.",
-          messages: [{ role: "user", content }],
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -5710,7 +5758,9 @@ export async function registerRoutes(
         throw new Error(`Claude Visa Tools error: ${response.status} ${truncateVisaToolText(text, 500)}`);
       }
       const data = await response.json() as any;
-      const text = data.content?.find((part: any) => part.type === "text")?.text || "";
+      // With web_search tool, content may have tool_result and multiple text blocks — get the last text block which contains the final JSON
+      const textBlocks = (data.content || []).filter((p: any) => p.type === "text");
+      const text = textBlocks.map((p: any) => p.text || "").join("\n");
       const jsonText = extractJsonObject(text);
       if (!jsonText) throw new Error("Claude did not return valid JSON");
       parsed = JSON.parse(jsonText);
@@ -5728,6 +5778,20 @@ export async function registerRoutes(
     }
 
     const riskScore = clampRiskScore(parsed.risk_score);
+
+    // Parse online_reputation_check for fake_agency
+    const onlineRep = parsed.online_reputation_check && typeof parsed.online_reputation_check === "object"
+      ? {
+          searched: true,
+          complaint_count_estimate: Number(parsed.online_reputation_check.complaint_count_estimate ?? 0),
+          complaint_severity: String(parsed.online_reputation_check.complaint_severity || "none"),
+          platforms_checked: Array.isArray(parsed.online_reputation_check.platforms_checked) ? parsed.online_reputation_check.platforms_checked.map(String).slice(0, 10) : [],
+          complaint_sources: Array.isArray(parsed.online_reputation_check.complaint_sources) ? parsed.online_reputation_check.complaint_sources.slice(0, 5) : [],
+          reputation_score: clampRiskScore(parsed.online_reputation_check.reputation_score ?? 50),
+          reputation_summary: String(parsed.online_reputation_check.reputation_summary || "No online reputation data available."),
+        }
+      : null;
+
     const result = {
       risk_score: riskScore,
       risk_level: normalizeRiskLevel(parsed.risk_level, riskScore),
@@ -5747,6 +5811,7 @@ export async function registerRoutes(
       eligibility_gaps: Array.isArray(parsed.eligibility_gaps) ? parsed.eligibility_gaps.map(String).slice(0, 12) : [],
       funding_strategy: Array.isArray(parsed.funding_strategy) ? parsed.funding_strategy.map(String).slice(0, 10) : [],
       application_timeline: Array.isArray(parsed.application_timeline) ? parsed.application_timeline.map(String).slice(0, 10) : [],
+      online_reputation_check: onlineRep,
       disclaimer: "This is an AI-assisted risk analysis only. Please verify with official government, employer, registered agency, or qualified immigration sources.",
     };
     return applyAgencySignals(result);
