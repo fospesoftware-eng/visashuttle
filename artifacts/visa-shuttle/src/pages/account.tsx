@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import {
   PlaneTakeoff, Crown, User, Clock, TrendingUp, CheckCircle, AlertCircle,
   ArrowRight, Plus, Brain, BarChart3, Zap, FileText, Bell, ChevronRight, BookUser,
-  MailCheck
+  MailCheck, X
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -194,6 +194,7 @@ export default function AccountPage() {
   const { user, isLoading: authLoading, checksRemaining, canCheck } = useB2cAuth();
   const [, setLocation] = useLocation();
   const [emailSent, setEmailSent] = useState(false);
+  const [emailAlertDismissed, setEmailAlertDismissed] = useState(false);
   const { toast } = useToast();
 
   const sendVerificationMutation = useMutation({
@@ -243,6 +244,35 @@ export default function AccountPage() {
     {showOnboarding && <OnboardingModal onDone={() => {}} />}
     <DashboardLayout title={`Welcome back, ${(user.fullName || "there").split(" ")[0]}`} subtitle="Your visa intelligence dashboard">
       <div className="max-w-5xl space-y-6">
+
+        {/* Email verification alert */}
+        {!(user as any).emailVerified && !emailAlertDismissed && (
+          <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-700/50 dark:bg-amber-950/30 px-4 py-3">
+            <MailCheck className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Verify your email address</p>
+              <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                Required to use Basic Check, Deep Check &amp; Visa Tools.{" "}
+                <span className="font-medium">Check spam/junk</span> if the email doesn't arrive.
+              </p>
+              {emailSent && (
+                <p className="text-xs text-emerald-700 dark:text-emerald-400 font-medium mt-1.5">✓ Verification email sent — check your inbox &amp; spam folder.</p>
+              )}
+            </div>
+            {!emailSent && (
+              <button
+                onClick={() => sendVerificationMutation.mutate()}
+                disabled={sendVerificationMutation.isPending}
+                className="shrink-0 text-xs font-semibold bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white px-3 py-1.5 rounded-lg transition whitespace-nowrap"
+              >
+                {sendVerificationMutation.isPending ? "Sending…" : "Send Verification Email"}
+              </button>
+            )}
+            <button onClick={() => setEmailAlertDismissed(true)} className="shrink-0 p-0.5 text-amber-500 hover:text-amber-700 transition">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {/* Stats row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -410,36 +440,6 @@ export default function AccountPage() {
 
           {/* Right column */}
           <div className="space-y-4">
-
-            {/* Email verification alert */}
-            {!(user as any).emailVerified && (
-              <Card className="border-amber-200 bg-amber-50 dark:border-amber-800/50 dark:bg-amber-950/30">
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center shrink-0 mt-0.5">
-                      <MailCheck className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-0.5">Verify your email</p>
-                      <p className="text-xs text-amber-700 dark:text-amber-400 leading-4 mb-3">
-                        Required to use Basic Check, Deep Check &amp; Visa Tools. Check <span className="font-medium">spam/junk</span> if not received.
-                      </p>
-                      {emailSent ? (
-                        <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">✓ Email sent — check your inbox &amp; spam folder.</p>
-                      ) : (
-                        <button
-                          onClick={() => sendVerificationMutation.mutate()}
-                          disabled={sendVerificationMutation.isPending}
-                          className="w-full text-xs font-semibold bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white py-2 rounded-lg transition"
-                        >
-                          {sendVerificationMutation.isPending ? "Sending…" : "Send Verification Email"}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
 
             {/* Profile completion */}
             <Card className="bg-white border-slate-100">

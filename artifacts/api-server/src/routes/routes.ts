@@ -250,6 +250,73 @@ function cleanProviderError(detail: string): string {
 
 const DEFAULT_ZEPTOMAIL_SENDER = "notifications@visashuttle.com";
 
+const LOGO_URL = "https://visashuttle.com/visa-shuttle-logo.png";
+
+function buildVerificationEmail(opts: {
+  name: string;
+  verifyUrl: string;
+  title: string;
+  bodyText: string;
+  buttonText: string;
+}): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f1f5f9;padding:40px 0">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08)">
+
+        <!-- Header with logo -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#4055FF 0%,#FF2060 100%);padding:28px 32px;text-align:center">
+            <img src="${LOGO_URL}" alt="Visa Shuttle" height="36" style="display:block;margin:0 auto;filter:brightness(0) invert(1)" onerror="this.style.display='none'">
+            <p style="margin:10px 0 0;color:rgba(255,255,255,0.85);font-size:13px;letter-spacing:0.3px">AI-Powered Visa Intelligence</p>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="background:#ffffff;padding:36px 32px">
+            <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:#0f172a;line-height:1.3">${opts.title}</h1>
+            <p style="margin:0 0 8px;font-size:15px;color:#475569;line-height:1.6">Hi ${opts.name},</p>
+            <p style="margin:0 0 28px;font-size:15px;color:#475569;line-height:1.6">${opts.bodyText}</p>
+
+            <!-- CTA Button -->
+            <table cellpadding="0" cellspacing="0" border="0" style="margin:0 0 28px">
+              <tr>
+                <td style="border-radius:8px;background:linear-gradient(135deg,#4055FF,#FF2060)">
+                  <a href="${opts.verifyUrl}" target="_blank" style="display:inline-block;padding:14px 32px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;border-radius:8px;letter-spacing:0.2px">${opts.buttonText}</a>
+                </td>
+              </tr>
+            </table>
+
+            <p style="margin:0 0 6px;font-size:13px;color:#94a3b8">Or copy this link into your browser:</p>
+            <p style="margin:0 0 28px;font-size:12px;color:#4055FF;word-break:break-all;line-height:1.5">${opts.verifyUrl}</p>
+
+            <div style="background:#fef9c3;border:1px solid #fde68a;border-radius:8px;padding:12px 16px;margin-bottom:8px">
+              <p style="margin:0;font-size:13px;color:#92400e;line-height:1.5">
+                📬 <strong>Can't find this email?</strong> Check your <strong>spam</strong> or <strong>junk</strong> folder and mark it as "Not Spam" to receive future emails.
+              </p>
+            </div>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 32px;text-align:center">
+            <p style="margin:0 0 6px;font-size:12px;color:#94a3b8">If you didn't create a Visa Shuttle account, you can safely ignore this email.</p>
+            <p style="margin:0;font-size:12px;color:#cbd5e1">© ${new Date().getFullYear()} Visa Shuttle · AI-Powered Visa Intelligence</p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
 function normalizeZeptoMailSender(sender?: string | null): string {
   const value = String(sender || "").trim().toLowerCase();
   if (!value || value === "support@visashuttle.com") return DEFAULT_ZEPTOMAIL_SENDER;
@@ -6637,20 +6704,14 @@ export async function registerRoutes(
         to: user.email,
         toName: user.fullName,
         subject: "Verify your Visa Shuttle email address",
-        html: `
-          <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;color:#1e293b">
-            <h2 style="margin:0 0 8px;font-size:22px;color:#1e293b">Verify your email address</h2>
-            <p style="margin:0 0 24px;color:#475569;font-size:15px">Hi ${user.fullName},<br><br>Please verify your email to unlock Basic Check, Deep Check, and Visa Tools on Visa Shuttle.</p>
-            <a href="${verifyUrl}" style="display:inline-block;background:#4055FF;color:#fff;text-decoration:none;padding:13px 28px;border-radius:8px;font-weight:600;font-size:15px">Verify Email Address</a>
-            <p style="margin:24px 0 8px;color:#64748b;font-size:13px">Or copy this link into your browser:</p>
-            <p style="margin:0 0 24px;word-break:break-all;color:#4055FF;font-size:13px">${verifyUrl}</p>
-            <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0">
-            <p style="margin:0;color:#94a3b8;font-size:12px">
-              If you didn't create a Visa Shuttle account, you can safely ignore this email.<br>
-              <strong>Can't find this email?</strong> Check your spam or junk folder.
-            </p>
-          </div>`,
-        text: `Hi ${user.fullName},\n\nVerify your email to unlock checks on Visa Shuttle:\n${verifyUrl}\n\nIf you can't find this email, check your spam/junk folder.\n\nIf you didn't create an account, ignore this email.`,
+        html: buildVerificationEmail({
+          name: user.fullName,
+          verifyUrl,
+          title: "Verify your email address",
+          bodyText: "Please verify your email address to unlock <strong>Basic Check</strong>, <strong>Deep Check</strong>, and <strong>Visa Tools</strong> on Visa Shuttle.",
+          buttonText: "Verify Email Address",
+        }),
+        text: `Hi ${user.fullName},\n\nVerify your email to unlock checks on Visa Shuttle:\n${verifyUrl}\n\nCan't find this email? Check your spam/junk folder.\n\nIf you didn't create an account, ignore this email.`,
       });
 
       res.json({ ok: true, message: "Verification email sent. Please check your inbox and spam folder." });
@@ -6713,16 +6774,14 @@ export async function registerRoutes(
         toName: user.fullName,
         subject: "Verify your new Visa Shuttle email address",
         html: `
-          <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;color:#1e293b">
-            <h2 style="margin:0 0 8px;font-size:22px">Verify your new email</h2>
-            <p style="margin:0 0 24px;color:#475569;font-size:15px">Hi ${user.fullName},<br><br>Your email address was updated. Please verify the new address to restore full access.</p>
-            <a href="${verifyUrl}" style="display:inline-block;background:#4055FF;color:#fff;text-decoration:none;padding:13px 28px;border-radius:8px;font-weight:600;font-size:15px">Verify New Email</a>
-            <p style="margin:24px 0 8px;color:#64748b;font-size:13px">Or copy this link:</p>
-            <p style="word-break:break-all;color:#4055FF;font-size:13px">${verifyUrl}</p>
-            <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0">
-            <p style="margin:0;color:#94a3b8;font-size:12px">Check your spam/junk folder if you don't see this email.</p>
-          </div>`,
-        text: `Verify your new Visa Shuttle email:\n${verifyUrl}\n\nCheck spam/junk if not received.`,
+          buildVerificationEmail({
+            name: user.fullName,
+            verifyUrl,
+            title: "Verify your new email address",
+            bodyText: "Your email address was updated. Please verify the new address to restore full access to Visa Shuttle.",
+            buttonText: "Verify New Email",
+          }),
+        text: `Hi ${user.fullName},\n\nVerify your new Visa Shuttle email:\n${verifyUrl}\n\nCheck spam/junk if not received.`,
       });
 
       req.session.save(() => {});
