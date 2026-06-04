@@ -126,7 +126,7 @@ function AiProviderCard() {
   const [showKey, setShowKey] = useState(false);
   const [form, setForm] = useState({
     anthropicApiKey: "",
-    anthropicModel: "claude-opus-4-5-20251101",
+    anthropicModel: "claude-sonnet-4-6",
   });
 
   const { data: cfg, isLoading } = useQuery<AiConfigResponse>({
@@ -137,7 +137,7 @@ function AiProviderCard() {
     if (cfg) {
       setForm({
         anthropicApiKey: cfg.anthropicApiKey || "",
-        anthropicModel: cfg.anthropicModel || "claude-opus-4-5-20251101",
+        anthropicModel: cfg.anthropicModel || "claude-sonnet-4-6",
       });
     }
   }, [cfg]);
@@ -230,7 +230,7 @@ function AiProviderCard() {
               <option value="claude-haiku-4-5-20251001">claude-haiku-4-5-20251001 — Haiku 4.5 (Fastest · Affordable)</option>
             </optgroup>
           </select>
-          <p className="text-xs text-muted-foreground">Used for Deep Check requests. Opus is most thorough; Haiku is fastest. All models are Claude 4 generation.</p>
+          <p className="text-xs text-muted-foreground">Used for Deep Check and all Visa Tools analysis. Opus is most thorough; Haiku is fastest. All models are Claude 4 generation.</p>
         </div>
 
         {!cfg?.hasAnthropicApiKey && (

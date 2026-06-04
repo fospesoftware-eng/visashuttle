@@ -5499,7 +5499,7 @@ export async function registerRoutes(
   }) {
     const aiConfig = await storage.getPlatformAiConfig();
     const apiKey = aiConfig?.anthropicApiKey || process.env.ANTHROPIC_API_KEY;
-    const model = aiConfig?.anthropicModel || process.env.ANTHROPIC_MODEL || "claude-opus-4-5";
+    const model = aiConfig?.anthropicModel || process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
     if (!apiKey) throw new Error("Anthropic API key not configured");
 
     const meaRegistryCheck = payload.toolType === "fake_agency"
@@ -5560,12 +5560,17 @@ export async function registerRoutes(
       : payload.toolType === "fake_agency"
         ? [
           "This is a fake agency detector request.",
-          "For Visa Shuttle, risk_score must be used as a trust/safety score from 0 to 100: 0 means extremely suspicious, 100 means strongest positive trust signal. Higher is better.",
-          "The agencyName field is the primary agency identity selected from the dropdown or entered manually. Always consider that agency name in the analysis.",
-          "Use official_registry_check as a positive reputed MEA/eMigrate registered recruiting-agent signal whenever matched, but check and mention the current status. Active status should improve the trust assessment. Dormant, expired, or non-active status should be treated as a caution even though the name is listed.",
-          "Use unregistered_agency_grievance_check as a strong negative signal when matched. Clearly mention the grievance count and status in red flags and next steps.",
-          "If an agency appears in both sources, the unregistered grievance match must remain a serious negative risk factor, but still mention the registered-agent signal separately.",
-          "If no match is found for an India-based recruiting agency, mention that no MEA/eMigrate RA match was found.",
+          "risk_score is a trust/safety score from 0 to 100. 0 = extremely suspicious / very high fraud risk. 100 = strongest positive trust signal / safe to proceed. Higher is always better.",
+          "SCORING RULES (the post-processing layer will also enforce these, but your initial score must reflect them):",
+          "- If official_registry_check.matched=true AND official_registry_check.is_active=true AND unregistered_agency_grievance_check.matched=false: assign risk_score >= 85. This agency is MEA/eMigrate registered and active with no grievances — it is 'Good to go'.",
+          "- If official_registry_check.matched=true AND official_registry_check.is_active=true AND unregistered_agency_grievance_check.matched=true: assign risk_score between 60-75. Active registry is a strong positive but grievances must be flagged.",
+          "- If official_registry_check.matched=true AND official_registry_check.is_active=false: assign risk_score <= 40. Registration is expired/dormant/cancelled.",
+          "- If official_registry_check.matched=false AND agency is India-based: assign risk_score <= 55. No MEA registration found — needs caution.",
+          "- If unregistered_agency_grievance_check.matched=true AND no active registry match: assign risk_score <= 20. Grievance-listed unregistered agency — high risk.",
+          "Always base positive_indicators on MEA registration status, website presence, and verifiable contact details.",
+          "Always base red_flags on grievances, mismatched details, missing registration, or suspicious patterns in the submitted text/document.",
+          "The agencyName field is the primary agency identity. Always analyze it as the main subject.",
+          "If no MEA match for an India-based agency, state clearly that no MEA/eMigrate RA match was found and recommend official verification.",
         ].join(" ")
       : payload.toolType === "scholarship_finder"
         ? [
@@ -5611,19 +5616,28 @@ export async function registerRoutes(
           ? `MEA/eMigrate reputed RA registry match: ${registry.agency_name || "Registered Agent"} (${registry.raid || "RA ID not listed"}) - status: ${registry.status}; source updated as on ${registry.updated_as_on}.`
           : `MEA/eMigrate RA registry check: ${registry.status}; source updated as on ${registry.updated_as_on}. ${registry.note}`;
         if (registry.matched) {
-          result.risk_score = registry.is_active ? Math.max(result.risk_score, 85) : Math.min(result.risk_score, 40);
-          result.risk_level = normalizeRiskLevel("", result.risk_score);
-          result.positive_indicators = [statusLine, ...result.positive_indicators].slice(0, 12);
-          if (!registry.is_active) {
+          if (registry.is_active) {
+            // Active MEA registered + no grievances = Good to go (floor at 85)
+            result.risk_score = Math.max(result.risk_score, 85);
+            result.positive_indicators = [statusLine, ...result.positive_indicators].slice(0, 12);
+          } else {
+            // Registered but expired/dormant/cancelled — caution
+            result.risk_score = Math.min(result.risk_score, 40);
             result.red_flags = [
               `MEA/eMigrate RA record was found, but current listed status is "${registry.status || "not active"}"; verify status through official channels before payment.`,
               ...result.red_flags,
             ].slice(0, 12);
           }
-        } else {
-          result.risk_score = Math.min(result.risk_score, 55);
           result.risk_level = normalizeRiskLevel("", result.risk_score);
-          result.red_flags = [statusLine, ...result.red_flags].slice(0, 12);
+        } else {
+          // Only apply MEA cap for India-context agencies; overseas agencies are not expected in MEA registry
+          const country = String(result.official_registry_check?.country || payload?.fields?.country || "").toLowerCase();
+          const isIndiaContext = !country || country.includes("india") || country.includes("in");
+          if (isIndiaContext) {
+            result.risk_score = Math.min(result.risk_score, 55);
+            result.risk_level = normalizeRiskLevel("", result.risk_score);
+            result.red_flags = [statusLine, ...result.red_flags].slice(0, 12);
+          }
         }
         result.official_registry_check = registry;
       }
@@ -5701,11 +5715,16 @@ export async function registerRoutes(
       if (!jsonText) throw new Error("Claude did not return valid JSON");
       parsed = JSON.parse(jsonText);
     } catch (err: any) {
+      console.error("[Visa Tools] Claude API error:", err?.message || err);
       if (payload.toolType === "fake_agency") {
-        console.warn("[Visa Tools] Fake agency AI fallback:", err?.message || err);
         return buildAgencyFallbackResult(err?.message || "AI provider unavailable.");
       }
-      throw err;
+      // For all other tools, surface a clear error
+      const isApiKeyError = String(err?.message || "").includes("API key") || String(err?.message || "").includes("401");
+      const isModelError = String(err?.message || "").includes("model") || String(err?.message || "").includes("404");
+      if (isApiKeyError) throw new Error("Anthropic API key not configured or invalid. Please update it in SaaS Admin > Settings > AI.");
+      if (isModelError) throw new Error("The configured AI model is unavailable. Please update the model in SaaS Admin > Settings > AI.");
+      throw new Error(`AI analysis failed: ${truncateVisaToolText(err?.message || "Unknown error", 200)}`);
     }
 
     const riskScore = clampRiskScore(parsed.risk_score);
@@ -5846,7 +5865,7 @@ export async function registerRoutes(
     const dbKeyConfigured = !!cfg?.anthropicApiKey;
     res.json({
       anthropicApiKey: cfg?.anthropicApiKey ? maskKey(cfg.anthropicApiKey) : "",
-      anthropicModel: cfg?.anthropicModel || process.env.ANTHROPIC_MODEL || "claude-opus-4-5",
+      anthropicModel: cfg?.anthropicModel || process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
       hasAnthropicApiKey: dbKeyConfigured || envKeyConfigured,
       usingDb: dbKeyConfigured,
       usingEnvFallback: !dbKeyConfigured && envKeyConfigured,
@@ -5857,12 +5876,12 @@ export async function registerRoutes(
     const { anthropicApiKey, anthropicModel } = req.body;
     const patch: Record<string, any> = {};
     if (anthropicApiKey && !anthropicApiKey.includes("•")) patch.anthropicApiKey = anthropicApiKey;
-    if (anthropicModel !== undefined) patch.anthropicModel = anthropicModel || "claude-opus-4-5";
+    if (anthropicModel !== undefined) patch.anthropicModel = anthropicModel || "claude-sonnet-4-6";
     const updated = await storage.upsertPlatformAiConfig(patch);
     res.json({
       success: true,
       anthropicApiKey: updated.anthropicApiKey ? maskKey(updated.anthropicApiKey) : "",
-      anthropicModel: updated.anthropicModel || "claude-opus-4-5",
+      anthropicModel: updated.anthropicModel || "claude-sonnet-4-6",
       hasAnthropicApiKey: !!updated.anthropicApiKey,
       usingDb: !!updated.anthropicApiKey,
       usingEnvFallback: !updated.anthropicApiKey && !!process.env.ANTHROPIC_API_KEY,
