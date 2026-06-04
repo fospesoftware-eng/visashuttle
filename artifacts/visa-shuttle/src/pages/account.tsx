@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   PlaneTakeoff, Crown, User, Clock, TrendingUp, CheckCircle, AlertCircle,
-  ArrowRight, Plus, Brain, BarChart3, Zap, FileText, Bell, ChevronRight, BookUser
+  ArrowRight, Plus, Brain, BarChart3, Zap, FileText, Bell, ChevronRight, BookUser,
+  MailCheck, X
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -192,6 +193,15 @@ function OnboardingModal({ onDone }: { onDone: () => void }) {
 export default function AccountPage() {
   const { user, isLoading: authLoading, checksRemaining, canCheck } = useB2cAuth();
   const [, setLocation] = useLocation();
+  const [emailBannerDismissed, setEmailBannerDismissed] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const { toast } = useToast();
+
+  const sendVerificationMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/b2c/auth/send-verification-email").then(r => r.json()),
+    onSuccess: () => { setEmailSent(true); toast({ title: "Verification email sent", description: "Check your inbox and spam/junk folder." }); },
+    onError: (e: any) => toast({ title: "Failed to send email", description: e.message, variant: "destructive" }),
+  });
 
   useEffect(() => {
     if (!authLoading && !user) setLocation("/sign-in");
@@ -229,9 +239,35 @@ export default function AccountPage() {
     !user.deepCheckAccess && { type: "tip", msg: `Deep Check reveals embassy-style risk analysis for ${deepCheckPrice}.` },
   ].filter(Boolean) as { type: string; msg: string }[];
 
+  const showEmailBanner = user && !user.emailVerified && !emailBannerDismissed;
+
   return (
     <>
     {showOnboarding && <OnboardingModal onDone={() => {}} />}
+    {showEmailBanner && (
+      <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-white px-4 py-3 flex items-center gap-3 shadow-md">
+        <MailCheck className="w-5 h-5 shrink-0" />
+        <div className="flex-1 text-sm font-medium">
+          {emailSent
+            ? "Verification email sent! Check your inbox and spam/junk folder."
+            : <>Verify your email to use Basic Check, Deep Check &amp; Visa Tools. <span className="underline underline-offset-2 opacity-80">Check spam/junk</span> if not received.</>
+          }
+        </div>
+        {!emailSent && (
+          <button
+            onClick={() => sendVerificationMutation.mutate()}
+            disabled={sendVerificationMutation.isPending}
+            className="shrink-0 bg-white text-amber-600 font-semibold text-xs px-3 py-1.5 rounded-lg hover:bg-amber-50 disabled:opacity-60 transition"
+          >
+            {sendVerificationMutation.isPending ? "Sending…" : "Send Verification Email"}
+          </button>
+        )}
+        <button onClick={() => setEmailBannerDismissed(true)} className="shrink-0 p-1 hover:opacity-70 transition">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    )}
+    {showEmailBanner && <div className="h-12" />}{/* spacer for fixed banner */}
     <DashboardLayout title={`Welcome back, ${(user.fullName || "there").split(" ")[0]}`} subtitle="Your visa intelligence dashboard">
       <div className="max-w-5xl space-y-6">
 

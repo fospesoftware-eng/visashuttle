@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { User, Lock, Bell, Shield, Save } from "lucide-react";
+import { User, Lock, Bell, Shield, Save, Mail, CheckCircle2 } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +18,10 @@ export default function SettingsPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [name, setName] = useState("");
+  const [changeEmailOpen, setChangeEmailOpen] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [emailPassword, setEmailPassword] = useState("");
+  const [verifyEmailSent, setVerifyEmailSent] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) setLocation("/sign-in");
@@ -27,6 +33,21 @@ export default function SettingsPage() {
   function handleSave() {
     toast({ title: "Settings saved", description: "Your preferences have been updated." });
   }
+
+  const sendVerifyMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/b2c/auth/send-verification-email").then(r => r.json()),
+    onSuccess: () => { setVerifyEmailSent(true); toast({ title: "Verification email sent", description: "Check your inbox and spam/junk folder." }); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const changeEmailMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/b2c/auth/change-email", { newEmail, password: emailPassword }).then(r => r.json()),
+    onSuccess: () => {
+      toast({ title: "Email updated", description: "A verification link has been sent to your new address." });
+      setChangeEmailOpen(false); setNewEmail(""); setEmailPassword("");
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
 
   const planLabel = user.subscriptionPlan === "pro" ? "Pro" : user.subscriptionPlan === "deep" ? "Deep Check" : user.subscriptionPlan === "starter" ? "Starter" : "Free";
   const deepCheckPrice = formatB2cPrice(getStoredB2cCurrency());
@@ -54,13 +75,67 @@ export default function SettingsPage() {
             </div>
             <div>
               <Label className="text-sm font-medium text-slate-700 mb-1.5 block">Email Address</Label>
-              <Input
-                value={user.email}
-                disabled
-                className="bg-slate-50 border-slate-200 text-slate-500"
-                data-testid="input-email"
-              />
-              <p className="text-xs text-slate-400 mt-1">Email cannot be changed</p>
+              <div className="flex gap-2">
+                <Input
+                  value={user.email}
+                  disabled
+                  className="bg-slate-50 border-slate-200 text-slate-500 flex-1"
+                  data-testid="input-email"
+                />
+                <button
+                  onClick={() => setChangeEmailOpen(v => !v)}
+                  className="text-xs text-blue-600 hover:underline shrink-0 font-medium"
+                >
+                  Change
+                </button>
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                {(user as any).emailVerified ? (
+                  <span className="flex items-center gap-1 text-xs text-emerald-600"><CheckCircle2 className="w-3 h-3" /> Verified</span>
+                ) : (
+                  <span className="flex items-center gap-1 text-xs text-amber-600">
+                    Not verified —{" "}
+                    <button
+                      onClick={() => !verifyEmailSent && sendVerifyMutation.mutate()}
+                      disabled={sendVerifyMutation.isPending || verifyEmailSent}
+                      className="underline underline-offset-2 disabled:opacity-60"
+                    >
+                      {verifyEmailSent ? "Email sent (check spam)" : sendVerifyMutation.isPending ? "Sending…" : "Send verification email"}
+                    </button>
+                  </span>
+                )}
+              </div>
+              {changeEmailOpen && (
+                <div className="mt-3 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-medium text-slate-700">Change Email Address</p>
+                  <Input
+                    type="email"
+                    placeholder="New email address"
+                    value={newEmail}
+                    onChange={e => setNewEmail(e.target.value)}
+                    className="text-sm"
+                  />
+                  <Input
+                    type="password"
+                    placeholder="Current password (to confirm)"
+                    value={emailPassword}
+                    onChange={e => setEmailPassword(e.target.value)}
+                    className="text-sm"
+                  />
+                  <p className="text-xs text-slate-500 flex items-center gap-1"><Mail className="w-3 h-3" /> A verification email will be sent to the new address.</p>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => changeEmailMutation.mutate()}
+                      disabled={!newEmail || !emailPassword || changeEmailMutation.isPending}
+                      className="text-xs"
+                    >
+                      {changeEmailMutation.isPending ? "Updating…" : "Update Email"}
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setChangeEmailOpen(false)} className="text-xs">Cancel</Button>
+                  </div>
+                </div>
+              )}
             </div>
             <Button onClick={handleSave} className="bg-blue-600 hover:bg-blue-700 gap-2" data-testid="button-save">
               <Save className="w-4 h-4" />

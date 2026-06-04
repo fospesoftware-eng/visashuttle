@@ -6617,6 +6617,122 @@ export async function registerRoutes(
     }
   });
 
+  // ── B2C Email Verification ────────────────────────────────────────────────
+
+  // Send verification email
+  app.post("/api/b2c/auth/send-verification-email", requireB2cAuth, async (req, res) => {
+    try {
+      const userId = req.session.b2cUserId!;
+      const user = await storage.getB2cUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+      if (user.emailVerified) return res.status(400).json({ error: "Email is already verified" });
+
+      const token = randomUUID();
+      await storage.updateB2cUser(userId, { emailVerificationToken: token });
+
+      const baseUrl = String(req.headers.origin || process.env.APP_BASE_URL || "https://visashuttle.com");
+      const verifyUrl = `${baseUrl}/verify-email?token=${token}`;
+
+      await sendTransactionalEmail({
+        to: user.email,
+        toName: user.fullName,
+        subject: "Verify your Visa Shuttle email address",
+        html: `
+          <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;color:#1e293b">
+            <h2 style="margin:0 0 8px;font-size:22px;color:#1e293b">Verify your email address</h2>
+            <p style="margin:0 0 24px;color:#475569;font-size:15px">Hi ${user.fullName},<br><br>Please verify your email to unlock Basic Check, Deep Check, and Visa Tools on Visa Shuttle.</p>
+            <a href="${verifyUrl}" style="display:inline-block;background:#4055FF;color:#fff;text-decoration:none;padding:13px 28px;border-radius:8px;font-weight:600;font-size:15px">Verify Email Address</a>
+            <p style="margin:24px 0 8px;color:#64748b;font-size:13px">Or copy this link into your browser:</p>
+            <p style="margin:0 0 24px;word-break:break-all;color:#4055FF;font-size:13px">${verifyUrl}</p>
+            <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0">
+            <p style="margin:0;color:#94a3b8;font-size:12px">
+              If you didn't create a Visa Shuttle account, you can safely ignore this email.<br>
+              <strong>Can't find this email?</strong> Check your spam or junk folder.
+            </p>
+          </div>`,
+        text: `Hi ${user.fullName},\n\nVerify your email to unlock checks on Visa Shuttle:\n${verifyUrl}\n\nIf you can't find this email, check your spam/junk folder.\n\nIf you didn't create an account, ignore this email.`,
+      });
+
+      res.json({ ok: true, message: "Verification email sent. Please check your inbox and spam folder." });
+    } catch (err: any) {
+      console.error("[email-verify] send error:", err);
+      res.status(500).json({ error: "Failed to send verification email. Please try again." });
+    }
+  });
+
+  // Verify email via token (GET — user clicks link in email)
+  app.get("/api/b2c/auth/verify-email", async (req, res) => {
+    try {
+      const token = String(req.query.token || "").trim();
+      if (!token) return res.status(400).json({ error: "Verification token is missing" });
+
+      const user = await storage.getB2cUserByVerificationToken(token);
+      if (!user) return res.status(404).json({ error: "Invalid or expired verification link" });
+
+      await storage.updateB2cUser(user.id, { emailVerified: true, emailVerificationToken: null });
+      // Redirect to frontend with success flag
+      const base = String(req.headers.origin || process.env.APP_BASE_URL || "https://visashuttle.com");
+      res.redirect(`${base}/verify-email?status=success`);
+    } catch (err: any) {
+      console.error("[email-verify] verify error:", err);
+      res.status(500).json({ error: "Verification failed. Please try again." });
+    }
+  });
+
+  // Change email address (requires re-verification)
+  app.post("/api/b2c/auth/change-email", requireB2cAuth, async (req, res) => {
+    try {
+      const userId = req.session.b2cUserId!;
+      const { newEmail, password } = req.body ?? {};
+      if (!newEmail || !password) return res.status(400).json({ error: "New email and current password are required" });
+
+      const normalizedEmail = String(newEmail).toLowerCase().trim();
+      const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRe.test(normalizedEmail)) return res.status(400).json({ error: "Invalid email address" });
+
+      const user = await storage.getB2cUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      const valid = await bcrypt.compare(password, user.password);
+      if (!valid) return res.status(401).json({ error: "Current password is incorrect" });
+
+      const existing = await storage.getB2cUserByEmail(normalizedEmail);
+      if (existing && existing.id !== userId) return res.status(409).json({ error: "This email is already in use" });
+
+      const token = randomUUID();
+      await storage.updateB2cUser(userId, {
+        email: normalizedEmail,
+        emailVerified: false,
+        emailVerificationToken: token,
+      });
+
+      const baseUrl = String(req.headers.origin || process.env.APP_BASE_URL || "https://visashuttle.com");
+      const verifyUrl = `${baseUrl}/verify-email?token=${token}`;
+      await sendTransactionalEmail({
+        to: normalizedEmail,
+        toName: user.fullName,
+        subject: "Verify your new Visa Shuttle email address",
+        html: `
+          <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;color:#1e293b">
+            <h2 style="margin:0 0 8px;font-size:22px">Verify your new email</h2>
+            <p style="margin:0 0 24px;color:#475569;font-size:15px">Hi ${user.fullName},<br><br>Your email address was updated. Please verify the new address to restore full access.</p>
+            <a href="${verifyUrl}" style="display:inline-block;background:#4055FF;color:#fff;text-decoration:none;padding:13px 28px;border-radius:8px;font-weight:600;font-size:15px">Verify New Email</a>
+            <p style="margin:24px 0 8px;color:#64748b;font-size:13px">Or copy this link:</p>
+            <p style="word-break:break-all;color:#4055FF;font-size:13px">${verifyUrl}</p>
+            <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0">
+            <p style="margin:0;color:#94a3b8;font-size:12px">Check your spam/junk folder if you don't see this email.</p>
+          </div>`,
+        text: `Verify your new Visa Shuttle email:\n${verifyUrl}\n\nCheck spam/junk if not received.`,
+      });
+
+      req.session.save(() => {});
+      res.json({ ok: true, message: "Email updated. A verification link has been sent to your new address." });
+    } catch (err: any) {
+      console.error("[email-verify] change-email error:", err);
+      res.status(500).json({ error: "Failed to change email. Please try again." });
+    }
+  });
+
   // ── B2C Payments: Deep Check / Pro via configured platform gateway ───────
   app.post("/api/b2c/payments/deep-check/coupon", requireB2cAuth, async (req, res) => {
     const price = await getB2cPlanPrice(req.body?.planKey || "deep", req.body?.currency);
@@ -7221,6 +7337,11 @@ export async function registerRoutes(
 
     // Demo accounts bypass all limits
     const isDemo = user.subscriptionPlan === "demo";
+
+    // Email verification required for all checks
+    if (!isDemo && !user.emailVerified) {
+      return res.status(403).json({ error: "Please verify your email address before running checks.", emailVerificationRequired: true });
+    }
 
     // Enforce limits
     if (!isDemo && checkType === "deep") {
@@ -7868,6 +7989,13 @@ export async function registerRoutes(
     const userId = req.session.b2cUserId!;
     const user = await storage.getB2cUser(userId);
     if (!user) return res.status(401).json({ error: "User not found" });
+
+    // Email verification required for visa tools
+    const isDemo = user.subscriptionPlan === "demo";
+    if (!isDemo && !user.emailVerified) {
+      return res.status(403).json({ error: "Please verify your email address before using Visa Tools.", emailVerificationRequired: true });
+    }
+
     const creditSummary = await getB2cCreditSummary(user);
     if (creditSummary.remainingCredits < VISA_TOOL_CREDITS_PER_CHECK) {
       return res.status(402).json({

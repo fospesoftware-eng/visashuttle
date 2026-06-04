@@ -35,6 +35,7 @@ import PaymentFailurePage from "@/pages/payment-failure";
 import VisaToolsCreditPaymentPage from "@/pages/visa-tools-credit-payment";
 import SavedProfilePage from "@/pages/saved-profile";
 import SettingsPage from "@/pages/settings";
+import VerifyEmailPage from "@/pages/verify-email";
 import VisaToolsPage from "@/pages/visa-tools";
 import VisaToolCheckPage from "@/pages/visa-tool-check";
 import { FakeAgencyDetectorPage, FakeEmploymentDetectorPage, FakeVisaDetectorPage, RejectionRecoveryPage } from "@/pages/visa-tool-detail";
@@ -162,6 +163,7 @@ function Router() {
       <Route path="/growth-hub">{() => <GrowthHubDashboardPage />}</Route>
       <Route path="/join" component={JoinPage} />
       <Route path="/sign-in" component={SignInPage} />
+      <Route path="/verify-email" component={VerifyEmailPage} />
       <Route path="/check" component={CheckPage} />
       <Route path="/account" component={AccountPage} />
       <Route path="/pricing" component={PricingPage} />

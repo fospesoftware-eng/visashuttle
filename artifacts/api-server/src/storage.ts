@@ -315,6 +315,7 @@ export interface IStorage {
   getB2cUser(id: string): Promise<B2cUser | undefined>;
   getB2cUserByEmail(email: string): Promise<B2cUser | undefined>;
   getB2cUserByPhone(phone: string): Promise<B2cUser | undefined>;
+  getB2cUserByVerificationToken(token: string): Promise<B2cUser | undefined>;
   getAllB2cUsers(): Promise<B2cUser[]>;
   createB2cUser(user: InsertB2cUser): Promise<B2cUser>;
   updateB2cUser(id: string, data: Partial<Omit<B2cUser, 'id' | 'createdAt'>>): Promise<B2cUser | undefined>;
@@ -850,6 +851,8 @@ export class MemStorage implements IStorage {
       checkLimit: 5,
       deepCheckAccess: true,
       adminDeepCheckBonus: 0,
+      emailVerified: true,
+      emailVerificationToken: null,
       stripeCustomerId: null,
       createdAt: new Date(),
     };
@@ -868,6 +871,8 @@ export class MemStorage implements IStorage {
       checkLimit: 9999,
       deepCheckAccess: true,
       adminDeepCheckBonus: 0,
+      emailVerified: true,
+      emailVerificationToken: null,
       stripeCustomerId: null,
       createdAt: new Date(),
     };
@@ -1949,6 +1954,10 @@ export class MemStorage implements IStorage {
     return Array.from(this.b2cUsersMap.values()).find(
       u => u.email.toLowerCase() === email.toLowerCase()
     );
+  }
+
+  async getB2cUserByVerificationToken(token: string): Promise<B2cUser | undefined> {
+    return Array.from(this.b2cUsersMap.values()).find(u => u.emailVerificationToken === token);
   }
 
   async getB2cUserByPhone(phone: string): Promise<B2cUser | undefined> {
@@ -3683,6 +3692,8 @@ class HybridStorage extends MemStorage {
         checkLimit: 5,
         deepCheckAccess: true,
         adminDeepCheckBonus: 0,
+        emailVerified: true,
+        emailVerificationToken: null,
         stripeCustomerId: null,
       },
       {
@@ -3697,6 +3708,8 @@ class HybridStorage extends MemStorage {
         checkLimit: 9999,
         deepCheckAccess: true,
         adminDeepCheckBonus: 0,
+        emailVerified: true,
+        emailVerificationToken: null,
         stripeCustomerId: null,
       },
     ];
@@ -3736,6 +3749,11 @@ class HybridStorage extends MemStorage {
 
   async getB2cUserByPhone(phone: string): Promise<B2cUser | undefined> {
     const rows = await db.select().from(b2cUsers).where(eq(b2cUsers.phone, phone)).limit(1);
+    return rows[0];
+  }
+
+  async getB2cUserByVerificationToken(token: string): Promise<B2cUser | undefined> {
+    const rows = await db.select().from(b2cUsers).where(eq(b2cUsers.emailVerificationToken, token)).limit(1);
     return rows[0];
   }
 
