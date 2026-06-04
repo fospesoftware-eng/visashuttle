@@ -6491,33 +6491,38 @@ export async function registerRoutes(
 
   // Login
   app.post("/api/b2c/auth/login", authRateLimiter, async (req, res) => {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email and password are required" });
-    }
-    const normalizedEmail = String(email).toLowerCase().trim();
-    if (["demo@visashuttle.com", "test@visashuttle.com"].includes(normalizedEmail)) {
-      await Promise.resolve((storage as any).seedDemoUsersToDb?.()).catch((err) => {
-        req.log.warn({ err }, "[b2c/auth/login] demo account repair seed failed");
-      });
-    }
-    const user = await storage.getB2cUserByEmail(normalizedEmail);
-    if (!user) {
-      return res.status(401).json({ error: "Invalid email or password" });
-    }
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) {
-      return res.status(401).json({ error: "Invalid email or password" });
-    }
-    req.session.b2cUserId = user.id;
-    req.session.save((err) => {
-      if (err) {
-        req.log.error({ err }, "[b2c/auth/login] session.save failed");
-        return res.status(500).json({ error: "Session error, please try again" });
+    try {
+      const { email, password } = req.body ?? {};
+      if (!email || !password) {
+        return res.status(400).json({ error: "Email and password are required" });
       }
-      const { password: _, ...safeUser } = user;
-      res.json({ user: safeUser });
-    });
+      const normalizedEmail = String(email).toLowerCase().trim();
+      if (["demo@visashuttle.com", "test@visashuttle.com"].includes(normalizedEmail)) {
+        await Promise.resolve((storage as any).seedDemoUsersToDb?.()).catch((err) => {
+          req.log.warn({ err }, "[b2c/auth/login] demo account repair seed failed");
+        });
+      }
+      const user = await storage.getB2cUserByEmail(normalizedEmail);
+      if (!user) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+      const valid = await bcrypt.compare(password, user.password);
+      if (!valid) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+      req.session.b2cUserId = user.id;
+      req.session.save((err) => {
+        if (err) {
+          req.log.error({ err }, "[b2c/auth/login] session.save failed");
+          return res.status(500).json({ error: "Session error, please try again" });
+        }
+        const { password: _, ...safeUser } = user;
+        res.json({ user: safeUser });
+      });
+    } catch (err: any) {
+      req.log.error({ err }, "[b2c/auth/login] unexpected error");
+      res.status(500).json({ error: "Sign in failed. Please try again." });
+    }
   });
 
   // Logout
@@ -6530,16 +6535,21 @@ export async function registerRoutes(
 
   // Get current user
   app.get("/api/b2c/auth/me", async (req, res) => {
-    if (!req.session?.b2cUserId) {
-      return res.status(401).json({ error: "Not authenticated" });
+    try {
+      if (!req.session?.b2cUserId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const user = await storage.getB2cUser(req.session.b2cUserId);
+      if (!user) {
+        req.session.b2cUserId = undefined;
+        return res.status(401).json({ error: "User not found" });
+      }
+      const { password: _, ...safeUser } = user;
+      res.json({ user: safeUser });
+    } catch (err: any) {
+      req.log.error({ err }, "[b2c/auth/me] unexpected error");
+      res.status(500).json({ error: "Failed to load account. Please try again." });
     }
-    const user = await storage.getB2cUser(req.session.b2cUserId);
-    if (!user) {
-      req.session.b2cUserId = undefined;
-      return res.status(401).json({ error: "User not found" });
-    }
-    const { password: _, ...safeUser } = user;
-    res.json({ user: safeUser });
   });
 
   // ── B2C Payments: Deep Check / Pro via configured platform gateway ───────

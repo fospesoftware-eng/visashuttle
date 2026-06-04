@@ -849,6 +849,7 @@ export class MemStorage implements IStorage {
       subscriptionPlan: "pro",
       checkLimit: 5,
       deepCheckAccess: true,
+      adminDeepCheckBonus: 0,
       stripeCustomerId: null,
       createdAt: new Date(),
     };
@@ -866,6 +867,7 @@ export class MemStorage implements IStorage {
       subscriptionPlan: "pro",
       checkLimit: 9999,
       deepCheckAccess: true,
+      adminDeepCheckBonus: 0,
       stripeCustomerId: null,
       createdAt: new Date(),
     };
@@ -3680,6 +3682,7 @@ class HybridStorage extends MemStorage {
         subscriptionPlan: "pro" as const,
         checkLimit: 5,
         deepCheckAccess: true,
+        adminDeepCheckBonus: 0,
         stripeCustomerId: null,
       },
       {
@@ -3693,6 +3696,7 @@ class HybridStorage extends MemStorage {
         subscriptionPlan: "pro" as const,
         checkLimit: 9999,
         deepCheckAccess: true,
+        adminDeepCheckBonus: 0,
         stripeCustomerId: null,
       },
     ];
