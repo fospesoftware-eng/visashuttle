@@ -7129,8 +7129,21 @@ export async function registerRoutes(
     const isDemo = user.subscriptionPlan === "demo";
 
     // Enforce limits
-    if (!isDemo && checkType === "deep" && !user.deepCheckAccess) {
-      return res.status(403).json({ error: "Deep Check requires paid access", upgrade: true });
+    if (!isDemo && checkType === "deep") {
+      if (!user.deepCheckAccess) {
+        return res.status(403).json({ error: "Deep Check requires paid access", upgrade: true });
+      }
+      // If access is only via admin bonus, enforce the bonus volume
+      const bonus = user.adminDeepCheckBonus || 0;
+      const planKey = user.subscriptionPlan;
+      const hasPlanDeepAccess = planKey === "deep" || planKey === "pro" || planKey === "demo";
+      if (!hasPlanDeepAccess && bonus > 0) {
+        const allChecks = await storage.getVisaChecksByUserId(user.id);
+        const deepUsed = allChecks.filter((c) => c.checkType === "deep").length;
+        if (deepUsed >= bonus) {
+          return res.status(403).json({ error: "Deep Check volume exhausted. Please contact support.", upgrade: true });
+        }
+      }
     }
     if (!isDemo && checkType === "basic") {
       const checksUsed = user.freeChecksUsed || 0;
@@ -8471,6 +8484,34 @@ export async function registerRoutes(
     });
     const summary = await getB2cCreditSummary(user);
     res.json({ ok: true, order: { ...order, note }, credits: summary });
+  });
+
+  // Add Basic/Deep Check volumes to a B2C user (admin adjustment)
+  app.post("/api/admin/b2c-users/:id/check-volumes", requireAdminAuth, async (req, res) => {
+    const user = await storage.getB2cUser(req.params.id);
+    if (!user) return res.status(404).json({ error: "B2C user not found" });
+
+    const basicVolume = Math.floor(Number(req.body?.basicCheckVolume ?? 0));
+    const deepVolume = Math.floor(Number(req.body?.deepCheckVolume ?? 0));
+
+    if (basicVolume < 0 || basicVolume > 10000 || deepVolume < 0 || deepVolume > 10000) {
+      return res.status(400).json({ error: "Volume must be between 0 and 10000" });
+    }
+    if (basicVolume === 0 && deepVolume === 0) {
+      return res.status(400).json({ error: "At least one volume must be greater than 0" });
+    }
+
+    const updates: Record<string, any> = {};
+    if (basicVolume > 0) updates.checkLimit = (user.checkLimit || 0) + basicVolume;
+    if (deepVolume > 0) {
+      updates.adminDeepCheckBonus = (user.adminDeepCheckBonus || 0) + deepVolume;
+      updates.deepCheckAccess = true;
+    }
+
+    const updated = await storage.updateB2cUser(user.id, updates);
+    if (!updated) return res.status(500).json({ error: "Failed to update user" });
+    const { password: _, ...safeUser } = updated;
+    res.json({ ok: true, user: safeUser });
   });
 
   // Delete B2C user (admin)

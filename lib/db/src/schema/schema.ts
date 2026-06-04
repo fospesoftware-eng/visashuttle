@@ -494,6 +494,7 @@ export const b2cUsers = pgTable("b2c_users", {
   subscriptionPlan: text("subscription_plan").notNull().default("free"), // free, starter, pro
   checkLimit: integer("check_limit").notNull().default(1),
   deepCheckAccess: boolean("deep_check_access").notNull().default(false),
+  adminDeepCheckBonus: integer("admin_deep_check_bonus").notNull().default(0),
   stripeCustomerId: text("stripe_customer_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });

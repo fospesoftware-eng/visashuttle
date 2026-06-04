@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Search, MoreVertical, User, Mail, Trash2, Edit2, Users, Globe, Shield, Coins, RotateCcw } from "lucide-react";
+import { Plus, Search, MoreVertical, User, Mail, Trash2, Edit2, Users, Globe, Shield, Coins, RotateCcw, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -58,6 +58,8 @@ export default function AdminUsersPage() {
   const [b2cEditUser, setB2cEditUser] = useState<any>(null);
   const [creditUser, setCreditUser] = useState<any>(null);
   const [creditForm, setCreditForm] = useState({ credits: 100, note: "" });
+  const [volumeUser, setVolumeUser] = useState<any>(null);
+  const [volumeForm, setVolumeForm] = useState({ basicCheckVolume: 0, deepCheckVolume: 0 });
   const [form, setForm] = useState({ name: "", email: "", role: "agency_staff", tenantId: "", password: "" });
 
   const { toast } = useToast();
@@ -131,6 +133,17 @@ export default function AdminUsersPage() {
       qc.invalidateQueries({ queryKey: ["/api/admin/stats"] });
       setDeleteB2cId(null);
       toast({ title: "B2C user deleted" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const addCheckVolumesMutation = useMutation({
+    mutationFn: ({ id, data }: any) => apiRequest("POST", `/api/admin/b2c-users/${id}/check-volumes`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/b2c-users"] });
+      setVolumeUser(null);
+      setVolumeForm({ basicCheckVolume: 0, deepCheckVolume: 0 });
+      toast({ title: "Check volumes added", description: "Basic/Deep Check volumes have been updated for the user." });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
@@ -337,7 +350,7 @@ export default function AdminUsersPage() {
                         <TableHead>User</TableHead>
                         <TableHead>Plan</TableHead>
                         <TableHead>Tool Credits</TableHead>
-                        <TableHead>Checks Used</TableHead>
+                        <TableHead>Basic Checks</TableHead>
                         <TableHead>Deep Check</TableHead>
                         <TableHead>Joined</TableHead>
                         <TableHead className="w-[50px]"></TableHead>
@@ -377,9 +390,14 @@ export default function AdminUsersPage() {
                           </TableCell>
                           <TableCell className="text-sm">{user.freeChecksUsed} / {user.checkLimit}</TableCell>
                           <TableCell>
-                            <Badge variant={user.deepCheckAccess ? "default" : "outline"} className="text-xs">
-                              {user.deepCheckAccess ? "Enabled" : "Disabled"}
-                            </Badge>
+                            <div className="space-y-0.5">
+                              <Badge variant={user.deepCheckAccess ? "default" : "outline"} className="text-xs">
+                                {user.deepCheckAccess ? "Enabled" : "Disabled"}
+                              </Badge>
+                              {(user.adminDeepCheckBonus || 0) > 0 && (
+                                <p className="text-[11px] text-muted-foreground">{user.adminDeepCheckBonus} bonus</p>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {user.createdAt ? formatDistanceToNow(new Date(user.createdAt), { addSuffix: true }) : "—"}
@@ -394,6 +412,9 @@ export default function AdminUsersPage() {
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem onClick={() => setB2cEditUser({ ...user })}>
                                   <Edit2 className="w-4 h-4 mr-2" />Edit Plan
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => { setVolumeUser({ ...user }); setVolumeForm({ basicCheckVolume: 0, deepCheckVolume: 0 }); }}>
+                                  <TrendingUp className="w-4 h-4 mr-2" />Add Check Volumes
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => { setCreditUser({ ...user }); setCreditForm({ credits: 100, note: "" }); }}>
                                   <Coins className="w-4 h-4 mr-2" />Add Credits
@@ -579,6 +600,70 @@ export default function AdminUsersPage() {
               disabled={updateB2cMutation.isPending}
             >
               {updateB2cMutation.isPending ? "Saving…" : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Check Volumes Dialog */}
+      <Dialog open={!!volumeUser} onOpenChange={() => setVolumeUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Check Volumes</DialogTitle>
+            <DialogDescription>
+              Add Basic Check and/or Deep Check volumes directly to {volumeUser?.email}.
+            </DialogDescription>
+          </DialogHeader>
+          {volumeUser && (
+            <div className="space-y-4 mt-2">
+              <div className="rounded-lg border bg-muted/30 p-3 grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground">Current Basic Limit</p>
+                  <p className="font-bold">{volumeUser.checkLimit} / month</p>
+                  <p className="text-xs text-muted-foreground">{volumeUser.freeChecksUsed} used</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Deep Check Bonus</p>
+                  <p className="font-bold">{volumeUser.adminDeepCheckBonus || 0} granted</p>
+                  <p className="text-xs text-muted-foreground">{volumeUser.deepCheckAccess ? "Access enabled" : "No access"}</p>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Basic Check Volume to Add</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={10000}
+                  value={volumeForm.basicCheckVolume}
+                  onChange={e => setVolumeForm({ ...volumeForm, basicCheckVolume: Number(e.target.value) })}
+                  placeholder="0"
+                />
+                <p className="text-xs text-muted-foreground">Adds to the user's monthly basic check limit.</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Deep Check Volume to Add</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={10000}
+                  value={volumeForm.deepCheckVolume}
+                  onChange={e => setVolumeForm({ ...volumeForm, deepCheckVolume: Number(e.target.value) })}
+                  placeholder="0"
+                />
+                <p className="text-xs text-muted-foreground">Grants additional deep checks and enables deep check access if not already active.</p>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setVolumeUser(null)}>Cancel</Button>
+            <Button
+              onClick={() => addCheckVolumesMutation.mutate({ id: volumeUser.id, data: volumeForm })}
+              disabled={
+                addCheckVolumesMutation.isPending ||
+                (volumeForm.basicCheckVolume <= 0 && volumeForm.deepCheckVolume <= 0)
+              }
+            >
+              {addCheckVolumesMutation.isPending ? "Adding..." : "Add Volumes"}
             </Button>
           </DialogFooter>
         </DialogContent>
