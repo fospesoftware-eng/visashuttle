@@ -8454,6 +8454,32 @@ export async function registerRoutes(
     res.json(safe);
   });
 
+  // Create B2C user (admin)
+  app.post("/api/admin/b2c-users", requireAdminAuth, async (req, res) => {
+    const { email, fullName, password, phone, subscriptionPlan, checkLimit, deepCheckAccess, adminDeepCheckBonus } = req.body;
+    if (!email || !fullName || !password) {
+      return res.status(400).json({ error: "email, fullName, and password are required" });
+    }
+    const existing = await storage.getB2cUserByEmail(email.toLowerCase().trim());
+    if (existing) return res.status(409).json({ error: "A user with this email already exists" });
+
+    const hashed = await bcrypt.hash(password, 10);
+    const user = await storage.createB2cUser({
+      email: email.toLowerCase().trim(),
+      fullName,
+      password: hashed,
+      phone: phone || null,
+      phoneVerified: false,
+      subscriptionPlan: subscriptionPlan || "free",
+      checkLimit: Number(checkLimit) || 1,
+      deepCheckAccess: Boolean(deepCheckAccess),
+      adminDeepCheckBonus: Number(adminDeepCheckBonus) || 0,
+      freeChecksUsed: 0,
+    });
+    const { password: _, ...safeUser } = user;
+    res.status(201).json(safeUser);
+  });
+
   // Update B2C user (admin)
   app.patch("/api/admin/b2c-users/:id", requireAdminAuth, async (req, res) => {
     const user = await storage.updateB2cUser(req.params.id, req.body);

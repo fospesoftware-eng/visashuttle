@@ -60,6 +60,8 @@ export default function AdminUsersPage() {
   const [creditForm, setCreditForm] = useState({ credits: 100, note: "" });
   const [volumeUser, setVolumeUser] = useState<any>(null);
   const [volumeForm, setVolumeForm] = useState({ basicCheckVolume: 0, deepCheckVolume: 0 });
+  const [createB2cOpen, setCreateB2cOpen] = useState(false);
+  const [b2cForm, setB2cForm] = useState({ fullName: "", email: "", password: "", phone: "", subscriptionPlan: "free", checkLimit: 1, deepCheckAccess: false, adminDeepCheckBonus: 0 });
   const [form, setForm] = useState({ name: "", email: "", role: "agency_staff", tenantId: "", password: "" });
 
   const { toast } = useToast();
@@ -133,6 +135,18 @@ export default function AdminUsersPage() {
       qc.invalidateQueries({ queryKey: ["/api/admin/stats"] });
       setDeleteB2cId(null);
       toast({ title: "B2C user deleted" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const createB2cMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/admin/b2c-users", data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/b2c-users"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      setCreateB2cOpen(false);
+      setB2cForm({ fullName: "", email: "", password: "", phone: "", subscriptionPlan: "free", checkLimit: 1, deepCheckAccess: false, adminDeepCheckBonus: 0 });
+      toast({ title: "B2C user created" });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
@@ -339,6 +353,12 @@ export default function AdminUsersPage() {
 
           {/* B2C Users Tab */}
           <TabsContent value="b2c" className="space-y-4">
+            <div className="flex justify-end">
+              <Button className="gap-2" onClick={() => setCreateB2cOpen(true)}>
+                <Plus className="w-4 h-4" />
+                Add B2C User
+              </Button>
+            </div>
             <Card>
               <CardContent className="p-0">
                 {b2cLoading ? (
@@ -559,7 +579,7 @@ export default function AdminUsersPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit B2C User</DialogTitle>
-            <DialogDescription>Manage plan and access for {b2cEditUser?.email}</DialogDescription>
+            <DialogDescription>Manage plan and check volumes for {b2cEditUser?.email}</DialogDescription>
           </DialogHeader>
           {b2cEditUser && (
             <div className="space-y-4 mt-2">
@@ -574,9 +594,27 @@ export default function AdminUsersPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
-                <Label>Check Limit / Month</Label>
-                <Input type="number" value={b2cEditUser.checkLimit} onChange={e => setB2cEditUser({ ...b2cEditUser, checkLimit: parseInt(e.target.value) })} />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Basic Check Limit / Month</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={b2cEditUser.checkLimit}
+                    onChange={e => setB2cEditUser({ ...b2cEditUser, checkLimit: parseInt(e.target.value) || 0 })}
+                  />
+                  <p className="text-xs text-muted-foreground">{b2cEditUser.freeChecksUsed} used so far</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Deep Check Volume (Admin Bonus)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={b2cEditUser.adminDeepCheckBonus ?? 0}
+                    onChange={e => setB2cEditUser({ ...b2cEditUser, adminDeepCheckBonus: parseInt(e.target.value) || 0 })}
+                  />
+                  <p className="text-xs text-muted-foreground">Extra deep checks granted</p>
+                </div>
               </div>
               <div className="flex items-center justify-between">
                 <div>
@@ -596,7 +634,7 @@ export default function AdminUsersPage() {
           <DialogFooter className="mt-4">
             <Button variant="outline" onClick={() => setB2cEditUser(null)}>Cancel</Button>
             <Button
-              onClick={() => updateB2cMutation.mutate({ id: b2cEditUser.id, data: { subscriptionPlan: b2cEditUser.subscriptionPlan, checkLimit: b2cEditUser.checkLimit, deepCheckAccess: b2cEditUser.deepCheckAccess, freeChecksUsed: b2cEditUser.freeChecksUsed } })}
+              onClick={() => updateB2cMutation.mutate({ id: b2cEditUser.id, data: { subscriptionPlan: b2cEditUser.subscriptionPlan, checkLimit: b2cEditUser.checkLimit, deepCheckAccess: b2cEditUser.deepCheckAccess, freeChecksUsed: b2cEditUser.freeChecksUsed, adminDeepCheckBonus: b2cEditUser.adminDeepCheckBonus ?? 0 } })}
               disabled={updateB2cMutation.isPending}
             >
               {updateB2cMutation.isPending ? "Saving…" : "Save Changes"}
@@ -715,6 +753,83 @@ export default function AdminUsersPage() {
               disabled={addB2cCreditsMutation.isPending || !creditForm.credits || creditForm.credits <= 0}
             >
               {addB2cCreditsMutation.isPending ? "Adding..." : "Add Credits"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create B2C User Dialog */}
+      <Dialog open={createB2cOpen} onOpenChange={setCreateB2cOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add B2C User</DialogTitle>
+            <DialogDescription>Create a new visa checker account with custom check volumes.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Full Name *</Label>
+                <Input value={b2cForm.fullName} onChange={e => setB2cForm({ ...b2cForm, fullName: e.target.value })} placeholder="Jane Smith" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Phone</Label>
+                <Input value={b2cForm.phone} onChange={e => setB2cForm({ ...b2cForm, phone: e.target.value })} placeholder="+1234567890" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Email *</Label>
+              <Input type="email" value={b2cForm.email} onChange={e => setB2cForm({ ...b2cForm, email: e.target.value })} placeholder="jane@example.com" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Password *</Label>
+              <Input type="password" value={b2cForm.password} onChange={e => setB2cForm({ ...b2cForm, password: e.target.value })} placeholder="Set initial password" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Subscription Plan</Label>
+              <Select value={b2cForm.subscriptionPlan} onValueChange={v => setB2cForm({ ...b2cForm, subscriptionPlan: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="free">Free</SelectItem>
+                  <SelectItem value="deep">Deep Check</SelectItem>
+                  <SelectItem value="pro">Pro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Basic Check Limit / Month</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={b2cForm.checkLimit}
+                  onChange={e => setB2cForm({ ...b2cForm, checkLimit: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Deep Check Volume</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={b2cForm.adminDeepCheckBonus}
+                  onChange={e => setB2cForm({ ...b2cForm, adminDeepCheckBonus: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-sm">Deep Check Access</p>
+                <p className="text-xs text-muted-foreground">Enable AI-powered deep visa assessment</p>
+              </div>
+              <Switch checked={b2cForm.deepCheckAccess} onCheckedChange={v => setB2cForm({ ...b2cForm, deepCheckAccess: v })} />
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setCreateB2cOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => createB2cMutation.mutate(b2cForm)}
+              disabled={!b2cForm.fullName || !b2cForm.email || !b2cForm.password || createB2cMutation.isPending}
+            >
+              {createB2cMutation.isPending ? "Creating…" : "Create User"}
             </Button>
           </DialogFooter>
         </DialogContent>
