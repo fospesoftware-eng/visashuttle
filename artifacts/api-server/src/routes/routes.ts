@@ -8456,28 +8456,33 @@ export async function registerRoutes(
 
   // Create B2C user (admin)
   app.post("/api/admin/b2c-users", requireAdminAuth, async (req, res) => {
-    const { email, fullName, password, phone, subscriptionPlan, checkLimit, deepCheckAccess, adminDeepCheckBonus } = req.body;
-    if (!email || !fullName || !password) {
-      return res.status(400).json({ error: "email, fullName, and password are required" });
-    }
-    const existing = await storage.getB2cUserByEmail(email.toLowerCase().trim());
-    if (existing) return res.status(409).json({ error: "A user with this email already exists" });
+    try {
+      const { email, fullName, password, phone, subscriptionPlan, checkLimit, deepCheckAccess, adminDeepCheckBonus } = req.body ?? {};
+      if (!email || !fullName || !password) {
+        return res.status(400).json({ error: "email, fullName, and password are required" });
+      }
+      const existing = await storage.getB2cUserByEmail(email.toLowerCase().trim());
+      if (existing) return res.status(409).json({ error: "A user with this email already exists" });
 
-    const hashed = await bcrypt.hash(password, 10);
-    const user = await storage.createB2cUser({
-      email: email.toLowerCase().trim(),
-      fullName,
-      password: hashed,
-      phone: phone || null,
-      phoneVerified: false,
-      subscriptionPlan: subscriptionPlan || "free",
-      checkLimit: Number(checkLimit) || 1,
-      deepCheckAccess: Boolean(deepCheckAccess),
-      adminDeepCheckBonus: Number(adminDeepCheckBonus) || 0,
-      freeChecksUsed: 0,
-    });
-    const { password: _, ...safeUser } = user;
-    res.status(201).json(safeUser);
+      const hashed = await bcrypt.hash(String(password), 10);
+      const user = await storage.createB2cUser({
+        email: email.toLowerCase().trim(),
+        fullName,
+        password: hashed,
+        phone: phone || null,
+        phoneVerified: false,
+        subscriptionPlan: subscriptionPlan || "free",
+        checkLimit: Number(checkLimit) || 1,
+        deepCheckAccess: Boolean(deepCheckAccess),
+        adminDeepCheckBonus: Number(adminDeepCheckBonus) || 0,
+        freeChecksUsed: 0,
+      });
+      const { password: _, ...safeUser } = user;
+      res.status(201).json(safeUser);
+    } catch (err: any) {
+      console.error("Admin create B2C user error:", err);
+      res.status(500).json({ error: err?.message ?? "Failed to create user" });
+    }
   });
 
   // Update B2C user (admin)
