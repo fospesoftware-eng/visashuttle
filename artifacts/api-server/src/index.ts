@@ -122,6 +122,11 @@ httpServer.listen({ port, host: "0.0.0.0" }, () => {
 // code in `./app` or `./routes/routes` can no longer block port binding.
 (async () => {
   try {
+    bootLog("running startup migrations");
+    const { runStartupMigrations } = await import("./db");
+    await runStartupMigrations();
+    bootLog("startup migrations done");
+
     bootLog("importing ./app");
     const appMod = await import("./app");
     const fullApp = appMod.default as Express;
