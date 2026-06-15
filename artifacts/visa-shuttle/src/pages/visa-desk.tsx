@@ -38,6 +38,7 @@ const CURRENCIES = [
   { code: "EUR", symbol: "€", rate: 0.92, flag: "🇪🇺" },
   { code: "INR", symbol: "₹", rate: 83, flag: "🇮🇳" },
   { code: "AED", symbol: "AED ", rate: 3.67, flag: "🇦🇪" },
+  { code: "BHD", symbol: "BHD ", rate: 0.38, flag: "🇧🇭" },
 ] as const;
 
 type CurrencyCode = typeof CURRENCIES[number]["code"];
@@ -45,6 +46,7 @@ type CurrencyCode = typeof CURRENCIES[number]["code"];
 function convertPrice(usdAmount: number, curr: typeof CURRENCIES[number]): string {
   const val = usdAmount * curr.rate;
   if (curr.code === "INR") return `${curr.symbol}${Math.round(val).toLocaleString("en-IN")}`;
+  if (curr.code === "BHD") return `${curr.symbol}${val.toFixed(3)}`;
   return `${curr.symbol}${Math.round(val)}`;
 }
 

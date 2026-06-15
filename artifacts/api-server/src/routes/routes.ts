@@ -872,8 +872,9 @@ const B2C_DEEP_CHECK_PRICES: Record<string, number> = {
   EUR: 12,
   INR: 1000,
   AED: 55,
+  BHD: 6,
 };
-const B2C_SUPPORTED_CURRENCIES = ["USD", "GBP", "EUR", "INR", "AED"] as const;
+const B2C_SUPPORTED_CURRENCIES = ["USD", "GBP", "EUR", "INR", "AED", "BHD"] as const;
 
 function getB2cDeepCheckPrice(currencyInput: unknown) {
   const currency = String(currencyInput || "USD").trim().toUpperCase();
@@ -932,7 +933,7 @@ function getCreditPricingFromPlan(plan: any, currencyInput: unknown) {
   const unit = Math.max(100, Number(conditions.extraCreditUnit || 100) || 100);
   const prices = conditions.extraCreditPrices && typeof conditions.extraCreditPrices === "object"
     ? conditions.extraCreditPrices as Record<string, unknown>
-    : { USD: 2, INR: 170, AED: 8, GBP: 2, EUR: 2 };
+    : { USD: 2, INR: 170, AED: 8, GBP: 2, EUR: 2, BHD: 1 };
   const amountPerUnit = Math.max(1, Number(prices[currency] ?? prices.USD ?? 2) || 2);
   return { currency, unit, amountPerUnit };
 }

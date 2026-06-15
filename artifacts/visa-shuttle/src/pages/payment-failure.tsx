@@ -10,7 +10,7 @@ import { type B2cCurrency, getStoredB2cCurrency } from "@/lib/b2c-pricing";
 
 function safeCurrency(value: string | null): B2cCurrency {
   const code = String(value || getStoredB2cCurrency()).toUpperCase();
-  return (["USD", "GBP", "EUR", "INR", "AED"].includes(code) ? code : "USD") as B2cCurrency;
+  return (["USD", "GBP", "EUR", "INR", "AED", "BHD"].includes(code) ? code : "USD") as B2cCurrency;
 }
 
 export default function PaymentFailurePage() {
