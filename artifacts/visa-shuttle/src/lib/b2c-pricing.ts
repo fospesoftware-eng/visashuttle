@@ -1,4 +1,4 @@
-export type B2cCurrency = "USD" | "GBP" | "EUR" | "INR" | "AED" | "BHD";
+export type B2cCurrency = "USD" | "GBP" | "EUR" | "INR" | "AED";
 export type B2cBillingType = "free" | "one_time" | "monthly";
 export type B2cPlanKey = "free" | "deep" | "pro";
 
@@ -24,7 +24,6 @@ export const B2C_DEEP_CHECK_PRICES: Record<B2cCurrency, { amount: number; symbol
   EUR: { amount: 12, symbol: "€", label: "Euro" },
   INR: { amount: 1000, symbol: "₹", label: "Indian Rupee" },
   AED: { amount: 55, symbol: "AED", label: "UAE Dirham" },
-  BHD: { amount: 6, symbol: "BHD", label: "Bahraini Dinar" },
 };
 
 export const B2C_CURRENCIES = Object.keys(B2C_DEEP_CHECK_PRICES) as B2cCurrency[];
@@ -35,7 +34,6 @@ export const B2C_CURRENCY_FLAGS: Record<B2cCurrency, string> = {
   EUR: "🇪🇺",
   INR: "🇮🇳",
   AED: "🇦🇪",
-  BHD: "🇧🇭",
 };
 
 export const DEFAULT_B2C_PLANS: B2cPlan[] = [
@@ -44,7 +42,7 @@ export const DEFAULT_B2C_PLANS: B2cPlan[] = [
     name: "Free",
     description: "Start with a quick AI visa score and essential guidance.",
     billingType: "free",
-    prices: { USD: 0, GBP: 0, EUR: 0, INR: 0, AED: 0, BHD: 0 },
+    prices: { USD: 0, GBP: 0, EUR: 0, INR: 0, AED: 0 },
     features: [
       "1 Basic Check",
       "Approval chance percentage",
@@ -65,7 +63,7 @@ export const DEFAULT_B2C_PLANS: B2cPlan[] = [
     name: "Deep Check",
     description: "One detailed embassy-style AI risk analysis for serious applicants.",
     billingType: "one_time",
-    prices: { USD: 15, GBP: 11, EUR: 12, INR: 1000, AED: 55, BHD: 6 },
+    prices: { USD: 15, GBP: 11, EUR: 12, INR: 1000, AED: 55 },
     features: [
       "Full embassy-style risk analysis",
       "Deep Check with 7 profile dimensions",
@@ -90,7 +88,7 @@ export const DEFAULT_B2C_PLANS: B2cPlan[] = [
     name: "Pro",
     description: "Monthly plan for frequent applicants and family/travel planning.",
     billingType: "monthly",
-    prices: { USD: 35, GBP: 26, EUR: 30, INR: 3000, AED: 125, BHD: 13 },
+    prices: { USD: 35, GBP: 26, EUR: 30, INR: 3000, AED: 125 },
     features: ["Unlimited Basic checks*", "10 Deep Checks", "1000 Visa Tools Credit"],
     conditions: {
       cta: "Upgrade to Pro",
@@ -112,7 +110,7 @@ export function isB2cCurrency(value: string | null | undefined): value is B2cCur
 export function formatB2cPrice(currency: B2cCurrency, amount = B2C_DEEP_CHECK_PRICES[currency].amount): string {
   const price = B2C_DEEP_CHECK_PRICES[currency];
   if (currency === "AED") return `AED ${amount}`;
-  if (currency === "BHD") return `BHD ${amount}`;
+
   return `${price.symbol}${amount}`;
 }
 
