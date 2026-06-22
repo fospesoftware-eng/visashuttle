@@ -679,6 +679,8 @@ export default function CaseDetailPage() {
   const [aiFiles, setAiFiles] = useState<File[]>([]);
   const [aiResult, setAiResult] = useState<any>(null);
   const aiFileInputRef = useRef<HTMLInputElement>(null);
+  // Per-checklist-item hidden file inputs
+  const itemFileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
   const aiAnalyzeMutation = useMutation({
     mutationFn: async (files: File[]) => {
@@ -1782,16 +1784,46 @@ export default function CaseDetailPage() {
                                   <p className="text-sm font-semibold">{name}</p>
                                   {item.description && <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>}
                                   {matched ? (
-                                    <p className={`text-xs mt-1 font-medium flex items-center gap-1 ${matched.status === "approved" ? "text-emerald-600" : "text-amber-600"}`}>
+                                    <p className={`text-xs mt-1 font-medium flex items-center gap-1 ${matched.status === "approved" ? "text-emerald-600" : matched.status === "needs_reupload" ? "text-red-500" : "text-amber-600"}`}>
                                       <FileText className="w-3 h-3" /> {matched.name} — {matched.status === "approved" ? "Approved" : matched.status === "pending" ? "Pending review" : matched.status.replace(/_/g, " ")}
                                     </p>
                                   ) : (
                                     <p className="text-xs mt-1 text-slate-400 italic">Not yet uploaded</p>
                                   )}
                                 </div>
-                                <Badge variant="outline" className={`text-xs shrink-0 mt-0.5 ${item.required !== false ? "border-red-200 text-red-600" : "border-slate-200 text-slate-500"}`}>
-                                  {item.required !== false ? "Required" : "Optional"}
-                                </Badge>
+                                <div className="flex items-center gap-2 shrink-0 mt-0.5">
+                                  <Badge variant="outline" className={`text-xs ${item.required !== false ? "border-red-200 text-red-600" : "border-slate-200 text-slate-500"}`}>
+                                    {item.required !== false ? "Required" : "Optional"}
+                                  </Badge>
+                                  {/* Per-item upload */}
+                                  <input
+                                    type="file"
+                                    accept=".pdf,.jpg,.jpeg,.png,.docx,.doc"
+                                    className="hidden"
+                                    ref={el => { itemFileInputRefs.current[idx] = el; }}
+                                    onChange={(e) => {
+                                      const files = Array.from(e.target.files || []);
+                                      if (files.length > 0) uploadDocumentsMutation.mutate(files);
+                                      e.target.value = "";
+                                    }}
+                                  />
+                                  <Button
+                                    size="sm"
+                                    variant={matched ? "ghost" : "outline"}
+                                    className={`h-7 text-xs px-2 ${matched?.status === "approved" ? "text-emerald-600 hover:bg-emerald-50" : ""}`}
+                                    onClick={() => itemFileInputRefs.current[idx]?.click()}
+                                    disabled={uploadDocumentsMutation.isPending}
+                                    title={matched ? "Replace document" : "Upload document"}
+                                  >
+                                    {uploadDocumentsMutation.isPending ? (
+                                      <Loader2 className="w-3 h-3 animate-spin" />
+                                    ) : matched?.status === "approved" ? (
+                                      <><CheckCircle className="w-3 h-3 mr-1" />Replace</>
+                                    ) : (
+                                      <><Plus className="w-3 h-3 mr-1" />Upload</>
+                                    )}
+                                  </Button>
+                                </div>
                               </div>
                             );
                           })}
@@ -1806,81 +1838,6 @@ export default function CaseDetailPage() {
                       </Card>
                     ) : null}
 
-                    {/* Upload zone */}
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm">Upload Documents</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <UploadDropzone onUpload={(files) => files.length > 0 && uploadDocumentsMutation.mutate(files)} />
-
-                        {docsLoading ? (
-                          <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
-                        ) : documents.length === 0 ? (
-                          <div className="text-center py-8 text-muted-foreground">
-                            <FileText className="w-10 h-10 mx-auto mb-2 opacity-40" />
-                            <p className="text-sm">No documents uploaded yet</p>
-                          </div>
-                        ) : (
-                          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            {documents.map((doc) => {
-                              const cfg = docStatusConfig[doc.status] || docStatusConfig.pending;
-                              const Icon = cfg.icon;
-                              return (
-                                <div key={doc.id} className="p-4 rounded-xl border bg-card hover-elevate transition-all" data-testid={`document-${doc.id}`}>
-                                  <div className="flex items-start justify-between gap-2 mb-3">
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
-                                        <FileText className="w-4 h-4 text-muted-foreground" />
-                                      </div>
-                                      <div>
-                                        <p className="text-sm font-semibold leading-tight">{doc.name}</p>
-                                        <p className="text-xs text-muted-foreground capitalize">{(doc.type || "").replace(/_/g, " ")}</p>
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <div className={`flex items-center gap-1.5 text-xs font-medium ${cfg.color} mb-3`}>
-                                    <Icon className="w-3.5 h-3.5" />{cfg.label}
-                                  </div>
-                                  {doc.qualityScore !== null && doc.qualityScore !== undefined && (
-                                    <div className="space-y-1 mb-3">
-                                      <div className="flex items-center justify-between text-xs">
-                                        <span className="text-muted-foreground">Quality</span>
-                                        <span className="font-semibold">{doc.qualityScore}%</span>
-                                      </div>
-                                      <Progress value={doc.qualityScore} className="h-1.5" />
-                                    </div>
-                                  )}
-                                  <div className="flex gap-2">
-                                    {doc.status === "pending" && (
-                                      <>
-                                        <Button variant="ghost" size="sm" className="flex-1 text-xs h-7 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" onClick={() => updateDocStatusMutation.mutate({ docId: doc.id, status: "approved" })} data-testid={`button-approve-doc-${doc.id}`}>
-                                          <CheckCircle className="w-3 h-3 mr-1" /> Approve
-                                        </Button>
-                                        <Button variant="ghost" size="sm" className="flex-1 text-xs h-7 text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => updateDocStatusMutation.mutate({ docId: doc.id, status: "needs_reupload" })} data-testid={`button-reject-doc-${doc.id}`}>
-                                          <AlertCircle className="w-3 h-3 mr-1" /> Reject
-                                        </Button>
-                                      </>
-                                    )}
-                                    {doc.status === "approved" && (
-                                      <Button variant="ghost" size="sm" className="flex-1 text-xs h-7" onClick={() => { if (doc.fileUrl) window.open(doc.fileUrl, "_blank", "noopener,noreferrer"); else toast({ title: "No file attached" }); }} data-testid={`button-download-doc-${doc.id}`}>
-                                        <Download className="w-3 h-3 mr-1" /> Download
-                                      </Button>
-                                    )}
-                                    {doc.status === "needs_reupload" && (
-                                      <Button variant="outline" size="sm" className="flex-1 text-xs h-7" disabled={requestSingleDocMutation.isPending} onClick={() => requestSingleDocMutation.mutate(doc)} data-testid={`button-request-doc-${doc.id}`}>
-                                        {requestSingleDocMutation.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <RefreshCw className="w-3 h-3 mr-1" />}
-                                        Request Again
-                                      </Button>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
                   </div>
                 )}
 

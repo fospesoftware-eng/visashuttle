@@ -2378,6 +2378,19 @@ Rules:
         if (match) {
           const aiChecklist = normalizeChecklistItems(JSON.parse(match[0]));
           if (aiChecklist.length > 0) {
+            // Persist to DB as a visa template so future requests skip AI entirely
+            try {
+              await storage.createVisaTemplate({
+                country,
+                visaType,
+                requirements: aiChecklist as any,
+                notes: nationality ? `AI-generated for ${nationality} nationals` : "AI-generated",
+                isActive: true,
+              });
+              console.info(`[checklists] Saved AI checklist to DB: ${country} / ${visaType}`);
+            } catch (saveErr) {
+              console.warn("[checklists] Failed to persist AI checklist to DB", saveErr);
+            }
             return {
               source: "ai" as const,
               country,
