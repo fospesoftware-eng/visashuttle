@@ -2299,7 +2299,7 @@ export async function registerRoutes(
     }
   }
 
-  async function getEffectiveDocumentChecklist(tenantId: string, country: string, visaType: string) {
+  async function getEffectiveDocumentChecklist(tenantId: string, country: string, visaType: string, nationality?: string) {
     let override: Awaited<ReturnType<typeof storage.getTenantDocumentChecklist>> | undefined;
     try {
       override = await storage.getTenantDocumentChecklist(tenantId, country, visaType);
@@ -2320,6 +2320,7 @@ export async function registerRoutes(
         source: "agency" as const,
         country,
         visaType,
+        nationality: nationality || null,
         checklist: normalizeChecklistItems(override.requirements),
         override,
       };
@@ -2331,15 +2332,69 @@ export async function registerRoutes(
         source: "database" as const,
         country,
         visaType,
+        nationality: nationality || null,
         checklist: templateChecklist,
         override: null,
       };
+    }
+
+    // No agency override and no DB template — generate a nationality-aware
+    // checklist on-the-fly with AI so the checklist is never empty.
+    if (country && visaType) {
+      try {
+        const Anthropic = (await import("@anthropic-ai/sdk")).default;
+        const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+        const nationalityLine = nationality ? `Applicant nationality: ${nationality}` : "";
+        const prompt = `You are a visa documentation expert. Generate a complete document checklist for:
+Destination country: ${country}
+Visa type: ${visaType}
+${nationalityLine}
+
+Return ONLY a JSON array of document requirements. Each item must have:
+{
+  "type": "snake_case_type",
+  "name": "Human Readable Name",
+  "description": "Brief one-line description of what is needed (e.g. 'Last 3 months, showing sufficient funds')",
+  "required": true or false
+}
+
+Rules:
+- Include nationality-specific documents if nationality is provided (e.g. Indian nationals applying for UK visa need ITR, salary slips, etc.)
+- Order: passport first, then photos, then financial docs, then employment/business docs, then travel docs, then supporting docs
+- Mark truly optional docs as required: false
+- Maximum 20 items
+- Return ONLY the JSON array, no other text`;
+
+        const resp = await client.messages.create({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1500,
+          messages: [{ role: "user", content: prompt }],
+        });
+        const text = (resp.content.find((b: any) => b.type === "text") as any)?.text || "[]";
+        const match = text.match(/\[[\s\S]*\]/);
+        if (match) {
+          const aiChecklist = normalizeChecklistItems(JSON.parse(match[0]));
+          if (aiChecklist.length > 0) {
+            return {
+              source: "ai" as const,
+              country,
+              visaType,
+              nationality: nationality || null,
+              checklist: aiChecklist,
+              override: null,
+            };
+          }
+        }
+      } catch (err) {
+        console.warn("[checklists] AI checklist generation failed", err);
+      }
     }
 
     return {
       source: "default" as const,
       country,
       visaType,
+      nationality: nationality || null,
       checklist: [] as DocumentRequirement[],
       override: null,
     };
@@ -2508,8 +2563,9 @@ export async function registerRoutes(
 
     const country = typeof req.query.country === "string" ? req.query.country.trim() : "";
     const visaType = typeof req.query.visaType === "string" ? req.query.visaType.trim() : "";
+    const nationality = typeof req.query.nationality === "string" ? req.query.nationality.trim() : undefined;
     if (country && visaType) {
-      return res.json(await getEffectiveDocumentChecklist(tenantId, country, visaType));
+      return res.json(await getEffectiveDocumentChecklist(tenantId, country, visaType, nationality));
     }
 
     const overrides = await storage.getTenantDocumentChecklists(tenantId);
@@ -5195,11 +5251,12 @@ export async function registerRoutes(
     const country = caseData.destinationCountry || "Unknown";
     const visaType = caseData.visaType || "Tourist Visa";
     const applicant = caseData.applicantName || "Applicant";
+    const nationality = (caseData as any).passportNationality || (caseData as any).nationality || "";
 
-    // Fetch the required document checklist for this case
+    // Fetch the required document checklist for this case (nationality-aware)
     let requiredDocs: string[] = [];
     try {
-      const checklist = await getEffectiveDocumentChecklist(caseData.tenantId, country, visaType);
+      const checklist = await getEffectiveDocumentChecklist(caseData.tenantId, country, visaType, nationality || undefined);
       requiredDocs = checklist.checklist.map((item: any) => item.name || item.documentType || String(item));
     } catch (_) { /* use empty list if checklist unavailable */ }
 
@@ -5207,11 +5264,12 @@ export async function registerRoutes(
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
     const today = new Date().toISOString().slice(0, 10);
-    const prompt = `You are a visa document verification expert for ${country} ${visaType} application for ${applicant}.
+    const nationalityLine = nationality ? `\nApplicant nationality: ${nationality}` : "";
+    const prompt = `You are a visa document verification expert for ${country} ${visaType} application for ${applicant}.${nationalityLine}
 
 Today's date: ${today}
 
-Required documents for ${country} ${visaType}:
+Required documents for ${nationality ? `${nationality} nationals applying for ` : ""}${country} ${visaType}:
 ${requiredDocs.length > 0 ? requiredDocs.map((d, i) => `${i + 1}. ${d}`).join("\n") : "Standard visa application documents (passport, photo, bank statements, travel history, etc.)"}
 
 The applicant has uploaded the following files:

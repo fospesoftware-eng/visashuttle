@@ -699,13 +699,19 @@ export default function CaseDetailPage() {
     enabled: !!id,
   });
 
-  // Document checklist for Self Mode
-  const { data: docChecklist } = useQuery<any>({
-    queryKey: ["/api/tenants", caseData?.tenantId, "document-checklist", caseData?.destinationCountry, caseData?.visaType],
+  // Document checklist for Self Mode — nationality-aware
+  const caseNationality = (caseData as any)?.passportNationality || (caseData as any)?.nationality || "";
+  const { data: docChecklist, isLoading: checklistLoading } = useQuery<any>({
+    queryKey: ["/api/tenants", caseData?.tenantId, "document-checklist", caseData?.destinationCountry, caseData?.visaType, caseNationality],
     queryFn: async () => {
       if (!caseData?.tenantId || !caseData?.destinationCountry || !caseData?.visaType) return null;
+      const params = new URLSearchParams({
+        country: caseData.destinationCountry,
+        visaType: caseData.visaType,
+        ...(caseNationality ? { nationality: caseNationality } : {}),
+      });
       const res = await fetch(
-        `/api/tenants/${caseData.tenantId}/document-checklist?country=${encodeURIComponent(caseData.destinationCountry)}&visaType=${encodeURIComponent(caseData.visaType)}`,
+        `/api/tenants/${caseData.tenantId}/application-settings/checklists?${params}`,
         { credentials: "include" }
       );
       if (!res.ok) return null;
@@ -1666,35 +1672,82 @@ export default function CaseDetailPage() {
                 {docMode === "self" && (
                   <div className="space-y-4">
                     {/* Checklist */}
-                    {docChecklist?.checklist && docChecklist.checklist.length > 0 && (
+                    {checklistLoading ? (
                       <Card>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm flex items-center gap-2">
-                            <ListChecks className="w-4 h-4 text-blue-600" />
-                            Required Documents — {caseData?.destinationCountry} {caseData?.visaType}
-                            <Badge variant="outline" className="ml-auto text-xs font-normal">
-                              {documents.filter(d => d.status === "approved").length} / {docChecklist.checklist.length} complete
+                        <CardContent className="flex items-center gap-3 p-5 text-sm text-muted-foreground">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          {caseNationality ? `Generating ${caseNationality} → ${caseData?.destinationCountry} checklist with AI…` : "Loading document checklist…"}
+                        </CardContent>
+                      </Card>
+                    ) : docChecklist?.checklist && docChecklist.checklist.length > 0 ? (
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <div className="flex items-start justify-between gap-3 flex-wrap">
+                            <div>
+                              <CardTitle className="text-sm flex items-center gap-2">
+                                <ListChecks className="w-4 h-4 text-blue-600" />
+                                Required Documents
+                              </CardTitle>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {caseNationality && <span className="font-medium text-foreground">{caseNationality}</span>}
+                                {caseNationality && " → "}
+                                <span className="font-medium text-foreground">{caseData?.destinationCountry}</span>
+                                {" · "}{caseData?.visaType}
+                                {docChecklist.source === "ai" && (
+                                  <span className="ml-2 inline-flex items-center gap-1 text-blue-600"><Brain className="w-3 h-3" />AI-generated</span>
+                                )}
+                              </p>
+                            </div>
+                            <Badge variant="outline" className="text-xs font-normal shrink-0">
+                              {documents.filter(d => d.status === "approved").length} / {docChecklist.checklist.filter((i: any) => i.required !== false).length} required complete
                             </Badge>
-                          </CardTitle>
+                          </div>
+
+                          {/* Quick navigation anchors */}
+                          <div className="flex flex-wrap gap-1.5 pt-2">
+                            {docChecklist.checklist.map((item: any, idx: number) => {
+                              const name = item.name || item.documentType || `Doc ${idx + 1}`;
+                              const matched = documents.find((d: Document) =>
+                                d.name?.toLowerCase().includes(name.toLowerCase().slice(0, 8)) ||
+                                (d.type || "").toLowerCase().replace(/_/g, " ").includes(name.toLowerCase().slice(0, 8))
+                              );
+                              return (
+                                <a
+                                  key={idx}
+                                  href={`#doc-item-${idx}`}
+                                  onClick={(e) => { e.preventDefault(); document.getElementById(`doc-item-${idx}`)?.scrollIntoView({ behavior: "smooth", block: "center" }); }}
+                                  className={`text-xs px-2 py-1 rounded-md border cursor-pointer transition-colors ${matched?.status === "approved" ? "bg-emerald-50 border-emerald-200 text-emerald-700" : matched ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"}`}
+                                >
+                                  {idx + 1}. {name.length > 18 ? name.slice(0, 18) + "…" : name}
+                                </a>
+                              );
+                            })}
+                          </div>
                         </CardHeader>
-                        <CardContent className="space-y-2">
+                        <CardContent className="space-y-2 pt-0">
                           {docChecklist.checklist.map((item: any, idx: number) => {
                             const name = item.name || item.documentType || `Document ${idx + 1}`;
-                            const matched = documents.find(d =>
-                              d.name?.toLowerCase().includes(name.toLowerCase()) ||
-                              (d.type || "").toLowerCase().replace(/_/g, " ").includes(name.toLowerCase())
+                            const matched = documents.find((d: Document) =>
+                              d.name?.toLowerCase().includes(name.toLowerCase().slice(0, 8)) ||
+                              (d.type || "").toLowerCase().replace(/_/g, " ").includes(name.toLowerCase().slice(0, 8))
                             );
                             return (
-                              <div key={idx} className="flex items-start gap-3 p-3 rounded-lg border bg-card">
-                                <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${matched?.status === "approved" ? "bg-emerald-100 text-emerald-600" : matched ? "bg-amber-100 text-amber-600" : "bg-slate-100 text-slate-400"}`}>
-                                  {matched?.status === "approved" ? <CheckCircle className="w-3 h-3" /> : matched ? <Clock className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                              <div key={idx} id={`doc-item-${idx}`} className={`flex items-start gap-3 p-3 rounded-lg border scroll-mt-4 transition-all ${matched?.status === "approved" ? "bg-emerald-50/40 border-emerald-100" : matched ? "bg-amber-50/40 border-amber-100" : "bg-card"}`}>
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold ${matched?.status === "approved" ? "bg-emerald-100 text-emerald-600" : matched ? "bg-amber-100 text-amber-600" : "bg-slate-100 text-slate-500"}`}>
+                                  {matched?.status === "approved" ? <CheckCircle className="w-3.5 h-3.5" /> : matched ? <Clock className="w-3.5 h-3.5" /> : <span>{idx + 1}</span>}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium">{name}</p>
+                                  <p className="text-sm font-semibold">{name}</p>
                                   {item.description && <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>}
-                                  {matched && <p className="text-xs text-blue-600 mt-0.5">Uploaded: {matched.name}</p>}
+                                  {matched ? (
+                                    <p className={`text-xs mt-1 font-medium flex items-center gap-1 ${matched.status === "approved" ? "text-emerald-600" : "text-amber-600"}`}>
+                                      <FileText className="w-3 h-3" /> {matched.name} — {matched.status === "approved" ? "Approved" : matched.status === "pending" ? "Pending review" : matched.status.replace(/_/g, " ")}
+                                    </p>
+                                  ) : (
+                                    <p className="text-xs mt-1 text-slate-400 italic">Not yet uploaded</p>
+                                  )}
                                 </div>
-                                <Badge variant="outline" className={`text-xs shrink-0 ${item.required !== false ? "border-red-200 text-red-600" : "border-slate-200 text-slate-500"}`}>
+                                <Badge variant="outline" className={`text-xs shrink-0 mt-0.5 ${item.required !== false ? "border-red-200 text-red-600" : "border-slate-200 text-slate-500"}`}>
                                   {item.required !== false ? "Required" : "Optional"}
                                 </Badge>
                               </div>
@@ -1702,7 +1755,14 @@ export default function CaseDetailPage() {
                           })}
                         </CardContent>
                       </Card>
-                    )}
+                    ) : !checklistLoading && caseData?.destinationCountry && caseData?.visaType ? (
+                      <Card className="border-dashed">
+                        <CardContent className="flex items-center gap-3 p-5 text-sm text-muted-foreground">
+                          <AlertCircle className="w-4 h-4 shrink-0" />
+                          No checklist available for {caseData.destinationCountry} {caseData.visaType}. You can configure one in Agency Settings → Application Settings.
+                        </CardContent>
+                      </Card>
+                    ) : null}
 
                     {/* Upload zone */}
                     <Card>
