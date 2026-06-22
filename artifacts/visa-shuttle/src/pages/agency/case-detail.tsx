@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useParams, Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
@@ -580,6 +580,44 @@ function computeReadiness(c: Case): number {
   return 20;
 }
 
+// Web Audio feedback — synthesized, no external files required
+function playDocSound(type: "approve" | "reject") {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    if (type === "approve") {
+      // Two-note cling: C5 → E5
+      [[523.25, 0, 0.12], [659.25, 0.12, 0.28]].forEach(([freq, start, end]) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
+        gain.gain.setValueAtTime(0.35, ctx.currentTime + start);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + end);
+        osc.start(ctx.currentTime + start);
+        osc.stop(ctx.currentTime + end);
+      });
+    } else {
+      // Low dull thud + descending tone for rejection
+      [[220, 0, 0.18], [180, 0.06, 0.28]].forEach(([freq, start, end], i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = i === 0 ? "sawtooth" : "sine";
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
+        gain.gain.setValueAtTime(0.25, ctx.currentTime + start);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + end);
+        osc.start(ctx.currentTime + start);
+        osc.stop(ctx.currentTime + end);
+      });
+    }
+    // Auto-close context after sounds finish
+    setTimeout(() => ctx.close(), 600);
+  } catch (_) { /* silently skip if audio not available */ }
+}
+
 const docStatusConfig: Record<string, { label: string; color: string; icon: any }> = {
   pending: { label: "Pending Review", color: "text-amber-600", icon: Clock },
   approved: { label: "Approved", color: "text-emerald-600", icon: CheckCircle },
@@ -788,11 +826,13 @@ export default function CaseDetailPage() {
         body: JSON.stringify({ status }),
       });
       if (!res.ok) throw new Error("Failed to update");
-      return res.json();
+      return { data: await res.json(), status };
     },
-    onSuccess: () => {
+    onSuccess: ({ status }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/cases", id, "documents"] });
       toast({ title: "Document status updated" });
+      if (status === "approved") playDocSound("approve");
+      else if (status === "needs_reupload" || status === "rejected") playDocSound("reject");
     },
   });
 
@@ -834,12 +874,14 @@ export default function CaseDetailPage() {
     },
     onSuccess: (results) => {
       queryClient.invalidateQueries({ queryKey: ["/api/cases", id, "documents"] });
+      playDocSound("approve");
       toast({
         title: "Documents added",
         description: `${results.length} file${results.length !== 1 ? "s" : ""} attached to this case.`,
       });
     },
     onError: (e: Error) => {
+      playDocSound("reject");
       toast({ title: "Upload failed", description: e.message, variant: "destructive" });
     },
   });
