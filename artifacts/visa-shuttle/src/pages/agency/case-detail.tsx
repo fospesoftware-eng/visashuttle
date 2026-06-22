@@ -636,6 +636,27 @@ export default function CaseDetailPage() {
     enabled: !!id,
   });
 
+  // Document mode: "self" = per-item checklist upload, "ai" = bulk drop + AI analysis
+  const [docMode, setDocMode] = useState<"self" | "ai">("self");
+  const [aiFiles, setAiFiles] = useState<File[]>([]);
+  const [aiResult, setAiResult] = useState<any>(null);
+  const aiFileInputRef = useRef<HTMLInputElement>(null);
+
+  const aiAnalyzeMutation = useMutation({
+    mutationFn: async (files: File[]) => {
+      const res = await fetch(`/api/cases/${id}/documents/ai-analyze`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileNames: files.map(f => f.name) }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "AI analysis failed");
+      return res.json();
+    },
+    onSuccess: (data) => { setAiResult(data); },
+    onError: (e: Error) => toast({ title: "AI Analysis Failed", description: e.message, variant: "destructive" }),
+  });
+
   const { data: messages = [], isLoading: msgsLoading } = useQuery<Message[]>({
     queryKey: ["/api/cases", id, "messages"],
     queryFn: async () => {
@@ -676,6 +697,21 @@ export default function CaseDetailPage() {
       return res.json();
     },
     enabled: !!id,
+  });
+
+  // Document checklist for Self Mode
+  const { data: docChecklist } = useQuery<any>({
+    queryKey: ["/api/tenants", caseData?.tenantId, "document-checklist", caseData?.destinationCountry, caseData?.visaType],
+    queryFn: async () => {
+      if (!caseData?.tenantId || !caseData?.destinationCountry || !caseData?.visaType) return null;
+      const res = await fetch(
+        `/api/tenants/${caseData.tenantId}/document-checklist?country=${encodeURIComponent(caseData.destinationCountry)}&visaType=${encodeURIComponent(caseData.visaType)}`,
+        { credentials: "include" }
+      );
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!caseData?.tenantId && !!caseData?.destinationCountry && !!caseData?.visaType,
   });
 
   const { data: caseInvoices = [] } = useQuery<Invoice[]>({
@@ -1594,142 +1630,311 @@ export default function CaseDetailPage() {
 
               {/* Documents tab */}
               <TabsContent value="documents" className="space-y-4">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between gap-4">
-                    <CardTitle className="text-base">Document Center</CardTitle>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => requestDocumentsMutation.mutate()}
-                      disabled={requestDocumentsMutation.isPending}
-                      data-testid="button-request-documents"
+                {/* Mode toggle */}
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div className="flex items-center gap-1 p-1 rounded-xl bg-muted w-fit">
+                    <button
+                      onClick={() => { setDocMode("self"); setAiResult(null); setAiFiles([]); }}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${docMode === "self" ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                      data-testid="button-doc-mode-self"
                     >
-                      {requestDocumentsMutation.isPending ? (
-                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                      ) : (
-                        <MessageSquare className="w-4 h-4 mr-2" />
-                      )}
-                      Request Documents
-                    </Button>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <UploadDropzone onUpload={(files) => files.length > 0 && uploadDocumentsMutation.mutate(files)} />
+                      <ListChecks className="w-4 h-4" />
+                      Self Mode
+                    </button>
+                    <button
+                      onClick={() => { setDocMode("ai"); setAiResult(null); setAiFiles([]); }}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${docMode === "ai" ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                      data-testid="button-doc-mode-ai"
+                    >
+                      <Brain className="w-4 h-4" />
+                      AI Mode
+                    </button>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => requestDocumentsMutation.mutate()}
+                    disabled={requestDocumentsMutation.isPending}
+                    data-testid="button-request-documents"
+                  >
+                    {requestDocumentsMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <MessageSquare className="w-4 h-4 mr-2" />}
+                    Request Documents
+                  </Button>
+                </div>
 
-                    {docsLoading ? (
-                      <div className="flex justify-center py-8">
-                        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                      </div>
-                    ) : documents.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <FileText className="w-10 h-10 mx-auto mb-2 opacity-40" />
-                        <p className="text-sm">No documents uploaded yet</p>
-                      </div>
-                    ) : (
-                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                        {documents.map((doc) => {
-                          const cfg = docStatusConfig[doc.status] || docStatusConfig.pending;
-                          const Icon = cfg.icon;
-                          return (
-                            <div
-                              key={doc.id}
-                              className="p-4 rounded-xl border bg-card hover-elevate transition-all"
-                              data-testid={`document-${doc.id}`}
-                            >
-                              <div className="flex items-start justify-between gap-2 mb-3">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
-                                    <FileText className="w-4 h-4 text-muted-foreground" />
-                                  </div>
-                                  <div>
-                                    <p className="text-sm font-semibold leading-tight">{doc.name}</p>
-                                    <p className="text-xs text-muted-foreground capitalize">{(doc.type || "").replace(/_/g, " ")}</p>
-                                  </div>
+                {/* ── SELF MODE ── */}
+                {docMode === "self" && (
+                  <div className="space-y-4">
+                    {/* Checklist */}
+                    {docChecklist?.checklist && docChecklist.checklist.length > 0 && (
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm flex items-center gap-2">
+                            <ListChecks className="w-4 h-4 text-blue-600" />
+                            Required Documents — {caseData?.destinationCountry} {caseData?.visaType}
+                            <Badge variant="outline" className="ml-auto text-xs font-normal">
+                              {documents.filter(d => d.status === "approved").length} / {docChecklist.checklist.length} complete
+                            </Badge>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                          {docChecklist.checklist.map((item: any, idx: number) => {
+                            const name = item.name || item.documentType || `Document ${idx + 1}`;
+                            const matched = documents.find(d =>
+                              d.name?.toLowerCase().includes(name.toLowerCase()) ||
+                              (d.type || "").toLowerCase().replace(/_/g, " ").includes(name.toLowerCase())
+                            );
+                            return (
+                              <div key={idx} className="flex items-start gap-3 p-3 rounded-lg border bg-card">
+                                <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${matched?.status === "approved" ? "bg-emerald-100 text-emerald-600" : matched ? "bg-amber-100 text-amber-600" : "bg-slate-100 text-slate-400"}`}>
+                                  {matched?.status === "approved" ? <CheckCircle className="w-3 h-3" /> : matched ? <Clock className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
                                 </div>
-                              </div>
-
-                              <div className={`flex items-center gap-1.5 text-xs font-medium ${cfg.color} mb-3`}>
-                                <Icon className="w-3.5 h-3.5" />
-                                {cfg.label}
-                              </div>
-
-                              {doc.qualityScore !== null && doc.qualityScore !== undefined && (
-                                <div className="space-y-1 mb-3">
-                                  <div className="flex items-center justify-between text-xs">
-                                    <span className="text-muted-foreground">Quality</span>
-                                    <span className="font-semibold">{doc.qualityScore}%</span>
-                                  </div>
-                                  <Progress value={doc.qualityScore} className="h-1.5" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium">{name}</p>
+                                  {item.description && <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>}
+                                  {matched && <p className="text-xs text-blue-600 mt-0.5">Uploaded: {matched.name}</p>}
                                 </div>
-                              )}
-
-                              <div className="flex gap-2">
-                                {doc.status === "pending" && (
-                                  <>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="flex-1 text-xs h-7 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-                                      onClick={() => updateDocStatusMutation.mutate({ docId: doc.id, status: "approved" })}
-                                      data-testid={`button-approve-doc-${doc.id}`}
-                                    >
-                                      <CheckCircle className="w-3 h-3 mr-1" /> Approve
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="flex-1 text-xs h-7 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                      onClick={() => updateDocStatusMutation.mutate({ docId: doc.id, status: "needs_reupload" })}
-                                      data-testid={`button-reject-doc-${doc.id}`}
-                                    >
-                                      <AlertCircle className="w-3 h-3 mr-1" /> Reject
-                                    </Button>
-                                  </>
-                                )}
-                                {doc.status === "approved" && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="flex-1 text-xs h-7"
-                                    onClick={() => {
-                                      if (doc.fileUrl) {
-                                        window.open(doc.fileUrl, "_blank", "noopener,noreferrer");
-                                      } else {
-                                        toast({
-                                          title: "No file attached",
-                                          description: "This document was logged without an uploaded file.",
-                                        });
-                                      }
-                                    }}
-                                    data-testid={`button-download-doc-${doc.id}`}
-                                  >
-                                    <Download className="w-3 h-3 mr-1" /> Download
-                                  </Button>
-                                )}
-                                {doc.status === "needs_reupload" && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="flex-1 text-xs h-7"
-                                    disabled={requestSingleDocMutation.isPending}
-                                    onClick={() => requestSingleDocMutation.mutate(doc)}
-                                    data-testid={`button-request-doc-${doc.id}`}
-                                  >
-                                    {requestSingleDocMutation.isPending ? (
-                                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                    ) : (
-                                      <RefreshCw className="w-3 h-3 mr-1" />
-                                    )}
-                                    Request Again
-                                  </Button>
-                                )}
+                                <Badge variant="outline" className={`text-xs shrink-0 ${item.required !== false ? "border-red-200 text-red-600" : "border-slate-200 text-slate-500"}`}>
+                                  {item.required !== false ? "Required" : "Optional"}
+                                </Badge>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                            );
+                          })}
+                        </CardContent>
+                      </Card>
                     )}
-                  </CardContent>
-                </Card>
+
+                    {/* Upload zone */}
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm">Upload Documents</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <UploadDropzone onUpload={(files) => files.length > 0 && uploadDocumentsMutation.mutate(files)} />
+
+                        {docsLoading ? (
+                          <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
+                        ) : documents.length === 0 ? (
+                          <div className="text-center py-8 text-muted-foreground">
+                            <FileText className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                            <p className="text-sm">No documents uploaded yet</p>
+                          </div>
+                        ) : (
+                          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            {documents.map((doc) => {
+                              const cfg = docStatusConfig[doc.status] || docStatusConfig.pending;
+                              const Icon = cfg.icon;
+                              return (
+                                <div key={doc.id} className="p-4 rounded-xl border bg-card hover-elevate transition-all" data-testid={`document-${doc.id}`}>
+                                  <div className="flex items-start justify-between gap-2 mb-3">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
+                                        <FileText className="w-4 h-4 text-muted-foreground" />
+                                      </div>
+                                      <div>
+                                        <p className="text-sm font-semibold leading-tight">{doc.name}</p>
+                                        <p className="text-xs text-muted-foreground capitalize">{(doc.type || "").replace(/_/g, " ")}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className={`flex items-center gap-1.5 text-xs font-medium ${cfg.color} mb-3`}>
+                                    <Icon className="w-3.5 h-3.5" />{cfg.label}
+                                  </div>
+                                  {doc.qualityScore !== null && doc.qualityScore !== undefined && (
+                                    <div className="space-y-1 mb-3">
+                                      <div className="flex items-center justify-between text-xs">
+                                        <span className="text-muted-foreground">Quality</span>
+                                        <span className="font-semibold">{doc.qualityScore}%</span>
+                                      </div>
+                                      <Progress value={doc.qualityScore} className="h-1.5" />
+                                    </div>
+                                  )}
+                                  <div className="flex gap-2">
+                                    {doc.status === "pending" && (
+                                      <>
+                                        <Button variant="ghost" size="sm" className="flex-1 text-xs h-7 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" onClick={() => updateDocStatusMutation.mutate({ docId: doc.id, status: "approved" })} data-testid={`button-approve-doc-${doc.id}`}>
+                                          <CheckCircle className="w-3 h-3 mr-1" /> Approve
+                                        </Button>
+                                        <Button variant="ghost" size="sm" className="flex-1 text-xs h-7 text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => updateDocStatusMutation.mutate({ docId: doc.id, status: "needs_reupload" })} data-testid={`button-reject-doc-${doc.id}`}>
+                                          <AlertCircle className="w-3 h-3 mr-1" /> Reject
+                                        </Button>
+                                      </>
+                                    )}
+                                    {doc.status === "approved" && (
+                                      <Button variant="ghost" size="sm" className="flex-1 text-xs h-7" onClick={() => { if (doc.fileUrl) window.open(doc.fileUrl, "_blank", "noopener,noreferrer"); else toast({ title: "No file attached" }); }} data-testid={`button-download-doc-${doc.id}`}>
+                                        <Download className="w-3 h-3 mr-1" /> Download
+                                      </Button>
+                                    )}
+                                    {doc.status === "needs_reupload" && (
+                                      <Button variant="outline" size="sm" className="flex-1 text-xs h-7" disabled={requestSingleDocMutation.isPending} onClick={() => requestSingleDocMutation.mutate(doc)} data-testid={`button-request-doc-${doc.id}`}>
+                                        {requestSingleDocMutation.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <RefreshCw className="w-3 h-3 mr-1" />}
+                                        Request Again
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
+                {/* ── AI MODE ── */}
+                {docMode === "ai" && (
+                  <div className="space-y-4">
+                    <Card className="border-blue-100">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm flex items-center gap-2">
+                          <Brain className="w-4 h-4 text-blue-600" />
+                          AI Document Analysis
+                        </CardTitle>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Drop all available documents. AI will identify each file, detect missing required documents, and flag expired ones — based on the destination country and visa type.
+                        </p>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {/* Drop zone */}
+                        <div
+                          className="border-2 border-dashed border-blue-200 rounded-xl p-8 text-center bg-blue-50/40 hover:bg-blue-50/70 transition-colors cursor-pointer"
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            const dropped = Array.from(e.dataTransfer.files);
+                            setAiFiles(prev => {
+                              const names = new Set(prev.map(f => f.name));
+                              return [...prev, ...dropped.filter(f => !names.has(f.name))];
+                            });
+                            setAiResult(null);
+                          }}
+                          onClick={() => aiFileInputRef.current?.click()}
+                          data-testid="ai-dropzone"
+                        >
+                          <Brain className="w-10 h-10 mx-auto mb-3 text-blue-400" />
+                          <p className="text-sm font-medium text-blue-700">Drop all your documents here</p>
+                          <p className="text-xs text-blue-500 mt-1">or click to browse — PDF, JPG, PNG, DOCX accepted</p>
+                          <input
+                            ref={aiFileInputRef}
+                            type="file"
+                            multiple
+                            accept=".pdf,.jpg,.jpeg,.png,.docx,.doc"
+                            className="hidden"
+                            onChange={(e) => {
+                              const picked = Array.from(e.target.files || []);
+                              setAiFiles(prev => {
+                                const names = new Set(prev.map(f => f.name));
+                                return [...prev, ...picked.filter(f => !names.has(f.name))];
+                              });
+                              setAiResult(null);
+                              e.target.value = "";
+                            }}
+                          />
+                        </div>
+
+                        {/* File list */}
+                        {aiFiles.length > 0 && (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs font-medium text-muted-foreground">{aiFiles.length} file{aiFiles.length !== 1 ? "s" : ""} selected</p>
+                              <button className="text-xs text-red-500 hover:underline" onClick={() => { setAiFiles([]); setAiResult(null); }}>Clear all</button>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {aiFiles.map((f, i) => (
+                                <span key={i} className="flex items-center gap-1.5 text-xs bg-blue-50 border border-blue-100 rounded-lg px-2.5 py-1.5 text-blue-700">
+                                  <FileText className="w-3 h-3 shrink-0" />
+                                  {f.name}
+                                  <button className="ml-1 text-blue-400 hover:text-red-500" onClick={() => setAiFiles(prev => prev.filter((_, j) => j !== i))}>×</button>
+                                </span>
+                              ))}
+                            </div>
+                            <Button
+                              className="w-full bg-blue-600 hover:bg-blue-700 mt-2"
+                              onClick={() => aiAnalyzeMutation.mutate(aiFiles)}
+                              disabled={aiAnalyzeMutation.isPending}
+                              data-testid="button-ai-analyze"
+                            >
+                              {aiAnalyzeMutation.isPending ? (
+                                <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Analysing with AI…</>
+                              ) : (
+                                <><Brain className="w-4 h-4 mr-2" /> Analyse Documents with AI</>
+                              )}
+                            </Button>
+                          </div>
+                        )}
+
+                        {/* AI Result */}
+                        {aiResult && (
+                          <div className="space-y-4 pt-2">
+                            {/* Summary bar */}
+                            <div className={`flex flex-wrap items-center gap-3 p-4 rounded-xl border ${aiResult.summary?.overallStatus === "complete" ? "bg-emerald-50 border-emerald-200" : aiResult.summary?.overallStatus === "action_required" ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200"}`}>
+                              <div className="flex-1">
+                                <p className={`text-sm font-semibold ${aiResult.summary?.overallStatus === "complete" ? "text-emerald-700" : aiResult.summary?.overallStatus === "action_required" ? "text-red-700" : "text-amber-700"}`}>
+                                  {aiResult.summary?.overallStatus === "complete" ? "✓ All documents complete" : aiResult.summary?.overallStatus === "action_required" ? "⚠ Action required" : "Documents incomplete"}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  {aiResult.summary?.identified ?? 0} identified · {aiResult.summary?.expired ?? 0} expired · {aiResult.summary?.missing ?? 0} missing
+                                </p>
+                              </div>
+                              {aiResult.country && <Badge variant="outline" className="text-xs">{aiResult.country} · {aiResult.visaType}</Badge>}
+                            </div>
+
+                            {/* Identified documents */}
+                            {aiResult.identified?.length > 0 && (
+                              <div>
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Identified Documents</p>
+                                <div className="space-y-2">
+                                  {aiResult.identified.map((item: any, i: number) => (
+                                    <div key={i} className="flex items-start gap-3 p-3 rounded-lg border bg-card">
+                                      <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${item.status === "valid" ? "bg-emerald-100 text-emerald-600" : item.status === "expired" || item.status === "likely_expired" ? "bg-red-100 text-red-600" : "bg-slate-100 text-slate-500"}`}>
+                                        {item.status === "valid" ? <CheckCircle className="w-3 h-3" /> : item.status === "expired" || item.status === "likely_expired" ? <AlertCircle className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium">{item.documentType}</p>
+                                        <p className="text-xs text-muted-foreground">{item.fileName}</p>
+                                        {item.notes && <p className="text-xs text-muted-foreground mt-0.5">{item.notes}</p>}
+                                        {item.expiryDate && <p className={`text-xs mt-0.5 font-medium ${item.status === "expired" || item.status === "likely_expired" ? "text-red-600" : "text-emerald-600"}`}>Expiry: {item.expiryDate}</p>}
+                                      </div>
+                                      <Badge variant="outline" className={`text-xs shrink-0 ${item.status === "valid" ? "border-emerald-200 text-emerald-700" : item.status === "expired" || item.status === "likely_expired" ? "border-red-200 text-red-700" : "border-slate-200 text-slate-600"}`}>
+                                        {item.status === "likely_expired" ? "Likely Expired" : item.status === "unrecognised" ? "Unrecognised" : item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                                      </Badge>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Missing documents */}
+                            {aiResult.missing?.length > 0 && (
+                              <div>
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Missing Documents</p>
+                                <div className="space-y-2">
+                                  {aiResult.missing.map((item: any, i: number) => (
+                                    <div key={i} className="flex items-start gap-3 p-3 rounded-lg border border-red-100 bg-red-50/40">
+                                      <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium text-red-800">{item.documentType}</p>
+                                        {item.notes && <p className="text-xs text-red-600 mt-0.5">{item.notes}</p>}
+                                      </div>
+                                      <Badge variant="outline" className={`text-xs shrink-0 ${item.priority === "required" ? "border-red-200 text-red-700" : "border-amber-200 text-amber-700"}`}>
+                                        {item.priority === "required" ? "Required" : "Recommended"}
+                                      </Badge>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            <Button variant="outline" size="sm" className="w-full" onClick={() => { setAiResult(null); setAiFiles([]); }}>
+                              <RefreshCw className="w-4 h-4 mr-2" /> Re-analyse
+                            </Button>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
               </TabsContent>
 
               {/* === Fees (wizard step 7) === */}

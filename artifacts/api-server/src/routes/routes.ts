@@ -5179,6 +5179,98 @@ export async function registerRoutes(
     res.json(document);
   });
 
+  // AI document analysis — accepts a list of {name, type} file descriptors and
+  // returns which required documents are present/missing/expired based on the
+  // case's destination country + visa type.
+  app.post("/api/cases/:caseId/documents/ai-analyze", async (req, res) => {
+    if (!(await caseTenantGuard(req, res, req.params.caseId))) return;
+    const caseData = await storage.getCase(req.params.caseId);
+    if (!caseData) return res.status(404).json({ error: "Case not found" });
+
+    const { fileNames } = req.body as { fileNames: string[] };
+    if (!Array.isArray(fileNames) || fileNames.length === 0) {
+      return res.status(400).json({ error: "fileNames array is required" });
+    }
+
+    const country = caseData.destinationCountry || "Unknown";
+    const visaType = caseData.visaType || "Tourist Visa";
+    const applicant = caseData.applicantName || "Applicant";
+
+    // Fetch the required document checklist for this case
+    let requiredDocs: string[] = [];
+    try {
+      const checklist = await getEffectiveDocumentChecklist(caseData.tenantId, country, visaType);
+      requiredDocs = checklist.checklist.map((item: any) => item.name || item.documentType || String(item));
+    } catch (_) { /* use empty list if checklist unavailable */ }
+
+    const Anthropic = (await import("@anthropic-ai/sdk")).default;
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    const today = new Date().toISOString().slice(0, 10);
+    const prompt = `You are a visa document verification expert for ${country} ${visaType} application for ${applicant}.
+
+Today's date: ${today}
+
+Required documents for ${country} ${visaType}:
+${requiredDocs.length > 0 ? requiredDocs.map((d, i) => `${i + 1}. ${d}`).join("\n") : "Standard visa application documents (passport, photo, bank statements, travel history, etc.)"}
+
+The applicant has uploaded the following files:
+${fileNames.map((name, i) => `${i + 1}. ${name}`).join("\n")}
+
+Analyze each uploaded file and the required documents list. Return ONLY a JSON object with this exact structure:
+{
+  "identified": [
+    {
+      "fileName": "original file name",
+      "documentType": "what this document is",
+      "status": "valid" | "expired" | "likely_expired" | "unrecognised",
+      "expiryDate": "YYYY-MM-DD or null",
+      "notes": "brief note about this document"
+    }
+  ],
+  "missing": [
+    {
+      "documentType": "name of required document that is missing",
+      "priority": "required" | "recommended",
+      "notes": "brief note"
+    }
+  ],
+  "summary": {
+    "totalUploaded": number,
+    "identified": number,
+    "expired": number,
+    "missing": number,
+    "readyToSubmit": boolean,
+    "overallStatus": "complete" | "incomplete" | "action_required"
+  }
+}
+
+Rules:
+- Identify documents from file names (e.g. "passport_copy.pdf" → Passport, "bank_statement_3months.pdf" → 3-Month Bank Statement)
+- If a file name suggests expiry (e.g. "passport_exp_2023") mark as expired
+- Mark as "unrecognised" only if the file name gives no clue at all
+- Compare identified documents against the required list and report what is missing
+- readyToSubmit is true only if all required documents are present and none are expired`;
+
+    try {
+      const response = await client.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 2000,
+        messages: [{ role: "user", content: prompt }],
+      });
+
+      const text = response.content.find((b: any) => b.type === "text")?.text || "{}";
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return res.status(500).json({ error: "AI returned invalid response" });
+
+      const result = JSON.parse(jsonMatch[0]);
+      res.json({ ...result, country, visaType, requiredDocs });
+    } catch (err: any) {
+      console.error("[ai-analyze-docs]", err);
+      res.status(500).json({ error: err?.message || "AI analysis failed" });
+    }
+  });
+
   // === Message Routes ===
   app.get("/api/cases/:caseId/messages", async (req, res) => {
     if (!(await caseTenantGuard(req, res, req.params.caseId))) return;
