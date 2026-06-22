@@ -2342,8 +2342,9 @@ export async function registerRoutes(
     // checklist on-the-fly with AI so the checklist is never empty.
     if (country && visaType) {
       try {
-        const Anthropic = (await import("@anthropic-ai/sdk")).default;
-        const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+        const aiConfig = await storage.getPlatformAiConfig();
+        const apiKey = aiConfig?.anthropicApiKey || process.env.ANTHROPIC_API_KEY;
+        if (!apiKey) throw new Error("Anthropic API key not configured");
         const nationalityLine = nationality ? `Applicant nationality: ${nationality}` : "";
         const prompt = `You are a visa documentation expert. Generate a complete document checklist for:
 Destination country: ${country}
@@ -2365,12 +2366,14 @@ Rules:
 - Maximum 20 items
 - Return ONLY the JSON array, no other text`;
 
-        const resp = await client.messages.create({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1500,
-          messages: [{ role: "user", content: prompt }],
+        const resp = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+          body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1500, messages: [{ role: "user", content: prompt }] }),
         });
-        const text = (resp.content.find((b: any) => b.type === "text") as any)?.text || "[]";
+        if (!resp.ok) throw new Error(`Claude checklist error: ${resp.status}`);
+        const data = await resp.json() as any;
+        const text = (data.content || []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n");
         const match = text.match(/\[[\s\S]*\]/);
         if (match) {
           const aiChecklist = normalizeChecklistItems(JSON.parse(match[0]));
@@ -5260,8 +5263,9 @@ Rules:
       requiredDocs = checklist.checklist.map((item: any) => item.name || item.documentType || String(item));
     } catch (_) { /* use empty list if checklist unavailable */ }
 
-    const Anthropic = (await import("@anthropic-ai/sdk")).default;
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const aiConfig = await storage.getPlatformAiConfig();
+    const aiApiKey = aiConfig?.anthropicApiKey || process.env.ANTHROPIC_API_KEY;
+    if (!aiApiKey) return res.status(500).json({ error: "Anthropic API key not configured" });
 
     const today = new Date().toISOString().slice(0, 10);
     const nationalityLine = nationality ? `\nApplicant nationality: ${nationality}` : "";
@@ -5311,13 +5315,15 @@ Rules:
 - readyToSubmit is true only if all required documents are present and none are expired`;
 
     try {
-      const response = await client.messages.create({
-        model: "claude-sonnet-4-6",
-        max_tokens: 2000,
-        messages: [{ role: "user", content: prompt }],
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": aiApiKey, "anthropic-version": "2023-06-01" },
+        body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 2000, messages: [{ role: "user", content: prompt }] }),
       });
+      if (!response.ok) throw new Error(`Claude error: ${response.status}`);
+      const data = await response.json() as any;
 
-      const text = response.content.find((b: any) => b.type === "text")?.text || "{}";
+      const text = (data.content || []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n") || "{}";
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) return res.status(500).json({ error: "AI returned invalid response" });
 
