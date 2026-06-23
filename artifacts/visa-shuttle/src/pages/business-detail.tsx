@@ -180,18 +180,18 @@ function BusinessOfferPage({ offerKey }: { offerKey: BusinessOfferKey }) {
   const Icon = offer.icon;
 
   return (
-    <main className="min-h-screen bg-[#F8FAFC]">
-      <section className="relative overflow-hidden border-b border-slate-200 px-4 py-14 md:py-20">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_14%_0%,rgba(64,85,255,0.12),transparent_32%),radial-gradient(circle_at_88%_12%,rgba(255,32,96,0.08),transparent_30%),linear-gradient(180deg,#FFFFFF,#F8FAFC)]" />
+    <main className="min-h-screen bg-[#F8FAFC] dark:bg-slate-950">
+      <section className="relative overflow-hidden border-b border-slate-200 dark:border-slate-800 px-4 py-14 md:py-20">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_14%_0%,rgba(64,85,255,0.12),transparent_32%),radial-gradient(circle_at_88%_12%,rgba(255,32,96,0.08),transparent_30%),linear-gradient(180deg,#FFFFFF,#F8FAFC)] dark:bg-[radial-gradient(circle_at_14%_0%,rgba(64,85,255,0.18),transparent_32%),radial-gradient(circle_at_88%_12%,rgba(255,32,96,0.12),transparent_30%)]" />
 
         <div className="relative mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1fr_0.9fr] lg:items-center">
           <div>
-            <Badge className="mb-5 border-[#4055FF]/15 bg-white text-[#4055FF] shadow-sm hover:bg-white">{offer.eyebrow}</Badge>
+            <Badge className="mb-5 border-[#4055FF]/15 bg-white dark:bg-slate-800 dark:border-[#4055FF]/30 text-[#4055FF] shadow-sm hover:bg-white dark:hover:bg-slate-700">{offer.eyebrow}</Badge>
             <div className={`mb-6 flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br ${offer.gradient} text-white shadow-2xl shadow-[#4055FF]/20`}>
               <Icon className="h-8 w-8" />
             </div>
-            <h1 className="max-w-3xl text-4xl font-black tracking-tight text-[#15236B] md:text-6xl">{offer.title}</h1>
-            <p className="mt-5 max-w-2xl text-base leading-7 text-slate-600 md:text-lg">{offer.summary}</p>
+            <h1 className="max-w-3xl text-4xl font-black tracking-tight text-[#15236B] dark:text-white md:text-6xl">{offer.title}</h1>
+            <p className="mt-5 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-300 md:text-lg">{offer.summary}</p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link href={offer.primaryHref}>
                 <Button size="lg" className="w-full gap-2 rounded-2xl border-0 bg-gradient-to-r from-[#4055FF] to-[#FF2060] text-white shadow-lg shadow-[#4055FF]/20 hover:opacity-90 sm:w-auto">
@@ -200,28 +200,28 @@ function BusinessOfferPage({ offerKey }: { offerKey: BusinessOfferKey }) {
                 </Button>
               </Link>
               <Link href={offer.secondaryHref}>
-                <Button size="lg" variant="outline" className="w-full rounded-2xl border-slate-200 bg-white/80 text-[#15236B] shadow-sm hover:bg-white sm:w-auto">
+                <Button size="lg" variant="outline" className="w-full rounded-2xl border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 text-[#15236B] dark:text-white shadow-sm hover:bg-white dark:hover:bg-slate-800 sm:w-auto">
                   {offer.secondaryCta}
                 </Button>
               </Link>
             </div>
           </div>
 
-          <Card className="relative overflow-hidden rounded-[2rem] border-slate-200 bg-white shadow-2xl shadow-slate-200/70">
+          <Card className="relative overflow-hidden rounded-[2rem] border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-2xl shadow-slate-200/70 dark:shadow-none">
             <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${offer.gradient}`} />
             <CardContent className="p-6 md:p-8">
-              <p className="text-sm font-bold uppercase tracking-wide text-slate-400">Designed for</p>
+              <p className="text-sm font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">Designed for</p>
               <div className="mt-5 space-y-3">
                 {offer.proof.map((item) => (
-                  <div key={item} className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                  <div key={item} className="flex items-center gap-3 rounded-2xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-4">
                     <BadgeCheck className="h-5 w-5 shrink-0 text-[#4055FF]" />
-                    <span className="text-sm font-bold text-slate-800">{item}</span>
+                    <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{item}</span>
                   </div>
                 ))}
               </div>
-              <div className="mt-6 rounded-3xl border border-[#4055FF]/15 bg-gradient-to-br from-[#4055FF]/10 via-white to-[#FF2060]/10 p-5">
+              <div className="mt-6 rounded-3xl border border-[#4055FF]/15 dark:border-[#4055FF]/25 bg-gradient-to-br from-[#4055FF]/10 via-white dark:via-slate-800 to-[#FF2060]/10 p-5">
                 <p className="text-sm font-bold uppercase tracking-wide text-[#4055FF]">Business outcome</p>
-                <p className="mt-3 text-2xl font-black leading-tight text-[#15236B]">
+                <p className="mt-3 text-2xl font-black leading-tight text-[#15236B] dark:text-white">
                   Faster decisions, cleaner operations, and stronger customer workflows.
                 </p>
               </div>
@@ -234,36 +234,36 @@ function BusinessOfferPage({ offerKey }: { offerKey: BusinessOfferKey }) {
         <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[0.9fr_1.1fr]">
           <div>
             <p className="text-sm font-black uppercase tracking-wide text-[#4055FF]">Capabilities</p>
-            <h2 className="mt-3 text-3xl font-black tracking-tight text-[#15236B] md:text-4xl">What you get</h2>
-            <p className="mt-4 text-base leading-7 text-slate-600">
+            <h2 className="mt-3 text-3xl font-black tracking-tight text-[#15236B] dark:text-white md:text-4xl">What you get</h2>
+            <p className="mt-4 text-base leading-7 text-slate-600 dark:text-slate-300">
               Each solution is built to blend AI visa intelligence with the practical tools businesses need to operate at scale.
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {offer.features.map((feature) => (
-              <div key={feature} className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div key={feature} className="flex items-start gap-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm">
                 <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
-                <span className="text-sm font-semibold leading-6 text-slate-700">{feature}</span>
+                <span className="text-sm font-semibold leading-6 text-slate-700 dark:text-slate-200">{feature}</span>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="border-y border-slate-200 bg-white px-4 py-12 md:py-16">
+      <section className="border-y border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-12 md:py-16">
         <div className="mx-auto max-w-7xl">
           <div className="mb-8">
             <p className="text-sm font-black uppercase tracking-wide text-[#FF2060]">Workflow</p>
-            <h2 className="mt-3 text-3xl font-black tracking-tight text-[#15236B]">How it works</h2>
+            <h2 className="mt-3 text-3xl font-black tracking-tight text-[#15236B] dark:text-white">How it works</h2>
           </div>
           <div className="grid gap-4 md:grid-cols-3">
             {offer.workflow.map((step, index) => (
-              <Card key={step} className="rounded-3xl border-slate-200 bg-[#F8FAFC] shadow-sm">
+              <Card key={step} className="rounded-3xl border-slate-200 dark:border-slate-700 bg-[#F8FAFC] dark:bg-slate-800 shadow-sm">
                 <CardContent className="p-6">
                   <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#4055FF] to-[#FF2060] text-lg font-black text-white shadow-lg shadow-[#4055FF]/20">
                     {index + 1}
                   </div>
-                  <p className="text-base font-bold leading-7 text-slate-800">{step}</p>
+                  <p className="text-base font-bold leading-7 text-slate-800 dark:text-slate-100">{step}</p>
                 </CardContent>
               </Card>
             ))}
@@ -274,13 +274,13 @@ function BusinessOfferPage({ offerKey }: { offerKey: BusinessOfferKey }) {
       <section className="px-4 py-12 md:py-16">
         <div className="mx-auto grid max-w-7xl gap-5 md:grid-cols-3">
           {offer.cards.map(({ icon: CardIcon, title, body }) => (
-            <Card key={title} className="group overflow-hidden rounded-3xl border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
+            <Card key={title} className="group overflow-hidden rounded-3xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
               <CardContent className="p-6">
                 <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#4055FF]/10 text-[#4055FF] transition group-hover:scale-110">
                   <CardIcon className="h-6 w-6" />
                 </div>
-                <h3 className="text-xl font-black tracking-tight text-[#15236B]">{title}</h3>
-                <p className="mt-3 text-sm leading-6 text-slate-600">{body}</p>
+                <h3 className="text-xl font-black tracking-tight text-[#15236B] dark:text-white">{title}</h3>
+                <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{body}</p>
               </CardContent>
             </Card>
           ))}

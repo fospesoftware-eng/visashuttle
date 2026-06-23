@@ -160,7 +160,7 @@ function FeatureValue({ value }: { value: boolean | string }) {
   }
   if (value === false) {
     return (
-      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-50 text-slate-300 ring-1 ring-slate-200">
+      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-50 dark:bg-slate-800 text-slate-300 dark:text-slate-600 ring-1 ring-slate-200 dark:ring-slate-700">
         <X className="h-4 w-4" />
       </span>
     );
@@ -174,17 +174,17 @@ export default function VisaDeskPage() {
 
   return (
     <main className="min-h-screen bg-background">
-      <section className="relative overflow-hidden border-b border-slate-200 bg-[#F8FAFC]">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_0%,rgba(64,85,255,0.12),transparent_34%),radial-gradient(circle_at_90%_12%,rgba(255,32,96,0.08),transparent_30%),linear-gradient(180deg,#FFFFFF,#F8FAFC)]" />
+      <section className="relative overflow-hidden border-b border-slate-200 dark:border-slate-800 bg-[#F8FAFC] dark:bg-slate-950">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_16%_0%,rgba(64,85,255,0.12),transparent_34%),radial-gradient(circle_at_90%_12%,rgba(255,32,96,0.08),transparent_30%),linear-gradient(180deg,#FFFFFF,#F8FAFC)] dark:bg-[radial-gradient(circle_at_16%_0%,rgba(64,85,255,0.18),transparent_34%),radial-gradient(circle_at_90%_12%,rgba(255,32,96,0.12),transparent_30%)]" />
         <div className="relative mx-auto grid max-w-7xl gap-10 px-4 py-16 md:grid-cols-[1.05fr_0.95fr] md:items-center md:py-20">
           <div>
-            <Badge className="mb-5 border-[#4055FF]/15 bg-white text-[#4055FF] shadow-sm hover:bg-white">
+            <Badge className="mb-5 border-[#4055FF]/15 bg-white dark:bg-slate-800 dark:border-[#4055FF]/30 text-[#4055FF] shadow-sm hover:bg-white dark:hover:bg-slate-700">
               Visa Desk Pricing
             </Badge>
-            <h1 className="max-w-3xl text-4xl font-black tracking-tight text-[#15236B] md:text-6xl">
+            <h1 className="max-w-3xl text-4xl font-black tracking-tight text-[#15236B] dark:text-white md:text-6xl">
               A modern Visa Desk for agencies that want cleaner growth.
             </h1>
-            <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
+            <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600 dark:text-slate-300">
               Manage leads, proposals, applications, documents, payments and customer communication from one clean workspace.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -195,7 +195,7 @@ export default function VisaDeskPage() {
                 </Button>
               </Link>
               <Link href="/business">
-                <Button size="lg" variant="outline" className="gap-2 rounded-2xl border-slate-200 bg-white/80 text-[#15236B] shadow-sm hover:bg-white">
+                <Button size="lg" variant="outline" className="gap-2 rounded-2xl border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/80 text-[#15236B] dark:text-white shadow-sm hover:bg-white dark:hover:bg-slate-800">
                   Explore business tools
                   <Globe className="h-4 w-4" />
                 </Button>
@@ -208,7 +208,7 @@ export default function VisaDeskPage() {
 
           <div className="relative">
             <div className="absolute -left-5 top-10 hidden h-24 w-24 animate-pulse rounded-full bg-[#4055FF]/10 blur-2xl md:block" />
-            <div className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-5 shadow-2xl shadow-slate-200/70">
+            <div className="relative overflow-hidden rounded-[2rem] border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 shadow-2xl shadow-slate-200/70 dark:shadow-none">
               <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-[#4055FF] via-[#9033F5] to-[#FF2060]" />
               <div className="grid gap-3">
                 {[
@@ -218,8 +218,8 @@ export default function VisaDeskPage() {
                 ].map((item) => {
                   const Icon = item.icon;
                   return (
-                    <div key={item.label} className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white shadow-sm">
+                    <div key={item.label} className="flex items-center gap-4 rounded-2xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-4">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white dark:bg-slate-700 shadow-sm">
                         <Icon className={`h-5 w-5 ${item.color}`} />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -231,7 +231,7 @@ export default function VisaDeskPage() {
                   );
                 })}
               </div>
-              <div className="mt-4 rounded-3xl border border-[#4055FF]/15 bg-gradient-to-br from-[#4055FF]/10 via-white to-[#FF2060]/10 p-5">
+              <div className="mt-4 rounded-3xl border border-[#4055FF]/15 dark:border-[#4055FF]/25 bg-gradient-to-br from-[#4055FF]/10 via-white dark:via-slate-800 to-[#FF2060]/10 p-5">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Recommended plan</p>
