@@ -2340,6 +2340,8 @@ export async function registerRoutes(
 
     // No agency override and no DB template — generate a nationality-aware
     // checklist on-the-fly with AI so the checklist is never empty.
+    // Wrap the whole block in a 6-second timeout so a slow AI response
+    // never hangs the checklist panel indefinitely.
     if (country && visaType) {
       try {
         const aiConfig = await storage.getPlatformAiConfig();
@@ -2363,14 +2365,20 @@ Rules:
 - Include nationality-specific documents if nationality is provided (e.g. Indian nationals applying for UK visa need ITR, salary slips, etc.)
 - Order: passport first, then photos, then financial docs, then employment/business docs, then travel docs, then supporting docs
 - Mark truly optional docs as required: false
-- Maximum 20 items
+- Maximum 15 items
 - Return ONLY the JSON array, no other text`;
 
+        // Use Haiku for checklist generation — it's 4-5x faster than Sonnet
+        // and structured list output doesn't need reasoning horsepower.
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 6000);
         const resp = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
+          signal: controller.signal,
           headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
-          body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1500, messages: [{ role: "user", content: prompt }] }),
+          body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 800, messages: [{ role: "user", content: prompt }] }),
         });
+        clearTimeout(timeout);
         if (!resp.ok) throw new Error(`Claude checklist error: ${resp.status}`);
         const data = await resp.json() as any;
         const text = (data.content || []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n");

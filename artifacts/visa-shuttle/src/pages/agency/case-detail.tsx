@@ -758,6 +758,7 @@ export default function CaseDetailPage() {
       return res.json();
     },
     enabled: !!caseData?.tenantId && !!caseData?.destinationCountry && !!caseData?.visaType,
+    staleTime: 1000 * 60 * 30, // 30 min — checklist rarely changes mid-session
   });
 
   const { data: caseInvoices = [] } = useQuery<Invoice[]>({
