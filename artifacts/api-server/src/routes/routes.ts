@@ -10193,6 +10193,75 @@ Rules:
     },
   });
 
+  // ── Self-Application Guide (AI-generated) ──────────────────────────────────
+  app.get("/api/visa-apply-guide", requireB2cAuth, async (req, res) => {
+    const destination = String(req.query.destination || "").trim();
+    const from = String(req.query.from || "").trim();
+    const visaType = String(req.query.visa || "Tourist").trim();
+
+    if (!destination) return res.status(400).json({ error: "destination is required" });
+
+    try {
+      const aiCfg = await storage.getPlatformAiConfig();
+      const apiKey = aiCfg?.apiKey || process.env.ANTHROPIC_API_KEY;
+      if (!apiKey) throw new Error("AI not configured");
+
+      const prompt = `You are a visa application expert. Generate a comprehensive, accurate self-application guide for:
+- Destination country: ${destination}
+- Applicant nationality/from: ${from || "Not specified"}
+- Visa type: ${visaType}
+
+Return ONLY valid JSON (no markdown, no code fences) matching this exact structure:
+{
+  "destination": "${destination}",
+  "nationality": "${from || "Traveler"}",
+  "visaType": "${visaType}",
+  "overview": "2-3 sentence summary of the visa process",
+  "estimatedTimeline": "e.g. 3-6 weeks",
+  "officialPortal": { "label": "Official Embassy Website", "url": "https://..." },
+  "steps": [
+    {
+      "step": 1,
+      "title": "Step title",
+      "description": "Detailed description",
+      "tips": ["Tip 1", "Tip 2"],
+      "officialLink": { "label": "Link text", "url": "https://..." },
+      "timeframe": "e.g. 1-2 days"
+    }
+  ],
+  "documentsChecklist": ["Document 1", "Document 2", ...],
+  "commonMistakes": ["Mistake 1", "Mistake 2", ...],
+  "importantNotes": ["Note 1", "Note 2", ...],
+  "disclaimer": "AI-generated guide disclaimer"
+}
+
+Include 6-8 steps covering: checking eligibility, gathering documents, completing application form, booking appointment/submitting online, paying fees, attending interview if needed, tracking application, collecting passport. Include 10-15 documents in the checklist. Provide real official website URLs where known. Make the guide accurate and specific to ${destination} ${visaType} visa.`;
+
+      const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 2000,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+
+      if (!aiRes.ok) throw new Error(`AI error: ${aiRes.status}`);
+      const aiData = await aiRes.json();
+      const raw = aiData.content?.[0]?.text || "{}";
+      const cleaned = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      const guide = JSON.parse(cleaned);
+      return res.json(guide);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || "Failed to generate guide" });
+    }
+  });
+
   // ── Platform extensions: granular admin roles, support tickets, tenant
   // subscription billing. The agency pays the platform via Cashfree using
   // PLATFORM creds (not tenant-scoped) — different from the invoice flow.

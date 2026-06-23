@@ -15,6 +15,7 @@ import {
   Mail,
   TrendingUp,
 } from "lucide-react";
+import { NextStepsSection } from "@/components/next-steps-section";
 import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
@@ -338,6 +339,13 @@ export default function HistoryDetailPage() {
         )}
 
         <FieldGrid formData={form} />
+
+        <NextStepsSection
+          score={score}
+          destinationCountry={form.destinationCountry}
+          nationality={form.nationality}
+          visaType={form.visaType}
+        />
 
         <div className="flex items-start gap-2 p-3 rounded-lg bg-slate-50 border border-slate-100 text-xs text-slate-500">
           <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />

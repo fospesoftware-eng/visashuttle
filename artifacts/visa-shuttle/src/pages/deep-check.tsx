@@ -27,6 +27,7 @@ import { MIN_DOB_ISO, TODAY_ISO, validateAdultApplicantDob } from "@/lib/applica
 import { formatB2cPrice, getStoredB2cCurrency } from "@/lib/b2c-pricing";
 
 import { COUNTRIES, VISA_TYPES } from "@/shared/destinations";
+import { NextStepsSection } from "@/components/next-steps-section";
 
 const YES_NO = ["Yes", "No"];
 const YES_NO_MAYBE = ["Yes", "No", "Planning to get"];
@@ -1106,6 +1107,13 @@ export default function DeepCheckPage() {
             <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
             <span>{result.disclaimer}</span>
           </div>
+
+          <NextStepsSection
+            score={score}
+            destinationCountry={form.destinationCountry}
+            nationality={form.nationality}
+            visaType={form.visaType}
+          />
 
           <div className="flex flex-wrap gap-3">
             <Button className="gap-2" style={{ background: "linear-gradient(135deg,#4055FF,#FF2060)" }}

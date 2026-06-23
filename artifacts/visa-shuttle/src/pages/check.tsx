@@ -22,6 +22,7 @@ import { useB2cAuth } from "@/hooks/use-b2c-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 import { COUNTRIES, VISA_TYPES } from "@/shared/destinations";
+import { NextStepsSection } from "@/components/next-steps-section";
 
 const OPTS = {
   gender: ["Male","Female","Non-binary","Prefer not to say"],
@@ -589,6 +590,15 @@ export default function CheckPage() {
               <div className="mt-5 flex items-start gap-2 p-3 rounded-lg bg-slate-50 border text-xs text-slate-400">
                 <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
                 <span>{result.disclaimer}</span>
+              </div>
+
+              <div className="mt-5">
+                <NextStepsSection
+                  score={result.approvalChance}
+                  destinationCountry={form.destinationCountry}
+                  nationality={form.nationality}
+                  visaType={form.visaType}
+                />
               </div>
 
               <div className="mt-5 flex flex-wrap gap-3">

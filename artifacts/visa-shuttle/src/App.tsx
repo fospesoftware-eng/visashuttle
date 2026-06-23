@@ -29,6 +29,7 @@ import PricingPage from "@/pages/pricing";
 import { BasicCheckPlanPage, DeepCheckPlanPage, ProPlanPage } from "@/pages/plan-detail";
 import HistoryPage from "@/pages/history";
 import HistoryDetailPage from "@/pages/history-detail";
+import ApplyGuidePage from "@/pages/apply-guide";
 import DeepCheckPage from "@/pages/deep-check";
 import DeepCheckPaymentPage from "@/pages/deep-check-payment";
 import PaymentFailurePage from "@/pages/payment-failure";
@@ -175,6 +176,7 @@ function Router() {
       <Route path="/tools/fake-agency-detector" component={FakeAgencyDetectorPage} />
       <Route path="/tools/fake-employment-detector" component={FakeEmploymentDetectorPage} />
       <Route path="/history/:id" component={HistoryDetailPage} />
+      <Route path="/apply-guide" component={ApplyGuidePage} />
       <Route path="/history" component={HistoryPage} />
       <Route path="/deep-check" component={DeepCheckPage} />
       <Route path="/payment/deep-check/failure" component={PaymentFailurePage} />
