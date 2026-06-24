@@ -297,7 +297,7 @@ export default function TravelStickerPage() {
     }
   }
 
-  if (authLoading || verifying) {
+  if (verifying) {
     return (
       <div className="min-h-screen flex items-center justify-center overflow-hidden relative" style={{background:"linear-gradient(160deg,#03071e 0%,#0a0a2e 40%,#0d1b4b 70%,#0a2a1a 100%)"}}>
 
@@ -424,12 +424,10 @@ export default function TravelStickerPage() {
 
           <div>
             <h2 className="text-xl font-black mb-1.5 tracking-wide" style={{textShadow:"0 0 30px rgba(100,160,255,0.5)"}}>
-              {verifying ? "Confirming Your Boarding Pass" : "Preparing for Takeoff"}
+              {"Confirming Your Boarding Pass"}
             </h2>
             <p className="text-sm text-blue-200/60 leading-relaxed">
-              {verifying
-                ? "Verifying your payment and generating your lucky sticker…"
-                : "Loading your travel sticker collection…"}
+              {"Verifying your payment and generating your lucky sticker…"}
             </p>
           </div>
 
