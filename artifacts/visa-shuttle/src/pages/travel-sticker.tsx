@@ -1328,8 +1328,18 @@ function PaymentModal({ onPaid, onClose }: { onPaid: (orderId: string) => void; 
     let cancelled = false;
     (async () => {
       try {
-        const cfg = await (await fetch("/api/travel-stickers/paypal/config")).json();
-        if (!cfg.configured || !cfg.clientId) throw new Error("Online payment isn't available right now. Please try again later.");
+        const cfgRes = await fetch("/api/travel-stickers/paypal/config");
+        if (!cfgRes.ok) throw new Error(`Payment service unavailable (HTTP ${cfgRes.status}). The server may need to be redeployed.`);
+        const cfg = await cfgRes.json().catch(() => ({}));
+        if (!cfg.configured || !cfg.clientId) {
+          const mode = (cfg.mode || "sandbox").toUpperCase();
+          const missing = [!cfg.clientId && "Client ID", !cfg.hasSecret && "Client Secret"].filter(Boolean).join(" + ");
+          throw new Error(
+            missing
+              ? `PayPal ${mode} ${missing} is missing. Add it in SaaS Admin → PayPal (for the ${mode} environment) and Save.`
+              : `PayPal ${mode} is not configured. Check SaaS Admin → PayPal.`
+          );
+        }
         await loadPayPalSdk(cfg.clientId);
         if (cancelled) return;
         const paypal = (window as any).paypal;

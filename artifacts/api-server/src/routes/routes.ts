@@ -7907,6 +7907,7 @@ Rules:
       return res.json({
         configured: !!(paypal.clientId && paypal.clientSecret),
         clientId: paypal.clientId || "",
+        hasSecret: !!paypal.clientSecret,
         mode: paypal.mode,
         currency: "USD",
         amount: 1,
