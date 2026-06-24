@@ -1428,6 +1428,7 @@ export default function TravelStickerPage() {
   const [matchLoading, setMatchLoading] = useState(false);
   const [payOpen,      setPayOpen]      = useState(false);   // inline PayPal modal
   const [verifying,    setVerifying]    = useState(false);   // capturing payment
+  const [paySuccess,   setPaySuccess]   = useState(false);   // success animation
   const [buyMode,      setBuyMode]      = useState(false);   // buying another sticker
   const pendingRef = useRef<PendingState | null>(null);
   const pendingName = useRef<string>("");
@@ -1470,14 +1471,16 @@ export default function TravelStickerPage() {
 
       const foundMatch: MatchInfo = data.match || localPartner(sticker.code);
       pendingRef.current = null;
-      setVerifying(false);
-      setBuyMode(false);
+      const next: SavedState = { name, nationalityCode, sticker, match: foundMatch };
       setMatch(foundMatch);
       setMatchLoading(false);
-      setReveal(sticker);
-      const next: SavedState = { name, nationalityCode, sticker, match: foundMatch };
       setSaved(next);
       saveState(next);
+      // Show a success animation, then auto-open the passport
+      setVerifying(false);
+      setBuyMode(false);
+      setPaySuccess(true);
+      setTimeout(() => { setPaySuccess(false); setReveal(sticker); }, 3500);
     } catch (e: any) {
       setVerifying(false);
       toast({ title: "Payment not completed", description: e?.message || "If you were charged, please contact support.", variant: "destructive" });
@@ -1525,6 +1528,30 @@ export default function TravelStickerPage() {
           <div className="w-12 h-12 rounded-full border-3 border-white/15 border-t-white/80 animate-spin" style={{ borderWidth: 3 }} />
           <p className="text-white font-bold">Confirming your payment…</p>
           <p className="text-white/40 text-xs">Please don't close this window.</p>
+        </div>
+      )}
+
+      {/* Payment success animation */}
+      {paySuccess && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden"
+          style={{ background: "rgba(2,4,20,0.96)", backdropFilter: "blur(20px)" }}>
+          <Confetti active />
+          {/* animated check ring */}
+          <div className="relative flex items-center justify-center mb-6" style={{ animation: "pop-in 0.5s cubic-bezier(0.34,1.6,0.6,1)" }}>
+            <span className="absolute w-28 h-28 rounded-full" style={{ background: "radial-gradient(circle, rgba(0,200,100,0.35), transparent 70%)", animation: "success-pulse 1.6s ease-out infinite" }} />
+            <div className="w-24 h-24 rounded-full flex items-center justify-center"
+              style={{ background: "linear-gradient(135deg,#00C170,#0FB5C9)", boxShadow: "0 0 40px rgba(0,193,112,0.6)" }}>
+              <svg viewBox="0 0 52 52" className="w-12 h-12">
+                <path d="M14 27 l8 8 l16 -18" fill="none" stroke="white" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"
+                  style={{ strokeDasharray: 60, strokeDashoffset: 60, animation: "check-draw 0.5s ease-out 0.25s forwards" }} />
+              </svg>
+            </div>
+          </div>
+          <h2 className="text-2xl font-black text-white mb-1" style={{ animation: "pop-in 0.5s ease 0.2s both" }}>Payment successful! 🎉</h2>
+          <p className="text-white/55 text-sm" style={{ animation: "pop-in 0.5s ease 0.35s both" }}>Opening your passport…</p>
+          <div className="mt-6 w-48 h-1.5 rounded-full bg-white/10 overflow-hidden">
+            <div className="h-full rounded-full" style={{ background: "linear-gradient(90deg,#00C170,#0FB5C9)", animation: "progress-fill 3.3s linear forwards" }} />
+          </div>
         </div>
       )}
 
@@ -1708,6 +1735,9 @@ export default function TravelStickerPage() {
         @keyframes gradient-shift { 0%{background-position:0% 50%} 100%{background-position:300% 50%} }
         @keyframes badge-bob    { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
         @keyframes avatar-bob   { 0%,100%{transform:translateY(0) rotate(-1deg)} 50%{transform:translateY(-3px) rotate(1deg)} }
+        @keyframes success-pulse{ 0%{transform:scale(0.8);opacity:0.8} 70%{transform:scale(1.6);opacity:0} 100%{opacity:0} }
+        @keyframes check-draw   { to{stroke-dashoffset:0} }
+        @keyframes progress-fill{ from{width:0%} to{width:100%} }
         @keyframes shooting-star{ 0%{opacity:0;transform:translate(0,0) rotate(18deg) scaleX(0.4)} 8%{opacity:1} 22%{opacity:1;transform:translate(220px,72px) rotate(18deg) scaleX(1)} 30%,100%{opacity:0;transform:translate(320px,104px) rotate(18deg) scaleX(0.4)} }
       `}</style>
     </div>
