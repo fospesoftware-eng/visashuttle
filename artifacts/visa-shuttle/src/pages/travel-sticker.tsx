@@ -628,202 +628,302 @@ function StickerDetailModal({
 // ── Travel partner match type ───────────────────────────────────────────────
 interface MatchInfo { name: string; collectedAt: string | null; }
 
-// ── Reveal overlay (sticker earned + travel partner match) ──────────────────
-function RevealOverlay({
-  sticker, match, matchLoading, onClose,
+// ── Passport themes (cover colour by nationality) ───────────────────────────
+const PASSPORT_GREEN = ["SA","PK","NG","BD","ID","MA","ML","SN","CI","BT2"];
+const PASSPORT_RED   = ["CN","CH","TR","JP","SG","FR","IT","DE","ES","PT","NL","GR","PL","CZ","HU","RO","NO","AT","IE","UA","DK","FI","SE","RW"];
+const PASSPORT_BLACK = ["NZ","BW","ZW","NA","UG"];
+function passportTheme(code: string): { cover: string; foil: string } {
+  if (PASSPORT_GREEN.includes(code)) return { cover: "linear-gradient(145deg,#0f5733,#06301b)", foil: "#E8C964" };
+  if (PASSPORT_RED.includes(code))   return { cover: "linear-gradient(145deg,#611a2a,#350b14)", foil: "#E8C964" };
+  if (PASSPORT_BLACK.includes(code)) return { cover: "linear-gradient(145deg,#202026,#0a0a0d)", foil: "#D9D9D0" };
+  return { cover: "linear-gradient(145deg,#172b54,#0b1630)", foil: "#E8C964" }; // navy default (India, US, UK…)
+}
+
+// Aged passport page background + watermark
+function PassportPage({ children, pageNo, accent }: { children: React.ReactNode; pageNo?: string; accent?: string }) {
+  const a = accent || "#9a8a55";
+  return (
+    <div className="absolute inset-0 overflow-hidden"
+      style={{
+        borderRadius: "5px 16px 16px 5px",
+        background: "linear-gradient(135deg,#f8f2e4 0%,#efe6d2 55%,#e7dcc4 100%)",
+        boxShadow: "inset 24px 0 32px -24px rgba(60,40,10,0.55)",
+      }}>
+      {/* guilloché watermark */}
+      <svg className="absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2" width="78%" viewBox="0 0 200 200" style={{ opacity: 0.55 }}>
+        {[...Array(8)].map((_, i) => (
+          <circle key={i} cx="100" cy="100" r={16 + i * 11} fill="none" stroke={a} strokeOpacity="0.07" strokeWidth="1" />
+        ))}
+        {[...Array(24)].map((_, i) => {
+          const ang = (i / 24) * Math.PI * 2;
+          return <line key={i} x1="100" y1="100" x2={100 + 102 * Math.cos(ang)} y2={100 + 102 * Math.sin(ang)} stroke={a} strokeOpacity="0.04" strokeWidth="0.6" />;
+        })}
+      </svg>
+      {/* horizontal rule lines top */}
+      <div className="absolute left-4 right-4 top-4 space-y-1.5 opacity-30">
+        <div className="h-px" style={{ background: a }} />
+        <div className="h-px w-2/3" style={{ background: a }} />
+      </div>
+      {children}
+      {pageNo && <span className="absolute bottom-2.5 right-3.5 text-[9px] font-bold tracking-widest" style={{ color: a, opacity: 0.5 }}>{pageNo}</span>}
+    </div>
+  );
+}
+
+// A country sticker rendered as an inked entry stamp on the page
+function PageStamp({ sticker, size, settled }: { sticker: StickerData; size: number; settled?: boolean }) {
+  return (
+    <div className="absolute left-1/2 top-1/2" style={{
+      transform: `translate(-50%,-50%) rotate(${settled ? -7 : 0}deg)`,
+      filter: `drop-shadow(0 6px 16px ${sticker.primary}55)`,
+      animation: settled ? "stamp-in 0.4s cubic-bezier(0.34,1.6,0.6,1)" : undefined,
+    }}>
+      <StickerBadge sticker={sticker} size={size} shine />
+    </div>
+  );
+}
+
+// ── Passport reveal — the flip-through game ─────────────────────────────────
+function PassportReveal({
+  name, nationality, sticker, match, matchLoading, onClose,
 }: {
+  name: string;
+  nationality: typeof COUNTRIES[0];
   sticker: StickerData;
   match: MatchInfo | null;
   matchLoading: boolean;
   onClose: () => void;
 }) {
-  // phase 0 hidden → 1 sticker pops → 2 sticker text → 3 partner section
+  // phase: 0 closed cover → 1 flipping → 2 arrived → 3 partner
   const [phase, setPhase] = useState<0 | 1 | 2 | 3>(0);
+  const [coverOpen, setCoverOpen] = useState(false);
+  const [flipIdx, setFlipIdx] = useState(0);
+  const speedRef = useRef(60);
+  const cyclesRef = useRef(0);
+  const theme = passportTheme(nationality.code);
+  const today = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }).toUpperCase();
 
+  // Open the cover, then start flipping
   useEffect(() => {
-    const t1 = setTimeout(() => { setPhase(1); playCollectSound(); }, 80);
-    const t2 = setTimeout(() => setPhase(2), 1500);
-    const t3 = setTimeout(() => setPhase(3), 2800);
-    return () => { [t1, t2, t3].forEach(clearTimeout); };
+    const t1 = setTimeout(() => setCoverOpen(true), 600);
+    const t2 = setTimeout(() => setPhase(1), 1250);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
+  // Flip through pages, decelerate, land on the lucky country
+  useEffect(() => {
+    if (phase !== 1) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      setFlipIdx(i => (i + 1) % COUNTRIES.length);
+      cyclesRef.current++;
+      if (cyclesRef.current > 13) speedRef.current += 24;
+      if (speedRef.current > 360) {
+        setPhase(2);
+        playCollectSound();
+        return;
+      }
+      timer = setTimeout(tick, speedRef.current);
+    };
+    timer = setTimeout(tick, speedRef.current);
+    return () => clearTimeout(timer);
+  }, [phase]);
+
+  const flipSticker: StickerData = { ...COUNTRIES[flipIdx], id: "flip", earnedAt: 0 };
   const initial = (match?.name || "?").trim().charAt(0).toUpperCase();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto py-8"
-      style={{ background: "rgba(2,4,20,0.94)", backdropFilter: "blur(20px)" }}>
-      <div className="relative text-center px-6 max-w-sm w-full flex flex-col items-center">
-        <Confetti active={phase >= 1} />
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-y-auto py-6 px-4"
+      style={{ background: "rgba(2,4,20,0.95)", backdropFilter: "blur(22px)" }}>
+      <Confetti active={phase >= 2} />
 
-        {/* Sticker pop-in */}
-        <div style={{
-          transform: phase === 0 ? "scale(0) rotate(-18deg)" : phase === 1 ? "scale(1.1) rotate(4deg)" : "scale(1) rotate(0deg)",
-          transition: phase === 0 ? "none" : "transform 0.6s cubic-bezier(0.34,1.56,0.64,1)",
-          filter: `drop-shadow(0 0 48px ${sticker.primary}80)`,
-          marginBottom: 18,
-        }}>
-          <StickerBadge sticker={sticker} size={200} shine />
-        </div>
+      <button onClick={onClose}
+        className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition z-10">
+        <X className="w-4 h-4" />
+      </button>
 
-        {/* Sticker text */}
-        <div style={{
-          opacity: phase >= 2 ? 1 : 0,
-          transform: phase >= 2 ? "translateY(0)" : "translateY(24px)",
-          transition: "all 0.5s ease",
-        }}>
-          <div className="flex items-center justify-center gap-2 mb-1.5">
-            <span className="text-2xl">🎉</span>
-            <h2 className="text-xl font-black text-white">You're going to {sticker.name}!</h2>
-            <span className="text-2xl">🎉</span>
-          </div>
-          <p className="text-white/50 text-xs leading-relaxed mb-1 px-2">
-            <span className="font-semibold text-white/75">Did you know? </span>{sticker.fact}
-          </p>
-        </div>
+      {/* status line */}
+      <p className="text-white/45 text-xs tracking-widest uppercase font-bold mb-4 h-4 text-center">
+        {phase === 0 && "Opening your passport…"}
+        {phase === 1 && "Stamping pages…"}
+        {phase === 2 && "✈️ Destination confirmed!"}
+        {phase === 3 && "Your travel partner"}
+      </p>
 
-        {/* Travel partner match */}
-        <div className="w-full mt-5" style={{
-          opacity: phase >= 3 ? 1 : 0,
-          transform: phase >= 3 ? "translateY(0)" : "translateY(20px)",
-          transition: "all 0.55s ease",
-        }}>
-          {matchLoading ? (
-            <div className="flex flex-col items-center gap-2 py-4">
-              <div className="w-7 h-7 rounded-full border-2 border-white/15 border-t-white/70 animate-spin" />
-              <p className="text-white/40 text-xs">Finding your travel partner…</p>
-            </div>
-          ) : match ? (
-            <div className="rounded-2xl border border-white/10 p-4"
-              style={{ background: `linear-gradient(160deg, ${sticker.primary}22, rgba(255,255,255,0.03))` }}>
-              <p className="text-[10px] uppercase tracking-widest font-bold text-white/40 mb-2">✈️ Your Travel Partner</p>
-              <div className="flex items-center justify-center gap-3 mb-2">
-                <div className="w-12 h-12 rounded-full flex items-center justify-center text-lg font-black text-white shrink-0"
-                  style={{ background: `linear-gradient(135deg, ${sticker.primary}, ${sticker.secondary})` }}>
-                  {initial}
+      {/* Passport book */}
+      <div style={{ perspective: "1600px" }}>
+        <div className="relative"
+          style={{ width: "clamp(258px,82vw,330px)", aspectRatio: "0.72", transformStyle: "preserve-3d" }}>
+
+          {/* Base page (under the cover) */}
+          {phase < 3 ? (
+            <PassportPage accent={sticker.primary} pageNo={phase === 2 ? "✓ ENTRY" : "·· ··"}>
+              {phase === 2 && (
+                <>
+                  <p className="absolute top-7 left-0 right-0 text-center text-[10px] tracking-[0.25em] font-black" style={{ color: sticker.primary }}>
+                    ✦ WELCOME TO ✦
+                  </p>
+                  <p className="absolute top-11 left-0 right-0 text-center text-sm font-black text-[#3a2d10]">
+                    {sticker.name.toUpperCase()}
+                  </p>
+                </>
+              )}
+              {/* flipping / arrived stamp */}
+              {phase >= 1 && (
+                <div key={phase === 2 ? "final" : flipIdx}
+                  className="absolute inset-0"
+                  style={{ animation: phase === 1 ? "page-flip 0.14s ease-out" : undefined }}>
+                  <PageStamp sticker={phase === 2 ? sticker : flipSticker} size={phase === 2 ? 168 : 150} settled={phase === 2} />
                 </div>
-                <div className="text-left">
-                  <p className="text-white font-black text-base leading-tight">{match.name}</p>
-                  <p className="text-white/45 text-xs">also landed on {sticker.flag} {sticker.name}</p>
+              )}
+              {phase === 2 && (
+                <div className="absolute bottom-5 left-0 right-0 text-center">
+                  <p className="text-[10px] font-bold tracking-widest" style={{ color: sticker.primary }}>ENTRY · {today}</p>
+                  <p className="text-[9px] text-[#3a2d10]/60 mt-0.5">{sticker.landmark} {sticker.fact.split(".")[0]}.</p>
                 </div>
-              </div>
-              <p className="text-white/45 text-xs leading-relaxed">
-                You two are matched for the journey to <span className="font-semibold text-white/70">{sticker.name}</span>! 🌍
-              </p>
-            </div>
+              )}
+            </PassportPage>
           ) : (
-            <div className="rounded-2xl border border-white/10 p-4"
-              style={{ background: `linear-gradient(160deg, ${sticker.primary}22, rgba(255,255,255,0.03))` }}>
-              <p className="text-[10px] uppercase tracking-widest font-bold text-white/40 mb-2">🌟 Trailblazer</p>
-              <p className="text-white font-black text-base mb-1">You're the first explorer of {sticker.flag} {sticker.name}!</p>
-              <p className="text-white/45 text-xs leading-relaxed">
-                The next traveller who lands here will be matched with <span className="font-semibold text-white/70">you</span> as their travel partner.
-              </p>
-            </div>
+            // Partner page
+            <PassportPage accent={sticker.primary} pageNo="PARTNER">
+              <div className="absolute inset-0 flex flex-col items-center justify-center px-5 text-center">
+                <p className="text-[10px] tracking-[0.25em] font-black mb-3" style={{ color: sticker.primary }}>✈ TRAVEL PARTNER ✈</p>
+                {matchLoading ? (
+                  <>
+                    <div className="w-8 h-8 rounded-full border-2 border-[#3a2d10]/20 border-t-[#3a2d10]/60 animate-spin mb-3" />
+                    <p className="text-[#3a2d10]/60 text-xs">Finding your partner…</p>
+                  </>
+                ) : match ? (
+                  <>
+                    {/* passport photo box */}
+                    <div className="w-24 h-28 rounded-md mb-3 flex items-center justify-center text-4xl font-black text-white border-4"
+                      style={{ background: `linear-gradient(135deg,${sticker.primary},${sticker.secondary})`, borderColor: "#3a2d1030", boxShadow: `0 8px 22px ${sticker.primary}55` }}>
+                      {initial}
+                    </div>
+                    <p className="text-lg font-black text-[#3a2d10]">{match.name}</p>
+                    <p className="text-[11px] text-[#3a2d10]/60 mt-0.5 mb-3">also bound for {sticker.flag} {sticker.name}</p>
+                    {/* mini stamp */}
+                    <div style={{ transform: "rotate(-8deg)", filter: `drop-shadow(0 4px 12px ${sticker.primary}55)` }}>
+                      <StickerBadge sticker={sticker} size={84} shine />
+                    </div>
+                    <p className="text-[10px] text-[#3a2d10]/70 mt-3 leading-relaxed">
+                      You &amp; <span className="font-bold">{match.name}</span> are matched for {sticker.name}!
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-5xl mb-3">🌟</div>
+                    <p className="text-base font-black text-[#3a2d10]">You're the first explorer!</p>
+                    <p className="text-[11px] text-[#3a2d10]/60 mt-2 leading-relaxed">
+                      No one had stamped {sticker.flag} {sticker.name} before you. The next traveller here will be matched with <span className="font-bold">you</span>.
+                    </p>
+                  </>
+                )}
+              </div>
+            </PassportPage>
           )}
 
-          <button onClick={onClose}
-            className="mt-4 inline-flex items-center gap-2 px-7 py-3 rounded-xl text-white font-bold text-sm transition hover:opacity-90 active:scale-95"
-            style={{ background: "linear-gradient(135deg,#4055FF,#9033F5)" }}>
-            View My Sticker →
-          </button>
+          {/* Cover (hinges open from the left) */}
+          {phase < 1 && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-5"
+              style={{
+                borderRadius: "5px 16px 16px 5px",
+                background: theme.cover,
+                transformOrigin: "left center",
+                transform: coverOpen ? "rotateY(-158deg)" : "rotateY(0deg)",
+                transition: "transform 0.75s cubic-bezier(0.6,0.05,0.25,1)",
+                boxShadow: "0 26px 60px rgba(0,0,0,0.6), inset 0 0 60px rgba(0,0,0,0.35)",
+                backfaceVisibility: "hidden",
+                zIndex: 20,
+              }}>
+              {/* gold border */}
+              <div className="absolute inset-2.5 rounded-[4px_12px_12px_4px] border" style={{ borderColor: `${theme.foil}55` }} />
+              <p className="text-[10px] tracking-[0.3em] font-bold mb-3" style={{ color: theme.foil }}>{nationality.name.toUpperCase()}</p>
+              <div className="text-5xl mb-3" style={{ filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.4))" }}>{nationality.flag}</div>
+              {/* emblem ring */}
+              <div className="w-16 h-16 rounded-full border-2 flex items-center justify-center mb-3" style={{ borderColor: `${theme.foil}80` }}>
+                <Globe className="w-8 h-8" style={{ color: theme.foil }} />
+              </div>
+              <p className="text-base font-black tracking-[0.2em]" style={{ color: theme.foil }}>PASSPORT</p>
+              <p className="text-[8px] tracking-[0.3em] mt-1" style={{ color: `${theme.foil}aa` }}>PASSEPORT · PASAPORTE</p>
+            </div>
+          )}
         </div>
+      </div>
 
-        <button onClick={onClose}
-          className="absolute top-0 right-0 w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition">
-          <X className="w-4 h-4" />
-        </button>
+      {/* Actions */}
+      <div className="mt-6 h-12 flex items-center">
+        {phase === 2 && (
+          <button onClick={() => setPhase(3)}
+            className="inline-flex items-center gap-2 px-7 py-3 rounded-xl text-white font-bold text-sm transition hover:opacity-90 active:scale-95"
+            style={{ background: "linear-gradient(135deg,#4055FF,#9033F5)", animation: "pop-in 0.4s ease both" }}>
+            ✈️ Meet my travel partner →
+          </button>
+        )}
+        {phase === 3 && (
+          <button onClick={onClose}
+            className="inline-flex items-center gap-2 px-7 py-3 rounded-xl text-white font-bold text-sm transition hover:opacity-90 active:scale-95"
+            style={{ background: "linear-gradient(135deg,#4055FF,#9033F5)", animation: "pop-in 0.4s ease both" }}>
+            <Download className="w-4 h-4" />View &amp; share my sticker
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-// ── Name entry gate ─────────────────────────────────────────────────────────
-function NameGate({ onSubmit, onClose }: { onSubmit: (name: string) => void; onClose: () => void }) {
-  const [name, setName] = useState("");
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => { const t = setTimeout(() => setMounted(true), 30); return () => clearTimeout(t); }, []);
+// ── Entry form (Name + Nationality → Go) ────────────────────────────────────
+const NATIONALITIES = [...COUNTRIES].sort((a, b) => a.name.localeCompare(b.name));
 
-  function submit() {
-    const n = name.trim();
-    if (n.length < 2) return;
-    onSubmit(n);
-  }
+function EntryForm({ onGo }: { onGo: (name: string, nationalityCode: string) => void }) {
+  const [name, setName] = useState("");
+  const [nat, setNat] = useState("");
+
+  const ready = name.trim().length >= 2 && !!nat;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(2,4,20,0.92)", backdropFilter: "blur(18px)" }}
-      onClick={onClose}>
-      <div className="relative w-full max-w-sm rounded-3xl border border-white/10 p-6 text-center"
-        style={{
-          background: "linear-gradient(160deg,#0d0f2a,#0a0a1a)",
-          boxShadow: "0 0 60px rgba(64,85,255,0.3), 0 32px 64px rgba(0,0,0,0.7)",
-          transform: mounted ? "scale(1) translateY(0)" : "scale(0.85) translateY(30px)",
-          opacity: mounted ? 1 : 0,
-          transition: "all 0.4s cubic-bezier(0.34,1.4,0.64,1)",
-        }}
-        onClick={e => e.stopPropagation()}>
-        <button onClick={onClose}
-          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition">
-          <X className="w-4 h-4" />
-        </button>
-        <div className="text-4xl mb-3">🌍✈️</div>
-        <h2 className="text-xl font-black text-white mb-1.5">What's your name, traveller?</h2>
-        <p className="text-white/45 text-xs mb-5 leading-relaxed">
-          We'll match you with another explorer heading to the same destination — your travel partner for the journey!
-        </p>
+    <div className="w-full max-w-md rounded-3xl border border-white/10 p-5 md:p-6"
+      style={{ background: "linear-gradient(160deg,rgba(20,22,55,0.85),rgba(10,10,26,0.85))", backdropFilter: "blur(8px)", boxShadow: "0 0 50px rgba(64,85,255,0.18)" }}>
+      <p className="text-[11px] uppercase tracking-widest font-bold text-white/40 mb-3">Required to board ✈️</p>
+
+      <label className="block mb-3">
+        <span className="text-xs font-semibold text-white/60 mb-1.5 block">Your name</span>
         <input
-          autoFocus
           value={name}
           onChange={e => setName(e.target.value)}
-          onKeyDown={e => { if (e.key === "Enter") submit(); }}
-          placeholder="Enter your name"
+          onKeyDown={e => { if (e.key === "Enter" && ready) onGo(name.trim(), nat); }}
+          placeholder="e.g. Aster"
           maxLength={60}
-          className="w-full px-4 py-3 rounded-xl bg-white/[0.06] border border-white/10 text-white text-sm placeholder-white/30 outline-none focus:border-[#4055FF]/60 transition mb-4"
+          className="w-full px-4 py-3 rounded-xl bg-white/[0.06] border border-white/10 text-white text-sm placeholder-white/25 outline-none focus:border-[#4055FF]/60 transition"
         />
-        <button onClick={submit} disabled={name.trim().length < 2}
-          className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-white font-black text-sm transition hover:opacity-90 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
-          style={{ background: "linear-gradient(135deg,#4055FF,#9033F5,#FF2060)" }}>
-          <Globe className="w-4 h-4" />Spin the Globe
-        </button>
-      </div>
-    </div>
-  );
-}
+      </label>
 
-// ── Spinning slot machine ───────────────────────────────────────────────────
-function SpinWheel({ onDone }: { onDone: () => void }) {
-  const [index, setIndex]   = useState(0);
-  const [speed, setSpeed]   = useState(55);
-  const cyclesRef = useRef(0);
-  const iRef = useRef<ReturnType<typeof setInterval> | null>(null);
+      <label className="block mb-4">
+        <span className="text-xs font-semibold text-white/60 mb-1.5 block">Nationality</span>
+        <select
+          value={nat}
+          onChange={e => setNat(e.target.value)}
+          className="w-full px-4 py-3 rounded-xl bg-white/[0.06] border border-white/10 text-white text-sm outline-none focus:border-[#4055FF]/60 transition appearance-none cursor-pointer"
+          style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23ffffff80' d='M1 1l5 5 5-5'/%3E%3C/svg%3E\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 1rem center" }}
+        >
+          <option value="" disabled style={{ color: "#000" }}>Select your nationality…</option>
+          {NATIONALITIES.map(c => (
+            <option key={c.code} value={c.code} style={{ color: "#000" }}>{c.flag} {c.name}</option>
+          ))}
+        </select>
+      </label>
 
-  useEffect(() => {
-    iRef.current = setInterval(() => {
-      setIndex(i => (i + 1) % COUNTRIES.length);
-      cyclesRef.current++;
-      if (cyclesRef.current > 45) {
-        setSpeed(s => {
-          const next = s + 20;
-          if (next > 420) {
-            clearInterval(iRef.current!);
-            setTimeout(onDone, 250);
-          }
-          return next;
-        });
-      }
-    }, speed);
-    return () => clearInterval(iRef.current!);
-  }, [speed]);
-
-  const c = COUNTRIES[index];
-  const dummy: StickerData = { ...c, id: "spin", earnedAt: 0 };
-
-  return (
-    <div className="flex flex-col items-center gap-4">
-      <div style={{ filter: `drop-shadow(0 0 28px ${c.primary}90)`, animation: "globe-spin 0.4s ease-in-out infinite alternate" }}>
-        <StickerBadge sticker={dummy} size={180} shine />
-      </div>
-      <p className="text-white/40 text-xs tracking-widest uppercase font-bold">Spinning the globe…</p>
+      <button
+        onClick={() => ready && onGo(name.trim(), nat)}
+        disabled={!ready}
+        className="group relative w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl text-white font-black text-base transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+        style={{ background: "linear-gradient(135deg,#4055FF,#9033F5,#FF2060)", boxShadow: ready ? "0 0 36px rgba(64,85,255,0.45)" : "none" }}>
+        <Globe className="w-5 h-5 group-hover:animate-spin" />
+        Go — Open My Passport
+        <span className="absolute inset-0 rounded-xl overflow-hidden">
+          <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+        </span>
+      </button>
     </div>
   );
 }
@@ -983,53 +1083,48 @@ function FloatingHero() {
 
 // ── Local storage (single sticker per traveller) ────────────────────────────
 const LS_KEY = "vs_travel_sticker_v3";
-interface SavedState { name: string; sticker: StickerData; match: MatchInfo | null; }
+interface SavedState { name: string; nationalityCode: string; sticker: StickerData; match: MatchInfo | null; }
 function loadState(): SavedState | null {
   try { const v = localStorage.getItem(LS_KEY); return v ? JSON.parse(v) : null; } catch { return null; }
 }
 function saveState(s: SavedState) { localStorage.setItem(LS_KEY, JSON.stringify(s)); }
 function clearState() { localStorage.removeItem(LS_KEY); }
 
+function findCountry(code: string) { return COUNTRIES.find(c => c.code === code) || COUNTRIES[0]; }
+
 // ── Main page ───────────────────────────────────────────────────────────────
 export default function TravelStickerPage() {
   const [saved,        setSaved]        = useState<SavedState | null>(loadState);
-  const [nameGate,     setNameGate]     = useState(false);
-  const [spinning,     setSpinning]     = useState(false);
   const [detail,       setDetail]       = useState<StickerData | null>(null);
   const [reveal,       setReveal]       = useState<StickerData | null>(null);
+  const [nationality,  setNationality]  = useState<typeof COUNTRIES[0]>(COUNTRIES[0]);
   const [match,        setMatch]        = useState<MatchInfo | null>(null);
   const [matchLoading, setMatchLoading] = useState(false);
   const pendingName = useRef<string>("");
 
   const hasSticker = !!saved;
 
-  function handleStartSpin() {
+  async function handleGo(name: string, nationalityCode: string) {
     if (hasSticker) return;        // one sticker only
-    setNameGate(true);
-  }
-
-  function handleNameSubmit(name: string) {
     pendingName.current = name;
-    setNameGate(false);
-    setSpinning(true);
-  }
+    const nat = findCountry(nationalityCode);
+    setNationality(nat);
 
-  async function handleSpinDone() {
+    // Pick the lucky destination (the passport flip will land here)
     const picked = COUNTRIES[Math.floor(Math.random() * COUNTRIES.length)];
     const sticker: StickerData = { ...picked, id: crypto.randomUUID(), earnedAt: Date.now() };
-    setSpinning(false);
     setReveal(sticker);
-    setMatchLoading(true);
     setMatch(null);
+    setMatchLoading(true);
 
-    // Find / register travel partner on the server
+    // Register & find travel partner on the server (runs during the flip animation)
     let foundMatch: MatchInfo | null = null;
     try {
       const r = await fetch("/api/travel-stickers/collect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: pendingName.current,
+          name, nationality: nat.name,
           code: picked.code, countryName: picked.name, flag: picked.flag,
           landmark: picked.landmark, primary: picked.primary,
           secondary: picked.secondary, fact: picked.fact,
@@ -1043,9 +1138,18 @@ export default function TravelStickerPage() {
 
     setMatch(foundMatch);
     setMatchLoading(false);
-    const next: SavedState = { name: pendingName.current, sticker, match: foundMatch };
+    const next: SavedState = { name, nationalityCode, sticker, match: foundMatch };
     setSaved(next);
     saveState(next);
+  }
+
+  function handleReopen() {
+    if (!saved) return;
+    pendingName.current = saved.name;
+    setNationality(findCountry(saved.nationalityCode));
+    setMatch(saved.match);
+    setMatchLoading(false);
+    setReveal(saved.sticker);
   }
 
   function handleReset() {
@@ -1059,9 +1163,17 @@ export default function TravelStickerPage() {
   return (
     <div className="min-h-screen" style={{ background: "linear-gradient(160deg,#03071e 0%,#08082e 38%,#0d1030 68%,#0a0a1a 100%)" }}>
 
-      {nameGate && <NameGate onSubmit={handleNameSubmit} onClose={() => setNameGate(false)} />}
-      {reveal   && <RevealOverlay sticker={reveal} match={match} matchLoading={matchLoading} onClose={() => setReveal(null)} />}
-      {detail   && <StickerDetailModal sticker={detail} onClose={() => setDetail(null)} />}
+      {reveal && (
+        <PassportReveal
+          name={pendingName.current}
+          nationality={nationality}
+          sticker={reveal}
+          match={match}
+          matchLoading={matchLoading}
+          onClose={() => setReveal(null)}
+        />
+      )}
+      {detail && <StickerDetailModal sticker={detail} onClose={() => setDetail(null)} />}
 
       {/* Minimal header */}
       <header className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
@@ -1113,36 +1225,28 @@ export default function TravelStickerPage() {
           </div>
 
           <h1 className="text-4xl md:text-6xl font-black text-white mb-4 leading-none tracking-tight">
-            Find Your<br />
+            Stamp Your<br />
             <span style={{ background: "linear-gradient(90deg,#4055FF,#9033F5,#FF2060)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-              Travel Partner
+              Lucky Passport
             </span>
           </h1>
 
           <p className="text-white/50 text-base md:text-lg leading-relaxed mb-7 max-w-md">
-            Spin the globe to reveal your lucky destination — then get matched with another explorer who landed on the same country. They're your travel partner for the journey! 🌍✈️
+            Enter your details, open your passport, and watch the pages flip to reveal your lucky destination — then meet the traveller matched as your partner for the journey! 🛂✈️
           </p>
 
           {!hasSticker ? (
-            <button onClick={handleStartSpin}
-              className="group relative inline-flex items-center gap-3 px-8 py-4 rounded-2xl text-white text-base font-black transition-all hover:scale-105 active:scale-95"
-              style={{
-                background: "linear-gradient(135deg,#4055FF,#9033F5,#FF2060)",
-                boxShadow: "0 0 40px rgba(64,85,255,0.45), 0 8px 32px rgba(144,51,245,0.3)",
-              }}>
-              <Globe className="w-5 h-5 group-hover:animate-spin" />
-              Spin the Globe — Free!
-              <span className="w-2 h-2 rounded-full bg-white/80" style={{ animation: "ping-dot 1.5s ease infinite" }} />
-              <span className="absolute inset-0 rounded-2xl overflow-hidden">
-                <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-              </span>
-            </button>
+            <EntryForm onGo={handleGo} />
           ) : (
-            <div className="flex items-center gap-3">
-              <button onClick={() => setDetail(saved.sticker)}
+            <div className="flex flex-wrap items-center gap-3">
+              <button onClick={handleReopen}
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-white text-sm font-black transition hover:scale-105 active:scale-95"
                 style={{ background: "linear-gradient(135deg,#4055FF,#9033F5)", boxShadow: "0 0 30px rgba(64,85,255,0.35)" }}>
-                <Download className="w-4 h-4" />View &amp; Share My Sticker
+                <Globe className="w-4 h-4" />Reopen My Passport
+              </button>
+              <button onClick={() => setDetail(saved.sticker)}
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-white text-sm font-bold border border-white/10 hover:border-white/25 transition">
+                <Download className="w-4 h-4" />Download &amp; Share
               </button>
               <button onClick={handleReset}
                 className="inline-flex items-center gap-1.5 px-4 py-3 rounded-2xl text-white/50 text-xs font-bold border border-white/10 hover:text-white/80 hover:border-white/20 transition">
@@ -1153,31 +1257,25 @@ export default function TravelStickerPage() {
         </div>
       </section>
 
-      {/* Spin modal */}
-      {spinning && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center"
-          style={{ background: "rgba(2,4,20,0.95)", backdropFilter: "blur(22px)" }}>
-          <SpinWheel onDone={handleSpinDone} />
-        </div>
-      )}
-
       {/* Result section */}
       <section className="px-5 md:px-10 pb-20 pt-6 max-w-3xl mx-auto w-full">
         {!hasSticker ? (
-          <div className="text-center py-16">
-            <div className="w-24 h-24 rounded-3xl flex items-center justify-center mx-auto mb-5 border-2 border-dashed border-white/[0.1]"
-              style={{ background: "rgba(64,85,255,0.07)" }}>
-              <Globe className="w-12 h-12 text-white/20" />
+          <div className="py-10">
+            <p className="text-center text-[11px] uppercase tracking-widest font-bold text-white/35 mb-6">How it works</p>
+            <div className="grid sm:grid-cols-3 gap-4">
+              {[
+                { icon: "🛂", title: "Enter your details", desc: "Your name and nationality set up your personal passport." },
+                { icon: "📖", title: "Flip the pages", desc: "Your passport opens and pages flip fast, stamping country after country." },
+                { icon: "✈️", title: "Meet your partner", desc: "Land on your lucky country and get matched with a fellow traveller." },
+              ].map((s, i) => (
+                <div key={i} className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 text-center"
+                  style={{ animation: `pop-in 0.5s cubic-bezier(0.34,1.56,0.64,1) ${i * 0.08}s both` }}>
+                  <div className="text-3xl mb-2">{s.icon}</div>
+                  <p className="text-sm font-black text-white mb-1">{s.title}</p>
+                  <p className="text-xs text-white/40 leading-relaxed">{s.desc}</p>
+                </div>
+              ))}
             </div>
-            <h3 className="text-xl font-black text-white mb-2">No destination yet</h3>
-            <p className="text-white/35 text-sm mb-6 max-w-sm mx-auto">
-              Enter your name, spin the globe once, and we'll pair you with a fellow traveller heading to the same place.
-            </p>
-            <button onClick={handleStartSpin}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-white text-sm font-bold"
-              style={{ background: "linear-gradient(135deg,#4055FF,#9033F5)" }}>
-              <Globe className="w-4 h-4" />Spin Now — Free!
-            </button>
           </div>
         ) : (
           <div className="grid md:grid-cols-2 gap-5">
@@ -1241,6 +1339,8 @@ export default function TravelStickerPage() {
         @keyframes cloud-drift  { from{transform:translateX(-25vw)} to{transform:translateX(125vw)} }
         @keyframes orb-drift-a  { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(40px,30px) scale(1.12)} }
         @keyframes orb-drift-b  { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-50px,-25px) scale(1.15)} }
+        @keyframes page-flip    { 0%{transform:rotateY(-95deg);transform-origin:left center;opacity:0.4} 60%{opacity:1} 100%{transform:rotateY(0deg);opacity:1} }
+        @keyframes stamp-in     { 0%{transform:translate(-50%,-50%) rotate(-7deg) scale(2.4);opacity:0} 55%{opacity:1} 100%{transform:translate(-50%,-50%) rotate(-7deg) scale(1);opacity:1} }
       `}</style>
     </div>
   );
