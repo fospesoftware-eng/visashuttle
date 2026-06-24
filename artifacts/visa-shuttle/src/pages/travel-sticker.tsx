@@ -1308,7 +1308,7 @@ function loadPayPalSdk(clientId: string): Promise<void> {
   if (paypalSdkPromise) return paypalSdkPromise;
   paypalSdkPromise = new Promise<void>((resolve, reject) => {
     const s = document.createElement("script");
-    s.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=USD&intent=capture&enable-funding=card,venmo&disable-funding=paylater,credit&components=buttons`;
+    s.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=USD&intent=capture&enable-funding=card&disable-funding=paylater,credit,venmo&components=buttons`;
     s.async = true;
     s.onload = () => resolve();
     s.onerror = () => { paypalSdkPromise = null; reject(new Error("Failed to load PayPal")); };
@@ -1342,11 +1342,19 @@ function PaymentModal({ onPaid, onClose }: { onPaid: (orderId: string) => void; 
               method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
             });
             const d = await r.json().catch(() => ({}));
-            if (!r.ok || !d.orderId) throw new Error(d.error || "Could not start checkout");
+            if (!r.ok || !d.orderId) {
+              const msg = d.error || "Could not start checkout";
+              setErr(msg); setStatus("error");
+              throw new Error(msg);
+            }
             return d.orderId;
           },
           onApprove: async (data: any) => { setStatus("processing"); onPaidRef.current(data.orderID); },
-          onError: () => { setErr("Payment failed. Please try again."); setStatus("error"); },
+          onError: (e: any) => {
+            console.error("[PayPal Buttons] error:", e);
+            setErr(prev => prev || (e?.message ? `PayPal error: ${e.message}` : "We couldn't complete the payment. This usually means the PayPal Sandbox Client ID and Secret don't match. Verify them in SaaS Admin → PayPal."));
+            setStatus("error");
+          },
         }).render(btnRef.current);
         if (!cancelled) setStatus("ready");
       } catch (e: any) {
