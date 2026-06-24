@@ -277,7 +277,6 @@ function StickerBadge({
   const yDiv      = cy + shieldOffset + contentR * 0.11;
   const yName     = cy + shieldOffset + contentR * 0.28;
   const yLandmark = cy + shieldOffset + contentR * 0.55;
-  const yBrand    = cy + shieldOffset + contentR * 0.82;
 
   return (
     <svg id={svgId} viewBox={`0 0 ${d} ${d}`} width={d} height={d}
@@ -355,13 +354,6 @@ function StickerBadge({
       {/* Landmark emoji */}
       <text x={cx} y={yLandmark} textAnchor="middle" dominantBaseline="central"
         fontSize={size * 0.13}>{sticker.landmark}</text>
-
-      {/* Brand text */}
-      <text x={cx} y={yBrand} textAnchor="middle" dominantBaseline="central"
-        fontSize={d * 0.048} fill="white" fillOpacity="0.45"
-        fontFamily="system-ui,sans-serif" letterSpacing={`${d * 0.004}px`}>
-        VISA SHUTTLE
-      </text>
 
       {/* Shine overlay */}
       {shine && (
