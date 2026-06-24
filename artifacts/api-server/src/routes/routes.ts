@@ -7888,8 +7888,25 @@ Rules:
     }
   });
 
-  // Travel Sticker — PayPal $1 checkout (no auth). Creates a PayPal order and
-  // returns the approval URL for redirect.
+  // Travel Sticker — public PayPal config for the inline JS SDK (no secrets).
+  app.get("/api/travel-stickers/paypal/config", async (_req, res) => {
+    try {
+      const cfg = await storage.getPaymentGatewayConfig();
+      const paypal = getPayPalCredentials(cfg);
+      return res.json({
+        configured: !!(paypal.clientId && paypal.clientSecret),
+        clientId: paypal.clientId || "",
+        mode: paypal.mode,
+        currency: "USD",
+        amount: 1,
+      });
+    } catch (e: any) {
+      return res.status(500).json({ configured: false, error: e?.message || "Config error" });
+    }
+  });
+
+  // Travel Sticker — PayPal $1 checkout (no auth). Creates a PayPal order
+  // (used by the inline JS SDK buttons; also returns an approval URL fallback).
   app.post("/api/travel-stickers/paypal/create-order", async (req, res) => {
     try {
       const cfg = await storage.getPaymentGatewayConfig();
@@ -7899,6 +7916,7 @@ Rules:
       }
       const origin = getRequestOrigin(req);
       const refId = `VS_STICKER_${Date.now()}_${randomUUID().slice(0, 8)}`;
+      void origin;
       const order = await createPayPalOrder(paypal, {
         intent: "CAPTURE",
         purchase_units: [{
@@ -7907,21 +7925,13 @@ Rules:
           description: "Visa Shuttle Travel Sticker",
           amount: { currency_code: "USD", value: formatPayPalAmount("USD", 1) },
         }],
-        payment_source: {
-          paypal: {
-            experience_context: {
-              brand_name: "Visa Shuttle",
-              shipping_preference: "NO_SHIPPING",
-              user_action: "PAY_NOW",
-              return_url: `${origin}/travel-sticker?paypal=return`,
-              cancel_url: `${origin}/travel-sticker?paypal=cancel`,
-            },
-          },
+        application_context: {
+          brand_name: "Visa Shuttle",
+          shipping_preference: "NO_SHIPPING",
+          user_action: "PAY_NOW",
         },
       });
-      const approvalUrl = getPayPalApprovalUrl(order);
-      if (!approvalUrl) return res.status(502).json({ error: "PayPal did not return an approval URL" });
-      return res.json({ orderId: order.id, approvalUrl, mode: paypal.mode, amount: 1, currency: "USD" });
+      return res.json({ orderId: order.id, mode: paypal.mode, amount: 1, currency: "USD" });
     } catch (err: any) {
       console.error("[PayPal] Create travel-sticker order failed:", err?.data || err);
       const message = String(err?.message || "Unable to create PayPal order");

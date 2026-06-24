@@ -1093,7 +1093,7 @@ function EntryForm({ onGo, busy }: { onGo: (name: string, nationalityCode: strin
         className="group relative w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl text-white font-black text-base transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
         style={{ background: "linear-gradient(135deg,#4055FF,#9033F5,#FF2060)", boxShadow: ready ? "0 0 36px rgba(64,85,255,0.45)" : "none" }}>
         {busy ? (
-          <><span className="w-5 h-5 rounded-full border-2 border-white/30 border-t-white animate-spin" />Redirecting to PayPal…</>
+          <><span className="w-5 h-5 rounded-full border-2 border-white/30 border-t-white animate-spin" />Opening secure checkout…</>
         ) : (
           <><Globe className="w-5 h-5 group-hover:animate-spin" />Pay US$1 &amp; Open My Passport</>
         )}
@@ -1281,16 +1281,106 @@ function loadState(): SavedState | null {
 function saveState(s: SavedState) { localStorage.setItem(LS_KEY, JSON.stringify(s)); }
 function clearState() { localStorage.removeItem(LS_KEY); }
 
-// Pending purchase persisted across the PayPal redirect
-const LS_PENDING = "vs_travel_sticker_pending";
+// Pending purchase held in memory while the PayPal checkout modal is open
 interface PendingState { name: string; nationalityCode: string; sticker: StickerData; }
-function loadPending(): PendingState | null {
-  try { const v = sessionStorage.getItem(LS_PENDING); return v ? JSON.parse(v) : null; } catch { return null; }
-}
-function savePending(p: PendingState) { sessionStorage.setItem(LS_PENDING, JSON.stringify(p)); }
-function clearPending() { sessionStorage.removeItem(LS_PENDING); }
 
 function findCountry(code: string) { return COUNTRIES.find(c => c.code === code) || COUNTRIES[0]; }
+
+// ── PayPal inline checkout (quick checkout incl. guest card payment) ────────
+let paypalSdkPromise: Promise<void> | null = null;
+function loadPayPalSdk(clientId: string): Promise<void> {
+  if ((window as any).paypal) return Promise.resolve();
+  if (paypalSdkPromise) return paypalSdkPromise;
+  paypalSdkPromise = new Promise<void>((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=USD&intent=capture&enable-funding=card,venmo&disable-funding=paylater,credit&components=buttons`;
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => { paypalSdkPromise = null; reject(new Error("Failed to load PayPal")); };
+    document.body.appendChild(s);
+  });
+  return paypalSdkPromise;
+}
+
+function PaymentModal({ onPaid, onClose }: { onPaid: (orderId: string) => void; onClose: () => void }) {
+  const [status, setStatus] = useState<"loading" | "ready" | "error" | "processing">("loading");
+  const [err, setErr] = useState("");
+  const btnRef = useRef<HTMLDivElement | null>(null);
+  const onPaidRef = useRef(onPaid);
+  onPaidRef.current = onPaid;
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const cfg = await (await fetch("/api/travel-stickers/paypal/config")).json();
+        if (!cfg.configured || !cfg.clientId) throw new Error("Online payment isn't available right now. Please try again later.");
+        await loadPayPalSdk(cfg.clientId);
+        if (cancelled) return;
+        const paypal = (window as any).paypal;
+        if (!paypal || !btnRef.current) throw new Error("PayPal failed to load. Please retry.");
+        btnRef.current.innerHTML = "";
+        paypal.Buttons({
+          style: { layout: "vertical", color: "blue", shape: "pill", label: "pay", height: 46 },
+          createOrder: async () => {
+            const r = await fetch("/api/travel-stickers/paypal/create-order", {
+              method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+            });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok || !d.orderId) throw new Error(d.error || "Could not start checkout");
+            return d.orderId;
+          },
+          onApprove: async (data: any) => { setStatus("processing"); onPaidRef.current(data.orderID); },
+          onError: () => { setErr("Payment failed. Please try again."); setStatus("error"); },
+        }).render(btnRef.current);
+        if (!cancelled) setStatus("ready");
+      } catch (e: any) {
+        if (!cancelled) { setErr(e?.message || "Payment unavailable"); setStatus("error"); }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      style={{ background: "rgba(2,4,20,0.92)", backdropFilter: "blur(16px)" }} onClick={onClose}>
+      <div className="relative w-full max-w-sm rounded-3xl border border-white/10 p-6"
+        style={{ background: "linear-gradient(160deg,#0d0f2a,#0a0a1a)", boxShadow: "0 30px 70px rgba(0,0,0,0.7)" }}
+        onClick={e => e.stopPropagation()}>
+        <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition">
+          <X className="w-4 h-4" />
+        </button>
+        <div className="text-center mb-5">
+          <div className="text-3xl mb-2">🛂</div>
+          <h2 className="text-lg font-black text-white">Pay US$1 to open your passport</h2>
+          <p className="text-white/45 text-xs mt-1">Pay with PayPal or any debit/credit card — no PayPal account required.</p>
+        </div>
+        {status === "error" ? (
+          <div className="text-center py-6">
+            <p className="text-red-400 text-sm mb-4">{err}</p>
+            <button onClick={onClose} className="px-5 py-2.5 rounded-xl text-white text-sm font-bold border border-white/15">Close</button>
+          </div>
+        ) : status === "processing" ? (
+          <div className="flex flex-col items-center gap-3 py-8">
+            <div className="w-9 h-9 rounded-full border-2 border-white/15 border-t-white/80 animate-spin" />
+            <p className="text-white/60 text-sm">Confirming your payment…</p>
+          </div>
+        ) : (
+          <>
+            {status === "loading" && (
+              <div className="flex flex-col items-center gap-3 py-8">
+                <div className="w-9 h-9 rounded-full border-2 border-white/15 border-t-white/80 animate-spin" />
+                <p className="text-white/40 text-xs">Loading secure checkout…</p>
+              </div>
+            )}
+            <div ref={btnRef} />
+            <p className="text-center text-white/25 text-[10px] mt-3">🔒 Payments processed securely by PayPal.</p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // Client-side partner fallback (used only if the API is unreachable)
 const PARTNER_NAMES = [
@@ -1313,41 +1403,28 @@ export default function TravelStickerPage() {
   const [nationality,  setNationality]  = useState<typeof COUNTRIES[0]>(COUNTRIES[0]);
   const [match,        setMatch]        = useState<MatchInfo | null>(null);
   const [matchLoading, setMatchLoading] = useState(false);
-  const [busy,         setBusy]         = useState(false);   // creating PayPal order
-  const [verifying,    setVerifying]    = useState(false);   // capturing after return
+  const [payOpen,      setPayOpen]      = useState(false);   // inline PayPal modal
+  const [verifying,    setVerifying]    = useState(false);   // capturing payment
+  const pendingRef = useRef<PendingState | null>(null);
   const pendingName = useRef<string>("");
   const { toast } = useToast();
 
   const hasSticker = !!saved;
 
-  // Step 1: pick destination, create PayPal order, redirect to PayPal
-  async function handleGo(name: string, nationalityCode: string) {
-    if (hasSticker || busy) return;
-    setBusy(true);
+  // Step 1: pick destination, open the inline PayPal checkout
+  function handleGo(name: string, nationalityCode: string) {
+    if (hasSticker || payOpen) return;
     const picked = COUNTRIES[Math.floor(Math.random() * COUNTRIES.length)];
     const sticker: StickerData = { ...picked, id: crypto.randomUUID(), earnedAt: Date.now() };
-    savePending({ name, nationalityCode, sticker });
-    try {
-      const r = await fetch("/api/travel-stickers/paypal/create-order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      const data = await r.json().catch(() => ({}));
-      if (r.ok && data.approvalUrl) {
-        window.location.href = data.approvalUrl;   // → PayPal
-        return;
-      }
-      throw new Error(data.error || "Could not start PayPal checkout");
-    } catch (e: any) {
-      clearPending();
-      setBusy(false);
-      toast({ title: "Payment unavailable", description: e?.message || "Please try again shortly.", variant: "destructive" });
-    }
+    pendingRef.current = { name, nationalityCode, sticker };
+    setPayOpen(true);
   }
 
-  // Step 2: on return from PayPal, capture the payment then reveal the sticker
-  async function completeAfterPayment(orderId: string, pending: PendingState) {
+  // Step 2: PayPal approved → capture server-side, then reveal the sticker
+  async function completeAfterPayment(orderId: string) {
+    const pending = pendingRef.current;
+    if (!pending) return;
+    setPayOpen(false);
     setVerifying(true);
     const { name, nationalityCode, sticker } = pending;
     const nat = findCountry(nationalityCode);
@@ -1368,7 +1445,7 @@ export default function TravelStickerPage() {
       if (!r.ok || !data.paid) throw new Error(data.error || "Payment could not be verified");
 
       const foundMatch: MatchInfo = data.match || localPartner(sticker.code);
-      clearPending();
+      pendingRef.current = null;
       setVerifying(false);
       setMatch(foundMatch);
       setMatchLoading(false);
@@ -1378,30 +1455,9 @@ export default function TravelStickerPage() {
       saveState(next);
     } catch (e: any) {
       setVerifying(false);
-      clearPending();
-      toast({ title: "Payment not completed", description: e?.message || "You were not charged. Please try again.", variant: "destructive" });
+      toast({ title: "Payment not completed", description: e?.message || "If you were charged, please contact support.", variant: "destructive" });
     }
   }
-
-  // Detect PayPal redirect return on mount
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const paypal = params.get("paypal");
-    const token = params.get("token");   // PayPal order id
-    if (!paypal) return;
-    const cleanUrl = window.location.pathname;
-    if (paypal === "return" && token) {
-      const pending = loadPending();
-      if (pending && !saved) {
-        completeAfterPayment(token, pending);
-      }
-    } else if (paypal === "cancel") {
-      clearPending();
-      toast({ title: "Payment cancelled", description: "No charge was made." });
-    }
-    window.history.replaceState({}, "", cleanUrl);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   function handleReopen() {
     if (!saved) return;
@@ -1434,6 +1490,8 @@ export default function TravelStickerPage() {
         />
       )}
       {detail && <StickerDetailModal sticker={detail} onClose={() => setDetail(null)} />}
+
+      {payOpen && <PaymentModal onPaid={completeAfterPayment} onClose={() => setPayOpen(false)} />}
 
       {/* Verifying payment overlay */}
       {verifying && (
@@ -1487,7 +1545,7 @@ export default function TravelStickerPage() {
           </p>
 
           {!hasSticker ? (
-            <EntryForm onGo={handleGo} busy={busy} />
+            <EntryForm onGo={handleGo} busy={payOpen} />
           ) : (
             <div className="flex flex-wrap items-center gap-3">
               <button onClick={handleReopen}
