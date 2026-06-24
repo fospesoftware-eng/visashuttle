@@ -674,21 +674,135 @@ function SpinWheel({ onDone }: { onDone: () => void }) {
 }
 
 // ── Floating sticker hero field ─────────────────────────────────────────────
-const HERO_CODES = ["JP", "FR", "BR", "AU", "IS", "IN", "TR", "NZ", "KR", "IT"];
+const HERO_CODES = ["JP", "FR", "BR", "AU", "IS", "IN", "TR", "NZ", "KR", "IT", "EG", "PE", "ZA", "GR", "MX", "CA"];
 const HERO_STICKERS = COUNTRIES.filter(c => HERO_CODES.includes(c.code));
+
+// ── Animated travel backdrop ────────────────────────────────────────────────
+function TravelBackdrop() {
+  // Dotted world-map silhouette: scatter of points across a 1000×420 viewBox.
+  const dots = useRef<{ x: number; y: number; r: number; o: number }[]>();
+  if (!dots.current) {
+    const pts: { x: number; y: number; r: number; o: number }[] = [];
+    let seed = 1337;
+    const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+    for (let i = 0; i < 240; i++) {
+      pts.push({ x: rnd() * 1000, y: rnd() * 420, r: 0.8 + rnd() * 1.6, o: 0.05 + rnd() * 0.22 });
+    }
+    dots.current = pts;
+  }
+
+  // Flight arcs: start → control → end, with a plane animating along each.
+  const arcs = [
+    { d: "M 60,330 Q 350,40 640,210",  dur: "9s",  delay: "0s",   color: "#7B94FF" },
+    { d: "M 120,90 Q 480,330 880,130", dur: "11s", delay: "1.5s", color: "#FF6BA8" },
+    { d: "M 250,380 Q 600,120 960,300",dur: "13s", delay: "3s",   color: "#5BE0C0" },
+    { d: "M 40,200 Q 420,420 820,360", dur: "10s", delay: "2.2s", color: "#FFC857" },
+  ];
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {/* Aurora gradient orbs */}
+      <div className="absolute rounded-full" style={{
+        top: "-12%", left: "8%", width: 460, height: 460,
+        background: "radial-gradient(circle, rgba(64,85,255,0.32), transparent 70%)",
+        filter: "blur(40px)", animation: "orb-drift-a 18s ease-in-out infinite",
+      }} />
+      <div className="absolute rounded-full" style={{
+        bottom: "-18%", right: "12%", width: 520, height: 520,
+        background: "radial-gradient(circle, rgba(255,32,96,0.22), transparent 70%)",
+        filter: "blur(50px)", animation: "orb-drift-b 22s ease-in-out infinite",
+      }} />
+      <div className="absolute rounded-full" style={{
+        top: "30%", left: "45%", width: 380, height: 380,
+        background: "radial-gradient(circle, rgba(144,51,245,0.20), transparent 70%)",
+        filter: "blur(45px)", animation: "orb-drift-a 25s ease-in-out infinite reverse",
+      }} />
+
+      {/* Starfield */}
+      {[...Array(60)].map((_, i) => {
+        const left = (i * 53) % 100, top = (i * 37) % 100, sz = (i % 3) + 1;
+        return <span key={i} className="absolute rounded-full bg-white" style={{
+          left: `${left}%`, top: `${top}%`, width: sz, height: sz,
+          opacity: 0.12 + (i % 5) * 0.05,
+          animation: `twinkle ${2 + (i % 4)}s ease-in-out ${(i % 7) * 0.3}s infinite`,
+        }} />;
+      })}
+
+      {/* Dotted world map + flight paths */}
+      <svg viewBox="0 0 1000 420" preserveAspectRatio="xMidYMid slice"
+        className="absolute inset-0 w-full h-full">
+        <defs>
+          {arcs.map((a, i) => (
+            <linearGradient key={i} id={`arc-grad-${i}`} x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor={a.color} stopOpacity="0" />
+              <stop offset="50%" stopColor={a.color} stopOpacity="0.55" />
+              <stop offset="100%" stopColor={a.color} stopOpacity="0" />
+            </linearGradient>
+          ))}
+        </defs>
+
+        {/* world dots */}
+        {dots.current.map((p, i) => (
+          <circle key={i} cx={p.x} cy={p.y} r={p.r} fill="#9FB0FF" opacity={p.o} />
+        ))}
+
+        {/* flight arcs */}
+        {arcs.map((a, i) => (
+          <g key={i}>
+            <path d={a.d} fill="none" stroke={`url(#arc-grad-${i})`} strokeWidth="1.5"
+              strokeDasharray="3 6" opacity="0.5" />
+            {/* endpoint pulse */}
+            <circle r="3" fill={a.color} opacity="0.8">
+              <animateMotion dur={a.dur} begin={a.delay} repeatCount="indefinite" path={a.d} keyPoints="0;1" keyTimes="0;1" calcMode="linear" />
+            </circle>
+            {/* plane */}
+            <g opacity="0.9">
+              <animateMotion dur={a.dur} begin={a.delay} repeatCount="indefinite" rotate="auto" path={a.d} />
+              <path d="M -7,0 L 7,0 M 4,0 L -2,-4 M 4,0 L -2,4" stroke={a.color} strokeWidth="1.6"
+                strokeLinecap="round" fill="none" />
+              <circle cx="6" cy="0" r="1.6" fill={a.color} />
+            </g>
+          </g>
+        ))}
+      </svg>
+
+      {/* Drifting clouds */}
+      {[
+        { top: "18%", dur: "34s", scale: 1.0,  o: 0.06, delay: "0s" },
+        { top: "55%", dur: "46s", scale: 1.5,  o: 0.05, delay: "-12s" },
+        { top: "72%", dur: "40s", scale: 0.8,  o: 0.07, delay: "-22s" },
+      ].map((c, i) => (
+        <svg key={i} viewBox="0 0 120 50" width={120 * c.scale} height={50 * c.scale}
+          className="absolute" style={{
+            top: c.top, left: 0, opacity: c.o, fill: "white",
+            animation: `cloud-drift ${c.dur} linear ${c.delay} infinite`,
+          }}>
+          <ellipse cx="40" cy="32" rx="34" ry="16" />
+          <ellipse cx="68" cy="26" rx="26" ry="20" />
+          <ellipse cx="86" cy="34" rx="22" ry="13" />
+        </svg>
+      ))}
+    </div>
+  );
+}
 
 function FloatingHero() {
   const positions = [
-    { top: "4%",   right: "2%",   size: 110, rotate:  12, float: 0, opacity: 0.92 },
-    { top: "50%",  right: "6%",   size:  92, rotate:  -7, float: 1, opacity: 0.80 },
-    { top: "7%",   right: "20%",  size:  82, rotate:   5, float: 2, opacity: 0.72 },
-    { top: "65%",  right: "25%",  size:  72, rotate: -14, float: 0, opacity: 0.60 },
-    { top: "-3%",  right: "38%",  size:  64, rotate:  19, float: 1, opacity: 0.50 },
-    { top: "60%",  right: "44%",  size:  56, rotate:  -5, float: 2, opacity: 0.40 },
-    { top: "20%",  right: "54%",  size:  50, rotate:  10, float: 0, opacity: 0.32 },
-    { top: "42%",  right: "62%",  size:  44, rotate: -18, float: 1, opacity: 0.22 },
-    { top: "3%",   right: "70%",  size:  38, rotate:   8, float: 2, opacity: 0.15 },
-    { top: "74%",  right: "15%",  size:  80, rotate: -10, float: 0, opacity: 0.65 },
+    { top: "3%",   right: "1%",   size: 116, rotate:  12, float: 0, opacity: 0.95 },
+    { top: "48%",  right: "5%",   size:  96, rotate:  -7, float: 1, opacity: 0.85 },
+    { top: "76%",  right: "13%",  size:  84, rotate: -10, float: 2, opacity: 0.72 },
+    { top: "6%",   right: "18%",  size:  86, rotate:   5, float: 2, opacity: 0.78 },
+    { top: "63%",  right: "23%",  size:  74, rotate: -14, float: 0, opacity: 0.64 },
+    { top: "28%",  right: "13%",  size:  66, rotate:   8, float: 1, opacity: 0.70 },
+    { top: "-4%",  right: "34%",  size:  70, rotate:  19, float: 1, opacity: 0.58 },
+    { top: "58%",  right: "40%",  size:  60, rotate:  -5, float: 2, opacity: 0.46 },
+    { top: "16%",  right: "36%",  size:  54, rotate:  -9, float: 0, opacity: 0.42 },
+    { top: "82%",  right: "34%",  size:  50, rotate:  14, float: 1, opacity: 0.34 },
+    { top: "34%",  right: "50%",  size:  50, rotate:  10, float: 0, opacity: 0.34 },
+    { top: "70%",  right: "52%",  size:  44, rotate: -16, float: 2, opacity: 0.26 },
+    { top: "5%",   right: "52%",  size:  46, rotate:   6, float: 1, opacity: 0.28 },
+    { top: "44%",  right: "61%",  size:  40, rotate: -18, float: 1, opacity: 0.20 },
+    { top: "16%",  right: "66%",  size:  36, rotate:   8, float: 2, opacity: 0.15 },
   ];
 
   return (
@@ -776,10 +890,17 @@ export default function TravelStickerPage() {
       </header>
 
       {/* Hero */}
-      <section className="relative overflow-hidden min-h-[500px] flex items-center">
+      <section className="relative overflow-hidden min-h-[560px] flex items-center">
+        <TravelBackdrop />
         <FloatingHero />
+        {/* readability mask — only over the text column on the left */}
         <div className="absolute inset-0 pointer-events-none"
-          style={{ background: "linear-gradient(to right,rgba(3,7,30,1) 32%,rgba(3,7,30,0.5) 65%,transparent 100%)" }} />
+          style={{ background: "linear-gradient(to right,rgba(3,7,30,0.92) 24%,rgba(3,7,30,0.45) 50%,transparent 72%)" }} />
+        {/* top + bottom vignette to blend */}
+        <div className="absolute inset-x-0 top-0 h-16 pointer-events-none"
+          style={{ background: "linear-gradient(to bottom,rgba(3,7,30,0.8),transparent)" }} />
+        <div className="absolute inset-x-0 bottom-0 h-20 pointer-events-none"
+          style={{ background: "linear-gradient(to top,rgba(10,10,26,0.95),transparent)" }} />
 
         <div className="relative z-10 px-6 md:px-12 py-16 max-w-lg">
           <div className="flex flex-wrap gap-2 mb-5">
@@ -961,6 +1082,10 @@ export default function TravelStickerPage() {
         @keyframes globe-spin   { from{filter:drop-shadow(0 0 12px #4055FF80)} to{filter:drop-shadow(0 0 30px #4055FFcc)} }
         @keyframes ping-dot     { 0%,100%{opacity:0.8;transform:scale(1)} 50%{opacity:0.3;transform:scale(2)} }
         @keyframes pop-in       { from{opacity:0;transform:scale(0.6) rotate(-10deg)} to{opacity:1;transform:scale(1) rotate(0deg)} }
+        @keyframes twinkle      { 0%,100%{opacity:0.15} 50%{opacity:0.7} }
+        @keyframes cloud-drift  { from{transform:translateX(-25vw)} to{transform:translateX(125vw)} }
+        @keyframes orb-drift-a  { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(40px,30px) scale(1.12)} }
+        @keyframes orb-drift-b  { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-50px,-25px) scale(1.15)} }
       `}</style>
     </div>
   );
