@@ -415,6 +415,55 @@ async function downloadStickerPNG(sticker: StickerData, svgId: string) {
   });
 }
 
+// ── Collect sound (Web Audio — no asset needed) ─────────────────────────────
+function playCollectSound() {
+  try {
+    const AC = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AC) return;
+    const ctx = new AC();
+    const now = ctx.currentTime;
+
+    // Master with a gentle reverb-ish tail
+    const master = ctx.createGain();
+    master.gain.value = 0.0001;
+    master.connect(ctx.destination);
+    master.gain.setValueAtTime(0.0001, now);
+    master.gain.exponentialRampToValueAtTime(0.5, now + 0.02);
+    master.gain.exponentialRampToValueAtTime(0.0001, now + 1.6);
+
+    // Cheerful ascending arpeggio (C–E–G–C major, sparkle)
+    const notes = [523.25, 659.25, 783.99, 1046.5, 1318.5];
+    notes.forEach((freq, i) => {
+      const t = now + i * 0.085;
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = i < 3 ? "triangle" : "sine";
+      osc.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.35, t + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+      osc.connect(g); g.connect(master);
+      osc.start(t); osc.stop(t + 0.5);
+    });
+
+    // Final shimmer chord
+    [1046.5, 1318.5, 1567.98].forEach((freq) => {
+      const t = now + 0.42;
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.18, t + 0.04);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.0);
+      osc.connect(g); g.connect(master);
+      osc.start(t); osc.stop(t + 1.05);
+    });
+
+    setTimeout(() => ctx.close().catch(() => {}), 2000);
+  } catch { /* ignore */ }
+}
+
 // ── Confetti burst ──────────────────────────────────────────────────────────
 function Confetti({ active }: { active: boolean }) {
   const COLORS = ["#4055FF","#FF2060","#FFBF00","#00E5A0","#FF6B35","#A855F7","#06B6D4","#F43F5E"];
@@ -592,7 +641,7 @@ function RevealOverlay({
   const [phase, setPhase] = useState<0 | 1 | 2 | 3>(0);
 
   useEffect(() => {
-    const t1 = setTimeout(() => setPhase(1), 80);
+    const t1 = setTimeout(() => { setPhase(1); playCollectSound(); }, 80);
     const t2 = setTimeout(() => setPhase(2), 1500);
     const t3 = setTimeout(() => setPhase(3), 2800);
     return () => { [t1, t2, t3].forEach(clearTimeout); };

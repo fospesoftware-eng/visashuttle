@@ -9,7 +9,7 @@ const footerColumns = [
       { label: "Basic Check", href: "/plans/basic-check" },
       { label: "Deep Check", href: "/plans/deep-check" },
       { label: "Pro Plan", href: "/plans/pro" },
-      { label: "✈️ Travel Virtual Sticker", href: "/travel-sticker" },
+      { label: "Travel Virtual Sticker", href: "/travel-sticker" },
       { label: "Fake Visa Detector", href: "/tools/fake-visa-detector" },
       { label: "Rejection Recovery", href: "/tools/rejection-recovery" },
       { label: "Fake Agency Detector", href: "/tools/fake-agency-detector" },
