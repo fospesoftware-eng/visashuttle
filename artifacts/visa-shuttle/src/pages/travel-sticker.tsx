@@ -576,19 +576,33 @@ function StickerDetailModal({
   );
 }
 
-// ── Reveal overlay (new sticker earned) ─────────────────────────────────────
-function RevealOverlay({ sticker, onClose }: { sticker: StickerData; onClose: () => void }) {
-  const [phase, setPhase] = useState<0 | 1 | 2>(0);
+// ── Travel partner match type ───────────────────────────────────────────────
+interface MatchInfo { name: string; collectedAt: string | null; }
+
+// ── Reveal overlay (sticker earned + travel partner match) ──────────────────
+function RevealOverlay({
+  sticker, match, matchLoading, onClose,
+}: {
+  sticker: StickerData;
+  match: MatchInfo | null;
+  matchLoading: boolean;
+  onClose: () => void;
+}) {
+  // phase 0 hidden → 1 sticker pops → 2 sticker text → 3 partner section
+  const [phase, setPhase] = useState<0 | 1 | 2 | 3>(0);
 
   useEffect(() => {
     const t1 = setTimeout(() => setPhase(1), 80);
-    const t2 = setTimeout(() => setPhase(2), 1600);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
+    const t2 = setTimeout(() => setPhase(2), 1500);
+    const t3 = setTimeout(() => setPhase(3), 2800);
+    return () => { [t1, t2, t3].forEach(clearTimeout); };
   }, []);
 
+  const initial = (match?.name || "?").trim().charAt(0).toUpperCase();
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(2,4,20,0.93)", backdropFilter: "blur(20px)" }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto py-8"
+      style={{ background: "rgba(2,4,20,0.94)", backdropFilter: "blur(20px)" }}>
       <div className="relative text-center px-6 max-w-sm w-full flex flex-col items-center">
         <Confetti active={phase >= 1} />
 
@@ -597,38 +611,130 @@ function RevealOverlay({ sticker, onClose }: { sticker: StickerData; onClose: ()
           transform: phase === 0 ? "scale(0) rotate(-18deg)" : phase === 1 ? "scale(1.1) rotate(4deg)" : "scale(1) rotate(0deg)",
           transition: phase === 0 ? "none" : "transform 0.6s cubic-bezier(0.34,1.56,0.64,1)",
           filter: `drop-shadow(0 0 48px ${sticker.primary}80)`,
-          marginBottom: 24,
+          marginBottom: 18,
         }}>
-          <StickerBadge sticker={sticker} size={230} shine />
+          <StickerBadge sticker={sticker} size={200} shine />
         </div>
 
-        {/* Text fade-up */}
+        {/* Sticker text */}
         <div style={{
           opacity: phase >= 2 ? 1 : 0,
           transform: phase >= 2 ? "translateY(0)" : "translateY(24px)",
           transition: "all 0.5s ease",
         }}>
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <span className="text-3xl">🎉</span>
-            <h2 className="text-2xl font-black text-white">You got {sticker.name}!</h2>
-            <span className="text-3xl">🎉</span>
+          <div className="flex items-center justify-center gap-2 mb-1.5">
+            <span className="text-2xl">🎉</span>
+            <h2 className="text-xl font-black text-white">You're going to {sticker.name}!</h2>
+            <span className="text-2xl">🎉</span>
           </div>
-          <p className="text-white/55 text-sm leading-relaxed mb-1 px-2">
-            <span className="font-semibold text-white/80">Did you know? </span>{sticker.fact}
+          <p className="text-white/50 text-xs leading-relaxed mb-1 px-2">
+            <span className="font-semibold text-white/75">Did you know? </span>{sticker.fact}
           </p>
-          <p className="text-white/30 text-xs mb-5">
-            Shape: {SHAPE_LABELS[getShape(sticker.code)]}
-          </p>
+        </div>
+
+        {/* Travel partner match */}
+        <div className="w-full mt-5" style={{
+          opacity: phase >= 3 ? 1 : 0,
+          transform: phase >= 3 ? "translateY(0)" : "translateY(20px)",
+          transition: "all 0.55s ease",
+        }}>
+          {matchLoading ? (
+            <div className="flex flex-col items-center gap-2 py-4">
+              <div className="w-7 h-7 rounded-full border-2 border-white/15 border-t-white/70 animate-spin" />
+              <p className="text-white/40 text-xs">Finding your travel partner…</p>
+            </div>
+          ) : match ? (
+            <div className="rounded-2xl border border-white/10 p-4"
+              style={{ background: `linear-gradient(160deg, ${sticker.primary}22, rgba(255,255,255,0.03))` }}>
+              <p className="text-[10px] uppercase tracking-widest font-bold text-white/40 mb-2">✈️ Your Travel Partner</p>
+              <div className="flex items-center justify-center gap-3 mb-2">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center text-lg font-black text-white shrink-0"
+                  style={{ background: `linear-gradient(135deg, ${sticker.primary}, ${sticker.secondary})` }}>
+                  {initial}
+                </div>
+                <div className="text-left">
+                  <p className="text-white font-black text-base leading-tight">{match.name}</p>
+                  <p className="text-white/45 text-xs">also landed on {sticker.flag} {sticker.name}</p>
+                </div>
+              </div>
+              <p className="text-white/45 text-xs leading-relaxed">
+                You two are matched for the journey to <span className="font-semibold text-white/70">{sticker.name}</span>! 🌍
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-white/10 p-4"
+              style={{ background: `linear-gradient(160deg, ${sticker.primary}22, rgba(255,255,255,0.03))` }}>
+              <p className="text-[10px] uppercase tracking-widest font-bold text-white/40 mb-2">🌟 Trailblazer</p>
+              <p className="text-white font-black text-base mb-1">You're the first explorer of {sticker.flag} {sticker.name}!</p>
+              <p className="text-white/45 text-xs leading-relaxed">
+                The next traveller who lands here will be matched with <span className="font-semibold text-white/70">you</span> as their travel partner.
+              </p>
+            </div>
+          )}
+
           <button onClick={onClose}
-            className="inline-flex items-center gap-2 px-7 py-3 rounded-xl text-white font-bold text-sm transition hover:opacity-90 active:scale-95"
+            className="mt-4 inline-flex items-center gap-2 px-7 py-3 rounded-xl text-white font-bold text-sm transition hover:opacity-90 active:scale-95"
             style={{ background: "linear-gradient(135deg,#4055FF,#9033F5)" }}>
-            View My Collection →
+            View My Sticker →
           </button>
         </div>
 
         <button onClick={onClose}
           className="absolute top-0 right-0 w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition">
           <X className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Name entry gate ─────────────────────────────────────────────────────────
+function NameGate({ onSubmit, onClose }: { onSubmit: (name: string) => void; onClose: () => void }) {
+  const [name, setName] = useState("");
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setMounted(true), 30); return () => clearTimeout(t); }, []);
+
+  function submit() {
+    const n = name.trim();
+    if (n.length < 2) return;
+    onSubmit(n);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(2,4,20,0.92)", backdropFilter: "blur(18px)" }}
+      onClick={onClose}>
+      <div className="relative w-full max-w-sm rounded-3xl border border-white/10 p-6 text-center"
+        style={{
+          background: "linear-gradient(160deg,#0d0f2a,#0a0a1a)",
+          boxShadow: "0 0 60px rgba(64,85,255,0.3), 0 32px 64px rgba(0,0,0,0.7)",
+          transform: mounted ? "scale(1) translateY(0)" : "scale(0.85) translateY(30px)",
+          opacity: mounted ? 1 : 0,
+          transition: "all 0.4s cubic-bezier(0.34,1.4,0.64,1)",
+        }}
+        onClick={e => e.stopPropagation()}>
+        <button onClick={onClose}
+          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition">
+          <X className="w-4 h-4" />
+        </button>
+        <div className="text-4xl mb-3">🌍✈️</div>
+        <h2 className="text-xl font-black text-white mb-1.5">What's your name, traveller?</h2>
+        <p className="text-white/45 text-xs mb-5 leading-relaxed">
+          We'll match you with another explorer heading to the same destination — your travel partner for the journey!
+        </p>
+        <input
+          autoFocus
+          value={name}
+          onChange={e => setName(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") submit(); }}
+          placeholder="Enter your name"
+          maxLength={60}
+          className="w-full px-4 py-3 rounded-xl bg-white/[0.06] border border-white/10 text-white text-sm placeholder-white/30 outline-none focus:border-[#4055FF]/60 transition mb-4"
+        />
+        <button onClick={submit} disabled={name.trim().length < 2}
+          className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-white font-black text-sm transition hover:opacity-90 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+          style={{ background: "linear-gradient(135deg,#4055FF,#9033F5,#FF2060)" }}>
+          <Globe className="w-4 h-4" />Spin the Globe
         </button>
       </div>
     </div>
@@ -826,48 +932,87 @@ function FloatingHero() {
   );
 }
 
-// ── Local storage ───────────────────────────────────────────────────────────
-const LS_KEY = "vs_travel_stickers_v2";
-function loadStickers(): StickerData[] {
-  try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); } catch { return []; }
+// ── Local storage (single sticker per traveller) ────────────────────────────
+const LS_KEY = "vs_travel_sticker_v3";
+interface SavedState { name: string; sticker: StickerData; match: MatchInfo | null; }
+function loadState(): SavedState | null {
+  try { const v = localStorage.getItem(LS_KEY); return v ? JSON.parse(v) : null; } catch { return null; }
 }
-function saveStickers(s: StickerData[]) { localStorage.setItem(LS_KEY, JSON.stringify(s)); }
+function saveState(s: SavedState) { localStorage.setItem(LS_KEY, JSON.stringify(s)); }
+function clearState() { localStorage.removeItem(LS_KEY); }
 
 // ── Main page ───────────────────────────────────────────────────────────────
 export default function TravelStickerPage() {
-  const [stickers,   setStickers]   = useState<StickerData[]>(loadStickers);
-  const [reveal,     setReveal]     = useState<StickerData | null>(null);
-  const [detail,     setDetail]     = useState<StickerData | null>(null);
-  const [spinning,   setSpinning]   = useState(false);
-  const { toast } = useToast();
+  const [saved,        setSaved]        = useState<SavedState | null>(loadState);
+  const [nameGate,     setNameGate]     = useState(false);
+  const [spinning,     setSpinning]     = useState(false);
+  const [detail,       setDetail]       = useState<StickerData | null>(null);
+  const [reveal,       setReveal]       = useState<StickerData | null>(null);
+  const [match,        setMatch]        = useState<MatchInfo | null>(null);
+  const [matchLoading, setMatchLoading] = useState(false);
+  const pendingName = useRef<string>("");
 
-  const ownedCodes = stickers.map(s => s.code);
+  const hasSticker = !!saved;
 
-  function handleSpin() {
-    const available = COUNTRIES.filter(c => !ownedCodes.includes(c.code));
-    if (available.length === 0) {
-      toast({ title: "You've collected all countries! 🌍", description: "You're a true world explorer." });
-      return;
-    }
+  function handleStartSpin() {
+    if (hasSticker) return;        // one sticker only
+    setNameGate(true);
+  }
+
+  function handleNameSubmit(name: string) {
+    pendingName.current = name;
+    setNameGate(false);
     setSpinning(true);
   }
 
-  function handleSpinDone() {
-    const available = COUNTRIES.filter(c => !ownedCodes.includes(c.code));
-    const picked = available[Math.floor(Math.random() * available.length)];
-    const newSticker: StickerData = { ...picked, id: crypto.randomUUID(), earnedAt: Date.now() };
-    const updated = [newSticker, ...stickers];
-    setStickers(updated);
-    saveStickers(updated);
+  async function handleSpinDone() {
+    const picked = COUNTRIES[Math.floor(Math.random() * COUNTRIES.length)];
+    const sticker: StickerData = { ...picked, id: crypto.randomUUID(), earnedAt: Date.now() };
     setSpinning(false);
-    setReveal(newSticker);
+    setReveal(sticker);
+    setMatchLoading(true);
+    setMatch(null);
+
+    // Find / register travel partner on the server
+    let foundMatch: MatchInfo | null = null;
+    try {
+      const r = await fetch("/api/travel-stickers/collect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: pendingName.current,
+          code: picked.code, countryName: picked.name, flag: picked.flag,
+          landmark: picked.landmark, primary: picked.primary,
+          secondary: picked.secondary, fact: picked.fact,
+        }),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        foundMatch = data.match || null;
+      }
+    } catch { /* offline / no DB → trailblazer */ }
+
+    setMatch(foundMatch);
+    setMatchLoading(false);
+    const next: SavedState = { name: pendingName.current, sticker, match: foundMatch };
+    setSaved(next);
+    saveState(next);
+  }
+
+  function handleReset() {
+    clearState();
+    setSaved(null);
+    setReveal(null);
+    setMatch(null);
+    pendingName.current = "";
   }
 
   return (
     <div className="min-h-screen" style={{ background: "linear-gradient(160deg,#03071e 0%,#08082e 38%,#0d1030 68%,#0a0a1a 100%)" }}>
 
-      {reveal  && <RevealOverlay sticker={reveal}  onClose={() => setReveal(null)} />}
-      {detail  && <StickerDetailModal sticker={detail} onClose={() => setDetail(null)} />}
+      {nameGate && <NameGate onSubmit={handleNameSubmit} onClose={() => setNameGate(false)} />}
+      {reveal   && <RevealOverlay sticker={reveal} match={match} matchLoading={matchLoading} onClose={() => setReveal(null)} />}
+      {detail   && <StickerDetailModal sticker={detail} onClose={() => setDetail(null)} />}
 
       {/* Minimal header */}
       <header className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
@@ -880,11 +1025,12 @@ export default function TravelStickerPage() {
           <Logo size="sm" />
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.05]">
-            <Trophy className="w-3.5 h-3.5 text-amber-400" />
-            <span className="text-xs font-black text-white">{stickers.length}</span>
-            <span className="text-xs text-white/35">/ {COUNTRIES.length}</span>
-          </div>
+          {saved && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.05]">
+              <span className="text-sm">{saved.sticker.flag}</span>
+              <span className="text-xs font-black text-white">{saved.name}</span>
+            </div>
+          )}
           <ThemeToggle className="h-8 w-8 rounded-xl border border-white/10 bg-white/[0.05] text-white/60" />
         </div>
       </header>
@@ -896,7 +1042,6 @@ export default function TravelStickerPage() {
         {/* readability mask — only over the text column on the left */}
         <div className="absolute inset-0 pointer-events-none"
           style={{ background: "linear-gradient(to right,rgba(3,7,30,0.92) 24%,rgba(3,7,30,0.45) 50%,transparent 72%)" }} />
-        {/* top + bottom vignette to blend */}
         <div className="absolute inset-x-0 top-0 h-16 pointer-events-none"
           style={{ background: "linear-gradient(to bottom,rgba(3,7,30,0.8),transparent)" }} />
         <div className="absolute inset-x-0 bottom-0 h-20 pointer-events-none"
@@ -906,7 +1051,7 @@ export default function TravelStickerPage() {
           <div className="flex flex-wrap gap-2 mb-5">
             <span className="text-[11px] font-bold px-3 py-1 rounded-full border"
               style={{ background: "rgba(64,85,255,0.2)", borderColor: "rgba(64,85,255,0.4)", color: "#7B94FF" }}>
-              ✨ Virtual Collectibles
+              ✨ One lucky sticker
             </span>
             <span className="text-[11px] font-bold px-3 py-1 rounded-full border"
               style={{ background: "rgba(0,200,100,0.15)", borderColor: "rgba(0,200,100,0.3)", color: "#4ade80" }}>
@@ -914,49 +1059,47 @@ export default function TravelStickerPage() {
             </span>
             <span className="text-[11px] font-bold px-3 py-1 rounded-full border"
               style={{ background: "rgba(255,191,0,0.12)", borderColor: "rgba(255,191,0,0.3)", color: "#FFBF00" }}>
-              6 unique shapes
+              ✈️ Find a travel partner
             </span>
           </div>
 
           <h1 className="text-4xl md:text-6xl font-black text-white mb-4 leading-none tracking-tight">
-            Collect Every<br />
+            Find Your<br />
             <span style={{ background: "linear-gradient(90deg,#4055FF,#9033F5,#FF2060)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-              Country on Earth
+              Travel Partner
             </span>
           </h1>
 
-          <p className="text-white/50 text-base md:text-lg leading-relaxed mb-3 max-w-md">
-            Spin the globe, discover your lucky destination. Each country has a unique shape, cultural pattern & heritage design. Download &amp; share with friends! 🌍
+          <p className="text-white/50 text-base md:text-lg leading-relaxed mb-7 max-w-md">
+            Spin the globe to reveal your lucky destination — then get matched with another explorer who landed on the same country. They're your travel partner for the journey! 🌍✈️
           </p>
 
-          {/* Shape legend */}
-          <div className="flex flex-wrap gap-1.5 mb-7">
-            {Object.entries(SHAPE_LABELS).map(([, label]) => (
-              <span key={label} className="text-[10px] text-white/30 border border-white/[0.07] rounded-full px-2 py-0.5 bg-white/[0.02]">
-                {label}
+          {!hasSticker ? (
+            <button onClick={handleStartSpin}
+              className="group relative inline-flex items-center gap-3 px-8 py-4 rounded-2xl text-white text-base font-black transition-all hover:scale-105 active:scale-95"
+              style={{
+                background: "linear-gradient(135deg,#4055FF,#9033F5,#FF2060)",
+                boxShadow: "0 0 40px rgba(64,85,255,0.45), 0 8px 32px rgba(144,51,245,0.3)",
+              }}>
+              <Globe className="w-5 h-5 group-hover:animate-spin" />
+              Spin the Globe — Free!
+              <span className="w-2 h-2 rounded-full bg-white/80" style={{ animation: "ping-dot 1.5s ease infinite" }} />
+              <span className="absolute inset-0 rounded-2xl overflow-hidden">
+                <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
               </span>
-            ))}
-          </div>
-
-          <button onClick={handleSpin}
-            className="group relative inline-flex items-center gap-3 px-8 py-4 rounded-2xl text-white text-base font-black transition-all hover:scale-105 active:scale-95"
-            style={{
-              background: "linear-gradient(135deg,#4055FF,#9033F5,#FF2060)",
-              boxShadow: "0 0 40px rgba(64,85,255,0.45), 0 8px 32px rgba(144,51,245,0.3)",
-            }}>
-            <Globe className="w-5 h-5 group-hover:animate-spin" />
-            Spin the Globe — Free!
-            <span className="w-2 h-2 rounded-full bg-white/80" style={{ animation: "ping-dot 1.5s ease infinite" }} />
-            <span className="absolute inset-0 rounded-2xl overflow-hidden">
-              <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
-            </span>
-          </button>
-
-          {stickers.length > 0 && (
-            <p className="mt-4 text-white/30 text-sm flex items-center gap-2">
-              <Trophy className="w-3.5 h-3.5 text-amber-400/60" />
-              {stickers.length} sticker{stickers.length > 1 ? "s" : ""} collected — tap any to download or share
-            </p>
+            </button>
+          ) : (
+            <div className="flex items-center gap-3">
+              <button onClick={() => setDetail(saved.sticker)}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-white text-sm font-black transition hover:scale-105 active:scale-95"
+                style={{ background: "linear-gradient(135deg,#4055FF,#9033F5)", boxShadow: "0 0 30px rgba(64,85,255,0.35)" }}>
+                <Download className="w-4 h-4" />View &amp; Share My Sticker
+              </button>
+              <button onClick={handleReset}
+                className="inline-flex items-center gap-1.5 px-4 py-3 rounded-2xl text-white/50 text-xs font-bold border border-white/10 hover:text-white/80 hover:border-white/20 transition">
+                <RefreshCcw className="w-3.5 h-3.5" />Start over
+              </button>
+            </div>
           )}
         </div>
       </section>
@@ -969,108 +1112,71 @@ export default function TravelStickerPage() {
         </div>
       )}
 
-      {/* Collection */}
-      <section className="px-5 md:px-10 pb-16 pt-6">
-        {/* Progress */}
-        <div className="mb-8 p-5 rounded-2xl border border-white/[0.07] bg-white/[0.02]">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-                style={{ background: "linear-gradient(135deg,#4055FF,#9033F5)" }}>
-                <Globe className="w-4 h-4 text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-black text-white">My Collection</p>
-                <p className="text-xs text-white/35">{stickers.length} of {COUNTRIES.length} countries · tap sticker to download/share</p>
-              </div>
-            </div>
-            {stickers.length >= 10 && (
-              <div className="flex gap-0.5">
-                {[...Array(Math.min(5, Math.floor(stickers.length / 10)))].map((_, i) => (
-                  <span key={i} className="text-amber-400 text-sm">⭐</span>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="h-2.5 rounded-full bg-white/[0.05] overflow-hidden">
-            <div className="h-full rounded-full transition-all duration-1000"
-              style={{
-                width: `${Math.max((stickers.length / COUNTRIES.length) * 100, stickers.length > 0 ? 1.5 : 0)}%`,
-                background: "linear-gradient(90deg,#4055FF,#9033F5,#FF2060)",
-                boxShadow: "0 0 12px rgba(64,85,255,0.5)",
-              }}
-            />
-          </div>
-        </div>
-
-        {stickers.length === 0 ? (
-          <div className="text-center py-20">
+      {/* Result section */}
+      <section className="px-5 md:px-10 pb-20 pt-6 max-w-3xl mx-auto w-full">
+        {!hasSticker ? (
+          <div className="text-center py-16">
             <div className="w-24 h-24 rounded-3xl flex items-center justify-center mx-auto mb-5 border-2 border-dashed border-white/[0.1]"
               style={{ background: "rgba(64,85,255,0.07)" }}>
               <Globe className="w-12 h-12 text-white/20" />
             </div>
-            <h3 className="text-xl font-black text-white mb-2">Your passport is empty</h3>
-            <p className="text-white/35 text-sm mb-6">Spin the globe to earn your first sticker — every country has a unique shape &amp; design!</p>
-            <button onClick={handleSpin}
+            <h3 className="text-xl font-black text-white mb-2">No destination yet</h3>
+            <p className="text-white/35 text-sm mb-6 max-w-sm mx-auto">
+              Enter your name, spin the globe once, and we'll pair you with a fellow traveller heading to the same place.
+            </p>
+            <button onClick={handleStartSpin}
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-white text-sm font-bold"
               style={{ background: "linear-gradient(135deg,#4055FF,#9033F5)" }}>
               <Globe className="w-4 h-4" />Spin Now — Free!
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
-            {stickers.map((s, i) => (
-              <button key={s.id}
-                className="group flex flex-col items-center p-3 rounded-2xl border transition-all text-left cursor-pointer"
-                style={{
-                  borderColor: "rgba(255,255,255,0.06)",
-                  background: "rgba(255,255,255,0.03)",
-                  animation: `pop-in 0.5s cubic-bezier(0.34,1.56,0.64,1) ${i * 0.035}s both`,
-                }}
-                onMouseEnter={e => {
-                  (e.currentTarget as HTMLElement).style.borderColor = s.primary + "55";
-                  (e.currentTarget as HTMLElement).style.background  = s.primary + "12";
-                  (e.currentTarget as HTMLElement).style.transform    = "translateY(-4px) scale(1.03)";
-                }}
-                onMouseLeave={e => {
-                  (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.06)";
-                  (e.currentTarget as HTMLElement).style.background  = "rgba(255,255,255,0.03)";
-                  (e.currentTarget as HTMLElement).style.transform    = "";
-                }}
-                onClick={() => setDetail(s)}
-                title={`${s.name} — click to view, download & share`}
-              >
-                <div className="group-hover:[filter:drop-shadow(0_4px_14px_var(--sticker-glow))]"
-                  style={{ "--sticker-glow": `${s.primary}70` } as React.CSSProperties}>
-                  <StickerBadge sticker={s} size={96} shine />
-                </div>
-                <p className="mt-2 text-[10px] font-black text-white/65 text-center leading-tight truncate w-full px-1">
-                  {s.name}
-                </p>
-                <p className="text-[9px] text-white/25 mt-0.5">
-                  {new Date(s.earnedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                </p>
-                {/* Tiny download hint on hover */}
-                <p className="text-[8px] text-white/0 group-hover:text-white/40 transition-colors mt-0.5 flex items-center gap-0.5">
-                  <Download className="w-2.5 h-2.5" />tap to share
-                </p>
+          <div className="grid md:grid-cols-2 gap-5">
+            {/* My sticker */}
+            <div className="rounded-3xl border border-white/[0.08] p-6 flex flex-col items-center text-center"
+              style={{ background: `linear-gradient(160deg, ${saved.sticker.primary}18, rgba(255,255,255,0.02))` }}>
+              <p className="text-[10px] uppercase tracking-widest font-bold text-white/40 mb-3">My Destination</p>
+              <button onClick={() => setDetail(saved.sticker)}
+                className="transition hover:scale-105 active:scale-95"
+                style={{ filter: `drop-shadow(0 8px 28px ${saved.sticker.primary}55)` }}
+                title="View, download & share">
+                <StickerBadge sticker={saved.sticker} size={150} shine />
               </button>
-            ))}
+              <h3 className="mt-4 text-lg font-black text-white">{saved.sticker.flag} {saved.sticker.name}</h3>
+              <p className="text-white/45 text-xs leading-relaxed mt-1 mb-4">{saved.sticker.fact}</p>
+              <button onClick={() => setDetail(saved.sticker)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-xs font-bold transition hover:opacity-90"
+                style={{ background: "linear-gradient(135deg,#4055FF,#9033F5)" }}>
+                <Download className="w-3.5 h-3.5" />Download &amp; Share
+              </button>
+            </div>
 
-            {/* Get more */}
-            <button onClick={handleSpin}
-              className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed transition-all group min-h-[148px]"
-              style={{ borderColor: "rgba(64,85,255,0.22)", background: "rgba(64,85,255,0.04)" }}
-              onMouseEnter={e => ((e.currentTarget as HTMLElement).style.borderColor = "rgba(64,85,255,0.5)")}
-              onMouseLeave={e => ((e.currentTarget as HTMLElement).style.borderColor = "rgba(64,85,255,0.22)")}
-            >
-              <div className="w-10 h-10 rounded-full mb-2 flex items-center justify-center group-hover:scale-110 transition-transform"
-                style={{ background: "linear-gradient(135deg,#4055FF,#9033F5)", boxShadow: "0 4px 16px rgba(64,85,255,0.35)" }}>
-                <RefreshCcw className="w-4 h-4 text-white" />
-              </div>
-              <p className="text-[11px] font-black text-blue-400">Spin Again</p>
-              <p className="text-[9px] text-white/25 mt-0.5">Free!</p>
-            </button>
+            {/* Travel partner */}
+            <div className="rounded-3xl border border-white/[0.08] p-6 flex flex-col items-center justify-center text-center"
+              style={{ background: "linear-gradient(160deg, rgba(64,85,255,0.08), rgba(255,255,255,0.02))" }}>
+              <p className="text-[10px] uppercase tracking-widest font-bold text-white/40 mb-3">✈️ My Travel Partner</p>
+              {saved.match ? (
+                <>
+                  <div className="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-black text-white mb-3"
+                    style={{ background: `linear-gradient(135deg, ${saved.sticker.primary}, ${saved.sticker.secondary})`, boxShadow: `0 8px 28px ${saved.sticker.primary}55` }}>
+                    {saved.match.name.trim().charAt(0).toUpperCase()}
+                  </div>
+                  <h3 className="text-xl font-black text-white">{saved.match.name}</h3>
+                  <p className="text-white/45 text-sm mt-1 mb-3">also landed on {saved.sticker.flag} {saved.sticker.name}</p>
+                  <p className="text-white/55 text-xs leading-relaxed max-w-xs">
+                    You and <span className="font-bold text-white/80">{saved.match.name}</span> are matched for the journey to <span className="font-bold text-white/80">{saved.sticker.name}</span>. Say hi to your travel buddy! 🌍
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="text-5xl mb-3">🌟</div>
+                  <h3 className="text-lg font-black text-white">You're the first explorer!</h3>
+                  <p className="text-white/50 text-xs leading-relaxed mt-2 max-w-xs">
+                    No one had landed on {saved.sticker.flag} {saved.sticker.name} before you. The next traveller who spins this country will be matched with <span className="font-bold text-white/75">you</span> as their travel partner.
+                  </p>
+                </>
+              )}
+            </div>
           </div>
         )}
       </section>

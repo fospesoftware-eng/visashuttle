@@ -51,6 +51,21 @@ export async function runStartupMigrations(): Promise<void> {
       )
     `);
     await client.query(`CREATE INDEX IF NOT EXISTS virtual_stickers_user_idx ON virtual_stickers (user_id)`);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS travel_sticker_collectors (
+        id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        collector_name text NOT NULL,
+        country_code text NOT NULL,
+        country_name text NOT NULL,
+        flag_emoji text NOT NULL,
+        landmark_emoji text NOT NULL,
+        primary_color text NOT NULL,
+        secondary_color text NOT NULL,
+        fun_fact text NOT NULL,
+        created_at timestamp DEFAULT now()
+      )
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS travel_sticker_collectors_country_idx ON travel_sticker_collectors (country_code, created_at)`);
     console.info("[db] Startup migrations applied.");
   } catch (err) {
     console.error("[db] Startup migration failed:", err);

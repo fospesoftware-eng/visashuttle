@@ -1,6 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import { storage, isMissingRelationError, getVirtualStickersByUser, createVirtualSticker, getVirtualStickerBySession } from "../storage";
+import { storage, isMissingRelationError, getVirtualStickersByUser, createVirtualSticker, getVirtualStickerBySession, collectTravelSticker } from "../storage";
 import { runVisaCheck, runDeepCheck, scanPassportImage, isPassportScanConfigured } from "../ai";
 import { registerApiPlatformRoutes } from "./api-platform";
 import { registerPlatformExtensions } from "./platform-extensions";
@@ -7860,6 +7860,31 @@ Rules:
       return res.json({ sticker, alreadyGranted: false });
     } catch (e: any) {
       return res.status(500).json({ error: e?.message || "Verification failed" });
+    }
+  });
+
+  // Travel Sticker matchmaking — no auth. Records a collector by name and returns
+  // the previous collector of the same country as their "travel partner".
+  app.post("/api/travel-stickers/collect", async (req, res) => {
+    try {
+      const b = req.body || {};
+      const collectorName = String(b.name || "").trim().slice(0, 60);
+      if (!collectorName) return res.status(400).json({ error: "Name is required" });
+      if (!b.code || !b.countryName) return res.status(400).json({ error: "Country data is required" });
+
+      const result = await collectTravelSticker({
+        collectorName,
+        countryCode: String(b.code),
+        countryName: String(b.countryName),
+        flagEmoji: String(b.flag || ""),
+        landmarkEmoji: String(b.landmark || ""),
+        primaryColor: String(b.primary || "#4055FF"),
+        secondaryColor: String(b.secondary || "#FFFFFF"),
+        funFact: String(b.fact || ""),
+      });
+      return res.json(result);
+    } catch (e: any) {
+      return res.status(500).json({ error: e?.message || "Collect failed" });
     }
   });
 

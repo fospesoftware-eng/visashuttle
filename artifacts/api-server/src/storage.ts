@@ -4620,6 +4620,75 @@ export async function createVirtualSticker(data: Omit<VirtualSticker, "id" | "cr
   } finally { client.release(); }
 }
 
+// ----- Travel Sticker matchmaking (name-based, no auth) -----
+
+export interface TravelStickerCollector {
+  collectorName: string;
+  countryCode: string;
+  countryName: string;
+  flagEmoji: string;
+  landmarkEmoji: string;
+  primaryColor: string;
+  secondaryColor: string;
+  funFact: string;
+}
+
+export interface TravelStickerMatch {
+  name: string;
+  collectedAt: Date | null;
+}
+
+export interface TravelStickerResult {
+  match: TravelStickerMatch | null;
+  totalForCountry: number;
+}
+
+// In-memory fallback when no DB is configured
+const memTravelCollectors: (TravelStickerCollector & { createdAt: Date })[] = [];
+
+/**
+ * Records a new collector for a country and returns the most recent *previous*
+ * collector of the same country (their "travel partner" match), plus how many
+ * people have now collected that country.
+ */
+export async function collectTravelSticker(data: TravelStickerCollector): Promise<TravelStickerResult> {
+  if (!rawPool) {
+    // In-memory fallback
+    const prior = memTravelCollectors
+      .filter(c => c.countryCode === data.countryCode)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    const match = prior[0] ? { name: prior[0].collectorName, collectedAt: prior[0].createdAt } : null;
+    memTravelCollectors.push({ ...data, createdAt: new Date() });
+    return { match, totalForCountry: prior.length + 1 };
+  }
+  const client = await rawPool.connect();
+  try {
+    // Find the most recent previous collector of the same country (before we insert).
+    const prevRes = await client.query(
+      `SELECT collector_name, created_at FROM travel_sticker_collectors
+       WHERE country_code = $1 ORDER BY created_at DESC LIMIT 1`,
+      [data.countryCode]
+    );
+    const match: TravelStickerMatch | null = prevRes.rows[0]
+      ? { name: prevRes.rows[0].collector_name, collectedAt: prevRes.rows[0].created_at }
+      : null;
+
+    await client.query(
+      `INSERT INTO travel_sticker_collectors
+         (collector_name, country_code, country_name, flag_emoji, landmark_emoji, primary_color, secondary_color, fun_fact)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+      [data.collectorName, data.countryCode, data.countryName, data.flagEmoji,
+       data.landmarkEmoji, data.primaryColor, data.secondaryColor, data.funFact]
+    );
+
+    const countRes = await client.query(
+      `SELECT COUNT(*)::int AS n FROM travel_sticker_collectors WHERE country_code = $1`,
+      [data.countryCode]
+    );
+    return { match, totalForCountry: countRes.rows[0]?.n ?? 1 };
+  } finally { client.release(); }
+}
+
 export async function getVirtualStickerBySession(sessionId: string): Promise<VirtualSticker | null> {
   if (!rawPool) return null;
   try {
