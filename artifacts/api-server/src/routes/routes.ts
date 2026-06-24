@@ -9484,6 +9484,17 @@ Rules:
     res.json(record);
   });
 
+  app.delete("/api/tenants/:tenantId/counselling/:collection/:id", requireAgencyAuth, async (req, res) => {
+    const { tenantId, collection, id } = req.params;
+    await ensureCounsellingReady();
+    const collections: Record<string, any> = { sessions: counsellingSessions, shortlists: counsellingShortlists, admissions: counsellingAdmissions, documents: counsellingDocuments, tasks: counsellingTasks };
+    const table = collections[collection];
+    if (!table) return res.status(404).json({ error: "Unknown counselling collection" });
+    const [deleted] = await db.delete(table).where(and(eq(table.tenantId, tenantId), eq(table.id, id))).returning();
+    if (!deleted) return res.status(404).json({ error: "Record not found" });
+    res.json({ ok: true });
+  });
+
   app.post("/api/tenants/:tenantId/counselling/students/:studentId/ai-assessment", requireAgencyAuth, async (req, res) => {
     const { tenantId, studentId } = req.params;
     await ensureCounsellingReady();
@@ -9492,16 +9503,76 @@ Rules:
     const docs = await db.select().from(counsellingDocuments).where(and(eq(counsellingDocuments.tenantId, tenantId), eq(counsellingDocuments.studentId, studentId)));
     const scores = calculateCounsellingScores(student, docs);
     const missingDocuments = docs.filter((d) => d.required && d.status !== "received").map((d) => d.documentType);
-    const responseJson = {
-      aiConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
-      profileStrengthSummary: `${student.fullName} has a ${scores.riskLevel} risk profile with ${scores.visaReadinessScore}% visa readiness.`,
-      suitableDestinations: student.preferredDestinations?.length ? student.preferredDestinations : ["Canada", "Australia", "United Kingdom"],
-      courseSuitability: student.preferredCourse ? `Good fit for ${student.preferredCourse} if academic continuity is clear.` : "Add preferred course details to improve matching.",
-      riskFactors: [student.previousVisaRefusals ? "Previous visa refusal requires a strong explanation." : null, student.educationGap ? "Education gap needs evidence and narrative." : null, missingDocuments.length ? `${missingDocuments.length} required documents are pending.` : null].filter(Boolean),
-      missingInformation: missingDocuments,
-      recommendedNextSteps: ["Complete required document checklist.", "Shortlist 3-5 realistic institutions.", "Prepare SOP and sponsor evidence before visa filing."],
-      disclaimer: "Beta AI-assisted guidance only. Counsellor review is required before use.",
-    };
+    let responseJson: any;
+    try {
+      const aiCfg = await storage.getPlatformAiConfig();
+      const apiKey = aiCfg?.apiKey || process.env.ANTHROPIC_API_KEY;
+      if (!apiKey) throw new Error("AI not configured");
+      const prompt = `You are a study abroad counselling expert. Analyze this student profile and return a JSON assessment.
+
+Student: ${student.fullName}
+Nationality: ${student.nationality || "Not specified"}
+Current country: ${student.currentCountry || "Not specified"}
+Preferred destinations: ${(student.preferredDestinations || []).join(", ") || "Not specified"}
+Preferred course: ${student.preferredCourse || "Not specified"}
+Preferred intake: ${student.preferredIntake || "Not specified"}
+Budget range: ${student.budgetRange || "Not specified"}
+Work experience: ${student.workExperience || "None specified"}
+Education gap: ${student.educationGap || "None"}
+Previous visa refusals: ${student.previousVisaRefusals || "None"}
+Travel history: ${student.travelHistory || "Not specified"}
+Academic history: ${JSON.stringify(student.academicHistory || {})}
+English tests: ${JSON.stringify(student.englishTests || {})}
+Sponsor details: ${JSON.stringify(student.sponsorDetails || {})}
+Missing documents: ${missingDocuments.join(", ") || "None"}
+
+Return ONLY valid JSON (no markdown):
+{
+  "profileStrengthSummary": "2-3 sentence summary",
+  "admissionReadiness": { "score": 0-100, "summary": "..." },
+  "visaReadiness": { "score": 0-100, "summary": "..." },
+  "riskLevel": "low|medium|high",
+  "strengths": ["strength1", ...],
+  "riskFactors": ["risk1", ...],
+  "suitableDestinations": ["country1", ...],
+  "universityRecommendations": [
+    { "name": "University", "country": "Country", "course": "Course", "rank": "QS rank", "probability": 0-100, "reason": "..." }
+  ],
+  "courseSuitability": "...",
+  "missingInformation": ["item1", ...],
+  "recommendedNextSteps": ["step1", ...],
+  "improvementActions": [{ "action": "...", "priority": "high|medium|low", "impact": "..." }],
+  "disclaimer": "AI-assisted guidance only. Counsellor review required."
+}`;
+      const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+        body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 1500, messages: [{ role: "user", content: prompt }] }),
+      });
+      if (!aiRes.ok) throw new Error(`AI error: ${aiRes.status}`);
+      const aiData = await aiRes.json();
+      const raw = aiData.content?.[0]?.text || "{}";
+      responseJson = JSON.parse(raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim());
+      if (responseJson.admissionReadiness?.score) scores.admissionReadinessScore = responseJson.admissionReadiness.score;
+      if (responseJson.visaReadiness?.score) scores.visaReadinessScore = responseJson.visaReadiness.score;
+      if (responseJson.riskLevel) scores.riskLevel = responseJson.riskLevel;
+    } catch (_) {
+      responseJson = {
+        profileStrengthSummary: `${student.fullName} has a ${scores.riskLevel} risk profile with ${scores.visaReadinessScore}% visa readiness.`,
+        admissionReadiness: { score: scores.admissionReadinessScore, summary: "Based on document completeness." },
+        visaReadiness: { score: scores.visaReadinessScore, summary: "Based on profile completeness." },
+        riskLevel: scores.riskLevel,
+        strengths: [],
+        riskFactors: [student.previousVisaRefusals ? "Previous visa refusal requires explanation." : null, missingDocuments.length ? `${missingDocuments.length} required documents pending.` : null].filter(Boolean),
+        suitableDestinations: student.preferredDestinations?.length ? student.preferredDestinations : ["Canada", "Australia", "United Kingdom"],
+        universityRecommendations: [],
+        courseSuitability: student.preferredCourse ? `Good fit for ${student.preferredCourse}.` : "Add preferred course.",
+        missingInformation: missingDocuments,
+        recommendedNextSteps: ["Complete document checklist.", "Shortlist 3-5 institutions.", "Prepare SOP and sponsor evidence."],
+        improvementActions: [],
+        disclaimer: "AI guidance only. Counsellor review required.",
+      };
+    }
     const [assessment] = await db.insert(counsellingAiAssessments).values({ tenantId, studentId, assessmentType: "profile_assessment", admissionReadinessScore: scores.admissionReadinessScore, visaReadinessScore: scores.visaReadinessScore, riskLevel: scores.riskLevel, responseJson, generatedText: null, createdBy: req.session.userId ?? null } as any).returning();
     await db.update(counsellingStudents).set({ ...scores, updatedAt: new Date() } as any).where(and(eq(counsellingStudents.tenantId, tenantId), eq(counsellingStudents.id, studentId)));
     res.json(assessment);
@@ -9516,8 +9587,37 @@ Rules:
     const country = textValue(target.destinationCountry, 80) ?? student.preferredDestinations?.[0] ?? "the destination country";
     const institution = textValue(target.institutionName, 160) ?? "the selected institution";
     const course = textValue(target.courseName, 160) ?? student.preferredCourse ?? "the selected program";
-    const draft = [`Statement of Purpose draft for ${student.fullName}`, "", `I am applying for ${course} at ${institution} in ${country}. My academic background and career goals have led me to choose this pathway because it aligns with my long-term professional plan.`, "", `Academic background: ${textValue(JSON.stringify(student.academicHistory || {}), 800) || "Please add academic details."}`, `Work experience: ${student.workExperience || "Please add work experience or explain if not applicable."}`, `Financial background: ${textValue(JSON.stringify(student.sponsorDetails || {}), 800) || "Please add sponsor and financial evidence."}`, "", "Counsellor editable notes: strengthen course relevance, explain any education gap/refusal history, and add institution-specific details before final use."].join("\n");
-    const [assessment] = await db.insert(counsellingAiAssessments).values({ tenantId, studentId, assessmentType: "sop_draft", admissionReadinessScore: student.admissionReadinessScore ?? 0, visaReadinessScore: student.visaReadinessScore ?? 0, riskLevel: student.riskLevel ?? "medium", responseJson: { aiConfigured: Boolean(process.env.ANTHROPIC_API_KEY), editable: true, country, institution, course }, generatedText: draft, createdBy: req.session.userId ?? null } as any).returning();
+    let draft: string;
+    try {
+      const aiCfg = await storage.getPlatformAiConfig();
+      const apiKey = aiCfg?.apiKey || process.env.ANTHROPIC_API_KEY;
+      if (!apiKey) throw new Error("AI not configured");
+      const prompt = `Write a compelling Statement of Purpose (SOP) draft for a student visa application. Make it professional, genuine, and 400-500 words.
+
+Student details:
+- Name: ${student.fullName}
+- Nationality: ${student.nationality || "Not specified"}
+- Applying for: ${course} at ${institution}, ${country}
+- Academic background: ${JSON.stringify(student.academicHistory || {})}
+- Work experience: ${student.workExperience || "None"}
+- Budget: ${student.budgetRange || "Not specified"}
+- Preferred intake: ${student.preferredIntake || "Not specified"}
+- Education gap: ${student.educationGap || "None"}
+- Previous visa refusals: ${student.previousVisaRefusals || "None"}
+
+Write a complete SOP draft starting with "Statement of Purpose" as the heading. Include: motivation for this course, academic background relevance, career goals, why this institution/country, financial capability, and intent to return home after studies. Add [EDIT: ...] placeholders where the counsellor should add specific details.`;
+      const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+        body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 1000, messages: [{ role: "user", content: prompt }] }),
+      });
+      if (!aiRes.ok) throw new Error(`AI error: ${aiRes.status}`);
+      const aiData = await aiRes.json();
+      draft = aiData.content?.[0]?.text || "";
+    } catch (_) {
+      draft = [`Statement of Purpose\n`, `I am ${student.fullName}, applying for ${course} at ${institution} in ${country}.`, `\n[EDIT: Add your academic background and why this course aligns with your career goals.]`, `\n[EDIT: Describe your work experience and how it supports your study plans.]`, `\n[EDIT: Explain your financial capability and sponsor details.]`, `\n[EDIT: Explain your ties to your home country and intent to return after studies.]`, `\nCounsellor note: Review and personalise before submission.`].join("\n");
+    }
+    const [assessment] = await db.insert(counsellingAiAssessments).values({ tenantId, studentId, assessmentType: "sop_draft", admissionReadinessScore: student.admissionReadinessScore ?? 0, visaReadinessScore: student.visaReadinessScore ?? 0, riskLevel: student.riskLevel ?? "medium", responseJson: { editable: true, country, institution, course }, generatedText: draft, createdBy: req.session.userId ?? null } as any).returning();
     res.json(assessment);
   });
 
