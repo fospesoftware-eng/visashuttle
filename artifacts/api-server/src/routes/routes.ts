@@ -1,6 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import { storage, isMissingRelationError } from "../storage";
+import { storage, isMissingRelationError, getVirtualStickersByUser, createVirtualSticker, getVirtualStickerBySession } from "../storage";
 import { runVisaCheck, runDeepCheck, scanPassportImage, isPassportScanConfigured } from "../ai";
 import { registerApiPlatformRoutes } from "./api-platform";
 import { registerPlatformExtensions } from "./platform-extensions";
@@ -7559,6 +7559,157 @@ Rules:
       credits: order?.credits ?? localOrder.credits,
       summary: await getB2cCreditSummary(user),
     });
+  });
+
+  // === Virtual Travel Sticker Routes ===
+
+  const STICKER_COUNTRIES = [
+    { code: "JP", name: "Japan", flag: "🇯🇵", landmark: "⛩️", primary: "#BC002D", secondary: "#FFFFFF", fact: "Japan has the world's oldest company, founded in 578 AD." },
+    { code: "FR", name: "France", flag: "🇫🇷", landmark: "🗼", primary: "#002395", secondary: "#ED2939", fact: "France is the world's most visited country with 90M tourists annually." },
+    { code: "IT", name: "Italy", flag: "🇮🇹", landmark: "🏛️", primary: "#009246", secondary: "#CE2B37", fact: "Italy is home to more UNESCO World Heritage Sites than any other nation." },
+    { code: "BR", name: "Brazil", flag: "🇧🇷", landmark: "🌴", primary: "#009C3B", secondary: "#FFDF00", fact: "Brazil has the world's largest rainforest, covering 60% of the Amazon." },
+    { code: "IN", name: "India", flag: "🇮🇳", landmark: "🕌", primary: "#FF9933", secondary: "#138808", fact: "India invented the number zero and the decimal system." },
+    { code: "AU", name: "Australia", flag: "🇦🇺", landmark: "🦘", primary: "#00008B", secondary: "#FFBF00", fact: "Australia is the only country that is also a continent." },
+    { code: "MX", name: "Mexico", flag: "🇲🇽", landmark: "🏺", primary: "#006847", secondary: "#CE1126", fact: "Mexico City was built on an ancient Aztec lake city." },
+    { code: "EG", name: "Egypt", flag: "🇪🇬", landmark: "🐪", primary: "#CE1126", secondary: "#C09300", fact: "Ancient Egyptians invented toothpaste over 5,000 years ago." },
+    { code: "GR", name: "Greece", flag: "🇬🇷", landmark: "🏺", primary: "#0D5EAF", secondary: "#FFFFFF", fact: "Greece has more archaeological museums than any country on Earth." },
+    { code: "TH", name: "Thailand", flag: "🇹🇭", landmark: "🛕", primary: "#A51931", secondary: "#F4F5F8", fact: "Thailand is the world's largest exporter of rice." },
+    { code: "NZ", name: "New Zealand", flag: "🇳🇿", landmark: "🌋", primary: "#00247D", secondary: "#CC142B", fact: "New Zealand was the first country to give women the right to vote." },
+    { code: "CA", name: "Canada", flag: "🇨🇦", landmark: "🍁", primary: "#FF0000", secondary: "#FFFFFF", fact: "Canada has the longest coastline of any country in the world." },
+    { code: "IS", name: "Iceland", flag: "🇮🇸", landmark: "🌋", primary: "#003897", secondary: "#DC1E35", fact: "Iceland is the world's most peaceful country and has no mosquitoes." },
+    { code: "PE", name: "Peru", flag: "🇵🇪", landmark: "🏔️", primary: "#D91023", secondary: "#FFFFFF", fact: "Peru's Machu Picchu was built without any iron tools or mortar." },
+    { code: "MA", name: "Morocco", flag: "🇲🇦", landmark: "🕌", primary: "#C1272D", secondary: "#006233", fact: "Morocco has the world's oldest university, founded in 859 AD." },
+    { code: "KR", name: "South Korea", flag: "🇰🇷", landmark: "🏯", primary: "#003478", secondary: "#CD2E3A", fact: "South Korea has the fastest internet speeds in the world." },
+    { code: "TR", name: "Türkiye", flag: "🇹🇷", landmark: "🕌", primary: "#E30A17", secondary: "#FFFFFF", fact: "Istanbul is the only city in the world that spans two continents." },
+    { code: "AR", name: "Argentina", flag: "🇦🇷", landmark: "🌎", primary: "#74ACDF", secondary: "#FFFFFF", fact: "Argentina has won more FIFA World Cups than any South American nation." },
+    { code: "NO", name: "Norway", flag: "🇳🇴", landmark: "🏔️", primary: "#EF2B2D", secondary: "#002868", fact: "Norway has the world's longest road tunnel at 24.5 km." },
+    { code: "PT", name: "Portugal", flag: "🇵🇹", landmark: "⛵", primary: "#006600", secondary: "#FF0000", fact: "Portugal is the world's oldest nation-state, established in 1139." },
+    { code: "CZ", name: "Czech Republic", flag: "🇨🇿", landmark: "🏰", primary: "#D7141A", secondary: "#11457E", fact: "Prague has more castles per capita than any city on Earth." },
+    { code: "SG", name: "Singapore", flag: "🇸🇬", landmark: "🌃", primary: "#EF3340", secondary: "#FFFFFF", fact: "Singapore has the world's best airport for 8 consecutive years." },
+    { code: "ZA", name: "South Africa", flag: "🇿🇦", landmark: "🦁", primary: "#007A4D", secondary: "#FFB81C", fact: "South Africa has three capital cities — the world's most." },
+    { code: "CH", name: "Switzerland", flag: "🇨🇭", landmark: "🏔️", primary: "#FF0000", secondary: "#FFFFFF", fact: "Switzerland has been officially neutral in conflicts since 1815." },
+    { code: "NL", name: "Netherlands", flag: "🇳🇱", landmark: "🌷", primary: "#AE1C28", secondary: "#21468B", fact: "The Netherlands grows more flowers than any country except Kenya." },
+    { code: "SE", name: "Sweden", flag: "🇸🇪", landmark: "🎿", primary: "#006AA7", secondary: "#FECC02", fact: "Sweden invented the seatbelt, saving millions of lives worldwide." },
+    { code: "HU", name: "Hungary", flag: "🇭🇺", landmark: "🏰", primary: "#CE2939", secondary: "#477050", fact: "Hungary has the third most Nobel Prize winners per capita." },
+    { code: "KE", name: "Kenya", flag: "🇰🇪", landmark: "🦒", primary: "#006600", secondary: "#BB0000", fact: "Kenya's Rift Valley is where the earliest human fossils were found." },
+    { code: "VN", name: "Vietnam", flag: "🇻🇳", landmark: "🍜", primary: "#DA251D", secondary: "#FFCD00", fact: "Vietnam is the world's second largest coffee producer." },
+    { code: "CL", name: "Chile", flag: "🇨🇱", landmark: "🗿", primary: "#D52B1E", secondary: "#003580", fact: "Chile is the longest country in the world at 4,300 km." },
+    { code: "TZ", name: "Tanzania", flag: "🇹🇿", landmark: "🦣", primary: "#1EB53A", secondary: "#FCD116", fact: "Tanzania is home to Africa's highest peak, Mount Kilimanjaro." },
+    { code: "ID", name: "Indonesia", flag: "🇮🇩", landmark: "🌴", primary: "#CE1126", secondary: "#FFFFFF", fact: "Indonesia has more active volcanoes than any country on Earth." },
+    { code: "CO", name: "Colombia", flag: "🇨🇴", landmark: "🌸", primary: "#FCD116", secondary: "#003893", fact: "Colombia is the only country in South America with two coastlines." },
+    { code: "IE", name: "Ireland", flag: "🇮🇪", landmark: "🍀", primary: "#169B62", secondary: "#FF883E", fact: "Ireland has never had a native snake population — ever." },
+    { code: "PH", name: "Philippines", flag: "🇵🇭", landmark: "🏝️", primary: "#0038A8", secondary: "#CE1126", fact: "The Philippines has over 7,640 islands." },
+    { code: "MY", name: "Malaysia", flag: "🇲🇾", landmark: "🏙️", primary: "#CC0001", secondary: "#010066", fact: "The Petronas Towers held the record as the world's tallest buildings for 6 years." },
+    { code: "DK", name: "Denmark", flag: "🇩🇰", landmark: "🧜", primary: "#C60C30", secondary: "#FFFFFF", fact: "Denmark is consistently ranked the world's happiest country." },
+    { code: "PL", name: "Poland", flag: "🇵🇱", landmark: "🦅", primary: "#DC143C", secondary: "#FFFFFF", fact: "Poland is home to the world's oldest salt mine, in operation since 1044." },
+    { code: "UZ", name: "Uzbekistan", flag: "🇺🇿", landmark: "🕌", primary: "#1EB53A", secondary: "#0099B5", fact: "Samarkand is one of the oldest continuously inhabited cities on Earth." },
+    { code: "GH", name: "Ghana", flag: "🇬🇭", landmark: "🥁", primary: "#006B3F", secondary: "#FCD116", fact: "Ghana was the first sub-Saharan African country to gain independence." },
+    { code: "CU", name: "Cuba", flag: "🇨🇺", landmark: "🎶", primary: "#002A8F", secondary: "#CF142B", fact: "Cuba has the highest literacy rate in Latin America at 99.8%." },
+    { code: "AT", name: "Austria", flag: "🇦🇹", landmark: "🎻", primary: "#ED2939", secondary: "#FFFFFF", fact: "Vienna hosted the world's first coffeehouse culture in Europe." },
+    { code: "RO", name: "Romania", flag: "🇷🇴", landmark: "🏰", primary: "#002B7F", secondary: "#FCD116", fact: "Romania has the world's longest and heaviest parliament building." },
+    { code: "BD", name: "Bangladesh", flag: "🇧🇩", landmark: "🌿", primary: "#006A4E", secondary: "#F42A41", fact: "Bangladesh has the world's largest river delta, the Sundarbans." },
+    { code: "ET", name: "Ethiopia", flag: "🇪🇹", landmark: "☕", primary: "#078930", secondary: "#FCDD09", fact: "Ethiopia is the birthplace of coffee and humanity's earliest ancestors." },
+    { code: "NP", name: "Nepal", flag: "🇳🇵", landmark: "🏔️", primary: "#003893", secondary: "#DC143C", fact: "Nepal is home to 8 of the world's 10 tallest mountains including Everest." },
+    { code: "UA", name: "Ukraine", flag: "🇺🇦", landmark: "🌻", primary: "#005BBB", secondary: "#FFD500", fact: "Ukraine is Europe's largest country and its breadbasket." },
+    { code: "MN", name: "Mongolia", flag: "🇲🇳", landmark: "🏕️", primary: "#C4272F", secondary: "#015197", fact: "Mongolia has the lowest population density of any sovereign nation." },
+    { code: "BT", name: "Bhutan", flag: "🇧🇹", landmark: "🐉", primary: "#FF8000", secondary: "#FF0000", fact: "Bhutan measures national happiness and is the only carbon-negative country." },
+    { code: "MW", name: "Malawi", flag: "🇲🇼", landmark: "🦅", primary: "#000000", secondary: "#CE1126", fact: "Malawi has Africa's third largest lake and is known as 'The Warm Heart of Africa'." },
+  ];
+
+  function pickCountryForUser(userId: string, existing: string[]): typeof STICKER_COUNTRIES[0] {
+    const available = STICKER_COUNTRIES.filter(c => !existing.includes(c.code));
+    if (available.length === 0) return STICKER_COUNTRIES[Math.floor(Math.random() * STICKER_COUNTRIES.length)];
+    const seed = userId.split("").reduce((a, c) => a + c.charCodeAt(0), 0) + Date.now();
+    return available[seed % available.length];
+  }
+
+  app.get("/api/b2c/stickers", requireB2cAuth, async (req, res) => {
+    const user = await storage.getB2cUser(req.session.b2cUserId!);
+    if (!user) return res.status(401).json({ error: "Not authenticated" });
+    const stickers = await getVirtualStickersByUser(user.id);
+    return res.json({ stickers });
+  });
+
+  app.post("/api/b2c/stickers/order", requireB2cAuth, async (req, res) => {
+    const user = await storage.getB2cUser(req.session.b2cUserId!);
+    if (!user) return res.status(401).json({ error: "Not authenticated" });
+    const cfg = await storage.getPaymentGatewayConfig();
+    const stripe = getStripeCredentials(cfg);
+    if (!stripe.secretKey) {
+      return res.status(503).json({ error: "Payment gateway not configured. Please contact support." });
+    }
+    const origin = getRequestOrigin(req);
+    const successUrl = `${origin}/travel-sticker?session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${origin}/travel-sticker?canceled=1`;
+    const params = new URLSearchParams();
+    params.append("mode", "payment");
+    params.append("success_url", successUrl);
+    params.append("cancel_url", cancelUrl);
+    params.append("client_reference_id", `sticker_${user.id}_${Date.now()}`);
+    params.append("customer_email", user.email);
+    params.append("line_items[0][price_data][currency]", "usd");
+    params.append("line_items[0][price_data][unit_amount]", "100");
+    params.append("line_items[0][price_data][product_data][name]", "Virtual Travel Sticker – Lucky Country");
+    params.append("line_items[0][price_data][product_data][description]", "A beautifully designed virtual sticker for your lucky destination country.");
+    params.append("line_items[0][quantity]", "1");
+    params.append("metadata[user_id]", user.id);
+    params.append("metadata[type]", "virtual_sticker");
+    try {
+      const stripeRes = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${stripe.secretKey}`, "Content-Type": "application/x-www-form-urlencoded" },
+        body: params.toString(),
+        signal: AbortSignal.timeout(15000),
+      });
+      const data: any = await stripeRes.json().catch(() => ({}));
+      if (!stripeRes.ok) return res.status(stripeRes.status >= 500 ? 503 : stripeRes.status).json({ error: data?.error?.message || "Unable to create checkout session" });
+      return res.json({ checkoutUrl: data.url, sessionId: data.id, publishableKey: stripe.publishableKey });
+    } catch {
+      return res.status(503).json({ error: "Payment gateway temporarily unreachable" });
+    }
+  });
+
+  app.get("/api/b2c/stickers/verify", requireB2cAuth, async (req, res) => {
+    const user = await storage.getB2cUser(req.session.b2cUserId!);
+    if (!user) return res.status(401).json({ error: "Not authenticated" });
+    const sessionId = String(req.query.session_id || "").trim();
+    if (!sessionId) return res.status(400).json({ error: "Missing session_id" });
+
+    // Check if sticker already exists for this session
+    const existing = await getVirtualStickerBySession(sessionId);
+    if (existing) return res.json({ sticker: existing, alreadyGranted: true });
+
+    const cfg = await storage.getPaymentGatewayConfig();
+    const stripe = getStripeCredentials(cfg);
+    if (!stripe.secretKey) return res.status(503).json({ error: "Payment gateway not configured" });
+
+    try {
+      const stripeRes = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`, {
+        headers: { "Authorization": `Bearer ${stripe.secretKey}` },
+        signal: AbortSignal.timeout(10000),
+      });
+      const session: any = await stripeRes.json().catch(() => ({}));
+      if (!stripeRes.ok) return res.status(400).json({ error: session?.error?.message || "Could not verify payment" });
+      if (session.payment_status !== "paid") return res.status(402).json({ error: "Payment not completed", status: session.payment_status });
+      if (session.metadata?.type !== "virtual_sticker") return res.status(400).json({ error: "Invalid session type" });
+      if (session.metadata?.user_id !== user.id) return res.status(403).json({ error: "Session does not belong to this user" });
+
+      const allStickers = await getVirtualStickersByUser(user.id);
+      const ownedCodes = allStickers.map(s => s.countryCode);
+      const country = pickCountryForUser(user.id, ownedCodes);
+
+      const sticker = await createVirtualSticker({
+        userId: user.id, countryCode: country.code, countryName: country.name,
+        flagEmoji: country.flag, landmarkEmoji: country.landmark,
+        primaryColor: country.primary, secondaryColor: country.secondary,
+        funFact: country.fact, stripeSessionId: sessionId,
+        stripePaymentIntent: String(session.payment_intent || ""),
+        amountCents: 100, currency: "USD",
+      });
+      return res.json({ sticker, alreadyGranted: false });
+    } catch (e: any) {
+      return res.status(500).json({ error: e?.message || "Verification failed" });
+    }
   });
 
   // === B2C Visa Check Routes ===

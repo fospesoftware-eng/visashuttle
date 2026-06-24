@@ -76,7 +76,7 @@ import {
 import { and, eq, desc, asc, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
-import { db, hasDatabase } from "./db";
+import { db, hasDatabase, pool as rawPool } from "./db";
 
 // Canonicalize a phone number for equality comparison: digits only, leading
 // "+" / spaces / dashes / parens stripped. Used for OTP + customer-account
@@ -4556,4 +4556,88 @@ class HybridStorage extends MemStorage {
   }
 }
 
+export interface VirtualSticker {
+  id: string;
+  userId: string;
+  countryCode: string;
+  countryName: string;
+  flagEmoji: string;
+  landmarkEmoji: string;
+  primaryColor: string;
+  secondaryColor: string;
+  funFact: string;
+  stripeSessionId?: string | null;
+  stripePaymentIntent?: string | null;
+  amountCents: number;
+  currency: string;
+  createdAt: Date | null;
+}
+
 export const storage: IStorage = hasDatabase ? new HybridStorage() : new MemStorage();
+
+// ----- Virtual Sticker helpers (raw SQL, no Drizzle schema needed) -----
+
+export async function getVirtualStickersByUser(userId: string): Promise<VirtualSticker[]> {
+  if (!rawPool) return [];
+  try {
+    const client = await rawPool.connect();
+    try {
+      const res = await client.query(
+        `SELECT id, user_id, country_code, country_name, flag_emoji, landmark_emoji, primary_color, secondary_color, fun_fact, stripe_session_id, stripe_payment_intent, amount_cents, currency, created_at
+         FROM virtual_stickers WHERE user_id = $1 ORDER BY created_at DESC`,
+        [userId]
+      );
+      return res.rows.map(r => ({
+        id: r.id, userId: r.user_id, countryCode: r.country_code, countryName: r.country_name,
+        flagEmoji: r.flag_emoji, landmarkEmoji: r.landmark_emoji, primaryColor: r.primary_color,
+        secondaryColor: r.secondary_color, funFact: r.fun_fact, stripeSessionId: r.stripe_session_id,
+        stripePaymentIntent: r.stripe_payment_intent, amountCents: r.amount_cents, currency: r.currency,
+        createdAt: r.created_at,
+      }));
+    } finally { client.release(); }
+  } catch { return []; }
+}
+
+export async function createVirtualSticker(data: Omit<VirtualSticker, "id" | "createdAt">): Promise<VirtualSticker> {
+  if (!rawPool) throw new Error("No DB");
+  const client = await rawPool.connect();
+  try {
+    const res = await client.query(
+      `INSERT INTO virtual_stickers (user_id, country_code, country_name, flag_emoji, landmark_emoji, primary_color, secondary_color, fun_fact, stripe_session_id, stripe_payment_intent, amount_cents, currency)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      [data.userId, data.countryCode, data.countryName, data.flagEmoji, data.landmarkEmoji,
+       data.primaryColor, data.secondaryColor, data.funFact, data.stripeSessionId ?? null,
+       data.stripePaymentIntent ?? null, data.amountCents, data.currency]
+    );
+    const r = res.rows[0];
+    return {
+      id: r.id, userId: r.user_id, countryCode: r.country_code, countryName: r.country_name,
+      flagEmoji: r.flag_emoji, landmarkEmoji: r.landmark_emoji, primaryColor: r.primary_color,
+      secondaryColor: r.secondary_color, funFact: r.fun_fact, stripeSessionId: r.stripe_session_id,
+      stripePaymentIntent: r.stripe_payment_intent, amountCents: r.amount_cents, currency: r.currency,
+      createdAt: r.created_at,
+    };
+  } finally { client.release(); }
+}
+
+export async function getVirtualStickerBySession(sessionId: string): Promise<VirtualSticker | null> {
+  if (!rawPool) return null;
+  try {
+    const client = await rawPool.connect();
+    try {
+      const res = await client.query(
+        `SELECT * FROM virtual_stickers WHERE stripe_session_id = $1 LIMIT 1`,
+        [sessionId]
+      );
+      if (!res.rows[0]) return null;
+      const r = res.rows[0];
+      return {
+        id: r.id, userId: r.user_id, countryCode: r.country_code, countryName: r.country_name,
+        flagEmoji: r.flag_emoji, landmarkEmoji: r.landmark_emoji, primaryColor: r.primary_color,
+        secondaryColor: r.secondary_color, funFact: r.fun_fact, stripeSessionId: r.stripe_session_id,
+        stripePaymentIntent: r.stripe_payment_intent, amountCents: r.amount_cents, currency: r.currency,
+        createdAt: r.created_at,
+      };
+    } finally { client.release(); }
+  } catch { return null; }
+}

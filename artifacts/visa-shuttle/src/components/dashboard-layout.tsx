@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
   Compass, PlaneTakeoff, ScanSearch, Luggage, ScrollText,
-  Ticket, SlidersHorizontal, LogOut, Menu, X, ChevronRight, Shield, Crown, ShieldAlert, Coins
+  Ticket, SlidersHorizontal, LogOut, Menu, X, ChevronRight, Shield, Crown, ShieldAlert, Coins, Sticker,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -18,6 +18,7 @@ const NAV_ITEMS = [
   { icon: ShieldAlert, label: "Visa Tools", href: "/visa-tools" },
   { icon: Luggage, label: "Saved Profile", href: "/saved-profile" },
   { icon: ScrollText, label: "Check History", href: "/history" },
+  { icon: Sticker, label: "Travel Stickers", href: "/travel-sticker", highlight: true },
   { icon: Ticket, label: "Pricing", href: "/pricing" },
   { icon: SlidersHorizontal, label: "Settings", href: "/settings" },
 ];
@@ -81,19 +82,20 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
       <nav className="flex-1 px-3 overflow-y-auto min-h-0">
         <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 px-2 mb-1.5">Navigation</p>
         <div className="space-y-0.5 pb-2">
-          {NAV_ITEMS.map(({ icon: Icon, label, href, premium }) => {
+          {NAV_ITEMS.map(({ icon: Icon, label, href, premium, highlight }: any) => {
             const isActive = location === href;
             const isLocked = premium && !user?.deepCheckAccess;
             return (
               <Link key={href} href={href}>
                 <div
                   className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all ${
-                    isActive ? "text-white shadow-sm" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                    isActive ? "text-white shadow-sm" : highlight ? "text-slate-700 hover:bg-gradient-to-r hover:from-[#4055FF]/5 hover:to-[#9033F5]/5 hover:text-slate-900" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                   }`}
-                  style={isActive ? { background: "linear-gradient(135deg,#4055FF,#7033F0)" } : undefined}
+                  style={isActive ? { background: "linear-gradient(135deg,#4055FF,#7033F0)" } : highlight && !isActive ? { background: "linear-gradient(135deg,rgba(64,85,255,0.06),rgba(144,51,245,0.06))", borderRadius: "12px" } : undefined}
                 >
-                  <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-white" : "text-slate-400 group-hover:text-[#4055FF]"} transition-colors`} />
+                  <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-white" : highlight ? "text-[#9033F5]" : "text-slate-400 group-hover:text-[#4055FF]"} transition-colors`} />
                   <span className="text-sm font-medium flex-1 leading-none">{label}</span>
+                  {highlight && !isActive && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full text-white" style={{background:"linear-gradient(135deg,#4055FF,#FF2060)"}}>$1</span>}
                   {isLocked && <Crown className="w-3 h-3 text-amber-500 flex-shrink-0" />}
                   {isActive && <ChevronRight className="w-3.5 h-3.5 text-white/60 flex-shrink-0" />}
                 </div>
