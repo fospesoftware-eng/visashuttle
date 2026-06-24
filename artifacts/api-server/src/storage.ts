@@ -4646,10 +4646,27 @@ export interface TravelStickerResult {
 // In-memory fallback when no DB is configured
 const memTravelCollectors: (TravelStickerCollector & { createdAt: Date })[] = [];
 
+// Pool of friendly partner names so every country always has a travel partner.
+const PARTNER_NAMES = [
+  "Nicky Kartina", "Leo Martins", "Aiko Tanaka", "Sofia Rossi", "Omar Haddad",
+  "Maya Patel", "Lucas Silva", "Elena Petrova", "Noah Becker", "Chloe Dubois",
+  "Diego Fernandez", "Yuki Sato", "Amara Okafor", "Liam O'Brien", "Isabella Costa",
+  "Arjun Nair", "Hana Kim", "Mateo Garcia", "Freya Nilsson", "Ravi Sharma",
+  "Carla Mendez", "Tomas Novak", "Zara Ahmed", "Nina Larsen", "Pablo Ortiz",
+  "Mei Lin", "Hugo Moreau", "Priya Reddy", "Sven Johansson", "Lucia Romano",
+  "Kenji Mori", "Aaliyah Hassan", "Marco Bianchi", "Ingrid Olsen", "Tariq Khan",
+  "Camila Torres", "Felix Wagner", "Sara Lindqvist", "Daniel Cohen", "Anaya Singh",
+];
+function generatedPartner(code: string): TravelStickerMatch {
+  let h = 0;
+  for (const ch of code) h = (h * 31 + ch.charCodeAt(0)) | 0;
+  return { name: PARTNER_NAMES[Math.abs(h) % PARTNER_NAMES.length], collectedAt: null };
+}
+
 /**
- * Records a new collector for a country and returns the most recent *previous*
- * collector of the same country (their "travel partner" match), plus how many
- * people have now collected that country.
+ * Records a new collector for a country and returns a "travel partner" match:
+ * the most recent *previous* real collector, or — if there is none yet — a
+ * generated random-named partner so every country always has a partner.
  */
 export async function collectTravelSticker(data: TravelStickerCollector): Promise<TravelStickerResult> {
   if (!rawPool) {
@@ -4657,7 +4674,9 @@ export async function collectTravelSticker(data: TravelStickerCollector): Promis
     const prior = memTravelCollectors
       .filter(c => c.countryCode === data.countryCode)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-    const match = prior[0] ? { name: prior[0].collectorName, collectedAt: prior[0].createdAt } : null;
+    const match = prior[0]
+      ? { name: prior[0].collectorName, collectedAt: prior[0].createdAt }
+      : generatedPartner(data.countryCode);
     memTravelCollectors.push({ ...data, createdAt: new Date() });
     return { match, totalForCountry: prior.length + 1 };
   }
@@ -4669,9 +4688,9 @@ export async function collectTravelSticker(data: TravelStickerCollector): Promis
        WHERE country_code = $1 ORDER BY created_at DESC LIMIT 1`,
       [data.countryCode]
     );
-    const match: TravelStickerMatch | null = prevRes.rows[0]
+    const match: TravelStickerMatch = prevRes.rows[0]
       ? { name: prevRes.rows[0].collector_name, collectedAt: prevRes.rows[0].created_at }
-      : null;
+      : generatedPartner(data.countryCode);
 
     await client.query(
       `INSERT INTO travel_sticker_collectors

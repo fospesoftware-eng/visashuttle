@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, Globe, RefreshCcw, X } from "lucide-react";
 import { FaFacebookF, FaInstagram, FaWhatsapp } from "react-icons/fa6";
 import { useToast } from "@/hooks/use-toast";
@@ -872,6 +872,78 @@ function PassportReveal({
 // ── Entry form (Name + Nationality → Go) ────────────────────────────────────
 const NATIONALITIES = [...COUNTRIES].sort((a, b) => a.name.localeCompare(b.name));
 
+// Type-to-search nationality picker
+function NationalityCombobox({ value, onChange }: { value: string; onChange: (code: string) => void }) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const selected = value ? COUNTRIES.find(c => c.code === value) : null;
+
+  const results = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return NATIONALITIES;
+    const starts = NATIONALITIES.filter(c => c.name.toLowerCase().startsWith(q));
+    const contains = NATIONALITIES.filter(c => !c.name.toLowerCase().startsWith(q) && c.name.toLowerCase().includes(q));
+    return [...starts, ...contains];
+  }, [query]);
+
+  // Close on outside click
+  useEffect(() => {
+    function onDoc(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+
+  function pick(code: string) {
+    onChange(code);
+    setOpen(false);
+    setQuery("");
+  }
+
+  const displayValue = open ? query : (selected ? `${selected.flag} ${selected.name}` : "");
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <input
+        value={displayValue}
+        onChange={e => { setQuery(e.target.value); setOpen(true); setActive(0); }}
+        onFocus={() => { setOpen(true); setQuery(""); }}
+        onKeyDown={e => {
+          if (e.key === "ArrowDown") { e.preventDefault(); setActive(a => Math.min(a + 1, results.length - 1)); }
+          else if (e.key === "ArrowUp") { e.preventDefault(); setActive(a => Math.max(a - 1, 0)); }
+          else if (e.key === "Enter" && open && results[active]) { e.preventDefault(); pick(results[active].code); }
+          else if (e.key === "Escape") setOpen(false);
+        }}
+        placeholder="Type to search… e.g. In"
+        className="w-full px-4 py-3 rounded-xl bg-white/[0.06] border border-white/10 text-white text-sm placeholder-white/25 outline-none focus:border-[#4055FF]/60 transition"
+      />
+      <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/40 text-xs">▾</span>
+
+      {open && (
+        <div className="absolute z-30 mt-1.5 w-full max-h-60 overflow-y-auto rounded-xl border border-white/10 shadow-2xl"
+          style={{ background: "#0d0f24" }}>
+          {results.length === 0 ? (
+            <p className="px-4 py-3 text-white/35 text-sm">No countries match “{query}”.</p>
+          ) : results.map((c, i) => (
+            <button key={c.code} type="button"
+              onMouseEnter={() => setActive(i)}
+              onClick={() => pick(c.code)}
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-sm transition"
+              style={{ background: i === active ? "rgba(64,85,255,0.18)" : "transparent", color: value === c.code ? "#7B94FF" : "#e6e8f2" }}>
+              <span className="text-base">{c.flag}</span>
+              <span className="font-medium">{c.name}</span>
+              {value === c.code && <span className="ml-auto text-[#7B94FF]">✓</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EntryForm({ onGo }: { onGo: (name: string, nationalityCode: string) => void }) {
   const [name, setName] = useState("");
   const [nat, setNat] = useState("");
@@ -895,20 +967,10 @@ function EntryForm({ onGo }: { onGo: (name: string, nationalityCode: string) => 
         />
       </label>
 
-      <label className="block mb-4">
+      <div className="block mb-4">
         <span className="text-xs font-semibold text-white/60 mb-1.5 block">Nationality</span>
-        <select
-          value={nat}
-          onChange={e => setNat(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl bg-white/[0.06] border border-white/10 text-white text-sm outline-none focus:border-[#4055FF]/60 transition appearance-none cursor-pointer"
-          style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23ffffff80' d='M1 1l5 5 5-5'/%3E%3C/svg%3E\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 1rem center" }}
-        >
-          <option value="" disabled style={{ color: "#000" }}>Select your nationality…</option>
-          {NATIONALITIES.map(c => (
-            <option key={c.code} value={c.code} style={{ color: "#000" }}>{c.flag} {c.name}</option>
-          ))}
-        </select>
-      </label>
+        <NationalityCombobox value={nat} onChange={setNat} />
+      </div>
 
       <button
         onClick={() => ready && onGo(name.trim(), nat)}
@@ -1103,6 +1165,19 @@ function clearState() { localStorage.removeItem(LS_KEY); }
 
 function findCountry(code: string) { return COUNTRIES.find(c => c.code === code) || COUNTRIES[0]; }
 
+// Client-side partner fallback (used only if the API is unreachable)
+const PARTNER_NAMES = [
+  "Nicky Kartina", "Leo Martins", "Aiko Tanaka", "Sofia Rossi", "Omar Haddad",
+  "Maya Patel", "Lucas Silva", "Elena Petrova", "Noah Becker", "Chloe Dubois",
+  "Diego Fernandez", "Yuki Sato", "Amara Okafor", "Liam O'Brien", "Isabella Costa",
+  "Arjun Nair", "Hana Kim", "Mateo Garcia", "Freya Nilsson", "Ravi Sharma",
+];
+function localPartner(code: string): MatchInfo {
+  let h = 0;
+  for (const ch of code) h = (h * 31 + ch.charCodeAt(0)) | 0;
+  return { name: PARTNER_NAMES[Math.abs(h) % PARTNER_NAMES.length], collectedAt: null };
+}
+
 // ── Main page ───────────────────────────────────────────────────────────────
 export default function TravelStickerPage() {
   const [saved,        setSaved]        = useState<SavedState | null>(loadState);
@@ -1145,7 +1220,10 @@ export default function TravelStickerPage() {
         const data = await r.json();
         foundMatch = data.match || null;
       }
-    } catch { /* offline / no DB → trailblazer */ }
+    } catch { /* offline → use local fallback below */ }
+
+    // Guarantee a travel partner even if the API is unreachable
+    if (!foundMatch) foundMatch = localPartner(picked.code);
 
     setMatch(foundMatch);
     setMatchLoading(false);
