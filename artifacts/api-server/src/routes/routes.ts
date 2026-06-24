@@ -7888,6 +7888,88 @@ Rules:
     }
   });
 
+  // Travel Sticker — PayPal $1 checkout (no auth). Creates a PayPal order and
+  // returns the approval URL for redirect.
+  app.post("/api/travel-stickers/paypal/create-order", async (req, res) => {
+    try {
+      const cfg = await storage.getPaymentGatewayConfig();
+      const paypal = getPayPalCredentials(cfg);
+      if (!paypal.clientId || !paypal.clientSecret) {
+        return res.status(503).json({ error: `PayPal ${paypal.mode} credentials are not configured. Please add them in SaaS Admin > PayPal.` });
+      }
+      const origin = getRequestOrigin(req);
+      const refId = `VS_STICKER_${Date.now()}_${randomUUID().slice(0, 8)}`;
+      const order = await createPayPalOrder(paypal, {
+        intent: "CAPTURE",
+        purchase_units: [{
+          reference_id: refId,
+          custom_id: "travel_sticker",
+          description: "Visa Shuttle Travel Sticker",
+          amount: { currency_code: "USD", value: formatPayPalAmount("USD", 1) },
+        }],
+        payment_source: {
+          paypal: {
+            experience_context: {
+              brand_name: "Visa Shuttle",
+              shipping_preference: "NO_SHIPPING",
+              user_action: "PAY_NOW",
+              return_url: `${origin}/travel-sticker?paypal=return`,
+              cancel_url: `${origin}/travel-sticker?paypal=cancel`,
+            },
+          },
+        },
+      });
+      const approvalUrl = getPayPalApprovalUrl(order);
+      if (!approvalUrl) return res.status(502).json({ error: "PayPal did not return an approval URL" });
+      return res.json({ orderId: order.id, approvalUrl, mode: paypal.mode, amount: 1, currency: "USD" });
+    } catch (err: any) {
+      console.error("[PayPal] Create travel-sticker order failed:", err?.data || err);
+      const message = String(err?.message || "Unable to create PayPal order");
+      const isAuthError = err?.status === 401 || /auth|credential|client|secret/i.test(message);
+      return res.status(isAuthError ? 400 : err?.status >= 500 ? 503 : err?.status || 502).json({ error: message });
+    }
+  });
+
+  // Travel Sticker — capture the approved PayPal order, then collect the sticker.
+  app.post("/api/travel-stickers/paypal/capture", async (req, res) => {
+    try {
+      const b = req.body || {};
+      const orderId = String(b.orderId || "").trim();
+      const collectorName = String(b.name || "").trim().slice(0, 60);
+      if (!orderId) return res.status(400).json({ error: "orderId is required" });
+      if (!collectorName) return res.status(400).json({ error: "Name is required" });
+      if (!b.code || !b.countryName) return res.status(400).json({ error: "Country data is required" });
+
+      const cfg = await storage.getPaymentGatewayConfig();
+      const paypal = getPayPalCredentials(cfg);
+      if (!paypal.clientId || !paypal.clientSecret) {
+        return res.status(503).json({ error: "PayPal credentials are not configured" });
+      }
+
+      const data = await capturePayPalOrder(paypal, orderId);
+      const capture = data?.purchase_units?.[0]?.payments?.captures?.[0];
+      const isPaid = data?.status === "COMPLETED" || capture?.status === "COMPLETED";
+      if (!isPaid) {
+        return res.status(402).json({ error: "Payment not completed", paid: false, status: data?.status || capture?.status });
+      }
+
+      const result = await collectTravelSticker({
+        collectorName,
+        countryCode: String(b.code),
+        countryName: String(b.countryName),
+        flagEmoji: String(b.flag || ""),
+        landmarkEmoji: String(b.landmark || ""),
+        primaryColor: String(b.primary || "#4055FF"),
+        secondaryColor: String(b.secondary || "#FFFFFF"),
+        funFact: String(b.fact || ""),
+      });
+      return res.json({ paid: true, captureId: getPayPalCaptureId(data), ...result });
+    } catch (err: any) {
+      console.error("[PayPal] Capture travel-sticker order failed:", err?.data || err);
+      return res.status(err?.status >= 500 ? 503 : err?.status || 502).json({ error: err?.message || "Unable to verify PayPal payment" });
+    }
+  });
+
   // === B2C Visa Check Routes ===
 
   app.post("/api/b2c/check", requireB2cAuth, async (req, res) => {

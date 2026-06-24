@@ -1007,16 +1007,55 @@ function NationalityCombobox({ value, onChange }: { value: string; onChange: (co
   );
 }
 
-function EntryForm({ onGo }: { onGo: (name: string, nationalityCode: string) => void }) {
+// ── Terms & Conditions modal ────────────────────────────────────────────────
+function TermsModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      style={{ background: "rgba(2,4,20,0.9)", backdropFilter: "blur(14px)" }} onClick={onClose}>
+      <div className="relative w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-3xl border border-white/10 p-6"
+        style={{ background: "linear-gradient(160deg,#0d0f2a,#0a0a1a)", boxShadow: "0 30px 70px rgba(0,0,0,0.7)" }}
+        onClick={e => e.stopPropagation()}>
+        <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition">
+          <X className="w-4 h-4" />
+        </button>
+        <h2 className="text-lg font-black text-white mb-1">Travel Sticker — Terms &amp; Conditions</h2>
+        <p className="text-white/40 text-xs mb-4">Please read before purchasing.</p>
+        <div className="space-y-3 text-white/60 text-xs leading-relaxed">
+          <p><span className="font-bold text-white/80">1. Paid digital service.</span> The Travel Sticker is a one-time digital collectible priced at <span className="font-bold text-white/80">US$1.00</span>, charged via PayPal. The fee is for the digital experience only.</p>
+          <p><span className="font-bold text-white/80">2. For entertainment.</span> The sticker, lucky country, and "travel partner" matching are for fun and novelty. They are not a travel booking, visa, ticket, or any guarantee of travel with the matched person.</p>
+          <p><span className="font-bold text-white/80">3. Random outcome.</span> The destination country is assigned at random and cannot be chosen, exchanged, or guaranteed.</p>
+          <p><span className="font-bold text-white/80">4. Travel partner.</span> Your match is another participant (or a sample profile) who received the same country. No personal contact details are shared, and Visa Shuttle is not responsible for any interaction between participants.</p>
+          <p><span className="font-bold text-white/80">5. No refunds.</span> As the sticker is delivered instantly after payment, all sales are final and non-refundable except where required by law.</p>
+          <p><span className="font-bold text-white/80">6. Data.</span> The name and nationality you provide are used only to personalise and store your sticker. See our Privacy Policy for details.</p>
+          <p><span className="font-bold text-white/80">7. Acceptance.</span> By ticking the box and paying, you confirm you are 18+ and agree to these terms.</p>
+        </div>
+        <button onClick={onClose}
+          className="mt-5 w-full px-6 py-3 rounded-xl text-white font-bold text-sm"
+          style={{ background: "linear-gradient(135deg,#4055FF,#9033F5)" }}>
+          Got it
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function EntryForm({ onGo, busy }: { onGo: (name: string, nationalityCode: string) => void; busy?: boolean }) {
   const [name, setName] = useState("");
   const [nat, setNat] = useState("");
+  const [agree, setAgree] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
 
-  const ready = name.trim().length >= 2 && !!nat;
+  const ready = name.trim().length >= 2 && !!nat && agree && !busy;
 
   return (
     <div className="w-full max-w-md rounded-3xl border border-white/10 p-5 md:p-6"
       style={{ background: "linear-gradient(160deg,rgba(20,22,55,0.85),rgba(10,10,26,0.85))", backdropFilter: "blur(8px)", boxShadow: "0 0 50px rgba(64,85,255,0.18)" }}>
-      <p className="text-[11px] uppercase tracking-widest font-bold text-white/40 mb-3">Required to board ✈️</p>
+      {showTerms && <TermsModal onClose={() => setShowTerms(false)} />}
+
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-[11px] uppercase tracking-widest font-bold text-white/40">Required to board ✈️</p>
+        <span className="text-[11px] font-black px-2.5 py-1 rounded-full" style={{ background: "rgba(0,200,100,0.15)", color: "#4ade80" }}>US$1 · PayPal</span>
+      </div>
 
       <label className="block mb-3">
         <span className="text-xs font-semibold text-white/60 mb-1.5 block">Your name</span>
@@ -1030,18 +1069,34 @@ function EntryForm({ onGo }: { onGo: (name: string, nationalityCode: string) => 
         />
       </label>
 
-      <div className="block mb-4">
+      <div className="block mb-3">
         <span className="text-xs font-semibold text-white/60 mb-1.5 block">Nationality</span>
         <NationalityCombobox value={nat} onChange={setNat} />
       </div>
+
+      {/* Terms checkbox */}
+      <label className="flex items-start gap-2.5 mb-4 cursor-pointer select-none">
+        <input type="checkbox" checked={agree} onChange={e => setAgree(e.target.checked)}
+          className="mt-0.5 h-4 w-4 rounded accent-[#4055FF] cursor-pointer shrink-0" />
+        <span className="text-xs text-white/55 leading-relaxed">
+          I agree to pay <span className="font-bold text-white/80">US$1.00</span> and accept the{" "}
+          <button type="button" onClick={(e) => { e.preventDefault(); setShowTerms(true); }}
+            className="text-[#7B94FF] font-semibold underline underline-offset-2 hover:text-[#9DB0FF]">
+            Terms &amp; Conditions
+          </button>.
+        </span>
+      </label>
 
       <button
         onClick={() => ready && onGo(name.trim(), nat)}
         disabled={!ready}
         className="group relative w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl text-white font-black text-base transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
         style={{ background: "linear-gradient(135deg,#4055FF,#9033F5,#FF2060)", boxShadow: ready ? "0 0 36px rgba(64,85,255,0.45)" : "none" }}>
-        <Globe className="w-5 h-5 group-hover:animate-spin" />
-        Go — Open My Passport
+        {busy ? (
+          <><span className="w-5 h-5 rounded-full border-2 border-white/30 border-t-white animate-spin" />Redirecting to PayPal…</>
+        ) : (
+          <><Globe className="w-5 h-5 group-hover:animate-spin" />Pay US$1 &amp; Open My Passport</>
+        )}
         <span className="absolute inset-0 rounded-xl overflow-hidden">
           <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
         </span>
@@ -1226,6 +1281,15 @@ function loadState(): SavedState | null {
 function saveState(s: SavedState) { localStorage.setItem(LS_KEY, JSON.stringify(s)); }
 function clearState() { localStorage.removeItem(LS_KEY); }
 
+// Pending purchase persisted across the PayPal redirect
+const LS_PENDING = "vs_travel_sticker_pending";
+interface PendingState { name: string; nationalityCode: string; sticker: StickerData; }
+function loadPending(): PendingState | null {
+  try { const v = sessionStorage.getItem(LS_PENDING); return v ? JSON.parse(v) : null; } catch { return null; }
+}
+function savePending(p: PendingState) { sessionStorage.setItem(LS_PENDING, JSON.stringify(p)); }
+function clearPending() { sessionStorage.removeItem(LS_PENDING); }
+
 function findCountry(code: string) { return COUNTRIES.find(c => c.code === code) || COUNTRIES[0]; }
 
 // Client-side partner fallback (used only if the API is unreachable)
@@ -1249,51 +1313,95 @@ export default function TravelStickerPage() {
   const [nationality,  setNationality]  = useState<typeof COUNTRIES[0]>(COUNTRIES[0]);
   const [match,        setMatch]        = useState<MatchInfo | null>(null);
   const [matchLoading, setMatchLoading] = useState(false);
+  const [busy,         setBusy]         = useState(false);   // creating PayPal order
+  const [verifying,    setVerifying]    = useState(false);   // capturing after return
   const pendingName = useRef<string>("");
+  const { toast } = useToast();
 
   const hasSticker = !!saved;
 
+  // Step 1: pick destination, create PayPal order, redirect to PayPal
   async function handleGo(name: string, nationalityCode: string) {
-    if (hasSticker) return;        // one sticker only
-    pendingName.current = name;
-    const nat = findCountry(nationalityCode);
-    setNationality(nat);
-
-    // Pick the lucky destination (the passport flip will land here)
+    if (hasSticker || busy) return;
+    setBusy(true);
     const picked = COUNTRIES[Math.floor(Math.random() * COUNTRIES.length)];
     const sticker: StickerData = { ...picked, id: crypto.randomUUID(), earnedAt: Date.now() };
-    setReveal(sticker);
-    setMatch(null);
-    setMatchLoading(true);
-
-    // Register & find travel partner on the server (runs during the flip animation)
-    let foundMatch: MatchInfo | null = null;
+    savePending({ name, nationalityCode, sticker });
     try {
-      const r = await fetch("/api/travel-stickers/collect", {
+      const r = await fetch("/api/travel-stickers/paypal/create-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (r.ok && data.approvalUrl) {
+        window.location.href = data.approvalUrl;   // → PayPal
+        return;
+      }
+      throw new Error(data.error || "Could not start PayPal checkout");
+    } catch (e: any) {
+      clearPending();
+      setBusy(false);
+      toast({ title: "Payment unavailable", description: e?.message || "Please try again shortly.", variant: "destructive" });
+    }
+  }
+
+  // Step 2: on return from PayPal, capture the payment then reveal the sticker
+  async function completeAfterPayment(orderId: string, pending: PendingState) {
+    setVerifying(true);
+    const { name, nationalityCode, sticker } = pending;
+    const nat = findCountry(nationalityCode);
+    pendingName.current = name;
+    setNationality(nat);
+    try {
+      const r = await fetch("/api/travel-stickers/paypal/capture", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name, nationality: nat.name,
-          code: picked.code, countryName: picked.name, flag: picked.flag,
-          landmark: picked.landmark, primary: picked.primary,
-          secondary: picked.secondary, fact: picked.fact,
+          orderId, name, nationality: nat.name,
+          code: sticker.code, countryName: sticker.name, flag: sticker.flag,
+          landmark: sticker.landmark, primary: sticker.primary,
+          secondary: sticker.secondary, fact: sticker.fact,
         }),
       });
-      if (r.ok) {
-        const data = await r.json();
-        foundMatch = data.match || null;
-      }
-    } catch { /* offline → use local fallback below */ }
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !data.paid) throw new Error(data.error || "Payment could not be verified");
 
-    // Guarantee a travel partner even if the API is unreachable
-    if (!foundMatch) foundMatch = localPartner(picked.code);
-
-    setMatch(foundMatch);
-    setMatchLoading(false);
-    const next: SavedState = { name, nationalityCode, sticker, match: foundMatch };
-    setSaved(next);
-    saveState(next);
+      const foundMatch: MatchInfo = data.match || localPartner(sticker.code);
+      clearPending();
+      setVerifying(false);
+      setMatch(foundMatch);
+      setMatchLoading(false);
+      setReveal(sticker);
+      const next: SavedState = { name, nationalityCode, sticker, match: foundMatch };
+      setSaved(next);
+      saveState(next);
+    } catch (e: any) {
+      setVerifying(false);
+      clearPending();
+      toast({ title: "Payment not completed", description: e?.message || "You were not charged. Please try again.", variant: "destructive" });
+    }
   }
+
+  // Detect PayPal redirect return on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paypal = params.get("paypal");
+    const token = params.get("token");   // PayPal order id
+    if (!paypal) return;
+    const cleanUrl = window.location.pathname;
+    if (paypal === "return" && token) {
+      const pending = loadPending();
+      if (pending && !saved) {
+        completeAfterPayment(token, pending);
+      }
+    } else if (paypal === "cancel") {
+      clearPending();
+      toast({ title: "Payment cancelled", description: "No charge was made." });
+    }
+    window.history.replaceState({}, "", cleanUrl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function handleReopen() {
     if (!saved) return;
@@ -1326,6 +1434,16 @@ export default function TravelStickerPage() {
         />
       )}
       {detail && <StickerDetailModal sticker={detail} onClose={() => setDetail(null)} />}
+
+      {/* Verifying payment overlay */}
+      {verifying && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4"
+          style={{ background: "rgba(2,4,20,0.95)", backdropFilter: "blur(20px)" }}>
+          <div className="w-12 h-12 rounded-full border-3 border-white/15 border-t-white/80 animate-spin" style={{ borderWidth: 3 }} />
+          <p className="text-white font-bold">Confirming your payment…</p>
+          <p className="text-white/40 text-xs">Please don't close this window.</p>
+        </div>
+      )}
 
       {/* Hero */}
       <section className="relative overflow-hidden min-h-[560px] flex items-center">
@@ -1369,7 +1487,7 @@ export default function TravelStickerPage() {
           </p>
 
           {!hasSticker ? (
-            <EntryForm onGo={handleGo} />
+            <EntryForm onGo={handleGo} busy={busy} />
           ) : (
             <div className="flex flex-wrap items-center gap-3">
               <button onClick={handleReopen}
