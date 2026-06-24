@@ -442,12 +442,12 @@ export default function TravelStickerPage() {
               </div>
               <div>
                 <h2 className="font-black text-base">My Collection</h2>
-                <p className="text-xs text-muted-foreground">{stickers.length} of 50 stickers</p>
+                <p className="text-xs text-muted-foreground">{stickers.length} of 195 countries</p>
               </div>
             </div>
             {stickers.length > 0 && (
               <div className="flex items-center gap-1.5">
-                {[...Array(Math.min(stickers.length, 5))].map((_, i) => (
+                {[...Array(Math.min(Math.floor(stickers.length / 10) + (stickers.length > 0 ? 1 : 0), 5))].map((_, i) => (
                   <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
                 ))}
                 {stickers.length > 5 && <span className="text-xs font-bold text-amber-500">+{stickers.length - 5}</span>}
@@ -459,13 +459,13 @@ export default function TravelStickerPage() {
           <div className="mb-6 p-4 rounded-2xl border border-border bg-card">
             <div className="flex items-center justify-between text-xs mb-2">
               <span className="font-semibold text-muted-foreground">Collection Progress</span>
-              <span className="font-black text-[#4055FF]">{stickers.length}/50</span>
+              <span className="font-black text-[#4055FF]">{stickers.length}/195</span>
             </div>
             <div className="h-3 rounded-full bg-muted overflow-hidden">
               <div
                 className="h-full rounded-full transition-all duration-1000"
                 style={{
-                  width: `${Math.max((stickers.length / 50) * 100, 2)}%`,
+                  width: `${Math.max((stickers.length / 195) * 100, 2)}%`,
                   background: "linear-gradient(90deg,#4055FF,#9033F5,#FF2060)",
                   boxShadow: "0 0 10px rgba(64,85,255,0.4)",
                 }}
