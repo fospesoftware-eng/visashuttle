@@ -1010,30 +1010,40 @@ function NationalityCombobox({ value, onChange }: { value: string; onChange: (co
 // ── Terms & Conditions modal ────────────────────────────────────────────────
 function TermsModal({ onClose }: { onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
-      style={{ background: "rgba(2,4,20,0.9)", backdropFilter: "blur(14px)" }} onClick={onClose}>
-      <div className="relative w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-3xl border border-white/10 p-6"
+    <div className="fixed inset-0 z-[70] flex flex-col"
+      style={{ background: "rgba(2,4,20,0.96)", backdropFilter: "blur(18px)" }} onClick={onClose}>
+      <div className="relative w-full h-full md:h-auto md:max-w-2xl md:max-h-[90vh] md:my-auto md:mx-auto md:rounded-3xl border border-white/10 flex flex-col overflow-hidden"
         style={{ background: "linear-gradient(160deg,#0d0f2a,#0a0a1a)", boxShadow: "0 30px 70px rgba(0,0,0,0.7)" }}
         onClick={e => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition">
-          <X className="w-4 h-4" />
-        </button>
-        <h2 className="text-lg font-black text-white mb-1">Travel Sticker — Terms &amp; Conditions</h2>
-        <p className="text-white/40 text-xs mb-4">Please read before purchasing.</p>
-        <div className="space-y-3 text-white/60 text-xs leading-relaxed">
-          <p><span className="font-bold text-white/80">1. Paid digital service.</span> The Travel Sticker is a one-time digital collectible priced at <span className="font-bold text-white/80">US$1.00</span>, charged via PayPal. The fee is for the digital experience only.</p>
-          <p><span className="font-bold text-white/80">2. For entertainment.</span> The sticker, lucky country, and "travel partner" matching are for fun and novelty. They are not a travel booking, visa, ticket, or any guarantee of travel with the matched person.</p>
-          <p><span className="font-bold text-white/80">3. Random outcome.</span> The destination country is assigned at random and cannot be chosen, exchanged, or guaranteed.</p>
-          <p><span className="font-bold text-white/80">4. Travel partner.</span> Your match is another participant (or a sample profile) who received the same country. No personal contact details are shared, and Visa Shuttle is not responsible for any interaction between participants.</p>
-          <p><span className="font-bold text-white/80">5. No refunds.</span> As the sticker is delivered instantly after payment, all sales are final and non-refundable except where required by law.</p>
-          <p><span className="font-bold text-white/80">6. Data.</span> The name and nationality you provide are used only to personalise and store your sticker. See our Privacy Policy for details.</p>
-          <p><span className="font-bold text-white/80">7. Acceptance.</span> By ticking the box and paying, you confirm you are 18+ and agree to these terms.</p>
+        {/* header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-white/10 shrink-0">
+          <div>
+            <h2 className="text-xl font-black text-white">Terms &amp; Conditions</h2>
+            <p className="text-white/40 text-xs mt-0.5">Travel Sticker — please read before purchasing.</p>
+          </div>
+          <button onClick={onClose} className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/20 transition">
+            <X className="w-5 h-5" />
+          </button>
         </div>
-        <button onClick={onClose}
-          className="mt-5 w-full px-6 py-3 rounded-xl text-white font-bold text-sm"
-          style={{ background: "linear-gradient(135deg,#4055FF,#9033F5)" }}>
-          Got it
-        </button>
+        {/* body */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4 text-white/65 text-sm leading-relaxed">
+          <p><span className="font-bold text-white">1. Paid digital service.</span> Each Travel Sticker is a digital collectible priced at <span className="font-bold text-white">US$1.00</span> per purchase, charged via PayPal. The fee is for the digital experience only and a new sticker requires a new payment.</p>
+          <p><span className="font-bold text-white">2. For entertainment.</span> The sticker, lucky country, and "travel partner" matching are for fun and novelty. They are not a travel booking, visa, ticket, or any guarantee of travel with the matched person.</p>
+          <p><span className="font-bold text-white">3. Random outcome.</span> The destination country is assigned at random and cannot be chosen, exchanged, or guaranteed.</p>
+          <p><span className="font-bold text-white">4. Travel partner.</span> Your match is another participant (or a sample profile) who received the same country. No personal contact details are shared, and Visa Shuttle is not responsible for any interaction between participants.</p>
+          <p><span className="font-bold text-white">5. No refunds.</span> As the sticker is delivered instantly after payment, all sales are final and non-refundable except where required by law.</p>
+          <p><span className="font-bold text-white">6. Data &amp; privacy.</span> The name and nationality you provide are used only to personalise and store your sticker. Payment is processed by PayPal under their own terms and privacy policy. See our Privacy Policy for details.</p>
+          <p><span className="font-bold text-white">7. Eligibility &amp; acceptance.</span> By ticking the box and paying, you confirm you are at least 18 years old and agree to these terms.</p>
+          <p className="text-white/40 text-xs pt-2">Visa Shuttle · Fospe Software Private Limited.</p>
+        </div>
+        {/* footer */}
+        <div className="px-6 py-4 border-t border-white/10 shrink-0">
+          <button onClick={onClose}
+            className="w-full px-6 py-3 rounded-xl text-white font-bold text-sm"
+            style={{ background: "linear-gradient(135deg,#4055FF,#9033F5)" }}>
+            I understand
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1347,39 +1357,39 @@ function PaymentModal({ onPaid, onClose }: { onPaid: (orderId: string) => void; 
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 overflow-y-auto"
       style={{ background: "rgba(2,4,20,0.92)", backdropFilter: "blur(16px)" }} onClick={onClose}>
-      <div className="relative w-full max-w-sm rounded-3xl border border-white/10 p-6"
-        style={{ background: "linear-gradient(160deg,#0d0f2a,#0a0a1a)", boxShadow: "0 30px 70px rgba(0,0,0,0.7)" }}
+      <div className="relative w-full max-w-md my-6 rounded-3xl p-6"
+        style={{ background: "#ffffff", boxShadow: "0 30px 70px rgba(0,0,0,0.5)" }}
         onClick={e => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition">
+        <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200 transition">
           <X className="w-4 h-4" />
         </button>
         <div className="text-center mb-5">
           <div className="text-3xl mb-2">🛂</div>
-          <h2 className="text-lg font-black text-white">Pay US$1 to open your passport</h2>
-          <p className="text-white/45 text-xs mt-1">Pay with PayPal or any debit/credit card — no PayPal account required.</p>
+          <h2 className="text-lg font-black text-slate-900">Complete your payment</h2>
+          <p className="text-slate-500 text-xs mt-1">Pay with PayPal or any debit/credit card — no PayPal account required.</p>
         </div>
         {status === "error" ? (
           <div className="text-center py-6">
-            <p className="text-red-400 text-sm mb-4">{err}</p>
-            <button onClick={onClose} className="px-5 py-2.5 rounded-xl text-white text-sm font-bold border border-white/15">Close</button>
+            <p className="text-red-500 text-sm mb-4">{err}</p>
+            <button onClick={onClose} className="px-5 py-2.5 rounded-xl text-slate-700 text-sm font-bold border border-slate-200 hover:bg-slate-50">Close</button>
           </div>
         ) : status === "processing" ? (
           <div className="flex flex-col items-center gap-3 py-8">
-            <div className="w-9 h-9 rounded-full border-2 border-white/15 border-t-white/80 animate-spin" />
-            <p className="text-white/60 text-sm">Confirming your payment…</p>
+            <div className="w-9 h-9 rounded-full border-2 border-slate-200 border-t-[#4055FF] animate-spin" />
+            <p className="text-slate-600 text-sm">Confirming your payment…</p>
           </div>
         ) : (
           <>
             {status === "loading" && (
               <div className="flex flex-col items-center gap-3 py-8">
-                <div className="w-9 h-9 rounded-full border-2 border-white/15 border-t-white/80 animate-spin" />
-                <p className="text-white/40 text-xs">Loading secure checkout…</p>
+                <div className="w-9 h-9 rounded-full border-2 border-slate-200 border-t-[#4055FF] animate-spin" />
+                <p className="text-slate-400 text-xs">Loading secure checkout…</p>
               </div>
             )}
             <div ref={btnRef} />
-            <p className="text-center text-white/25 text-[10px] mt-3">🔒 Payments processed securely by PayPal.</p>
+            <p className="text-center text-slate-400 text-[10px] mt-3">🔒 Payments processed securely by PayPal.</p>
           </>
         )}
       </div>

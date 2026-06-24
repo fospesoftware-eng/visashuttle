@@ -1,6 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import { storage, isMissingRelationError, getVirtualStickersByUser, createVirtualSticker, getVirtualStickerBySession, collectTravelSticker } from "../storage";
+import { storage, isMissingRelationError, getVirtualStickersByUser, createVirtualSticker, getVirtualStickerBySession, collectTravelSticker, getTravelStickerPayments } from "../storage";
 import { runVisaCheck, runDeepCheck, scanPassportImage, isPassportScanConfigured } from "../ai";
 import { registerApiPlatformRoutes } from "./api-platform";
 import { registerPlatformExtensions } from "./platform-extensions";
@@ -6168,6 +6168,17 @@ Rules:
   });
 
   // ── Admin: Platform AI Config ─────────────────────────────────────────────
+  // Travel Sticker payment report (SaaS admin)
+  app.get("/api/admin/travel-sticker-payments", requireAdminAuth, async (req, res) => {
+    try {
+      const limit = Number(req.query.limit) || 200;
+      const report = await getTravelStickerPayments(limit);
+      res.json(report);
+    } catch (e: any) {
+      res.status(500).json({ error: e?.message || "Failed to load travel sticker payments" });
+    }
+  });
+
   app.get("/api/admin/ai-config", requireAdminAuth, async (_req, res) => {
     const cfg = await storage.getPlatformAiConfig();
     const envKeyConfigured = !!process.env.ANTHROPIC_API_KEY;
@@ -7963,6 +7974,7 @@ Rules:
         return res.status(402).json({ error: "Payment not completed", paid: false, status: data?.status || capture?.status });
       }
 
+      const captureId = getPayPalCaptureId(data);
       const result = await collectTravelSticker({
         collectorName,
         countryCode: String(b.code),
@@ -7972,8 +7984,12 @@ Rules:
         primaryColor: String(b.primary || "#4055FF"),
         secondaryColor: String(b.secondary || "#FFFFFF"),
         funFact: String(b.fact || ""),
+        nationality: b.nationality ? String(b.nationality) : null,
+        paypalCaptureId: captureId || null,
+        amountCents: 100,
+        currency: "USD",
       });
-      return res.json({ paid: true, captureId: getPayPalCaptureId(data), ...result });
+      return res.json({ paid: true, captureId, ...result });
     } catch (err: any) {
       console.error("[PayPal] Capture travel-sticker order failed:", err?.data || err);
       return res.status(err?.status >= 500 ? 503 : err?.status || 502).json({ error: err?.message || "Unable to verify PayPal payment" });

@@ -4631,6 +4631,10 @@ export interface TravelStickerCollector {
   primaryColor: string;
   secondaryColor: string;
   funFact: string;
+  nationality?: string | null;
+  paypalCaptureId?: string | null;
+  amountCents?: number | null;
+  currency?: string | null;
 }
 
 export interface TravelStickerMatch {
@@ -4694,10 +4698,11 @@ export async function collectTravelSticker(data: TravelStickerCollector): Promis
 
     await client.query(
       `INSERT INTO travel_sticker_collectors
-         (collector_name, country_code, country_name, flag_emoji, landmark_emoji, primary_color, secondary_color, fun_fact)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+         (collector_name, country_code, country_name, flag_emoji, landmark_emoji, primary_color, secondary_color, fun_fact, nationality, paypal_capture_id, amount_cents, currency)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
       [data.collectorName, data.countryCode, data.countryName, data.flagEmoji,
-       data.landmarkEmoji, data.primaryColor, data.secondaryColor, data.funFact]
+       data.landmarkEmoji, data.primaryColor, data.secondaryColor, data.funFact,
+       data.nationality ?? null, data.paypalCaptureId ?? null, data.amountCents ?? null, data.currency ?? null]
     );
 
     const countRes = await client.query(
@@ -4705,6 +4710,64 @@ export async function collectTravelSticker(data: TravelStickerCollector): Promis
       [data.countryCode]
     );
     return { match, totalForCountry: countRes.rows[0]?.n ?? 1 };
+  } finally { client.release(); }
+}
+
+// ----- Travel Sticker payment report (SaaS admin) -----
+
+export interface TravelStickerPaymentRow {
+  id: string;
+  name: string;
+  nationality: string | null;
+  countryName: string;
+  flag: string;
+  amountCents: number | null;
+  currency: string | null;
+  captureId: string | null;
+  createdAt: Date | null;
+}
+
+export interface TravelStickerPaymentReport {
+  rows: TravelStickerPaymentRow[];
+  totalCount: number;
+  paidCount: number;
+  totalRevenueCents: number;
+}
+
+export async function getTravelStickerPayments(limit = 200): Promise<TravelStickerPaymentReport> {
+  if (!rawPool) return { rows: [], totalCount: 0, paidCount: 0, totalRevenueCents: 0 };
+  const client = await rawPool.connect();
+  try {
+    const rowsRes = await client.query(
+      `SELECT id, collector_name, nationality, country_name, flag_emoji, amount_cents, currency, paypal_capture_id, created_at
+       FROM travel_sticker_collectors
+       ORDER BY created_at DESC LIMIT $1`,
+      [Math.min(Math.max(limit, 1), 1000)]
+    );
+    const summaryRes = await client.query(
+      `SELECT
+         COUNT(*)::int AS total_count,
+         COUNT(paypal_capture_id)::int AS paid_count,
+         COALESCE(SUM(amount_cents) FILTER (WHERE paypal_capture_id IS NOT NULL), 0)::int AS revenue_cents
+       FROM travel_sticker_collectors`
+    );
+    const s = summaryRes.rows[0] || {};
+    return {
+      rows: rowsRes.rows.map(r => ({
+        id: r.id,
+        name: r.collector_name,
+        nationality: r.nationality,
+        countryName: r.country_name,
+        flag: r.flag_emoji,
+        amountCents: r.amount_cents,
+        currency: r.currency,
+        captureId: r.paypal_capture_id,
+        createdAt: r.created_at,
+      })),
+      totalCount: s.total_count ?? 0,
+      paidCount: s.paid_count ?? 0,
+      totalRevenueCents: s.revenue_cents ?? 0,
+    };
   } finally { client.release(); }
 }
 

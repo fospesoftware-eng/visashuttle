@@ -66,6 +66,13 @@ export async function runStartupMigrations(): Promise<void> {
       )
     `);
     await client.query(`CREATE INDEX IF NOT EXISTS travel_sticker_collectors_country_idx ON travel_sticker_collectors (country_code, created_at)`);
+    await client.query(`
+      ALTER TABLE travel_sticker_collectors
+        ADD COLUMN IF NOT EXISTS nationality text,
+        ADD COLUMN IF NOT EXISTS paypal_capture_id text,
+        ADD COLUMN IF NOT EXISTS amount_cents integer,
+        ADD COLUMN IF NOT EXISTS currency text
+    `);
     console.info("[db] Startup migrations applied.");
   } catch (err) {
     console.error("[db] Startup migration failed:", err);

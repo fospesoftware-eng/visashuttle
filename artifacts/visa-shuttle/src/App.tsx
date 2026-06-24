@@ -87,6 +87,7 @@ import AdminVKBPage from "@/pages/admin/vkb";
 import AdminAIPage from "@/pages/admin/ai";
 import AdminVisaToolsPage from "@/pages/admin/visa-tools";
 import AdminAuditPage from "@/pages/admin/audit";
+import AdminTravelStickersPage from "@/pages/admin/travel-stickers";
 import AdminSettingsPage from "@/pages/admin/settings";
 import AdminOperationsPage from "@/pages/admin/operations";
 import AdminFinancePage from "@/pages/admin/finance";
@@ -323,6 +324,7 @@ function Router() {
       <Route path="/admin/updates" component={AdminUpdatesPage} />
       <Route path="/admin/version-logs" component={AdminVersionLogsPage} />
       <Route path="/admin/audit" component={AdminAuditPage} />
+      <Route path="/admin/travel-stickers" component={AdminTravelStickersPage} />
       <Route path="/admin/settings" component={AdminSettingsPage} />
 
       <Route path="/w/:slug" component={AgencyHomePage} />
