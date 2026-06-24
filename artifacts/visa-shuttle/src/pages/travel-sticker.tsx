@@ -1,114 +1,239 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
-import { ArrowLeft, Globe, MapPin, RefreshCcw, Share2, Sparkles, Trophy, X } from "lucide-react";
+import { ArrowLeft, Download, Globe, MapPin, RefreshCcw, Trophy, X } from "lucide-react";
+import { FaFacebookF, FaInstagram, FaWhatsapp } from "react-icons/fa6";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
 
 // ── Country data ────────────────────────────────────────────────────────────
 const COUNTRIES = [
-  { code: "JP", name: "Japan", flag: "🇯🇵", landmark: "⛩️", primary: "#BC002D", secondary: "#FFFFFF", fact: "Japan has the world's oldest company, Kongō Gumi, founded in 578 AD." },
-  { code: "CN", name: "China", flag: "🇨🇳", landmark: "🏯", primary: "#DE2910", secondary: "#FFDE00", fact: "China invented paper, printing, gunpowder, and the compass." },
-  { code: "IN", name: "India", flag: "🇮🇳", landmark: "🕌", primary: "#FF9933", secondary: "#138808", fact: "India invented the number zero and the decimal system." },
-  { code: "KR", name: "South Korea", flag: "🇰🇷", landmark: "🏯", primary: "#003478", secondary: "#CD2E3A", fact: "South Korea has the fastest average internet speeds in the world." },
-  { code: "TH", name: "Thailand", flag: "🇹🇭", landmark: "🛕", primary: "#A51931", secondary: "#2D2A6E", fact: "Thailand is the world's largest exporter of rice." },
-  { code: "VN", name: "Vietnam", flag: "🇻🇳", landmark: "🍜", primary: "#DA251D", secondary: "#FFCD00", fact: "Vietnam is the world's second largest coffee producer." },
-  { code: "SG", name: "Singapore", flag: "🇸🇬", landmark: "🌃", primary: "#EF3340", secondary: "#FFFFFF", fact: "Changi Airport has won the world's best airport award for over 12 years." },
-  { code: "MY", name: "Malaysia", flag: "🇲🇾", landmark: "🏙️", primary: "#CC0001", secondary: "#010066", fact: "The Petronas Towers were the world's tallest buildings from 1998–2004." },
-  { code: "ID", name: "Indonesia", flag: "🇮🇩", landmark: "🌴", primary: "#CE1126", secondary: "#FFFFFF", fact: "Indonesia has more active volcanoes than any country on Earth." },
-  { code: "PH", name: "Philippines", flag: "🇵🇭", landmark: "🏝️", primary: "#0038A8", secondary: "#CE1126", fact: "The Philippines has over 7,640 islands." },
-  { code: "NP", name: "Nepal", flag: "🇳🇵", landmark: "🏔️", primary: "#003893", secondary: "#DC143C", fact: "Nepal is home to 8 of the world's 10 tallest mountains." },
-  { code: "BT", name: "Bhutan", flag: "🇧🇹", landmark: "🐉", primary: "#FF8000", secondary: "#FF0000", fact: "Bhutan is the world's only carbon-negative country." },
-  { code: "LK", name: "Sri Lanka", flag: "🇱🇰", landmark: "🦁", primary: "#8D153A", secondary: "#EB7400", fact: "Sri Lanka was the first country to elect a female prime minister." },
-  { code: "MN", name: "Mongolia", flag: "🇲🇳", landmark: "🏕️", primary: "#C4272F", secondary: "#015197", fact: "Mongolia has the lowest population density of any sovereign nation." },
-  { code: "KZ", name: "Kazakhstan", flag: "🇰🇿", landmark: "🏇", primary: "#00AFCA", secondary: "#FFCC00", fact: "Kazakhstan is the world's largest landlocked country." },
-  { code: "UZ", name: "Uzbekistan", flag: "🇺🇿", landmark: "🕌", primary: "#1EB53A", secondary: "#0099B5", fact: "Samarkand is one of the oldest continuously inhabited cities on Earth." },
-  { code: "AZ", name: "Azerbaijan", flag: "🇦🇿", landmark: "🔥", primary: "#0092BC", secondary: "#E8323B", fact: "Azerbaijan means 'Land of Fire' — it has eternal flames from the ground." },
-  { code: "AM", name: "Armenia", flag: "🇦🇲", landmark: "⛪", primary: "#D90012", secondary: "#F2A800", fact: "Armenia was the first country to officially adopt Christianity in 301 AD." },
-  { code: "GE", name: "Georgia", flag: "🇬🇪", landmark: "⛪", primary: "#FF0000", secondary: "#FFFFFF", fact: "Georgia is home to the world's deepest cave at 2,212 metres." },
-  { code: "IR", name: "Iran", flag: "🇮🇷", landmark: "🕌", primary: "#239F40", secondary: "#DA0000", fact: "Iran (Persia) is one of the world's oldest civilisations at 7,000 years." },
-  { code: "SA", name: "Saudi Arabia", flag: "🇸🇦", landmark: "🕌", primary: "#006C35", secondary: "#FFFFFF", fact: "Saudi Arabia holds 17% of the world's proven oil reserves." },
-  { code: "AE", name: "UAE", flag: "🇦🇪", landmark: "🏙️", primary: "#00732F", secondary: "#FF0000", fact: "The Burj Khalifa is the world's tallest building at 828 metres." },
-  { code: "QA", name: "Qatar", flag: "🇶🇦", landmark: "🏟️", primary: "#8D1B3D", secondary: "#FFFFFF", fact: "Qatar has the world's third largest natural gas reserves." },
-  { code: "JO", name: "Jordan", flag: "🇯🇴", landmark: "🏜️", primary: "#007A3D", secondary: "#CE1126", fact: "Jordan's Petra, carved from rose-red rock, is one of the Seven Wonders." },
-  { code: "FR", name: "France", flag: "🇫🇷", landmark: "🗼", primary: "#002395", secondary: "#ED2939", fact: "France is the world's most visited country with 90 million tourists annually." },
-  { code: "IT", name: "Italy", flag: "🇮🇹", landmark: "🏛️", primary: "#009246", secondary: "#CE2B37", fact: "Italy has more UNESCO World Heritage Sites than any other nation." },
-  { code: "DE", name: "Germany", flag: "🇩🇪", landmark: "🏰", primary: "#000000", secondary: "#DD0000", fact: "Germany has 1,500 types of beer brewed in over 1,300 breweries." },
-  { code: "ES", name: "Spain", flag: "🇪🇸", landmark: "💃", primary: "#AA151B", secondary: "#F1BF00", fact: "Spain has the second largest number of UNESCO sites in Europe." },
-  { code: "GB", name: "United Kingdom", flag: "🇬🇧", landmark: "🎡", primary: "#012169", secondary: "#C8102E", fact: "The UK invented the World Wide Web, telephone, and television." },
-  { code: "PT", name: "Portugal", flag: "🇵🇹", landmark: "⛵", primary: "#006600", secondary: "#FF0000", fact: "Portugal is the world's oldest nation-state with borders since 1139." },
-  { code: "NL", name: "Netherlands", flag: "🇳🇱", landmark: "🌷", primary: "#AE1C28", secondary: "#21468B", fact: "The Netherlands grows more flowers than any country except Kenya." },
-  { code: "CH", name: "Switzerland", flag: "🇨🇭", landmark: "🏔️", primary: "#FF0000", secondary: "#FFFFFF", fact: "Switzerland has been officially neutral in conflicts since 1815." },
-  { code: "AT", name: "Austria", flag: "🇦🇹", landmark: "🎻", primary: "#ED2939", secondary: "#FFFFFF", fact: "Vienna is the birthplace of classical music — Mozart, Beethoven, Schubert." },
-  { code: "SE", name: "Sweden", flag: "🇸🇪", landmark: "🎿", primary: "#006AA7", secondary: "#FECC02", fact: "Sweden invented the seatbelt, which has saved over a million lives." },
-  { code: "NO", name: "Norway", flag: "🇳🇴", landmark: "🏔️", primary: "#EF2B2D", secondary: "#002868", fact: "Norway has the world's longest road tunnel at 24.5 km." },
-  { code: "DK", name: "Denmark", flag: "🇩🇰", landmark: "🧜", primary: "#C60C30", secondary: "#FFFFFF", fact: "Denmark is consistently ranked the world's happiest country." },
-  { code: "FI", name: "Finland", flag: "🇫🇮", landmark: "🎅", primary: "#003580", secondary: "#FFFFFF", fact: "Finland has the most heavy metal bands per capita of any nation." },
-  { code: "IS", name: "Iceland", flag: "🇮🇸", landmark: "🌋", primary: "#003897", secondary: "#DC1E35", fact: "Iceland is the world's most peaceful country with no standing army." },
-  { code: "IE", name: "Ireland", flag: "🇮🇪", landmark: "🍀", primary: "#169B62", secondary: "#FF883E", fact: "Ireland has never had a native snake population." },
-  { code: "PL", name: "Poland", flag: "🇵🇱", landmark: "🦅", primary: "#DC143C", secondary: "#FFFFFF", fact: "Poland has the world's oldest salt mine in operation since 1044." },
-  { code: "CZ", name: "Czechia", flag: "🇨🇿", landmark: "🏰", primary: "#D7141A", secondary: "#11457E", fact: "Prague has the highest density of castles per capita in the world." },
-  { code: "HU", name: "Hungary", flag: "🇭🇺", landmark: "🏰", primary: "#CE2939", secondary: "#477050", fact: "Hungary has the third most Nobel Prize winners per capita." },
-  { code: "RO", name: "Romania", flag: "🇷🇴", landmark: "🏰", primary: "#002B7F", secondary: "#FCD116", fact: "Romania's Parliament Palace is the world's heaviest administrative building." },
-  { code: "GR", name: "Greece", flag: "🇬🇷", landmark: "🏺", primary: "#0D5EAF", secondary: "#FFFFFF", fact: "Greece has more archaeological museums than any other country." },
-  { code: "UA", name: "Ukraine", flag: "🇺🇦", landmark: "🌻", primary: "#005BBB", secondary: "#FFD500", fact: "Ukraine is Europe's largest country and its breadbasket." },
-  { code: "NG", name: "Nigeria", flag: "🇳🇬", landmark: "🥁", primary: "#008751", secondary: "#FFFFFF", fact: "Nigeria is Africa's most populous nation and largest economy." },
-  { code: "ZA", name: "South Africa", flag: "🇿🇦", landmark: "🦁", primary: "#007A4D", secondary: "#FFB81C", fact: "South Africa has three official capital cities." },
-  { code: "EG", name: "Egypt", flag: "🇪🇬", landmark: "🐪", primary: "#CE1126", secondary: "#C09300", fact: "Ancient Egyptians invented toothpaste over 5,000 years ago." },
-  { code: "ET", name: "Ethiopia", flag: "🇪🇹", landmark: "☕", primary: "#078930", secondary: "#FCDD09", fact: "Ethiopia is the birthplace of coffee and humanity's earliest ancestors." },
-  { code: "KE", name: "Kenya", flag: "🇰🇪", landmark: "🦒", primary: "#006600", secondary: "#BB0000", fact: "Kenya's Rift Valley is where the earliest human fossils were found." },
-  { code: "TZ", name: "Tanzania", flag: "🇹🇿", landmark: "🦣", primary: "#1EB53A", secondary: "#FCD116", fact: "Tanzania is home to Africa's highest peak, Mount Kilimanjaro." },
-  { code: "GH", name: "Ghana", flag: "🇬🇭", landmark: "🥁", primary: "#006B3F", secondary: "#FCD116", fact: "Ghana was the first sub-Saharan African country to gain independence." },
-  { code: "MA", name: "Morocco", flag: "🇲🇦", landmark: "🕌", primary: "#C1272D", secondary: "#006233", fact: "Morocco has the world's oldest university, founded in 859 AD." },
-  { code: "MG", name: "Madagascar", flag: "🇲🇬", landmark: "🦜", primary: "#FC3D32", secondary: "#007E3A", fact: "90% of Madagascar's wildlife exists nowhere else on the planet." },
-  { code: "ZW", name: "Zimbabwe", flag: "🇿🇼", landmark: "🌊", primary: "#006400", secondary: "#FFD200", fact: "Zimbabwe's Victoria Falls is the world's largest waterfall by area." },
-  { code: "US", name: "United States", flag: "🇺🇸", landmark: "🗽", primary: "#002868", secondary: "#BF0A30", fact: "The US has won more Nobel Prizes than any other country in history." },
-  { code: "CA", name: "Canada", flag: "🇨🇦", landmark: "🍁", primary: "#FF0000", secondary: "#FFFFFF", fact: "Canada has the longest coastline of any country at 202,080 km." },
-  { code: "MX", name: "Mexico", flag: "🇲🇽", landmark: "🏺", primary: "#006847", secondary: "#CE1126", fact: "Mexico City was built on an ancient Aztec lake — it sinks 10 cm/year." },
-  { code: "BR", name: "Brazil", flag: "🇧🇷", landmark: "🌴", primary: "#009C3B", secondary: "#FFDF00", fact: "Brazil's Amazon contains 10% of all species on Earth." },
-  { code: "AR", name: "Argentina", flag: "🇦🇷", landmark: "🌎", primary: "#74ACDF", secondary: "#FFFFFF", fact: "Argentina has won the FIFA World Cup three times." },
-  { code: "CL", name: "Chile", flag: "🇨🇱", landmark: "🗿", primary: "#D52B1E", secondary: "#003580", fact: "Chile is the longest country in the world at 4,300 km." },
-  { code: "CO", name: "Colombia", flag: "🇨🇴", landmark: "🌸", primary: "#FCD116", secondary: "#003893", fact: "Colombia is the only South American country with two coastlines." },
-  { code: "PE", name: "Peru", flag: "🇵🇪", landmark: "🏔️", primary: "#D91023", secondary: "#FFFFFF", fact: "Machu Picchu was built without mortar or iron tools." },
-  { code: "VE", name: "Venezuela", flag: "🇻🇪", landmark: "🌊", primary: "#CF142B", secondary: "#007A5E", fact: "Venezuela has the world's highest waterfall, Angel Falls, at 979 m." },
-  { code: "CU", name: "Cuba", flag: "🇨🇺", landmark: "🎶", primary: "#002A8F", secondary: "#CF142B", fact: "Cuba has the highest literacy rate in Latin America at 99.8%." },
-  { code: "JM", name: "Jamaica", flag: "🇯🇲", landmark: "🎵", primary: "#000000", secondary: "#009B3A", fact: "Jamaica is the birthplace of reggae music and Bob Marley." },
-  { code: "TT", name: "Trinidad & Tobago", flag: "🇹🇹", landmark: "🎺", primary: "#CE1126", secondary: "#000000", fact: "Trinidad and Tobago is the birthplace of steelpan music." },
-  { code: "BB", name: "Barbados", flag: "🇧🇧", landmark: "🏖️", primary: "#00267F", secondary: "#FFC726", fact: "Barbados is the birthplace of rum, first distilled in the 1620s." },
-  { code: "CR", name: "Costa Rica", flag: "🇨🇷", landmark: "🦋", primary: "#002B7F", secondary: "#CE1126", fact: "Costa Rica runs on 100% renewable energy." },
-  { code: "PA", name: "Panama", flag: "🇵🇦", landmark: "⛵", primary: "#FFFFFF", secondary: "#D21034", fact: "Panama Canal reduced ocean routes by up to 20,000 km." },
-  { code: "AU", name: "Australia", flag: "🇦🇺", landmark: "🦘", primary: "#00008B", secondary: "#FFBF00", fact: "Australia is the only country that is also a continent." },
-  { code: "NZ", name: "New Zealand", flag: "🇳🇿", landmark: "🌋", primary: "#00247D", secondary: "#CC142B", fact: "New Zealand was the first country to give women the right to vote." },
-  { code: "FJ", name: "Fiji", flag: "🇫🇯", landmark: "🏝️", primary: "#003F87", secondary: "#FFFFFF", fact: "Fiji's 333 islands are spread across 1.3 million sq km of ocean." },
+  { code: "JP", name: "Japan",         flag: "🇯🇵", landmark: "⛩️",  primary: "#BC002D", secondary: "#FFCDD2", fact: "Japan has the world's oldest company, Kongō Gumi, founded in 578 AD." },
+  { code: "CN", name: "China",         flag: "🇨🇳", landmark: "🏯",  primary: "#DE2910", secondary: "#FFDE00", fact: "China invented paper, printing, gunpowder, and the compass." },
+  { code: "IN", name: "India",         flag: "🇮🇳", landmark: "🕌",  primary: "#FF9933", secondary: "#138808", fact: "India invented the number zero and the decimal system." },
+  { code: "KR", name: "South Korea",   flag: "🇰🇷", landmark: "🏯",  primary: "#003478", secondary: "#CD2E3A", fact: "South Korea has the fastest average internet speeds in the world." },
+  { code: "TH", name: "Thailand",      flag: "🇹🇭", landmark: "🛕",  primary: "#A51931", secondary: "#F9C440", fact: "Thailand is the world's largest exporter of rice." },
+  { code: "VN", name: "Vietnam",       flag: "🇻🇳", landmark: "🍜",  primary: "#DA251D", secondary: "#FFCD00", fact: "Vietnam is the world's second largest coffee producer." },
+  { code: "SG", name: "Singapore",     flag: "🇸🇬", landmark: "🌃",  primary: "#EF3340", secondary: "#FFFFFF", fact: "Changi Airport has won the world's best airport award for 12+ years." },
+  { code: "MY", name: "Malaysia",      flag: "🇲🇾", landmark: "🏙️", primary: "#CC0001", secondary: "#010066", fact: "The Petronas Towers were the world's tallest buildings from 1998–2004." },
+  { code: "ID", name: "Indonesia",     flag: "🇮🇩", landmark: "🌴",  primary: "#CE1126", secondary: "#FFFFFF", fact: "Indonesia has more active volcanoes than any other country on Earth." },
+  { code: "PH", name: "Philippines",   flag: "🇵🇭", landmark: "🏝️", primary: "#0038A8", secondary: "#FCD116", fact: "The Philippines has over 7,640 islands." },
+  { code: "NP", name: "Nepal",         flag: "🇳🇵", landmark: "🏔️", primary: "#003893", secondary: "#DC143C", fact: "Nepal is home to 8 of the world's 10 tallest mountains." },
+  { code: "BT", name: "Bhutan",        flag: "🇧🇹", landmark: "🐉",  primary: "#FF8000", secondary: "#FF0000", fact: "Bhutan is the world's only carbon-negative country." },
+  { code: "LK", name: "Sri Lanka",     flag: "🇱🇰", landmark: "🦁",  primary: "#8D153A", secondary: "#EB7400", fact: "Sri Lanka was the first country to elect a female prime minister." },
+  { code: "MN", name: "Mongolia",      flag: "🇲🇳", landmark: "🏕️", primary: "#C4272F", secondary: "#015197", fact: "Mongolia has the lowest population density of any sovereign nation." },
+  { code: "KZ", name: "Kazakhstan",    flag: "🇰🇿", landmark: "🏇",  primary: "#00AFCA", secondary: "#FFCC00", fact: "Kazakhstan is the world's largest landlocked country." },
+  { code: "UZ", name: "Uzbekistan",    flag: "🇺🇿", landmark: "🕌",  primary: "#1EB53A", secondary: "#0099B5", fact: "Samarkand is one of the oldest continuously inhabited cities on Earth." },
+  { code: "AZ", name: "Azerbaijan",    flag: "🇦🇿", landmark: "🔥",  primary: "#0092BC", secondary: "#E8323B", fact: "Azerbaijan means 'Land of Fire' — it has eternal flames from the ground." },
+  { code: "AM", name: "Armenia",       flag: "🇦🇲", landmark: "⛪",  primary: "#D90012", secondary: "#F2A800", fact: "Armenia was the first country to officially adopt Christianity in 301 AD." },
+  { code: "GE", name: "Georgia",       flag: "🇬🇪", landmark: "⛪",  primary: "#FF0000", secondary: "#FFFFFF", fact: "Georgia is home to the world's deepest cave at 2,212 metres." },
+  { code: "IR", name: "Iran",          flag: "🇮🇷", landmark: "🕌",  primary: "#239F40", secondary: "#DA0000", fact: "Iran (Persia) is one of the world's oldest civilisations at 7,000 years." },
+  { code: "SA", name: "Saudi Arabia",  flag: "🇸🇦", landmark: "🕌",  primary: "#006C35", secondary: "#FFFFFF", fact: "Saudi Arabia holds 17% of the world's proven oil reserves." },
+  { code: "AE", name: "UAE",           flag: "🇦🇪", landmark: "🏙️", primary: "#00732F", secondary: "#FF0000", fact: "The Burj Khalifa is the world's tallest building at 828 metres." },
+  { code: "QA", name: "Qatar",         flag: "🇶🇦", landmark: "🏟️", primary: "#8D1B3D", secondary: "#FFFFFF", fact: "Qatar has the world's third largest natural gas reserves." },
+  { code: "JO", name: "Jordan",        flag: "🇯🇴", landmark: "🏜️", primary: "#007A3D", secondary: "#CE1126", fact: "Jordan's Petra, carved from rose-red rock, is one of the Seven Wonders." },
+  { code: "FR", name: "France",        flag: "🇫🇷", landmark: "🗼",  primary: "#002395", secondary: "#ED2939", fact: "France is the world's most visited country with 90 million tourists annually." },
+  { code: "IT", name: "Italy",         flag: "🇮🇹", landmark: "🏛️", primary: "#009246", secondary: "#CE2B37", fact: "Italy has more UNESCO World Heritage Sites than any other nation." },
+  { code: "DE", name: "Germany",       flag: "🇩🇪", landmark: "🏰",  primary: "#333333", secondary: "#DD0000", fact: "Germany has 1,500 types of beer brewed in over 1,300 breweries." },
+  { code: "ES", name: "Spain",         flag: "🇪🇸", landmark: "💃",  primary: "#AA151B", secondary: "#F1BF00", fact: "Spain has the second largest number of UNESCO sites in Europe." },
+  { code: "GB", name: "United Kingdom",flag: "🇬🇧", landmark: "🎡",  primary: "#012169", secondary: "#C8102E", fact: "The UK invented the World Wide Web, telephone, and television." },
+  { code: "PT", name: "Portugal",      flag: "🇵🇹", landmark: "⛵",  primary: "#006600", secondary: "#FF0000", fact: "Portugal is the world's oldest nation-state with borders since 1139." },
+  { code: "NL", name: "Netherlands",   flag: "🇳🇱", landmark: "🌷",  primary: "#AE1C28", secondary: "#21468B", fact: "The Netherlands grows more flowers than any country except Kenya." },
+  { code: "CH", name: "Switzerland",   flag: "🇨🇭", landmark: "🏔️", primary: "#FF0000", secondary: "#FFFFFF", fact: "Switzerland has been officially neutral in conflicts since 1815." },
+  { code: "AT", name: "Austria",       flag: "🇦🇹", landmark: "🎻",  primary: "#ED2939", secondary: "#FFFFFF", fact: "Vienna is the birthplace of classical music — Mozart, Beethoven, Schubert." },
+  { code: "SE", name: "Sweden",        flag: "🇸🇪", landmark: "🎿",  primary: "#006AA7", secondary: "#FECC02", fact: "Sweden invented the seatbelt, which has saved over a million lives." },
+  { code: "NO", name: "Norway",        flag: "🇳🇴", landmark: "🏔️", primary: "#EF2B2D", secondary: "#002868", fact: "Norway has the world's longest road tunnel at 24.5 km." },
+  { code: "DK", name: "Denmark",       flag: "🇩🇰", landmark: "🧜",  primary: "#C60C30", secondary: "#FFFFFF", fact: "Denmark is consistently ranked the world's happiest country." },
+  { code: "FI", name: "Finland",       flag: "🇫🇮", landmark: "🎅",  primary: "#003580", secondary: "#FFFFFF", fact: "Finland has the most heavy metal bands per capita of any nation." },
+  { code: "IS", name: "Iceland",       flag: "🇮🇸", landmark: "🌋",  primary: "#003897", secondary: "#DC1E35", fact: "Iceland is the world's most peaceful country with no standing army." },
+  { code: "IE", name: "Ireland",       flag: "🇮🇪", landmark: "🍀",  primary: "#169B62", secondary: "#FF883E", fact: "Ireland has never had a native snake population." },
+  { code: "PL", name: "Poland",        flag: "🇵🇱", landmark: "🦅",  primary: "#DC143C", secondary: "#FFFFFF", fact: "Poland has the world's oldest salt mine in operation since 1044." },
+  { code: "CZ", name: "Czechia",       flag: "🇨🇿", landmark: "🏰",  primary: "#D7141A", secondary: "#11457E", fact: "Prague has the highest density of castles per capita in the world." },
+  { code: "HU", name: "Hungary",       flag: "🇭🇺", landmark: "🏰",  primary: "#CE2939", secondary: "#477050", fact: "Hungary has the third most Nobel Prize winners per capita." },
+  { code: "RO", name: "Romania",       flag: "🇷🇴", landmark: "🏰",  primary: "#002B7F", secondary: "#FCD116", fact: "Romania's Parliament Palace is the world's heaviest administrative building." },
+  { code: "GR", name: "Greece",        flag: "🇬🇷", landmark: "🏺",  primary: "#0D5EAF", secondary: "#FFFFFF", fact: "Greece has more archaeological museums than any other country." },
+  { code: "UA", name: "Ukraine",       flag: "🇺🇦", landmark: "🌻",  primary: "#005BBB", secondary: "#FFD500", fact: "Ukraine is Europe's largest country and its breadbasket." },
+  { code: "NG", name: "Nigeria",       flag: "🇳🇬", landmark: "🥁",  primary: "#008751", secondary: "#FFFFFF", fact: "Nigeria is Africa's most populous nation and largest economy." },
+  { code: "ZA", name: "South Africa",  flag: "🇿🇦", landmark: "🦁",  primary: "#007A4D", secondary: "#FFB81C", fact: "South Africa has three official capital cities." },
+  { code: "EG", name: "Egypt",         flag: "🇪🇬", landmark: "🐪",  primary: "#CE1126", secondary: "#C09300", fact: "Ancient Egyptians invented toothpaste over 5,000 years ago." },
+  { code: "ET", name: "Ethiopia",      flag: "🇪🇹", landmark: "☕",  primary: "#078930", secondary: "#FCDD09", fact: "Ethiopia is the birthplace of coffee and humanity's earliest ancestors." },
+  { code: "KE", name: "Kenya",         flag: "🇰🇪", landmark: "🦒",  primary: "#006600", secondary: "#BB0000", fact: "Kenya's Rift Valley is where the earliest human fossils were found." },
+  { code: "TZ", name: "Tanzania",      flag: "🇹🇿", landmark: "🦣",  primary: "#1EB53A", secondary: "#FCD116", fact: "Tanzania is home to Africa's highest peak, Mount Kilimanjaro." },
+  { code: "GH", name: "Ghana",         flag: "🇬🇭", landmark: "🥁",  primary: "#006B3F", secondary: "#FCD116", fact: "Ghana was the first sub-Saharan African country to gain independence." },
+  { code: "MA", name: "Morocco",       flag: "🇲🇦", landmark: "🕌",  primary: "#C1272D", secondary: "#006233", fact: "Morocco has the world's oldest continuously operating university, founded in 859 AD." },
+  { code: "MG", name: "Madagascar",    flag: "🇲🇬", landmark: "🦜",  primary: "#FC3D32", secondary: "#007E3A", fact: "90% of Madagascar's wildlife exists nowhere else on the planet." },
+  { code: "ZW", name: "Zimbabwe",      flag: "🇿🇼", landmark: "🌊",  primary: "#006400", secondary: "#FFD200", fact: "Zimbabwe's Victoria Falls is the world's largest waterfall by area." },
+  { code: "RW", name: "Rwanda",        flag: "🇷🇼", landmark: "🌄",  primary: "#20603D", secondary: "#FAD201", fact: "Rwanda has the highest percentage of women in parliament globally." },
+  { code: "UG", name: "Uganda",        flag: "🇺🇬", landmark: "🦍",  primary: "#000000", secondary: "#FCDC04", fact: "Uganda is home to over half the world's remaining mountain gorillas." },
+  { code: "US", name: "United States", flag: "🇺🇸", landmark: "🗽",  primary: "#002868", secondary: "#BF0A30", fact: "The US has won more Nobel Prizes than any other country in history." },
+  { code: "CA", name: "Canada",        flag: "🇨🇦", landmark: "🍁",  primary: "#FF0000", secondary: "#FFFFFF", fact: "Canada has the longest coastline of any country at 202,080 km." },
+  { code: "MX", name: "Mexico",        flag: "🇲🇽", landmark: "🏺",  primary: "#006847", secondary: "#CE1126", fact: "Mexico City was built on an ancient Aztec lake — it sinks 10 cm/year." },
+  { code: "BR", name: "Brazil",        flag: "🇧🇷", landmark: "🌴",  primary: "#009C3B", secondary: "#FFDF00", fact: "Brazil's Amazon contains 10% of all species on Earth." },
+  { code: "AR", name: "Argentina",     flag: "🇦🇷", landmark: "🌎",  primary: "#74ACDF", secondary: "#FFFFFF", fact: "Argentina has won the FIFA World Cup three times." },
+  { code: "CL", name: "Chile",         flag: "🇨🇱", landmark: "🗿",  primary: "#D52B1E", secondary: "#003580", fact: "Chile is the longest country in the world at 4,300 km." },
+  { code: "CO", name: "Colombia",      flag: "🇨🇴", landmark: "🌸",  primary: "#FCD116", secondary: "#003893", fact: "Colombia is the only South American country with two coastlines." },
+  { code: "PE", name: "Peru",          flag: "🇵🇪", landmark: "🏔️", primary: "#D91023", secondary: "#FFFFFF", fact: "Machu Picchu was built without mortar or iron tools." },
+  { code: "VE", name: "Venezuela",     flag: "🇻🇪", landmark: "🌊",  primary: "#CF142B", secondary: "#007A5E", fact: "Venezuela has the world's highest waterfall, Angel Falls, at 979 m." },
+  { code: "CU", name: "Cuba",          flag: "🇨🇺", landmark: "🎶",  primary: "#002A8F", secondary: "#CF142B", fact: "Cuba has the highest literacy rate in Latin America at 99.8%." },
+  { code: "JM", name: "Jamaica",       flag: "🇯🇲", landmark: "🎵",  primary: "#000000", secondary: "#009B3A", fact: "Jamaica is the birthplace of reggae music and Bob Marley." },
+  { code: "CR", name: "Costa Rica",    flag: "🇨🇷", landmark: "🦋",  primary: "#002B7F", secondary: "#CE1126", fact: "Costa Rica runs on 100% renewable energy." },
+  { code: "PA", name: "Panama",        flag: "🇵🇦", landmark: "⛵",  primary: "#FFFFFF", secondary: "#D21034", fact: "Panama Canal reduced ocean routes by up to 20,000 km." },
+  { code: "AU", name: "Australia",     flag: "🇦🇺", landmark: "🦘",  primary: "#00008B", secondary: "#FFBF00", fact: "Australia is the only country that is also a continent." },
+  { code: "NZ", name: "New Zealand",   flag: "🇳🇿", landmark: "🌋",  primary: "#00247D", secondary: "#CC142B", fact: "New Zealand was the first country to give women the right to vote." },
+  { code: "FJ", name: "Fiji",          flag: "🇫🇯", landmark: "🏝️", primary: "#003F87", secondary: "#FFFFFF", fact: "Fiji's 333 islands are spread across 1.3 million sq km of ocean." },
   { code: "PG", name: "Papua New Guinea", flag: "🇵🇬", landmark: "🦅", primary: "#000000", secondary: "#CE1126", fact: "Papua New Guinea has over 800 distinct languages." },
-  { code: "WS", name: "Samoa", flag: "🇼🇸", landmark: "🌺", primary: "#CE1126", secondary: "#002B7F", fact: "Samoa is the first country in the world to see each new day." },
-  { code: "TO", name: "Tonga", flag: "🇹🇴", landmark: "🐳", primary: "#C10000", secondary: "#FFFFFF", fact: "Tonga is the last Polynesian monarchy in the world." },
-  { code: "PW", name: "Palau", flag: "🇵🇼", landmark: "🐠", primary: "#4AADD6", secondary: "#FFE900", fact: "Palau established the world's first shark sanctuary in 2009." },
-  { code: "MV", name: "Maldives", flag: "🇲🇻", landmark: "🏖️", primary: "#D21034", secondary: "#007E3A", fact: "The Maldives is the world's lowest-lying country at just 1.5 m." },
-  { code: "SC", name: "Seychelles", flag: "🇸🇨", landmark: "🏝️", primary: "#003F87", secondary: "#FCD856", fact: "Seychelles has more giant tortoises per sq km than anywhere else." },
-  { code: "MU", name: "Mauritius", flag: "🇲🇺", landmark: "🌺", primary: "#EA2839", secondary: "#1A206D", fact: "Mauritius is home to the famous dodo bird, now extinct since 1680." },
-  { code: "LU", name: "Luxembourg", flag: "🇱🇺", landmark: "🏰", primary: "#EF3340", secondary: "#00A1DE", fact: "Luxembourg has the highest GDP per capita in the world." },
-  { code: "MC", name: "Monaco", flag: "🇲🇨", landmark: "🎰", primary: "#CE1126", secondary: "#FFFFFF", fact: "Monaco is the world's second smallest and most densely populated country." },
-  { code: "SM", name: "San Marino", flag: "🇸🇲", landmark: "🏰", primary: "#5EB6E4", secondary: "#FFFFFF", fact: "San Marino is the world's oldest republic, founded in 301 AD." },
-  { code: "VA", name: "Vatican City", flag: "🇻🇦", landmark: "⛪", primary: "#FFE000", secondary: "#FFFFFF", fact: "Vatican City is the world's smallest internationally recognized country." },
-  { code: "BT2", name: "Brunei", flag: "🇧🇳", landmark: "🕌", primary: "#F7E017", secondary: "#000000", fact: "Brunei has one of the highest GDP per capita in Southeast Asia." },
-  { code: "RW", name: "Rwanda", flag: "🇷🇼", landmark: "🌄", primary: "#20603D", secondary: "#FAD201", fact: "Rwanda has the highest percentage of women in parliament globally." },
-  { code: "UG", name: "Uganda", flag: "🇺🇬", landmark: "🦅", primary: "#000000", secondary: "#FCDC04", fact: "Uganda is home to over half the world's remaining mountain gorillas." },
-  { code: "BO", name: "Bolivia", flag: "🇧🇴", landmark: "🏔️", primary: "#D52B1E", secondary: "#F4E400", fact: "Bolivia has the world's largest salt flat, Salar de Uyuni." },
-  { code: "PY", name: "Paraguay", flag: "🇵🇾", landmark: "💧", primary: "#D52B1E", secondary: "#0038A8", fact: "Paraguay's Itaipu Dam is the world's largest hydroelectric power plant." },
-  { code: "UY", name: "Uruguay", flag: "🇺🇾", landmark: "🌞", primary: "#FFFFFF", secondary: "#009FCA", fact: "Uruguay was the first country to fully legalise marijuana." },
-  { code: "EC", name: "Ecuador", flag: "🇪🇨", landmark: "🌎", primary: "#FFD100", secondary: "#003580", fact: "Ecuador is the only country named after a geographic feature — the Equator." },
-  { code: "NA", name: "Namibia", flag: "🇳🇦", landmark: "🏜️", primary: "#009543", secondary: "#003580", fact: "The Namib is the world's oldest desert at 55–80 million years old." },
-  { code: "BW", name: "Botswana", flag: "🇧🇼", landmark: "🦓", primary: "#75AADB", secondary: "#000000", fact: "Botswana transformed from the world's poorest to a middle-income country in 30 years." },
-  { code: "SN", name: "Senegal", flag: "🇸🇳", landmark: "🎺", primary: "#00853F", secondary: "#FDEF42", fact: "Senegal's Lake Retba is naturally pink due to algae and high salt." },
-  { code: "CI", name: "Côte d'Ivoire", flag: "🇨🇮", landmark: "🌺", primary: "#F77F00", secondary: "#009A44", fact: "Côte d'Ivoire is the world's largest producer of cocoa beans." },
-  { code: "CV", name: "Cape Verde", flag: "🇨🇻", landmark: "🏝️", primary: "#003893", secondary: "#CF2027", fact: "Cape Verde has one of Africa's most stable democracies." },
-  { code: "ML", name: "Mali", flag: "🇲🇱", landmark: "🕌", primary: "#14B53A", secondary: "#CE1126", fact: "Mali's Timbuktu was the most important Islamic learning centre in medieval times." },
-  { code: "SS", name: "South Sudan", flag: "🇸🇸", landmark: "🌿", primary: "#078930", secondary: "#003DA5", fact: "South Sudan became the world's newest country on July 9, 2011." },
+  { code: "MV", name: "Maldives",      flag: "🇲🇻", landmark: "🏖️", primary: "#D21034", secondary: "#007E3A", fact: "The Maldives is the world's lowest-lying country at just 1.5 m above sea level." },
+  { code: "LU", name: "Luxembourg",    flag: "🇱🇺", landmark: "🏰",  primary: "#EF3340", secondary: "#00A1DE", fact: "Luxembourg has the highest GDP per capita in the world." },
+  { code: "MC", name: "Monaco",        flag: "🇲🇨", landmark: "🎰",  primary: "#CE1126", secondary: "#FFFFFF", fact: "Monaco is the world's second smallest and most densely populated country." },
+  { code: "VA", name: "Vatican City",  flag: "🇻🇦", landmark: "⛪",  primary: "#FFE000", secondary: "#FFFFFF", fact: "Vatican City is the world's smallest internationally recognized country." },
+  { code: "BO", name: "Bolivia",       flag: "🇧🇴", landmark: "🏔️", primary: "#D52B1E", secondary: "#F4E400", fact: "Bolivia has the world's largest salt flat, Salar de Uyuni." },
+  { code: "EC", name: "Ecuador",       flag: "🇪🇨", landmark: "🌎",  primary: "#FFD100", secondary: "#003580", fact: "Ecuador is the only country named after a geographic feature — the Equator." },
+  { code: "NA", name: "Namibia",       flag: "🇳🇦", landmark: "🏜️", primary: "#009543", secondary: "#003580", fact: "The Namib is the world's oldest desert at 55–80 million years old." },
+  { code: "BW", name: "Botswana",      flag: "🇧🇼", landmark: "🦓",  primary: "#75AADB", secondary: "#000000", fact: "Botswana transformed from the world's poorest to middle-income in just 30 years." },
+  { code: "SN", name: "Senegal",       flag: "🇸🇳", landmark: "🎺",  primary: "#00853F", secondary: "#FDEF42", fact: "Senegal's Lake Retba is naturally pink due to algae and its high salt content." },
+  { code: "ML", name: "Mali",          flag: "🇲🇱", landmark: "🕌",  primary: "#14B53A", secondary: "#CE1126", fact: "Mali's Timbuktu was the world's most important Islamic learning centre in medieval times." },
+  { code: "TR", name: "Turkey",        flag: "🇹🇷", landmark: "🕌",  primary: "#E30A17", secondary: "#FFFFFF", fact: "Turkey has the world's oldest known temple, Göbekli Tepe, at 12,000 years old." },
+  { code: "PK", name: "Pakistan",      flag: "🇵🇰", landmark: "🏔️", primary: "#01411C", secondary: "#FFFFFF", fact: "Pakistan is home to K2, the world's second highest mountain." },
+  { code: "BD", name: "Bangladesh",    flag: "🇧🇩", landmark: "🌿",  primary: "#006A4E", secondary: "#F42A41", fact: "Bangladesh has the world's largest river delta — the Ganges-Brahmaputra." },
+  { code: "MM", name: "Myanmar",       flag: "🇲🇲", landmark: "🛕",  primary: "#FECB00", secondary: "#34B233", fact: "Myanmar has over 2,000 ancient temples in the Bagan plain." },
+  { code: "KH", name: "Cambodia",      flag: "🇰🇭", landmark: "🏯",  primary: "#032EA1", secondary: "#E00025", fact: "Angkor Wat is the world's largest religious monument." },
+  { code: "UY", name: "Uruguay",       flag: "🇺🇾", landmark: "🌞",  primary: "#FFFFFF", secondary: "#009FCA", fact: "Uruguay was the first country to fully legalise marijuana." },
+  { code: "PY", name: "Paraguay",      flag: "🇵🇾", landmark: "💧",  primary: "#D52B1E", secondary: "#0038A8", fact: "Paraguay's Itaipu Dam is the world's largest hydroelectric power plant." },
+  { code: "SC", name: "Seychelles",    flag: "🇸🇨", landmark: "🏝️", primary: "#003F87", secondary: "#FCD856", fact: "Seychelles has more giant tortoises per sq km than anywhere else on Earth." },
+  { code: "MU", name: "Mauritius",     flag: "🇲🇺", landmark: "🌺",  primary: "#EA2839", secondary: "#1A206D", fact: "Mauritius is home to the famous dodo bird, now extinct since 1680." },
+  { code: "CV", name: "Cape Verde",    flag: "🇨🇻", landmark: "🏝️", primary: "#003893", secondary: "#CF2027", fact: "Cape Verde has one of Africa's most stable democracies." },
+  { code: "TO", name: "Tonga",         flag: "🇹🇴", landmark: "🐳",  primary: "#C10000", secondary: "#FFFFFF", fact: "Tonga is the last Polynesian monarchy in the world." },
+  { code: "PW", name: "Palau",         flag: "🇵🇼", landmark: "🐠",  primary: "#4AADD6", secondary: "#FFE900", fact: "Palau established the world's first shark sanctuary in 2009." },
+  { code: "WS", name: "Samoa",         flag: "🇼🇸", landmark: "🌺",  primary: "#CE1126", secondary: "#002B7F", fact: "Samoa is the first country in the world to see each new day." },
+  { code: "CI", name: "Côte d'Ivoire", flag: "🇨🇮", landmark: "🌺",  primary: "#F77F00", secondary: "#009A44", fact: "Côte d'Ivoire is the world's largest producer of cocoa beans." },
 ];
 
+// ── Shape & pattern system ──────────────────────────────────────────────────
+type Shape = "circle" | "hexagon" | "shield" | "diamond" | "starburst" | "rounded";
+type PatternType = "islamic" | "waves" | "diamonds" | "celtic" | "tribal" | "aztec" | "oriental" | "nordic";
+
+function codeHash(code: string): number {
+  return code.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+}
+
+const SHAPE_LIST: Shape[] = ["circle", "hexagon", "shield", "rounded", "starburst", "diamond"];
+const PATTERN_LIST: PatternType[] = ["islamic", "waves", "diamonds", "celtic", "tribal", "aztec", "oriental", "nordic"];
+
+function getShape(code: string): Shape   { return SHAPE_LIST[codeHash(code) % SHAPE_LIST.length]; }
+function getPattern(code: string): PatternType { return PATTERN_LIST[codeHash(code) % PATTERN_LIST.length]; }
+
+const f = (n: number) => n.toFixed(2);
+
+// ── Shape path helpers ──────────────────────────────────────────────────────
+function hexagonPoints(cx: number, cy: number, r: number): string {
+  return Array.from({ length: 6 }, (_, i) => {
+    const a = (i * 60 - 90) * Math.PI / 180;
+    return `${f(cx + r * Math.cos(a))},${f(cy + r * Math.sin(a))}`;
+  }).join(" ");
+}
+
+function shieldPath(cx: number, cy: number, r: number): string {
+  return [
+    `M ${f(cx - r * 0.62)},${f(cy - r * 0.88)}`,
+    `Q ${f(cx - r)},${f(cy - r * 0.88)} ${f(cx - r)},${f(cy - r * 0.1)}`,
+    `Q ${f(cx - r)},${f(cy + r * 0.5)} ${f(cx)},${f(cy + r)}`,
+    `Q ${f(cx + r)},${f(cy + r * 0.5)} ${f(cx + r)},${f(cy - r * 0.1)}`,
+    `Q ${f(cx + r)},${f(cy - r * 0.88)} ${f(cx + r * 0.62)},${f(cy - r * 0.88)}`,
+    `Q ${f(cx)},${f(cy - r * 1.1)} ${f(cx - r * 0.62)},${f(cy - r * 0.88)} Z`,
+  ].join(" ");
+}
+
+function starburstPoints(cx: number, cy: number, r: number): string {
+  return Array.from({ length: 16 }, (_, i) => {
+    const a = (i * Math.PI / 8) - Math.PI / 2;
+    const pr = i % 2 === 0 ? r : r * 0.62;
+    return `${f(cx + pr * Math.cos(a))},${f(cy + pr * Math.sin(a))}`;
+  }).join(" ");
+}
+
+function diamondPath(cx: number, cy: number, r: number): string {
+  const rx = r * 0.88, ry = r * 1.02;
+  return `M ${f(cx)},${f(cy - ry)} L ${f(cx + rx)},${f(cy)} L ${f(cx)},${f(cy + ry)} L ${f(cx - rx)},${f(cy)} Z`;
+}
+
+// ── Shape element renderer ──────────────────────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SVGAttr = Record<string, any>;
+
+function ShapeEl({ shape, cx, cy, r, ...attr }: { shape: Shape; cx: number; cy: number; r: number } & SVGAttr) {
+  if (shape === "hexagon")   return <polygon points={hexagonPoints(cx, cy, r)} {...attr} />;
+  if (shape === "shield")    return <path d={shieldPath(cx, cy, r)} {...attr} />;
+  if (shape === "starburst") return <polygon points={starburstPoints(cx, cy, r)} {...attr} />;
+  if (shape === "diamond")   return <path d={diamondPath(cx, cy, r)} {...attr} />;
+  if (shape === "rounded") {
+    const w = r * 1.85, h = r * 2.0, rx = r * 0.22;
+    return <rect x={cx - w / 2} y={cy - h / 2} width={w} height={h} rx={rx} ry={rx} {...attr} />;
+  }
+  return <circle cx={cx} cy={cy} r={r} {...attr} />;
+}
+
+// Inset version (for dashed ring) — slightly smaller
+function ShapeElInner({ shape, cx, cy, r, inset, ...attr }: { shape: Shape; cx: number; cy: number; r: number; inset: number } & SVGAttr) {
+  return <ShapeEl shape={shape} cx={cx} cy={cy} r={r - inset} {...attr} />;
+}
+
+// ── Cultural patterns defs ──────────────────────────────────────────────────
+function PatternDefs({ uid, size }: { uid: string; size: number }) {
+  const s = size / 7; // tile size
+  return (
+    <defs>
+      {/* Islamic geometric star */}
+      <pattern id={`pat-islamic-${uid}`} x="0" y="0" width={s} height={s} patternUnits="userSpaceOnUse">
+        <polygon points={`${s/2},0 ${s*0.62},${s*0.35} ${s},${s*0.35} ${s*0.69},${s*0.57} ${s*0.81},${s} ${s/2},${s*0.72} ${s*0.19},${s} ${s*0.31},${s*0.57} 0,${s*0.35} ${s*0.38},${s*0.35}`}
+          fill="white" fillOpacity="0.07" />
+      </pattern>
+      {/* Waves */}
+      <pattern id={`pat-waves-${uid}`} x="0" y="0" width={s} height={s/2} patternUnits="userSpaceOnUse">
+        <path d={`M0,${s*0.25} Q${s*0.25},0 ${s*0.5},${s*0.25} Q${s*0.75},${s*0.5} ${s},${s*0.25}`}
+          fill="none" stroke="white" strokeWidth="0.7" strokeOpacity="0.13" />
+      </pattern>
+      {/* Diamonds lattice */}
+      <pattern id={`pat-diamonds-${uid}`} x="0" y="0" width={s} height={s} patternUnits="userSpaceOnUse">
+        <polygon points={`${s/2},0 ${s},${s/2} ${s/2},${s} 0,${s/2}`}
+          fill="none" stroke="white" strokeWidth="0.65" strokeOpacity="0.1" />
+        <circle cx={s/2} cy={s/2} r={s*0.1} fill="white" fillOpacity="0.06" />
+      </pattern>
+      {/* Celtic knot circles */}
+      <pattern id={`pat-celtic-${uid}`} x="0" y="0" width={s} height={s} patternUnits="userSpaceOnUse">
+        <circle cx={s*0.25} cy={s*0.25} r={s*0.2} fill="none" stroke="white" strokeWidth="0.6" strokeOpacity="0.1" />
+        <circle cx={s*0.75} cy={s*0.75} r={s*0.2} fill="none" stroke="white" strokeWidth="0.6" strokeOpacity="0.1" />
+        <line x1={s*0.25} y1={s*0.25} x2={s*0.75} y2={s*0.75} stroke="white" strokeWidth="0.4" strokeOpacity="0.07" />
+      </pattern>
+      {/* Tribal chevrons */}
+      <pattern id={`pat-tribal-${uid}`} x="0" y="0" width={s} height={s*0.5} patternUnits="userSpaceOnUse">
+        <polyline points={`0,${s*0.25} ${s*0.25},0 ${s*0.5},${s*0.25} ${s*0.75},0 ${s},${s*0.25}`}
+          fill="none" stroke="white" strokeWidth="0.7" strokeOpacity="0.1" />
+      </pattern>
+      {/* Aztec steps */}
+      <pattern id={`pat-aztec-${uid}`} x="0" y="0" width={s} height={s} patternUnits="userSpaceOnUse">
+        <rect x={s*0.1} y={s*0.1} width={s*0.3} height={s*0.3} fill="white" fillOpacity="0.07" />
+        <rect x={s*0.6} y={s*0.6} width={s*0.3} height={s*0.3} fill="white" fillOpacity="0.07" />
+        <rect x={s*0.2} y={s*0.2} width={s*0.15} height={s*0.15} fill="white" fillOpacity="0.04" />
+        <rect x={s*0.7} y={s*0.7} width={s*0.15} height={s*0.15} fill="white" fillOpacity="0.04" />
+      </pattern>
+      {/* Oriental clouds */}
+      <pattern id={`pat-oriental-${uid}`} x="0" y="0" width={s*1.5} height={s} patternUnits="userSpaceOnUse">
+        <path d={`M0,${s*0.6} Q${s*0.2},${s*0.2} ${s*0.5},${s*0.5} Q${s*0.8},${s*0.8} ${s},${s*0.5} Q${s*1.2},${s*0.2} ${s*1.5},${s*0.6}`}
+          fill="none" stroke="white" strokeWidth="0.7" strokeOpacity="0.1" />
+      </pattern>
+      {/* Nordic runes */}
+      <pattern id={`pat-nordic-${uid}`} x="0" y="0" width={s} height={s} patternUnits="userSpaceOnUse">
+        <line x1={s*0.5} y1="0" x2={s*0.5} y2={s} stroke="white" strokeWidth="0.5" strokeOpacity="0.08" />
+        <line x1="0" y1={s*0.5} x2={s} y2={s*0.5} stroke="white" strokeWidth="0.5" strokeOpacity="0.08" />
+        <line x1="0" y1="0" x2={s} y2={s} stroke="white" strokeWidth="0.35" strokeOpacity="0.05" />
+        <line x1={s} y1="0" x2="0" y2={s} stroke="white" strokeWidth="0.35" strokeOpacity="0.05" />
+      </pattern>
+    </defs>
+  );
+}
+
 // ── Sticker Badge SVG ───────────────────────────────────────────────────────
-interface Sticker {
+interface StickerData {
   id: string;
   code: string;
   name: string;
@@ -120,98 +245,198 @@ interface Sticker {
   earnedAt: number;
 }
 
-function StickerBadge({ sticker, size = 140, shine = false, style }: {
-  sticker: Sticker | typeof COUNTRIES[0];
+function StickerBadge({
+  sticker, size = 140, shine = false, style, svgId,
+}: {
+  sticker: StickerData | typeof COUNTRIES[0];
   size?: number;
   shine?: boolean;
   style?: React.CSSProperties;
+  svgId?: string;
 }) {
-  const d = size;
-  const cx = d / 2;
-  const r = d * 0.455;
-  const hex = sticker.primary.replace("#", "");
-  const rgbR = parseInt(hex.substring(0, 2) || "64", 16);
-  const rgbG = parseInt(hex.substring(2, 4) || "85", 16);
-  const rgbB = parseInt(hex.substring(4, 6) || "255", 16);
-  const uid = sticker.code + size;
+  const shape   = getShape(sticker.code);
+  const pattern = getPattern(sticker.code);
+  const d = size, cx = d / 2, cy = d / 2;
+
+  // For non-circle shapes the "r" is the circumradius; content fits inside inscribed circle
+  const r = shape === "rounded"   ? d * 0.43
+          : shape === "shield"    ? d * 0.43
+          : shape === "diamond"   ? d * 0.43
+          : shape === "starburst" ? d * 0.44
+          : d * 0.46;
+
+  // Inscribed circle for content (starburst inner star, others same as r)
+  const contentR = shape === "starburst" ? r * 0.62 : r;
+  const uid = sticker.code + (svgId || size);
+
+  // Flag emoji size
+  const flagSize = size * 0.22;
+  // Name font size (shrinks for long names)
+  const nameFontSize = Math.min(size * 0.075, size * 0.075 * (9 / Math.max(sticker.name.length, 9)));
+
+  // Vertical content positions (relative to cy) — adjusted for shape
+  const shieldOffset = shape === "shield" ? -d * 0.03 : 0;
+  const yFlag     = cy + shieldOffset - contentR * 0.18;
+  const yDiv      = cy + shieldOffset + contentR * 0.11;
+  const yName     = cy + shieldOffset + contentR * 0.28;
+  const yLandmark = cy + shieldOffset + contentR * 0.55;
+  const yBrand    = cy + shieldOffset + contentR * 0.82;
 
   return (
-    <svg viewBox={`0 0 ${d} ${d}`} width={d} height={d} xmlns="http://www.w3.org/2000/svg" style={style}>
+    <svg id={svgId} viewBox={`0 0 ${d} ${d}`} width={d} height={d}
+      xmlns="http://www.w3.org/2000/svg" style={style}>
       <defs>
-        <radialGradient id={`bg-${uid}`} cx="50%" cy="38%" r="70%">
-          <stop offset="0%" stopColor={sticker.secondary} stopOpacity="0.9" />
+        <radialGradient id={`bg-${uid}`} cx="50%" cy="36%" r="72%">
+          <stop offset="0%" stopColor={sticker.secondary} stopOpacity="0.85" />
+          <stop offset="55%" stopColor={sticker.primary} stopOpacity="1" />
           <stop offset="100%" stopColor={sticker.primary} stopOpacity="1" />
         </radialGradient>
-        <radialGradient id={`shine-${uid}`} cx="38%" cy="28%" r="55%">
-          <stop offset="0%" stopColor="white" stopOpacity="0.4" />
+        <radialGradient id={`shine-${uid}`} cx="36%" cy="26%" r="58%">
+          <stop offset="0%" stopColor="white" stopOpacity="0.42" />
           <stop offset="100%" stopColor="white" stopOpacity="0" />
         </radialGradient>
-        <filter id={`shadow-${uid}`} x="-25%" y="-25%" width="150%" height="150%">
-          <feDropShadow dx="0" dy={d * 0.03} stdDeviation={d * 0.04}
-            floodColor={`rgb(${rgbR},${rgbG},${rgbB})`} floodOpacity="0.6" />
+        <filter id={`shadow-${uid}`} x="-30%" y="-30%" width="160%" height="160%">
+          <feDropShadow dx="0" dy={d * 0.03} stdDeviation={d * 0.045}
+            floodColor={sticker.primary} floodOpacity="0.55" />
         </filter>
-        <clipPath id={`clip-${uid}`}><circle cx={cx} cy={cx} r={r} /></clipPath>
+        <clipPath id={`clip-${uid}`}>
+          <ShapeEl shape={shape} cx={cx} cy={cy} r={r} />
+        </clipPath>
       </defs>
-      {/* Glow ring */}
-      <circle cx={cx} cy={cx} r={r + d * 0.025} fill="none" stroke={sticker.primary} strokeWidth={d * 0.01} strokeOpacity="0.35" />
+
+      <PatternDefs uid={uid} size={size} />
+
+      {/* Outer glow ring */}
+      <ShapeEl shape={shape} cx={cx} cy={cy} r={r + d * 0.028}
+        fill="none" stroke={sticker.primary} strokeWidth={d * 0.009} strokeOpacity="0.3" />
+
       {/* Main fill */}
-      <circle cx={cx} cy={cx} r={r} fill={`url(#bg-${uid})`} filter={`url(#shadow-${uid})`} />
-      {/* Stamp dashes */}
-      <circle cx={cx} cy={cx} r={r - d * 0.028} fill="none" stroke="white" strokeWidth={d * 0.013} strokeOpacity="0.65" strokeDasharray={`${d * 0.032} ${d * 0.024}`} />
-      {/* Inner ring */}
-      <circle cx={cx} cy={cx} r={r * 0.78} fill="none" stroke="white" strokeWidth={d * 0.005} strokeOpacity="0.25" />
-      {/* Stars */}
-      {[0, 72, 144, 216, 288].map(a => {
-        const rad = (a * Math.PI) / 180;
-        const sr = r - d * 0.063;
-        return <text key={a} x={cx + sr * Math.cos(rad - Math.PI / 2)} y={cx + sr * Math.sin(rad - Math.PI / 2)}
-          textAnchor="middle" dominantBaseline="central" fontSize={d * 0.038} fill="white" fillOpacity="0.4">✦</text>;
+      <ShapeEl shape={shape} cx={cx} cy={cy} r={r}
+        fill={`url(#bg-${uid})`} filter={`url(#shadow-${uid})`} />
+
+      {/* Cultural pattern overlay (clipped to shape) */}
+      <ShapeEl shape={shape} cx={cx} cy={cy} r={r}
+        fill={`url(#pat-${pattern}-${uid})`} clipPath={`url(#clip-${uid})`} />
+
+      {/* Dashed border ring (inset) */}
+      <ShapeElInner shape={shape} cx={cx} cy={cy} r={r} inset={d * 0.028}
+        fill="none" stroke="white" strokeWidth={d * 0.012} strokeOpacity="0.6"
+        strokeDasharray={`${d * 0.032} ${d * 0.022}`} />
+
+      {/* Inner content ring (subtle) */}
+      <circle cx={cx} cy={cy} r={contentR * 0.92}
+        fill="none" stroke="white" strokeWidth={d * 0.004} strokeOpacity="0.12" />
+
+      {/* 5 decorative stars at corners */}
+      {[0, 72, 144, 216, 288].map(angle => {
+        const rad = (angle * Math.PI) / 180;
+        const sr  = r - d * 0.07;
+        return (
+          <text key={angle}
+            x={cx + sr * Math.cos(rad - Math.PI / 2)}
+            y={cy + sr * Math.sin(rad - Math.PI / 2)}
+            textAnchor="middle" dominantBaseline="central"
+            fontSize={d * 0.036} fill="white" fillOpacity="0.35">✦</text>
+        );
       })}
+
       {/* Flag emoji */}
-      <text x={cx} y={cx - d * 0.1} textAnchor="middle" dominantBaseline="central" fontSize={d * 0.22}>{sticker.flag}</text>
-      {/* Divider */}
-      <line x1={cx - d * 0.13} y1={cx + d * 0.05} x2={cx + d * 0.13} y2={cx + d * 0.05} stroke="white" strokeWidth={d * 0.005} strokeOpacity="0.45" />
-      {/* Name */}
-      <text x={cx} y={cx + d * 0.135} textAnchor="middle" dominantBaseline="central"
-        fontSize={Math.min(d * 0.075, d * 0.075 * (10 / Math.max(sticker.name.length, 10)))} fontWeight="800"
-        fill="white" fontFamily="system-ui,sans-serif">
+      <text x={cx} y={yFlag} textAnchor="middle" dominantBaseline="central"
+        fontSize={flagSize}>{sticker.flag}</text>
+
+      {/* Divider line */}
+      <line x1={cx - d * 0.12} y1={yDiv} x2={cx + d * 0.12} y2={yDiv}
+        stroke="white" strokeWidth={d * 0.005} strokeOpacity="0.4" />
+
+      {/* Country name */}
+      <text x={cx} y={yName} textAnchor="middle" dominantBaseline="central"
+        fontSize={nameFontSize} fontWeight="800" fill="white"
+        fontFamily="system-ui,sans-serif" letterSpacing="0.02em">
         {sticker.name.toUpperCase()}
       </text>
-      {/* Landmark */}
-      <text x={cx} y={cx + d * 0.265} textAnchor="middle" dominantBaseline="central" fontSize={d * 0.14}>{sticker.landmark}</text>
-      {/* Brand */}
-      <text x={cx} y={cx + d * 0.395} textAnchor="middle" dominantBaseline="central"
-        fontSize={d * 0.052} fill="white" fillOpacity="0.5" fontFamily="system-ui,sans-serif" letterSpacing={d * 0.004}>
+
+      {/* Landmark emoji */}
+      <text x={cx} y={yLandmark} textAnchor="middle" dominantBaseline="central"
+        fontSize={size * 0.13}>{sticker.landmark}</text>
+
+      {/* Brand text */}
+      <text x={cx} y={yBrand} textAnchor="middle" dominantBaseline="central"
+        fontSize={d * 0.048} fill="white" fillOpacity="0.45"
+        fontFamily="system-ui,sans-serif" letterSpacing={`${d * 0.004}px`}>
         VISA SHUTTLE
       </text>
-      {/* Shine */}
-      {shine && <circle cx={cx} cy={cx} r={r} fill={`url(#shine-${uid})`} clipPath={`url(#clip-${uid})`} />}
+
+      {/* Shine overlay */}
+      {shine && (
+        <ShapeEl shape={shape} cx={cx} cy={cy} r={r}
+          fill={`url(#shine-${uid})`} clipPath={`url(#clip-${uid})`} />
+      )}
     </svg>
   );
 }
 
-// ── Particle burst ──────────────────────────────────────────────────────────
+// ── Download helpers ────────────────────────────────────────────────────────
+async function downloadStickerPNG(sticker: StickerData, svgId: string) {
+  const el = document.getElementById(svgId) as SVGElement | null;
+  if (!el) return;
+  const SIZE = 600;
+  const serializer = new XMLSerializer();
+  const svgStr = serializer.serializeToString(el);
+  // Inject white-space for background
+  const withBg = svgStr.replace("<svg ", `<svg style="background:${sticker.primary}22" `);
+  const blob = new Blob([withBg], { type: "image/svg+xml;charset=utf-8" });
+  const url  = URL.createObjectURL(blob);
+
+  return new Promise<void>(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = SIZE; canvas.height = SIZE;
+      const ctx = canvas.getContext("2d")!;
+      // Dark background
+      ctx.fillStyle = "#03071e";
+      ctx.fillRect(0, 0, SIZE, SIZE);
+      ctx.drawImage(img, 0, 0, SIZE, SIZE);
+      canvas.toBlob(b => {
+        if (!b) { resolve(); return; }
+        const pngUrl = URL.createObjectURL(b);
+        const a = document.createElement("a");
+        a.href = pngUrl;
+        a.download = `${sticker.name.replace(/\s+/g, "-").toLowerCase()}-sticker.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(pngUrl);
+        resolve();
+      }, "image/png");
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  });
+}
+
+// ── Confetti burst ──────────────────────────────────────────────────────────
 function Confetti({ active }: { active: boolean }) {
-  const COLORS = ["#4055FF", "#FF2060", "#FFBF00", "#00E5A0", "#FF6B35", "#A855F7", "#06B6D4", "#F43F5E"];
+  const COLORS = ["#4055FF","#FF2060","#FFBF00","#00E5A0","#FF6B35","#A855F7","#06B6D4","#F43F5E"];
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
       {[...Array(40)].map((_, i) => {
-        const angle = (i / 40) * 360 + Math.random() * 9;
-        const dist = 120 + Math.random() * 140;
-        const size = 5 + Math.random() * 10;
-        const delay = Math.random() * 0.15;
+        const angle = (i / 40) * 360;
+        const dist  = 110 + (i % 5) * 30;
+        const size  = 5 + (i % 4) * 3;
+        const delay = (i % 8) * 0.02;
         return (
           <div key={i} className="absolute rounded-sm"
             style={{
-              width: size, height: size * (Math.random() > 0.5 ? 1 : 0.4),
+              width: size, height: size * (i % 2 === 0 ? 1 : 0.4),
               background: COLORS[i % COLORS.length],
               left: "50%", top: "50%",
-              transform: `translate(-50%,-50%) rotate(${Math.random() * 360}deg)`,
-              opacity: active ? 0 : 0,
-              transition: active ? `all 0.9s cubic-bezier(0.1,0.8,0.3,1) ${delay}s` : "none",
+              transform: `translate(-50%,-50%) rotate(${i * 9}deg)`,
+              opacity: 0,
               ...(active && {
                 opacity: 0,
-                transform: `translate(calc(-50% + ${Math.cos(angle * Math.PI / 180) * dist}px), calc(-50% + ${Math.sin(angle * Math.PI / 180) * dist}px)) rotate(${Math.random() * 720}deg)`,
+                transform: `translate(calc(-50% + ${Math.cos(angle * Math.PI / 180) * dist}px), calc(-50% + ${Math.sin(angle * Math.PI / 180) * dist}px)) rotate(${i * 50}deg)`,
+                transition: `all 0.95s cubic-bezier(0.1,0.8,0.25,1) ${delay}s`,
               }),
             }}
           />
@@ -221,37 +446,166 @@ function Confetti({ active }: { active: boolean }) {
   );
 }
 
-// ── Reveal overlay ──────────────────────────────────────────────────────────
-function RevealOverlay({ sticker, onClose }: { sticker: Sticker; onClose: () => void }) {
-  const [phase, setPhase] = useState<0 | 1 | 2>(0);
+// ── Shape label for the badge ───────────────────────────────────────────────
+const SHAPE_LABELS: Record<Shape, string> = {
+  circle:    "🔵 Passport Stamp",
+  hexagon:   "⬡ Hex Badge",
+  shield:    "🛡️ Heritage Crest",
+  rounded:   "🪪 Travel Card",
+  starburst: "⭐ Star Collector",
+  diamond:   "💎 Diamond Gem",
+};
+
+// ── Sticker Detail Modal ────────────────────────────────────────────────────
+function StickerDetailModal({
+  sticker, onClose,
+}: { sticker: StickerData; onClose: () => void }) {
+  const [mounted, setMounted] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const { toast } = useToast();
+  const DETAIL_SVG_ID = `sticker-detail-${sticker.id}`;
+  const shareUrl  = encodeURIComponent(`${window.location.origin}/travel-sticker`);
+  const shareText = encodeURIComponent(`I just collected ${sticker.flag} ${sticker.name} on Visa Shuttle Travel Stickers! 🌍✈️`);
+
+  useEffect(() => { const t = setTimeout(() => setMounted(true), 40); return () => clearTimeout(t); }, []);
+
+  async function handleDownload() {
+    setDownloading(true);
+    try {
+      await downloadStickerPNG(sticker, DETAIL_SVG_ID);
+      toast({ title: "Sticker downloaded!", description: `${sticker.name} saved as PNG.` });
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  async function handleInstagram() {
+    // Try Web Share API (works on mobile)
+    const el = document.getElementById(DETAIL_SVG_ID) as SVGElement | null;
+    if (el && navigator.share) {
+      try {
+        const serializer = new XMLSerializer();
+        const svgStr = serializer.serializeToString(el);
+        const blob = new Blob([svgStr], { type: "image/svg+xml" });
+        const file = new File([blob], `${sticker.name}-sticker.svg`, { type: "image/svg+xml" });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: `${sticker.name} Travel Sticker`, text: `${sticker.flag} ${sticker.name} — Visa Shuttle` });
+          return;
+        }
+      } catch { /* fallthrough */ }
+    }
+    // Desktop fallback: download + instruct
+    await downloadStickerPNG(sticker, DETAIL_SVG_ID);
+    toast({ title: "Image saved!", description: "Open Instagram and share from your photos gallery." });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(2,4,20,0.90)", backdropFilter: "blur(18px)" }}
+      onClick={onClose}>
+      <div className="relative flex flex-col items-center max-w-xs w-full rounded-3xl border border-white/10 p-6"
+        style={{
+          background: "linear-gradient(160deg,#0d0f2a,#0a0a1a)",
+          boxShadow: `0 0 80px ${sticker.primary}40, 0 32px 64px rgba(0,0,0,0.7)`,
+          transform: mounted ? "scale(1) translateY(0)" : "scale(0.8) translateY(40px)",
+          opacity: mounted ? 1 : 0,
+          transition: "all 0.45s cubic-bezier(0.34,1.4,0.64,1)",
+        }}
+        onClick={e => e.stopPropagation()}>
+
+        {/* Close */}
+        <button onClick={onClose}
+          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white/50 hover:text-white hover:bg-white/20 transition">
+          <X className="w-4 h-4" />
+        </button>
+
+        {/* Shape label */}
+        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full border border-white/10 text-white/40 mb-3">
+          {SHAPE_LABELS[getShape(sticker.code)]}
+        </span>
+
+        {/* Large sticker */}
+        <div style={{ filter: `drop-shadow(0 0 50px ${sticker.primary}80)` }}>
+          <StickerBadge sticker={sticker} size={240} shine svgId={DETAIL_SVG_ID} />
+        </div>
+
+        {/* Info */}
+        <div className="mt-4 text-center mb-5">
+          <h2 className="text-xl font-black text-white mb-1">{sticker.flag} {sticker.name}</h2>
+          <p className="text-white/50 text-xs leading-relaxed">
+            <span className="text-white/70 font-semibold">Fun fact: </span>{sticker.fact}
+          </p>
+          <p className="text-white/25 text-[10px] mt-2">
+            Collected {new Date(sticker.earnedAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+          </p>
+        </div>
+
+        {/* Download */}
+        <button onClick={handleDownload} disabled={downloading}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-bold mb-3 transition hover:opacity-90 active:scale-95"
+          style={{ background: "linear-gradient(135deg,#4055FF,#9033F5)" }}>
+          <Download className="w-4 h-4" />
+          {downloading ? "Saving…" : "Download Sticker PNG"}
+        </button>
+
+        {/* Social share row */}
+        <p className="text-white/30 text-[10px] uppercase tracking-widest font-bold mb-2">Share</p>
+        <div className="flex gap-2.5 justify-center">
+          {/* WhatsApp */}
+          <a href={`https://wa.me/?text=${shareText}`} target="_blank" rel="noreferrer"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-white text-xs font-bold transition hover:opacity-90 active:scale-95"
+            style={{ background: "#25D366" }}>
+            <FaWhatsapp className="w-4 h-4" />WhatsApp
+          </a>
+          {/* Facebook */}
+          <a href={`https://www.facebook.com/sharer/sharer.php?u=${shareUrl}&quote=${shareText}`}
+            target="_blank" rel="noreferrer"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-white text-xs font-bold transition hover:opacity-90 active:scale-95"
+            style={{ background: "#1877F2" }}>
+            <FaFacebookF className="w-3.5 h-3.5" />Facebook
+          </a>
+          {/* Instagram */}
+          <button onClick={handleInstagram}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-white text-xs font-bold transition hover:opacity-90 active:scale-95"
+            style={{ background: "linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)" }}>
+            <FaInstagram className="w-4 h-4" />Instagram
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Reveal overlay (new sticker earned) ─────────────────────────────────────
+function RevealOverlay({ sticker, onClose }: { sticker: StickerData; onClose: () => void }) {
+  const [phase, setPhase] = useState<0 | 1 | 2>(0);
 
   useEffect(() => {
-    const t1 = setTimeout(() => setPhase(1), 100);
-    const t2 = setTimeout(() => setPhase(2), 1800);
+    const t1 = setTimeout(() => setPhase(1), 80);
+    const t2 = setTimeout(() => setPhase(2), 1600);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(2,4,20,0.92)", backdropFilter: "blur(16px)" }}>
+      style={{ background: "rgba(2,4,20,0.93)", backdropFilter: "blur(20px)" }}>
       <div className="relative text-center px-6 max-w-sm w-full flex flex-col items-center">
         <Confetti active={phase >= 1} />
 
-        {/* Sticker with pop-in */}
+        {/* Sticker pop-in */}
         <div style={{
-          transform: phase === 0 ? "scale(0) rotate(-20deg)" : phase === 1 ? "scale(1.12) rotate(3deg)" : "scale(1) rotate(0deg)",
-          transition: phase === 0 ? "none" : "transform 0.65s cubic-bezier(0.34,1.56,0.64,1)",
-          filter: `drop-shadow(0 0 40px ${sticker.primary}90)`,
-          marginBottom: 28,
+          transform: phase === 0 ? "scale(0) rotate(-18deg)" : phase === 1 ? "scale(1.1) rotate(4deg)" : "scale(1) rotate(0deg)",
+          transition: phase === 0 ? "none" : "transform 0.6s cubic-bezier(0.34,1.56,0.64,1)",
+          filter: `drop-shadow(0 0 48px ${sticker.primary}80)`,
+          marginBottom: 24,
         }}>
-          <StickerBadge sticker={sticker} size={220} shine />
+          <StickerBadge sticker={sticker} size={230} shine />
         </div>
 
-        {/* Text reveal */}
+        {/* Text fade-up */}
         <div style={{
           opacity: phase >= 2 ? 1 : 0,
-          transform: phase >= 2 ? "translateY(0)" : "translateY(20px)",
+          transform: phase >= 2 ? "translateY(0)" : "translateY(24px)",
           transition: "all 0.5s ease",
         }}>
           <div className="flex items-center justify-center gap-2 mb-2">
@@ -259,32 +613,21 @@ function RevealOverlay({ sticker, onClose }: { sticker: Sticker; onClose: () => 
             <h2 className="text-2xl font-black text-white">You got {sticker.name}!</h2>
             <span className="text-3xl">🎉</span>
           </div>
-          <p className="text-white/60 text-sm leading-relaxed mb-6 px-2">
-            <span className="text-white/85 font-semibold">Fun fact: </span>{sticker.fact}
+          <p className="text-white/55 text-sm leading-relaxed mb-1 px-2">
+            <span className="font-semibold text-white/80">Did you know? </span>{sticker.fact}
           </p>
-          <div className="flex gap-3 justify-center">
-            <button
-              onClick={() => {
-                const txt = `I just collected ${sticker.flag} ${sticker.name} on Visa Shuttle Travel Stickers! 🌍✈️`;
-                if (navigator.share) navigator.share({ text: txt });
-                else { navigator.clipboard.writeText(txt); toast({ title: "Copied to clipboard!" }); }
-              }}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-white/20 text-white text-sm font-semibold hover:bg-white/10 transition"
-            >
-              <Share2 className="w-4 h-4" />Share
-            </button>
-            <button
-              onClick={onClose}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-white text-sm font-bold transition"
-              style={{ background: "linear-gradient(135deg,#4055FF,#9033F5)" }}
-            >
-              <Trophy className="w-4 h-4" />View Collection
-            </button>
-          </div>
+          <p className="text-white/30 text-xs mb-5">
+            Shape: {SHAPE_LABELS[getShape(sticker.code)]}
+          </p>
+          <button onClick={onClose}
+            className="inline-flex items-center gap-2 px-7 py-3 rounded-xl text-white font-bold text-sm transition hover:opacity-90 active:scale-95"
+            style={{ background: "linear-gradient(135deg,#4055FF,#9033F5)" }}>
+            View My Collection →
+          </button>
         </div>
 
-        {/* Close */}
-        <button onClick={onClose} className="absolute top-0 right-0 w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/20 transition">
+        <button onClick={onClose}
+          className="absolute top-0 right-0 w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition">
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -292,38 +635,76 @@ function RevealOverlay({ sticker, onClose }: { sticker: Sticker; onClose: () => 
   );
 }
 
-// ── Floating sticker for hero ───────────────────────────────────────────────
-const HERO_COUNTRIES = ["JP", "FR", "BR", "AU", "IS", "IN", "TR", "NZ", "KR", "IT"];
-const HERO_STICKERS = COUNTRIES.filter(c => HERO_COUNTRIES.includes(c.code));
+// ── Spinning slot machine ───────────────────────────────────────────────────
+function SpinWheel({ onDone }: { onDone: () => void }) {
+  const [index, setIndex]   = useState(0);
+  const [speed, setSpeed]   = useState(55);
+  const cyclesRef = useRef(0);
+  const iRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-function FloatingStickerField() {
+  useEffect(() => {
+    iRef.current = setInterval(() => {
+      setIndex(i => (i + 1) % COUNTRIES.length);
+      cyclesRef.current++;
+      if (cyclesRef.current > 45) {
+        setSpeed(s => {
+          const next = s + 20;
+          if (next > 420) {
+            clearInterval(iRef.current!);
+            setTimeout(onDone, 250);
+          }
+          return next;
+        });
+      }
+    }, speed);
+    return () => clearInterval(iRef.current!);
+  }, [speed]);
+
+  const c = COUNTRIES[index];
+  const dummy: StickerData = { ...c, id: "spin", earnedAt: 0 };
+
+  return (
+    <div className="flex flex-col items-center gap-4">
+      <div style={{ filter: `drop-shadow(0 0 28px ${c.primary}90)`, animation: "globe-spin 0.4s ease-in-out infinite alternate" }}>
+        <StickerBadge sticker={dummy} size={180} shine />
+      </div>
+      <p className="text-white/40 text-xs tracking-widest uppercase font-bold">Spinning the globe…</p>
+    </div>
+  );
+}
+
+// ── Floating sticker hero field ─────────────────────────────────────────────
+const HERO_CODES = ["JP", "FR", "BR", "AU", "IS", "IN", "TR", "NZ", "KR", "IT"];
+const HERO_STICKERS = COUNTRIES.filter(c => HERO_CODES.includes(c.code));
+
+function FloatingHero() {
   const positions = [
-    { top: "5%",  right: "1%",  size: 105, rotate:  12, float: 0, opacity: 0.9 },
-    { top: "52%", right: "7%",  size:  90, rotate:  -8, float: 1, opacity: 0.8 },
-    { top: "8%",  right: "20%", size:  82, rotate:   5, float: 2, opacity: 0.75 },
-    { top: "63%", right: "27%", size:  72, rotate: -14, float: 0, opacity: 0.65 },
-    { top: "-4%", right: "38%", size:  65, rotate:  19, float: 1, opacity: 0.55 },
-    { top: "62%", right: "45%", size:  58, rotate:  -5, float: 2, opacity: 0.45 },
-    { top: "18%", right: "56%", size:  52, rotate:  10, float: 0, opacity: 0.35 },
-    { top: "40%", right: "63%", size:  45, rotate: -18, float: 1, opacity: 0.25 },
-    { top: "2%",  right: "70%", size:  40, rotate:   8, float: 2, opacity: 0.2 },
-    { top: "72%", right: "16%", size:  78, rotate: -10, float: 0, opacity: 0.6 },
+    { top: "4%",   right: "2%",   size: 110, rotate:  12, float: 0, opacity: 0.92 },
+    { top: "50%",  right: "6%",   size:  92, rotate:  -7, float: 1, opacity: 0.80 },
+    { top: "7%",   right: "20%",  size:  82, rotate:   5, float: 2, opacity: 0.72 },
+    { top: "65%",  right: "25%",  size:  72, rotate: -14, float: 0, opacity: 0.60 },
+    { top: "-3%",  right: "38%",  size:  64, rotate:  19, float: 1, opacity: 0.50 },
+    { top: "60%",  right: "44%",  size:  56, rotate:  -5, float: 2, opacity: 0.40 },
+    { top: "20%",  right: "54%",  size:  50, rotate:  10, float: 0, opacity: 0.32 },
+    { top: "42%",  right: "62%",  size:  44, rotate: -18, float: 1, opacity: 0.22 },
+    { top: "3%",   right: "70%",  size:  38, rotate:   8, float: 2, opacity: 0.15 },
+    { top: "74%",  right: "15%",  size:  80, rotate: -10, float: 0, opacity: 0.65 },
   ];
 
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
       {positions.map((p, i) => {
         const c = HERO_STICKERS[i % HERO_STICKERS.length];
+        const dummy: StickerData = { ...c, id: `h${i}`, earnedAt: 0 };
         return (
           <div key={i} style={{
-            position: "absolute",
-            top: p.top, right: p.right,
+            position: "absolute", top: p.top, right: p.right,
             transform: `rotate(${p.rotate}deg)`,
             opacity: p.opacity,
-            animation: `hero-float-${p.float} ${4.5 + i * 0.4}s ease-in-out ${i * 0.3}s infinite`,
-            filter: `drop-shadow(0 8px 20px ${c.primary}55)`,
+            animation: `hero-float-${p.float} ${4.5 + i * 0.35}s ease-in-out ${i * 0.28}s infinite`,
+            filter: `drop-shadow(0 8px 22px ${c.primary}55)`,
           }}>
-            <StickerBadge sticker={{ ...c, id: `h${i}`, earnedAt: 0 }} size={p.size} shine />
+            <StickerBadge sticker={dummy} size={p.size} shine />
           </div>
         );
       })}
@@ -331,60 +712,19 @@ function FloatingStickerField() {
   );
 }
 
-// ── Local storage helpers ───────────────────────────────────────────────────
-const LS_KEY = "vs_travel_stickers";
-function loadStickers(): Sticker[] {
+// ── Local storage ───────────────────────────────────────────────────────────
+const LS_KEY = "vs_travel_stickers_v2";
+function loadStickers(): StickerData[] {
   try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); } catch { return []; }
 }
-function saveStickers(s: Sticker[]) {
-  localStorage.setItem(LS_KEY, JSON.stringify(s));
-}
-
-// ── Spin animation numbers ─────────────────────────────────────────────────
-function SpinWheel({ onDone }: { onDone: (c: typeof COUNTRIES[0]) => void }) {
-  const [index, setIndex] = useState(0);
-  const [speed, setSpeed] = useState(50);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const cyclesRef = useRef(0);
-  const targetRef = useRef(Math.floor(Math.random() * COUNTRIES.length));
-
-  useEffect(() => {
-    const step = () => {
-      setIndex(i => (i + 1) % COUNTRIES.length);
-      cyclesRef.current++;
-
-      if (cyclesRef.current > 40) {
-        setSpeed(s => {
-          const next = s + 18;
-          if (next > 380) {
-            clearInterval(intervalRef.current!);
-            setTimeout(() => onDone(COUNTRIES[targetRef.current]), 200);
-          }
-          return next;
-        });
-      }
-    };
-    intervalRef.current = setInterval(step, speed);
-    return () => clearInterval(intervalRef.current!);
-  }, [speed]);
-
-  const c = COUNTRIES[index];
-  return (
-    <div className="flex flex-col items-center gap-3">
-      <div style={{ filter: `drop-shadow(0 0 24px ${c.primary}80)`, animation: "globe-pulse 0.3s ease-in-out infinite alternate" }}>
-        <StickerBadge sticker={{ ...c, id: "spin", earnedAt: 0 }} size={160} shine />
-      </div>
-      <p className="text-white/50 text-xs tracking-widest uppercase">Spinning the globe…</p>
-    </div>
-  );
-}
+function saveStickers(s: StickerData[]) { localStorage.setItem(LS_KEY, JSON.stringify(s)); }
 
 // ── Main page ───────────────────────────────────────────────────────────────
 export default function TravelStickerPage() {
-  const [stickers, setStickers] = useState<Sticker[]>(loadStickers);
-  const [reveal, setReveal] = useState<Sticker | null>(null);
-  const [spinning, setSpinning] = useState(false);
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [stickers,   setStickers]   = useState<StickerData[]>(loadStickers);
+  const [reveal,     setReveal]     = useState<StickerData | null>(null);
+  const [detail,     setDetail]     = useState<StickerData | null>(null);
+  const [spinning,   setSpinning]   = useState(false);
   const { toast } = useToast();
 
   const ownedCodes = stickers.map(s => s.code);
@@ -392,16 +732,16 @@ export default function TravelStickerPage() {
   function handleSpin() {
     const available = COUNTRIES.filter(c => !ownedCodes.includes(c.code));
     if (available.length === 0) {
-      toast({ title: "You've collected all countries! 🌍", description: "You're a true world traveller." });
+      toast({ title: "You've collected all countries! 🌍", description: "You're a true world explorer." });
       return;
     }
     setSpinning(true);
   }
 
-  function handleSpinDone(country: typeof COUNTRIES[0]) {
+  function handleSpinDone() {
     const available = COUNTRIES.filter(c => !ownedCodes.includes(c.code));
     const picked = available[Math.floor(Math.random() * available.length)];
-    const newSticker: Sticker = { ...picked, id: crypto.randomUUID(), earnedAt: Date.now() };
+    const newSticker: StickerData = { ...picked, id: crypto.randomUUID(), earnedAt: Date.now() };
     const updated = [newSticker, ...stickers];
     setStickers(updated);
     saveStickers(updated);
@@ -410,9 +750,10 @@ export default function TravelStickerPage() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: "linear-gradient(160deg,#03071e 0%,#08082e 35%,#0d1030 65%,#0a0a1a 100%)" }}>
+    <div className="min-h-screen" style={{ background: "linear-gradient(160deg,#03071e 0%,#08082e 38%,#0d1030 68%,#0a0a1a 100%)" }}>
 
-      {reveal && <RevealOverlay sticker={reveal} onClose={() => setReveal(null)} />}
+      {reveal  && <RevealOverlay sticker={reveal}  onClose={() => setReveal(null)} />}
+      {detail  && <StickerDetailModal sticker={detail} onClose={() => setDetail(null)} />}
 
       {/* Minimal header */}
       <header className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
@@ -425,36 +766,34 @@ export default function TravelStickerPage() {
           <Logo size="sm" />
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/10 bg-white/5">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.05]">
             <Trophy className="w-3.5 h-3.5 text-amber-400" />
-            <span className="text-xs font-bold text-white">{stickers.length}</span>
-            <span className="text-xs text-white/40">/{COUNTRIES.length}</span>
+            <span className="text-xs font-black text-white">{stickers.length}</span>
+            <span className="text-xs text-white/35">/ {COUNTRIES.length}</span>
           </div>
-          <ThemeToggle className="h-8 w-8 rounded-xl border border-white/10 bg-white/5 text-white/60" />
+          <ThemeToggle className="h-8 w-8 rounded-xl border border-white/10 bg-white/[0.05] text-white/60" />
         </div>
       </header>
 
       {/* Hero */}
-      <section className="relative overflow-hidden min-h-[480px] flex items-center">
-        <FloatingStickerField />
-
-        {/* Gradient mask over stickers on left */}
+      <section className="relative overflow-hidden min-h-[500px] flex items-center">
+        <FloatingHero />
         <div className="absolute inset-0 pointer-events-none"
-          style={{ background: "linear-gradient(to right, rgba(3,7,30,1) 30%, rgba(3,7,30,0.5) 65%, transparent 100%)" }} />
+          style={{ background: "linear-gradient(to right,rgba(3,7,30,1) 32%,rgba(3,7,30,0.5) 65%,transparent 100%)" }} />
 
-        <div className="relative z-10 px-6 md:px-12 py-16 max-w-xl">
+        <div className="relative z-10 px-6 md:px-12 py-16 max-w-lg">
           <div className="flex flex-wrap gap-2 mb-5">
-            <span className="flex items-center gap-1.5 text-[11px] font-bold px-3 py-1 rounded-full border"
+            <span className="text-[11px] font-bold px-3 py-1 rounded-full border"
               style={{ background: "rgba(64,85,255,0.2)", borderColor: "rgba(64,85,255,0.4)", color: "#7B94FF" }}>
-              <Sparkles className="w-3 h-3" />Virtual Collectibles
+              ✨ Virtual Collectibles
             </span>
-            <span className="flex items-center gap-1.5 text-[11px] font-bold px-3 py-1 rounded-full border"
+            <span className="text-[11px] font-bold px-3 py-1 rounded-full border"
               style={{ background: "rgba(0,200,100,0.15)", borderColor: "rgba(0,200,100,0.3)", color: "#4ade80" }}>
               🆓 Free to play
             </span>
             <span className="text-[11px] font-bold px-3 py-1 rounded-full border"
               style={{ background: "rgba(255,191,0,0.12)", borderColor: "rgba(255,191,0,0.3)", color: "#FFBF00" }}>
-              {COUNTRIES.length} countries
+              6 unique shapes
             </span>
           </div>
 
@@ -465,66 +804,74 @@ export default function TravelStickerPage() {
             </span>
           </h1>
 
-          <p className="text-white/55 text-base md:text-lg leading-relaxed mb-8 max-w-md">
-            Spin the globe and discover your lucky destination. Beautiful virtual passport stamps — free to collect, fun to share. 🌍
+          <p className="text-white/50 text-base md:text-lg leading-relaxed mb-3 max-w-md">
+            Spin the globe, discover your lucky destination. Each country has a unique shape, cultural pattern & heritage design. Download &amp; share with friends! 🌍
           </p>
 
-          <button
-            onClick={handleSpin}
+          {/* Shape legend */}
+          <div className="flex flex-wrap gap-1.5 mb-7">
+            {Object.entries(SHAPE_LABELS).map(([, label]) => (
+              <span key={label} className="text-[10px] text-white/30 border border-white/[0.07] rounded-full px-2 py-0.5 bg-white/[0.02]">
+                {label}
+              </span>
+            ))}
+          </div>
+
+          <button onClick={handleSpin}
             className="group relative inline-flex items-center gap-3 px-8 py-4 rounded-2xl text-white text-base font-black transition-all hover:scale-105 active:scale-95"
             style={{
               background: "linear-gradient(135deg,#4055FF,#9033F5,#FF2060)",
               boxShadow: "0 0 40px rgba(64,85,255,0.45), 0 8px 32px rgba(144,51,245,0.3)",
-            }}
-          >
+            }}>
             <Globe className="w-5 h-5 group-hover:animate-spin" />
             Spin the Globe — Free!
             <span className="w-2 h-2 rounded-full bg-white/80" style={{ animation: "ping-dot 1.5s ease infinite" }} />
-            {/* shimmer */}
             <span className="absolute inset-0 rounded-2xl overflow-hidden">
               <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
             </span>
           </button>
 
           {stickers.length > 0 && (
-            <p className="mt-4 text-white/35 text-sm flex items-center gap-2">
+            <p className="mt-4 text-white/30 text-sm flex items-center gap-2">
               <Trophy className="w-3.5 h-3.5 text-amber-400/60" />
-              {stickers.length} sticker{stickers.length > 1 ? "s" : ""} in your collection
+              {stickers.length} sticker{stickers.length > 1 ? "s" : ""} collected — tap any to download or share
             </p>
           )}
         </div>
       </section>
 
-      {/* Spin overlay modal */}
+      {/* Spin modal */}
       {spinning && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(2,4,20,0.95)", backdropFilter: "blur(20px)" }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: "rgba(2,4,20,0.95)", backdropFilter: "blur(22px)" }}>
           <SpinWheel onDone={handleSpinDone} />
         </div>
       )}
 
       {/* Collection */}
-      <section className="px-5 md:px-10 pb-16 pt-8">
-        {/* Progress bar */}
-        <div className="mb-8 p-5 rounded-2xl border border-white/[0.08] bg-white/[0.03]">
+      <section className="px-5 md:px-10 pb-16 pt-6">
+        {/* Progress */}
+        <div className="mb-8 p-5 rounded-2xl border border-white/[0.07] bg-white/[0.02]">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#4055FF,#9033F5)" }}>
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+                style={{ background: "linear-gradient(135deg,#4055FF,#9033F5)" }}>
                 <Globe className="w-4 h-4 text-white" />
               </div>
               <div>
                 <p className="text-sm font-black text-white">My Collection</p>
-                <p className="text-xs text-white/40">{stickers.length} of {COUNTRIES.length} countries</p>
+                <p className="text-xs text-white/35">{stickers.length} of {COUNTRIES.length} countries · tap sticker to download/share</p>
               </div>
             </div>
             {stickers.length >= 10 && (
-              <div className="flex gap-1">
+              <div className="flex gap-0.5">
                 {[...Array(Math.min(5, Math.floor(stickers.length / 10)))].map((_, i) => (
-                  <span key={i} className="text-amber-400 text-base">⭐</span>
+                  <span key={i} className="text-amber-400 text-sm">⭐</span>
                 ))}
               </div>
             )}
           </div>
-          <div className="h-2.5 rounded-full bg-white/[0.06] overflow-hidden">
+          <div className="h-2.5 rounded-full bg-white/[0.05] overflow-hidden">
             <div className="h-full rounded-full transition-all duration-1000"
               style={{
                 width: `${Math.max((stickers.length / COUNTRIES.length) * 100, stickers.length > 0 ? 1.5 : 0)}%`,
@@ -537,12 +884,12 @@ export default function TravelStickerPage() {
 
         {stickers.length === 0 ? (
           <div className="text-center py-20">
-            <div className="w-24 h-24 rounded-3xl flex items-center justify-center mx-auto mb-5 border-2 border-dashed border-white/[0.12]"
+            <div className="w-24 h-24 rounded-3xl flex items-center justify-center mx-auto mb-5 border-2 border-dashed border-white/[0.1]"
               style={{ background: "rgba(64,85,255,0.07)" }}>
               <Globe className="w-12 h-12 text-white/20" />
             </div>
             <h3 className="text-xl font-black text-white mb-2">Your passport is empty</h3>
-            <p className="text-white/40 text-sm mb-6">Spin the globe to earn your first lucky country sticker!</p>
+            <p className="text-white/35 text-sm mb-6">Spin the globe to earn your first sticker — every country has a unique shape &amp; design!</p>
             <button onClick={handleSpin}
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-white text-sm font-bold"
               style={{ background: "linear-gradient(135deg,#4055FF,#9033F5)" }}>
@@ -550,66 +897,70 @@ export default function TravelStickerPage() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
             {stickers.map((s, i) => (
-              <div key={s.id}
-                className="relative flex flex-col items-center p-3 rounded-2xl border cursor-default transition-all"
+              <button key={s.id}
+                className="group flex flex-col items-center p-3 rounded-2xl border transition-all text-left cursor-pointer"
                 style={{
-                  borderColor: hoveredId === s.id ? s.primary + "60" : "rgba(255,255,255,0.06)",
-                  background: hoveredId === s.id ? s.primary + "14" : "rgba(255,255,255,0.03)",
-                  transform: hoveredId === s.id ? "translateY(-4px) scale(1.03)" : "none",
-                  animation: `pop-in 0.5s cubic-bezier(0.34,1.56,0.64,1) ${i * 0.04}s both`,
+                  borderColor: "rgba(255,255,255,0.06)",
+                  background: "rgba(255,255,255,0.03)",
+                  animation: `pop-in 0.5s cubic-bezier(0.34,1.56,0.64,1) ${i * 0.035}s both`,
                 }}
-                onMouseEnter={() => setHoveredId(s.id)}
-                onMouseLeave={() => setHoveredId(null)}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLElement).style.borderColor = s.primary + "55";
+                  (e.currentTarget as HTMLElement).style.background  = s.primary + "12";
+                  (e.currentTarget as HTMLElement).style.transform    = "translateY(-4px) scale(1.03)";
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.06)";
+                  (e.currentTarget as HTMLElement).style.background  = "rgba(255,255,255,0.03)";
+                  (e.currentTarget as HTMLElement).style.transform    = "";
+                }}
+                onClick={() => setDetail(s)}
+                title={`${s.name} — click to view, download & share`}
               >
-                <div style={{ filter: hoveredId === s.id ? `drop-shadow(0 4px 16px ${s.primary}70)` : undefined }}>
-                  <StickerBadge sticker={s} size={100} shine={hoveredId === s.id} />
+                <div className="group-hover:[filter:drop-shadow(0_4px_14px_var(--sticker-glow))]"
+                  style={{ "--sticker-glow": `${s.primary}70` } as React.CSSProperties}>
+                  <StickerBadge sticker={s} size={96} shine />
                 </div>
-                <p className="mt-2 text-[10px] font-black text-white/70 text-center leading-tight">{s.name}</p>
+                <p className="mt-2 text-[10px] font-black text-white/65 text-center leading-tight truncate w-full px-1">
+                  {s.name}
+                </p>
                 <p className="text-[9px] text-white/25 mt-0.5">
                   {new Date(s.earnedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                 </p>
-
-                {/* Tooltip */}
-                {hoveredId === s.id && (
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 p-3 rounded-xl text-xs leading-relaxed z-20 border border-white/10 shadow-2xl"
-                    style={{ background: "#0d0f1e" }}>
-                    <p className="font-bold text-white mb-1 flex items-center gap-1.5">
-                      <MapPin className="w-3 h-3" style={{ color: s.primary }} />{s.name}
-                    </p>
-                    <p className="text-white/55">{s.fact}</p>
-                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full border-l-4 border-r-4 border-t-4 border-transparent" style={{ borderTopColor: "#0d0f1e" }} />
-                  </div>
-                )}
-              </div>
+                {/* Tiny download hint on hover */}
+                <p className="text-[8px] text-white/0 group-hover:text-white/40 transition-colors mt-0.5 flex items-center gap-0.5">
+                  <Download className="w-2.5 h-2.5" />tap to share
+                </p>
+              </button>
             ))}
 
             {/* Get more */}
             <button onClick={handleSpin}
-              className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed transition-all group min-h-[140px]"
-              style={{ borderColor: "rgba(64,85,255,0.25)", background: "rgba(64,85,255,0.04)" }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = "rgba(64,85,255,0.5)")}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = "rgba(64,85,255,0.25)")}
+              className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed transition-all group min-h-[148px]"
+              style={{ borderColor: "rgba(64,85,255,0.22)", background: "rgba(64,85,255,0.04)" }}
+              onMouseEnter={e => ((e.currentTarget as HTMLElement).style.borderColor = "rgba(64,85,255,0.5)")}
+              onMouseLeave={e => ((e.currentTarget as HTMLElement).style.borderColor = "rgba(64,85,255,0.22)")}
             >
               <div className="w-10 h-10 rounded-full mb-2 flex items-center justify-center group-hover:scale-110 transition-transform"
                 style={{ background: "linear-gradient(135deg,#4055FF,#9033F5)", boxShadow: "0 4px 16px rgba(64,85,255,0.35)" }}>
                 <RefreshCcw className="w-4 h-4 text-white" />
               </div>
               <p className="text-[11px] font-black text-blue-400">Spin Again</p>
-              <p className="text-[9px] text-white/30 mt-0.5">Free!</p>
+              <p className="text-[9px] text-white/25 mt-0.5">Free!</p>
             </button>
           </div>
         )}
       </section>
 
       <style>{`
-        @keyframes hero-float-0 { 0%,100%{transform:inherit;margin-top:0} 50%{margin-top:-14px} }
-        @keyframes hero-float-1 { 0%,100%{transform:inherit;margin-top:0} 50%{margin-top:-9px} }
-        @keyframes hero-float-2 { 0%,100%{transform:inherit;margin-top:0} 50%{margin-top:-18px} }
-        @keyframes globe-pulse  { from{filter:drop-shadow(0 0 10px #4055FF80)} to{filter:drop-shadow(0 0 28px #4055FFcc)} }
+        @keyframes hero-float-0 { 0%,100%{margin-top:0} 50%{margin-top:-13px} }
+        @keyframes hero-float-1 { 0%,100%{margin-top:0} 50%{margin-top:-8px}  }
+        @keyframes hero-float-2 { 0%,100%{margin-top:0} 50%{margin-top:-17px} }
+        @keyframes globe-spin   { from{filter:drop-shadow(0 0 12px #4055FF80)} to{filter:drop-shadow(0 0 30px #4055FFcc)} }
         @keyframes ping-dot     { 0%,100%{opacity:0.8;transform:scale(1)} 50%{opacity:0.3;transform:scale(2)} }
-        @keyframes pop-in       { from{opacity:0;transform:scale(0.6) rotate(-10deg)} to{opacity:1;transform:scale(1) rotate(0)} }
+        @keyframes pop-in       { from{opacity:0;transform:scale(0.6) rotate(-10deg)} to{opacity:1;transform:scale(1) rotate(0deg)} }
       `}</style>
     </div>
   );
