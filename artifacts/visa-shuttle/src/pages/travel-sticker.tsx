@@ -1069,7 +1069,7 @@ function EntryForm({ onGo, busy, initialName, initialNat }: {
 
       <div className="flex items-center justify-between mb-3">
         <p className="text-[11px] uppercase tracking-widest font-bold text-white/40">Required to board ✈️</p>
-        <span className="text-[11px] font-black px-2.5 py-1 rounded-full" style={{ background: "rgba(0,200,100,0.15)", color: "#4ade80" }}>US$1 · PayPal</span>
+        <span className="text-[11px] font-black px-2.5 py-1 rounded-full" style={{ background: "rgba(0,200,100,0.15)", color: "#4ade80" }}>US$1</span>
       </div>
 
       <label className="block mb-3">
