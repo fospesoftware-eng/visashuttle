@@ -1039,9 +1039,14 @@ function TermsModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-function EntryForm({ onGo, busy }: { onGo: (name: string, nationalityCode: string) => void; busy?: boolean }) {
-  const [name, setName] = useState("");
-  const [nat, setNat] = useState("");
+function EntryForm({ onGo, busy, initialName, initialNat }: {
+  onGo: (name: string, nationalityCode: string) => void;
+  busy?: boolean;
+  initialName?: string;
+  initialNat?: string;
+}) {
+  const [name, setName] = useState(initialName || "");
+  const [nat, setNat] = useState(initialNat || "");
   const [agree, setAgree] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
 
@@ -1405,15 +1410,16 @@ export default function TravelStickerPage() {
   const [matchLoading, setMatchLoading] = useState(false);
   const [payOpen,      setPayOpen]      = useState(false);   // inline PayPal modal
   const [verifying,    setVerifying]    = useState(false);   // capturing payment
+  const [buyMode,      setBuyMode]      = useState(false);   // buying another sticker
   const pendingRef = useRef<PendingState | null>(null);
   const pendingName = useRef<string>("");
   const { toast } = useToast();
 
   const hasSticker = !!saved;
 
-  // Step 1: pick destination, open the inline PayPal checkout
+  // Step 1: pick destination, open the inline PayPal checkout (each play = US$1)
   function handleGo(name: string, nationalityCode: string) {
-    if (hasSticker || payOpen) return;
+    if (payOpen) return;
     const picked = COUNTRIES[Math.floor(Math.random() * COUNTRIES.length)];
     const sticker: StickerData = { ...picked, id: crypto.randomUUID(), earnedAt: Date.now() };
     pendingRef.current = { name, nationalityCode, sticker };
@@ -1447,6 +1453,7 @@ export default function TravelStickerPage() {
       const foundMatch: MatchInfo = data.match || localPartner(sticker.code);
       pendingRef.current = null;
       setVerifying(false);
+      setBuyMode(false);
       setMatch(foundMatch);
       setMatchLoading(false);
       setReveal(sticker);
@@ -1521,7 +1528,7 @@ export default function TravelStickerPage() {
               ⭐ One lucky country
             </span>
             <span className="text-[11px] font-bold px-3 py-1 rounded-full border" style={{ background: "rgba(0,200,100,0.15)", borderColor: "rgba(0,200,100,0.3)", color: "#4ade80", animation: "badge-bob 3.2s ease-in-out 0.4s infinite" }}>
-              🆓 Free to play
+              💳 US$1 per sticker
             </span>
             <span className="text-[11px] font-bold px-3 py-1 rounded-full border" style={{ background: "rgba(255,191,0,0.12)", borderColor: "rgba(255,191,0,0.3)", color: "#FFBF00", animation: "badge-bob 3.2s ease-in-out 0.8s infinite" }}>
               ✈️ Find a travel partner
@@ -1544,22 +1551,35 @@ export default function TravelStickerPage() {
             Enter your details, open your passport, and watch the pages flip to reveal your lucky destination — then meet the traveller matched as your partner for the journey! 🛂✈️
           </p>
 
-          {!hasSticker ? (
-            <EntryForm onGo={handleGo} busy={payOpen} />
+          {(!hasSticker || buyMode) ? (
+            <>
+              <EntryForm
+                onGo={handleGo}
+                busy={payOpen}
+                initialName={saved?.name}
+                initialNat={saved?.nationalityCode}
+              />
+              {buyMode && (
+                <button onClick={() => setBuyMode(false)}
+                  className="mt-3 text-white/45 text-xs font-semibold hover:text-white/75 transition">
+                  ← Back to my sticker
+                </button>
+              )}
+            </>
           ) : (
             <div className="flex flex-wrap items-center gap-3">
-              <button onClick={handleReopen}
+              <button onClick={() => setBuyMode(true)}
                 className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-white text-sm font-black transition hover:scale-105 active:scale-95"
-                style={{ background: "linear-gradient(135deg,#4055FF,#9033F5)", boxShadow: "0 0 30px rgba(64,85,255,0.35)" }}>
-                <Globe className="w-4 h-4" />Reopen My Passport
+                style={{ background: "linear-gradient(135deg,#4055FF,#9033F5,#FF2060)", boxShadow: "0 0 30px rgba(64,85,255,0.35)" }}>
+                <Globe className="w-4 h-4" />Get Another Sticker — US$1
+              </button>
+              <button onClick={handleReopen}
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-white text-sm font-bold border border-white/10 hover:border-white/25 transition">
+                <RefreshCcw className="w-4 h-4" />Reopen Passport
               </button>
               <button onClick={() => setDetail(saved.sticker)}
                 className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-white text-sm font-bold border border-white/10 hover:border-white/25 transition">
                 <Download className="w-4 h-4" />Download &amp; Share
-              </button>
-              <button onClick={handleReset}
-                className="inline-flex items-center gap-1.5 px-4 py-3 rounded-2xl text-white/50 text-xs font-bold border border-white/10 hover:text-white/80 hover:border-white/20 transition">
-                <RefreshCcw className="w-3.5 h-3.5" />Start over
               </button>
             </div>
           )}
