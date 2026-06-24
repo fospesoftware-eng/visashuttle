@@ -373,6 +373,7 @@ const PRODUCT_SHELL_PREFIXES = [
   "/w/",
   "/p/",
   "/pay/",
+  "/travel-sticker",
 ];
 
 function SiteChrome() {
