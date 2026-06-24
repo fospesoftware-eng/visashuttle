@@ -680,6 +680,78 @@ function PageStamp({ sticker, size, settled }: { sticker: StickerData; size: num
   );
 }
 
+// ── Gender-based cartoon avatar (seeded by name) ────────────────────────────
+const FEMALE_FIRST = new Set([
+  "Nicky","Aiko","Sofia","Maya","Elena","Chloe","Yuki","Amara","Isabella","Hana",
+  "Freya","Carla","Zara","Nina","Mei","Priya","Lucia","Aaliyah","Ingrid","Camila",
+  "Sara","Anaya","Kartina","Hana",
+]);
+function hashStr(s: string) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h); }
+function nameGender(name: string): "f" | "m" {
+  return FEMALE_FIRST.has(name.trim().split(/\s+/)[0]) ? "f" : "m";
+}
+
+const SKINS = ["#F4C8A0", "#E8B088", "#D69A6E", "#B97A4E", "#8D5524"];
+const HAIRS = ["#2B221B", "#4A2C12", "#6E4B1F", "#171717", "#8A5A2B", "#C9A33B", "#A33B2B"];
+const SHIRTS = ["#4055FF", "#FF2060", "#00C170", "#FF9F1C", "#9033F5", "#0FB5C9"];
+
+function Avatar({ name, size = 84, animate = true }: { name: string; size?: number; animate?: boolean }) {
+  const g = nameGender(name);
+  const h = hashStr(name);
+  const skin = SKINS[h % SKINS.length];
+  const hair = HAIRS[(h >> 3) % HAIRS.length];
+  const shirt = SHIRTS[(h >> 6) % SHIRTS.length];
+  const uid = `av-${h}-${size}`;
+
+  return (
+    <svg viewBox="0 0 100 100" width={size} height={size}
+      style={{ animation: animate ? "avatar-bob 3s ease-in-out infinite" : undefined }}>
+      <defs>
+        <radialGradient id={`${uid}-bg`} cx="50%" cy="35%" r="75%">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.25" />
+          <stop offset="100%" stopColor={shirt} stopOpacity="0.85" />
+        </radialGradient>
+        <clipPath id={`${uid}-c`}><circle cx="50" cy="50" r="50" /></clipPath>
+      </defs>
+      <g clipPath={`url(#${uid}-c)`}>
+        <rect width="100" height="100" fill={`url(#${uid}-bg)`} />
+        {/* long hair behind (female) */}
+        {g === "f" && <ellipse cx="50" cy="54" rx="33" ry="36" fill={hair} />}
+        {/* shirt / shoulders */}
+        <path d="M18,100 Q50,68 82,100 Z" fill={shirt} />
+        <path d="M18,100 Q50,68 82,100 Z" fill="#000" opacity="0.08" />
+        {/* neck */}
+        <rect x="43" y="62" width="14" height="16" rx="6" fill={skin} />
+        {/* face */}
+        <ellipse cx="50" cy="46" rx="25" ry="27" fill={skin} />
+        {/* hair top */}
+        <path d="M23,48 C23,18 77,18 77,48 C77,33 63,27 50,27 C37,27 23,33 23,48 Z" fill={hair} />
+        {/* eyes */}
+        <ellipse cx="40" cy="46" rx="2.6" ry="3.6" fill="#2a2320" />
+        <ellipse cx="60" cy="46" rx="2.6" ry="3.6" fill="#2a2320" />
+        <circle cx="41" cy="45" r="0.9" fill="#fff" />
+        <circle cx="61" cy="45" r="0.9" fill="#fff" />
+        {/* brows */}
+        <path d="M35.5,39.5 Q40,37.5 44.5,39.5" stroke="#2a2320" strokeWidth="1.4" fill="none" strokeLinecap="round" />
+        <path d="M55.5,39.5 Q60,37.5 64.5,39.5" stroke="#2a2320" strokeWidth="1.4" fill="none" strokeLinecap="round" />
+        {/* blush */}
+        <ellipse cx="36" cy="53" rx="3.5" ry="2.2" fill="#FF6B8A" opacity="0.35" />
+        <ellipse cx="64" cy="53" rx="3.5" ry="2.2" fill="#FF6B8A" opacity="0.35" />
+        {/* smile */}
+        <path d="M42,56 Q50,63 58,56" stroke="#2a2320" strokeWidth="2" fill="none" strokeLinecap="round" />
+        {/* female: earrings + fringe accent */}
+        {g === "f" && <>
+          <circle cx="25" cy="55" r="2.2" fill="#E8C964" />
+          <circle cx="75" cy="55" r="2.2" fill="#E8C964" />
+        </>}
+        {/* male: subtle hairline accent */}
+        {g === "m" && <path d="M27,40 Q50,30 73,40" stroke="#000" strokeOpacity="0.12" strokeWidth="2" fill="none" />}
+      </g>
+      <circle cx="50" cy="50" r="49" fill="none" stroke="#fff" strokeOpacity="0.5" strokeWidth="2" />
+    </svg>
+  );
+}
+
 // ── Passport reveal — the flip-through game ─────────────────────────────────
 function PassportReveal({
   name, nationality, sticker, match, matchLoading, onClose,
@@ -727,7 +799,6 @@ function PassportReveal({
   }, [phase]);
 
   const flipSticker: StickerData = { ...COUNTRIES[flipIdx], id: "flip", earnedAt: 0 };
-  const initial = (match?.name || "?").trim().charAt(0).toUpperCase();
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-y-auto py-6 px-4"
@@ -793,9 +864,9 @@ function PassportReveal({
                 ) : match ? (
                   <>
                     {/* passport photo box */}
-                    <div className="w-24 h-28 rounded-md mb-3 flex items-center justify-center text-4xl font-black text-white border-4"
-                      style={{ background: `linear-gradient(135deg,${sticker.primary},${sticker.secondary})`, borderColor: "#3a2d1030", boxShadow: `0 8px 22px ${sticker.primary}55` }}>
-                      {initial}
+                    <div className="w-24 h-28 rounded-md mb-3 flex items-center justify-center border-4 overflow-hidden"
+                      style={{ background: "#fffdf6", borderColor: "#3a2d1030", boxShadow: `0 8px 22px ${sticker.primary}55` }}>
+                      <Avatar name={match.name} size={88} />
                     </div>
                     <p className="text-lg font-black text-[#3a2d10]">{match.name}</p>
                     <p className="text-[11px] text-[#3a2d10]/60 mt-0.5 mb-3">also bound for {sticker.flag} {sticker.name}</p>
@@ -1348,53 +1419,70 @@ export default function TravelStickerPage() {
             </div>
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 gap-5">
-            {/* My sticker */}
-            <div className="rounded-3xl border border-white/[0.08] p-6 flex flex-col items-center text-center"
-              style={{ background: `linear-gradient(160deg, ${saved.sticker.primary}18, rgba(255,255,255,0.02))` }}>
-              <p className="text-[10px] uppercase tracking-widest font-bold text-white/40 mb-3">My Destination</p>
-              <button onClick={() => setDetail(saved.sticker)}
-                className="transition hover:scale-105 active:scale-95"
-                style={{ filter: `drop-shadow(0 8px 28px ${saved.sticker.primary}55)` }}
-                title="View, download & share">
-                <StickerBadge sticker={saved.sticker} size={150} shine />
-              </button>
-              <h3 className="mt-4 text-lg font-black text-white">{saved.sticker.flag} {saved.sticker.name}</h3>
-              <p className="text-white/45 text-xs leading-relaxed mt-1 mb-4">{saved.sticker.fact}</p>
-              <button onClick={() => setDetail(saved.sticker)}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-xs font-bold transition hover:opacity-90"
-                style={{ background: "linear-gradient(135deg,#4055FF,#9033F5)" }}>
-                <Download className="w-3.5 h-3.5" />Download &amp; Share
-              </button>
+          <>
+            <p className="text-center text-[11px] uppercase tracking-[0.3em] font-bold text-white/35 mb-5">— My Passport —</p>
+            <div className="grid md:grid-cols-2 gap-5 md:gap-4 items-stretch">
+
+              {/* Destination passport page */}
+              <div className="relative w-full" style={{ aspectRatio: "0.82", animation: "pop-in 0.5s cubic-bezier(0.34,1.56,0.64,1) both" }}>
+                <PassportPage accent={saved.sticker.primary} pageNo="✓ ENTRY">
+                  <p className="absolute top-6 left-0 right-0 text-center text-[10px] tracking-[0.25em] font-black" style={{ color: saved.sticker.primary }}>✦ MY DESTINATION ✦</p>
+                  <button onClick={() => setDetail(saved.sticker)}
+                    className="absolute left-1/2 top-[46%] -translate-x-1/2 -translate-y-1/2 transition hover:scale-105 active:scale-95"
+                    style={{ transform: "translate(-50%,-50%) rotate(-7deg)", filter: `drop-shadow(0 8px 22px ${saved.sticker.primary}55)`, animation: "stamp-in 0.5s cubic-bezier(0.34,1.6,0.6,1)" }}
+                    title="View, download & share">
+                    <StickerBadge sticker={saved.sticker} size={150} shine />
+                  </button>
+                  <div className="absolute bottom-6 left-0 right-0 text-center px-5">
+                    <p className="text-base font-black text-[#3a2d10]">{saved.sticker.flag} {saved.sticker.name}</p>
+                    <p className="text-[10px] text-[#3a2d10]/60 mt-1 leading-relaxed">{saved.sticker.fact}</p>
+                  </div>
+                </PassportPage>
+              </div>
+
+              {/* Travel partner passport page */}
+              <div className="relative w-full" style={{ aspectRatio: "0.82", animation: "pop-in 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.1s both" }}>
+                <PassportPage accent={saved.sticker.primary} pageNo="PARTNER">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center px-5 text-center">
+                    <p className="text-[10px] tracking-[0.25em] font-black mb-3" style={{ color: saved.sticker.primary }}>✈ TRAVEL PARTNER ✈</p>
+                    {saved.match ? (
+                      <>
+                        {/* passport photo box */}
+                        <div className="w-24 h-28 rounded-md mb-3 flex items-center justify-center border-4 overflow-hidden"
+                          style={{ background: "#fffdf6", borderColor: "#3a2d1030", boxShadow: `0 8px 22px ${saved.sticker.primary}55` }}>
+                          <Avatar name={saved.match.name} size={88} />
+                        </div>
+                        <p className="text-lg font-black text-[#3a2d10]">{saved.match.name}</p>
+                        <p className="text-[11px] text-[#3a2d10]/60 mt-0.5 mb-3">also bound for {saved.sticker.flag} {saved.sticker.name}</p>
+                        <div style={{ transform: "rotate(-8deg)", filter: `drop-shadow(0 4px 12px ${saved.sticker.primary}55)` }}>
+                          <StickerBadge sticker={saved.sticker} size={78} shine />
+                        </div>
+                        <p className="text-[10px] text-[#3a2d10]/70 mt-3 leading-relaxed">
+                          You &amp; <span className="font-bold">{saved.match.name}</span> are matched for {saved.sticker.name}! Say hi to your travel buddy 🌍
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-5xl mb-3">🌟</div>
+                        <p className="text-base font-black text-[#3a2d10]">You're the first explorer!</p>
+                        <p className="text-[11px] text-[#3a2d10]/60 mt-2 leading-relaxed">
+                          The next traveller who lands on {saved.sticker.flag} {saved.sticker.name} will be matched with <span className="font-bold">you</span>.
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </PassportPage>
+              </div>
             </div>
 
-            {/* Travel partner */}
-            <div className="rounded-3xl border border-white/[0.08] p-6 flex flex-col items-center justify-center text-center"
-              style={{ background: "linear-gradient(160deg, rgba(64,85,255,0.08), rgba(255,255,255,0.02))" }}>
-              <p className="text-[10px] uppercase tracking-widest font-bold text-white/40 mb-3">✈️ My Travel Partner</p>
-              {saved.match ? (
-                <>
-                  <div className="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-black text-white mb-3"
-                    style={{ background: `linear-gradient(135deg, ${saved.sticker.primary}, ${saved.sticker.secondary})`, boxShadow: `0 8px 28px ${saved.sticker.primary}55` }}>
-                    {saved.match.name.trim().charAt(0).toUpperCase()}
-                  </div>
-                  <h3 className="text-xl font-black text-white">{saved.match.name}</h3>
-                  <p className="text-white/45 text-sm mt-1 mb-3">also landed on {saved.sticker.flag} {saved.sticker.name}</p>
-                  <p className="text-white/55 text-xs leading-relaxed max-w-xs">
-                    You and <span className="font-bold text-white/80">{saved.match.name}</span> are matched for the journey to <span className="font-bold text-white/80">{saved.sticker.name}</span>. Say hi to your travel buddy! 🌍
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div className="text-5xl mb-3">🌟</div>
-                  <h3 className="text-lg font-black text-white">You're the first explorer!</h3>
-                  <p className="text-white/50 text-xs leading-relaxed mt-2 max-w-xs">
-                    No one had landed on {saved.sticker.flag} {saved.sticker.name} before you. The next traveller who spins this country will be matched with <span className="font-bold text-white/75">you</span> as their travel partner.
-                  </p>
-                </>
-              )}
+            <div className="flex justify-center mt-6">
+              <button onClick={() => setDetail(saved.sticker)}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-white text-sm font-bold transition hover:opacity-90 active:scale-95"
+                style={{ background: "linear-gradient(135deg,#4055FF,#9033F5)", boxShadow: "0 0 30px rgba(64,85,255,0.3)" }}>
+                <Download className="w-4 h-4" />Download &amp; Share My Sticker
+              </button>
             </div>
-          </div>
+          </>
         )}
       </section>
 
@@ -1413,6 +1501,7 @@ export default function TravelStickerPage() {
         @keyframes stamp-in     { 0%{transform:translate(-50%,-50%) rotate(-7deg) scale(2.4);opacity:0} 55%{opacity:1} 100%{transform:translate(-50%,-50%) rotate(-7deg) scale(1);opacity:1} }
         @keyframes gradient-shift { 0%{background-position:0% 50%} 100%{background-position:300% 50%} }
         @keyframes badge-bob    { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+        @keyframes avatar-bob   { 0%,100%{transform:translateY(0) rotate(-1deg)} 50%{transform:translateY(-3px) rotate(1deg)} }
         @keyframes shooting-star{ 0%{opacity:0;transform:translate(0,0) rotate(18deg) scaleX(0.4)} 8%{opacity:1} 22%{opacity:1;transform:translate(220px,72px) rotate(18deg) scaleX(1)} 30%,100%{opacity:0;transform:translate(320px,104px) rotate(18deg) scaleX(0.4)} }
       `}</style>
     </div>
