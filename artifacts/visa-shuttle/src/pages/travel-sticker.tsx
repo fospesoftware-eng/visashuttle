@@ -299,13 +299,165 @@ export default function TravelStickerPage() {
 
   if (authLoading || verifying) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950">
-        <div className="flex flex-col items-center gap-4 text-white">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#4055FF] to-[#9033F5] flex items-center justify-center animate-pulse">
-            <Globe className="w-8 h-8" />
-          </div>
-          <p className="text-sm text-white/60">{verifying ? "Verifying your payment…" : "Loading…"}</p>
+      <div className="min-h-screen flex items-center justify-center overflow-hidden relative" style={{background:"linear-gradient(160deg,#03071e 0%,#0a0a2e 40%,#0d1b4b 70%,#0a2a1a 100%)"}}>
+
+        {/* Stars */}
+        <div className="absolute inset-0 pointer-events-none">
+          {[...Array(80)].map((_, i) => (
+            <div key={i} className="absolute rounded-full bg-white"
+              style={{
+                width: Math.random() * 2.5 + 0.5,
+                height: Math.random() * 2.5 + 0.5,
+                top: `${Math.random() * 100}%`,
+                left: `${Math.random() * 100}%`,
+                opacity: Math.random() * 0.7 + 0.15,
+                animation: `twinkle ${2 + Math.random() * 4}s ease-in-out ${Math.random() * 4}s infinite`,
+              }}
+            />
+          ))}
         </div>
+
+        {/* Curved earth horizon at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 overflow-hidden" style={{height:"38%"}}>
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2"
+            style={{
+              width:"160vw", height:"160vw",
+              borderRadius:"50%",
+              background:"linear-gradient(180deg,#0d4f2e 0%,#0a3d22 30%,#072c18 60%,#051d10 100%)",
+              boxShadow:"0 -4px 60px rgba(0,180,80,0.15), inset 0 4px 40px rgba(0,200,100,0.1)",
+            }}
+          />
+          {/* Atmosphere glow */}
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2"
+            style={{
+              width:"162vw", height:"162vw",
+              borderRadius:"50%",
+              background:"transparent",
+              boxShadow:"0 -12px 80px rgba(20,200,120,0.18)",
+            }}
+          />
+          {/* City lights dots */}
+          {[...Array(18)].map((_, i) => (
+            <div key={i} className="absolute rounded-full"
+              style={{
+                width: Math.random() * 3 + 1,
+                height: Math.random() * 3 + 1,
+                bottom: `${8 + Math.random() * 28}%`,
+                left: `${5 + Math.random() * 90}%`,
+                background: ["#FFE066","#FFA040","#80CFFF","#FFFFFF"][i%4],
+                opacity: 0.5 + Math.random() * 0.4,
+                animation: `twinkle ${1.5 + Math.random() * 3}s ease-in-out ${Math.random() * 3}s infinite`,
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Clouds */}
+        {[
+          {top:"28%",left:"-8%",w:260,op:0.13,dur:28},
+          {top:"38%",left:"75%",w:200,op:0.1,dur:22},
+          {top:"18%",left:"60%",w:180,op:0.08,dur:35},
+        ].map((c,i)=>(
+          <div key={i} className="absolute pointer-events-none" style={{top:c.top,left:c.left,opacity:c.op,animation:`cloud-drift ${c.dur}s linear infinite`}}>
+            <svg width={c.w} viewBox="0 0 200 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <ellipse cx="100" cy="50" rx="90" ry="22" fill="white"/>
+              <ellipse cx="70" cy="38" rx="45" ry="28" fill="white"/>
+              <ellipse cx="130" cy="40" rx="40" ry="24" fill="white"/>
+              <ellipse cx="100" cy="34" rx="50" ry="30" fill="white"/>
+            </svg>
+          </div>
+        ))}
+
+        {/* Airplane */}
+        <div className="absolute" style={{animation:"fly-across 6s cubic-bezier(0.45,0,0.55,1) infinite", top:"30%"}}>
+          <div style={{transform:"rotate(-8deg) scale(1)", filter:"drop-shadow(0 0 18px rgba(100,160,255,0.7))"}}>
+            <svg width="110" height="44" viewBox="0 0 110 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+              {/* Fuselage */}
+              <ellipse cx="55" cy="22" rx="48" ry="9" fill="url(#plane-body)"/>
+              {/* Nose */}
+              <ellipse cx="96" cy="22" rx="14" ry="7" fill="#E8F0FF"/>
+              {/* Main wing */}
+              <path d="M55 22 L72 4 L82 8 L65 22Z" fill="#C8D8FF" opacity="0.95"/>
+              <path d="M55 22 L72 40 L82 36 L65 22Z" fill="#C8D8FF" opacity="0.85"/>
+              {/* Tail */}
+              <path d="M14 22 L6 10 L18 14 L20 22Z" fill="#B0C4FF" opacity="0.9"/>
+              <path d="M14 22 L6 34 L18 30 L20 22Z" fill="#B0C4FF" opacity="0.8"/>
+              {/* Windows */}
+              {[76,68,60,52,44].map((x,i)=>(
+                <ellipse key={i} cx={x} cy="19" rx="3.5" ry="2.5" fill="#E0F0FF" opacity="0.7"/>
+              ))}
+              {/* Engine */}
+              <ellipse cx="63" cy="28" rx="8" ry="4" fill="#A0B8E8" opacity="0.8"/>
+              <defs>
+                <linearGradient id="plane-body" x1="7" y1="22" x2="103" y2="22" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor="#7090D0"/>
+                  <stop offset="50%" stopColor="#C8D8FF"/>
+                  <stop offset="100%" stopColor="#E8F0FF"/>
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+          {/* Contrail */}
+          <div className="absolute top-1/2 right-full -translate-y-1/2" style={{width:120, height:6, marginRight:4}}>
+            <div style={{width:"100%",height:"2px",background:"linear-gradient(to left,rgba(180,210,255,0.6),transparent)",borderRadius:2,marginTop:6}}/>
+            <div style={{width:"70%",height:"2px",background:"linear-gradient(to left,rgba(180,210,255,0.35),transparent)",borderRadius:2,marginTop:3}}/>
+          </div>
+        </div>
+
+        {/* Center content */}
+        <div className="relative z-10 flex flex-col items-center gap-6 text-white text-center px-6">
+          {/* Globe ring */}
+          <div className="relative">
+            <div className="w-20 h-20 rounded-full flex items-center justify-center"
+              style={{
+                background:"linear-gradient(135deg,rgba(64,85,255,0.3),rgba(144,51,245,0.3))",
+                border:"1.5px solid rgba(100,140,255,0.35)",
+                boxShadow:"0 0 40px rgba(64,85,255,0.3), 0 0 80px rgba(64,85,255,0.1)",
+                animation:"globe-spin 3s ease-in-out infinite",
+              }}>
+              <Globe className="w-9 h-9 text-blue-300" />
+            </div>
+            {/* Orbit ring */}
+            <div className="absolute inset-0 rounded-full border border-blue-400/20"
+              style={{transform:"rotateX(70deg)", animation:"orbit 4s linear infinite"}}/>
+          </div>
+
+          <div>
+            <h2 className="text-xl font-black mb-1.5 tracking-wide" style={{textShadow:"0 0 30px rgba(100,160,255,0.5)"}}>
+              {verifying ? "Confirming Your Boarding Pass" : "Preparing for Takeoff"}
+            </h2>
+            <p className="text-sm text-blue-200/60 leading-relaxed">
+              {verifying
+                ? "Verifying your payment and generating your lucky sticker…"
+                : "Loading your travel sticker collection…"}
+            </p>
+          </div>
+
+          {/* Progress dots */}
+          <div className="flex items-center gap-2">
+            {[0,1,2,3].map(i=>(
+              <div key={i} className="w-1.5 h-1.5 rounded-full bg-blue-400"
+                style={{animation:`dot-bounce 1.4s ease-in-out ${i*0.2}s infinite`, opacity:0.4}}/>
+            ))}
+          </div>
+        </div>
+
+        <style>{`
+          @keyframes twinkle { 0%,100%{opacity:0.15} 50%{opacity:0.9} }
+          @keyframes fly-across {
+            0%   { left: -15%; opacity: 0; }
+            8%   { opacity: 1; }
+            92%  { opacity: 1; }
+            100% { left: 110%; opacity: 0; }
+          }
+          @keyframes cloud-drift { from { transform: translateX(0) } to { transform: translateX(110vw) } }
+          @keyframes globe-spin {
+            0%,100% { transform: scale(1); box-shadow: 0 0 40px rgba(64,85,255,0.3); }
+            50%     { transform: scale(1.06); box-shadow: 0 0 60px rgba(64,85,255,0.5); }
+          }
+          @keyframes orbit { from{transform:rotateX(70deg) rotateZ(0deg)} to{transform:rotateX(70deg) rotateZ(360deg)} }
+          @keyframes dot-bounce { 0%,80%,100%{transform:translateY(0);opacity:0.4} 40%{transform:translateY(-6px);opacity:1} }
+        `}</style>
       </div>
     );
   }
