@@ -1,9 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "wouter";
-import { ArrowLeft, Download, Globe, MapPin, RefreshCcw, Trophy, X } from "lucide-react";
+import { Download, Globe, RefreshCcw, X } from "lucide-react";
 import { FaFacebookF, FaInstagram, FaWhatsapp } from "react-icons/fa6";
-import { Logo } from "@/components/logo";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
 
 // ── Country data ────────────────────────────────────────────────────────────
@@ -892,7 +889,7 @@ function EntryForm({ onGo }: { onGo: (name: string, nationalityCode: string) => 
           value={name}
           onChange={e => setName(e.target.value)}
           onKeyDown={e => { if (e.key === "Enter" && ready) onGo(name.trim(), nat); }}
-          placeholder="e.g. Aster"
+          placeholder="e.g. Nicky Kartina"
           maxLength={60}
           className="w-full px-4 py-3 rounded-xl bg-white/[0.06] border border-white/10 text-white text-sm placeholder-white/25 outline-none focus:border-[#4055FF]/60 transition"
         />
@@ -982,6 +979,20 @@ function TravelBackdrop() {
           animation: `twinkle ${2 + (i % 4)}s ease-in-out ${(i % 7) * 0.3}s infinite`,
         }} />;
       })}
+
+      {/* Shooting stars */}
+      {[
+        { top: "12%", left: "20%", dur: "5s",  delay: "1s",  w: 120 },
+        { top: "30%", left: "55%", dur: "6.5s", delay: "3.4s", w: 90 },
+        { top: "62%", left: "35%", dur: "7s",  delay: "5.2s", w: 140 },
+      ].map((s, i) => (
+        <span key={i} className="absolute" style={{
+          top: s.top, left: s.left, width: s.w, height: 2,
+          background: "linear-gradient(90deg, rgba(255,255,255,0.8), transparent)",
+          borderRadius: 2, transform: "rotate(18deg)", opacity: 0,
+          animation: `shooting-star ${s.dur} ease-in ${s.delay} infinite`,
+        }} />
+      ))}
 
       {/* Dotted world map + flight paths */}
       <svg viewBox="0 0 1000 420" preserveAspectRatio="xMidYMid slice"
@@ -1175,27 +1186,6 @@ export default function TravelStickerPage() {
       )}
       {detail && <StickerDetailModal sticker={detail} onClose={() => setDetail(null)} />}
 
-      {/* Minimal header */}
-      <header className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
-        <div className="flex items-center gap-4">
-          <Link href="/">
-            <button className="flex items-center gap-1.5 text-white/40 hover:text-white/70 transition text-xs">
-              <ArrowLeft className="w-3.5 h-3.5" />Back
-            </button>
-          </Link>
-          <Logo size="sm" />
-        </div>
-        <div className="flex items-center gap-3">
-          {saved && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.05]">
-              <span className="text-sm">{saved.sticker.flag}</span>
-              <span className="text-xs font-black text-white">{saved.name}</span>
-            </div>
-          )}
-          <ThemeToggle className="h-8 w-8 rounded-xl border border-white/10 bg-white/[0.05] text-white/60" />
-        </div>
-      </header>
-
       {/* Hero */}
       <section className="relative overflow-hidden min-h-[560px] flex items-center">
         <TravelBackdrop />
@@ -1208,25 +1198,27 @@ export default function TravelStickerPage() {
         <div className="absolute inset-x-0 bottom-0 h-20 pointer-events-none"
           style={{ background: "linear-gradient(to top,rgba(10,10,26,0.95),transparent)" }} />
 
-        <div className="relative z-10 px-6 md:px-12 py-16 max-w-lg">
+        <div className="relative z-10 px-6 md:pl-16 lg:pl-24 md:pr-12 py-16 max-w-xl">
           <div className="flex flex-wrap gap-2 mb-5">
-            <span className="text-[11px] font-bold px-3 py-1 rounded-full border"
-              style={{ background: "rgba(64,85,255,0.2)", borderColor: "rgba(64,85,255,0.4)", color: "#7B94FF" }}>
-              ✨ One lucky sticker
+            <span className="text-[11px] font-bold px-3 py-1 rounded-full border" style={{ background: "rgba(64,85,255,0.2)", borderColor: "rgba(64,85,255,0.4)", color: "#7B94FF", animation: "badge-bob 3.2s ease-in-out infinite" }}>
+              ⭐ One lucky country
             </span>
-            <span className="text-[11px] font-bold px-3 py-1 rounded-full border"
-              style={{ background: "rgba(0,200,100,0.15)", borderColor: "rgba(0,200,100,0.3)", color: "#4ade80" }}>
+            <span className="text-[11px] font-bold px-3 py-1 rounded-full border" style={{ background: "rgba(0,200,100,0.15)", borderColor: "rgba(0,200,100,0.3)", color: "#4ade80", animation: "badge-bob 3.2s ease-in-out 0.4s infinite" }}>
               🆓 Free to play
             </span>
-            <span className="text-[11px] font-bold px-3 py-1 rounded-full border"
-              style={{ background: "rgba(255,191,0,0.12)", borderColor: "rgba(255,191,0,0.3)", color: "#FFBF00" }}>
+            <span className="text-[11px] font-bold px-3 py-1 rounded-full border" style={{ background: "rgba(255,191,0,0.12)", borderColor: "rgba(255,191,0,0.3)", color: "#FFBF00", animation: "badge-bob 3.2s ease-in-out 0.8s infinite" }}>
               ✈️ Find a travel partner
             </span>
           </div>
 
           <h1 className="text-4xl md:text-6xl font-black text-white mb-4 leading-none tracking-tight">
             Stamp Your<br />
-            <span style={{ background: "linear-gradient(90deg,#4055FF,#9033F5,#FF2060)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+            <span style={{
+              background: "linear-gradient(90deg,#4055FF,#9033F5,#FF2060,#9033F5,#4055FF)",
+              backgroundSize: "300% 100%",
+              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+              animation: "gradient-shift 6s linear infinite",
+            }}>
               Lucky Passport
             </span>
           </h1>
@@ -1341,6 +1333,9 @@ export default function TravelStickerPage() {
         @keyframes orb-drift-b  { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-50px,-25px) scale(1.15)} }
         @keyframes page-flip    { 0%{transform:rotateY(-95deg);transform-origin:left center;opacity:0.4} 60%{opacity:1} 100%{transform:rotateY(0deg);opacity:1} }
         @keyframes stamp-in     { 0%{transform:translate(-50%,-50%) rotate(-7deg) scale(2.4);opacity:0} 55%{opacity:1} 100%{transform:translate(-50%,-50%) rotate(-7deg) scale(1);opacity:1} }
+        @keyframes gradient-shift { 0%{background-position:0% 50%} 100%{background-position:300% 50%} }
+        @keyframes badge-bob    { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+        @keyframes shooting-star{ 0%{opacity:0;transform:translate(0,0) rotate(18deg) scaleX(0.4)} 8%{opacity:1} 22%{opacity:1;transform:translate(220px,72px) rotate(18deg) scaleX(1)} 30%,100%{opacity:0;transform:translate(320px,104px) rotate(18deg) scaleX(0.4)} }
       `}</style>
     </div>
   );
