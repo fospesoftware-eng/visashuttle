@@ -678,6 +678,21 @@ export default function CaseDetailPage() {
   const [docMode, setDocMode] = useState<"self" | "ai">("self");
   const [aiFiles, setAiFiles] = useState<File[]>([]);
   const [aiResult, setAiResult] = useState<any>(null);
+  const [aiRisk, setAiRisk] = useState<any>(null);
+  const [aiRiskLoading, setAiRiskLoading] = useState(false);
+  const [aiRiskRan, setAiRiskRan] = useState(false);
+
+  async function fetchAiRisk() {
+    if (!id) return;
+    setAiRiskLoading(true);
+    try {
+      const r = await fetch(`/api/cases/${id}/ai-risk`, { method: "POST", credentials: "include" });
+      if (!r.ok) throw new Error("Failed");
+      setAiRisk(await r.json());
+    } catch { setAiRisk(null); }
+    setAiRiskLoading(false);
+    setAiRiskRan(true);
+  }
   const aiFileInputRef = useRef<HTMLInputElement>(null);
   // Per-checklist-item hidden file inputs
   const itemFileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
@@ -1440,6 +1455,9 @@ export default function CaseDetailPage() {
                   </TabsTrigger>
                   <TabsTrigger value="activity" data-testid="tab-activity">
                     <Clock className="w-3.5 h-3.5 mr-1.5" /> Activity
+                  </TabsTrigger>
+                  <TabsTrigger value="ai-risk">
+                    <Brain className="w-3.5 h-3.5 mr-1.5" /> AI Risk
                   </TabsTrigger>
                 </TabsList>
               </ScrollableTabBar>
@@ -2239,6 +2257,91 @@ export default function CaseDetailPage() {
                       </div>
                     ) : (
                       <Timeline items={activityItems} />
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* AI Risk Assessment */}
+              <TabsContent value="ai-risk" className="space-y-4">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Brain className="w-4 h-4 text-[#4055FF]" />AI Risk Assessment
+                    </CardTitle>
+                    <button
+                      onClick={fetchAiRisk}
+                      disabled={aiRiskLoading}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-[#4055FF] hover:underline disabled:opacity-50"
+                    >
+                      {aiRiskLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lightbulb className="w-3.5 h-3.5" />}
+                      {aiRiskRan ? "Refresh" : "Run Assessment"}
+                    </button>
+                  </CardHeader>
+                  <CardContent>
+                    {!aiRiskRan && !aiRiskLoading && (
+                      <div className="text-center py-10">
+                        <Brain className="w-12 h-12 mx-auto mb-3 text-muted-foreground/30" />
+                        <p className="text-sm text-muted-foreground">Run an AI-powered risk assessment for this application.</p>
+                      </div>
+                    )}
+                    {aiRiskLoading && (
+                      <div className="flex items-center justify-center py-10 gap-3 text-muted-foreground">
+                        <Loader2 className="w-5 h-5 animate-spin" />Analysing application…
+                      </div>
+                    )}
+                    {!aiRiskLoading && aiRisk && (
+                      <div className="space-y-4">
+                        <div className={`flex items-center justify-between p-4 rounded-xl border ${aiRisk.riskLevel === "low" ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800" : aiRisk.riskLevel === "high" ? "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800" : "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800"}`}>
+                          <div>
+                            <p className="font-bold text-sm capitalize">{aiRisk.riskLevel} Risk</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">{aiRisk.summary}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-2xl font-black">{aiRisk.riskScore}</p>
+                            <p className="text-xs text-muted-foreground">Risk Score</p>
+                          </div>
+                        </div>
+                        {aiRisk.approvalLikelihood && (
+                          <p className="text-sm"><span className="font-bold">Approval likelihood:</span> {aiRisk.approvalLikelihood}</p>
+                        )}
+                        {aiRisk.strengths?.length > 0 && (
+                          <div>
+                            <p className="text-xs font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-400 mb-2">Strengths</p>
+                            <ul className="space-y-1.5">
+                              {aiRisk.strengths.map((s: string, i: number) => (
+                                <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                                  <span className="text-emerald-500 mt-0.5">✓</span>{s}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {aiRisk.concerns?.length > 0 && (
+                          <div>
+                            <p className="text-xs font-bold uppercase tracking-wide text-red-700 dark:text-red-400 mb-2">Concerns</p>
+                            <ul className="space-y-1.5">
+                              {aiRisk.concerns.map((c: string, i: number) => (
+                                <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                                  <span className="text-red-500 mt-0.5">⚠</span>{c}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {aiRisk.recommendations?.length > 0 && (
+                          <div>
+                            <p className="text-xs font-bold uppercase tracking-wide text-[#4055FF] mb-2">Recommendations</p>
+                            <ul className="space-y-1.5">
+                              {aiRisk.recommendations.map((r: string, i: number) => (
+                                <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                                  <span className="text-[#4055FF] mt-0.5">→</span>{r}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </CardContent>
                 </Card>

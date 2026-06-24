@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, Search, MoreVertical, Mail, Phone, Loader2, AlertCircle, Briefcase, GripVertical, MapPin, UserCog, User, Globe2, StickyNote, UserPlus, ClipboardList } from "lucide-react";
+import { Plus, Search, MoreVertical, Mail, Phone, Loader2, AlertCircle, Briefcase, GripVertical, MapPin, UserCog, User, Globe2, StickyNote, UserPlus, ClipboardList, Brain, Copy } from "lucide-react";
 import { getCountryVisaConfig } from "@/data/country-visa-types";
 import { Combobox, type ComboboxOption } from "@/components/combobox";
 import {
@@ -137,12 +137,13 @@ interface LeadCardContentProps {
   onDelete: (id: string) => void;
   onMove: (id: string, stage: string) => void;
   onReassign?: (id: string, userId: string) => void;
+  onAiFollowup?: (lead: Lead) => void;
   currentStage: string;
   staff?: StaffMember[];
   assigneeName?: string | null;
 }
 
-function LeadCardBody({ lead, dragHandleProps, onEdit, onCreateCustomer, onConvert, onConvertProposal, onDelete, onMove, onReassign, currentStage, staff = [], assigneeName }: LeadCardContentProps) {
+function LeadCardBody({ lead, dragHandleProps, onEdit, onCreateCustomer, onConvert, onConvertProposal, onDelete, onMove, onReassign, onAiFollowup, currentStage, staff = [], assigneeName }: LeadCardContentProps) {
   return (
     <div className="group relative overflow-visible rounded-xl border border-border/60 bg-background p-3 shadow-sm transition-all hover:border-primary/25 hover:shadow-md">
       <div className="flex items-start justify-between gap-2">
@@ -201,6 +202,15 @@ function LeadCardBody({ lead, dragHandleProps, onEdit, onCreateCustomer, onConve
               <ClipboardList className="w-3.5 h-3.5 mr-2" />
               Convert to Proposal
             </DropdownMenuItem>
+            {onAiFollowup && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => onAiFollowup(lead)}>
+                  <Brain className="w-3.5 h-3.5 mr-2 text-[#4055FF]" />
+                  Draft Follow-up Email
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuSeparator />
             <p className="text-xs text-muted-foreground px-2 py-1">Move to stage</p>
             {stages.filter((s) => s !== currentStage).map((s) => (
@@ -323,6 +333,9 @@ export default function LeadsPage() {
   const [form, setForm] = useState(emptyForm);
   const [activeDragLead, setActiveDragLead] = useState<Lead | null>(null);
   const [stageFilter, setStageFilter] = useState<"all" | string>("all");
+  const [aiFollowupLead, setAiFollowupLead] = useState<Lead | null>(null);
+  const [aiFollowupResult, setAiFollowupResult] = useState("");
+  const [aiFollowupLoading, setAiFollowupLoading] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -554,6 +567,21 @@ export default function LeadsPage() {
     const id = String(event.active.id).replace("lead:", "");
     const lead = leads.find((l) => l.id === id);
     if (lead) setActiveDragLead(lead);
+  };
+
+  const handleAiFollowup = async (lead: Lead) => {
+    setAiFollowupLead(lead);
+    setAiFollowupResult("");
+    setAiFollowupLoading(true);
+    try {
+      const res = await apiRequest("POST", `/api/tenants/${tenantId}/leads/${lead.id}/ai-followup`, { lead });
+      const data = await res.json();
+      setAiFollowupResult(data.email || "Could not generate email.");
+    } catch {
+      setAiFollowupResult("AI not configured. Please add an Anthropic API key in Admin → Settings.");
+    } finally {
+      setAiFollowupLoading(false);
+    }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -837,6 +865,7 @@ export default function LeadsPage() {
                                   onDelete={(id) => setDeleteLeadId(id)}
                                   onMove={(id, s) => moveStageMutation.mutate({ id, stage: s })}
                                   onReassign={(id, userId) => updateMutation.mutate({ id, data: { assignedTo: userId } as Partial<Lead> })}
+                                  onAiFollowup={handleAiFollowup}
                                   currentStage={stage}
                                   staff={staff}
                                   assigneeName={assigneeNameById(lead.assignedTo)}
@@ -985,6 +1014,39 @@ export default function LeadsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* AI Follow-up Email Dialog */}
+      <Dialog open={!!aiFollowupLead} onOpenChange={(open) => { if (!open) { setAiFollowupLead(null); setAiFollowupResult(""); } }}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Brain className="w-5 h-5 text-[#4055FF]" />AI Follow-up Email</DialogTitle>
+            <DialogDescription>
+              {aiFollowupLead ? `Drafted for ${aiFollowupLead.name}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {aiFollowupLoading ? (
+            <div className="flex items-center justify-center py-10 gap-3 text-muted-foreground">
+              <Loader2 className="w-5 h-5 animate-spin" />Drafting email…
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="rounded-xl border bg-muted/40 p-4">
+                <pre className="whitespace-pre-wrap font-sans text-sm leading-7">{aiFollowupResult || "No email generated."}</pre>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" className="gap-2" onClick={() => { navigator.clipboard.writeText(aiFollowupResult); toast({ title: "Copied to clipboard" }); }}>
+                  <Copy className="w-4 h-4" />Copy
+                </Button>
+                {aiFollowupLead?.email && (
+                  <a href={`mailto:${aiFollowupLead.email}?body=${encodeURIComponent(aiFollowupResult)}`}>
+                    <Button className="gap-2"><Mail className="w-4 h-4" />Open in Mail</Button>
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

@@ -5,7 +5,7 @@ import {
   ArrowLeft, Mail, Phone, BadgeCheck, FileText, Calendar,
   Briefcase, ChevronRight, User as UserIcon, Globe2,
   AlertTriangle, Clock, Download, ExternalLink,
-  Plus, Pencil, Trash2, Star, BookUser, Upload, Loader2, Sparkles,
+  Plus, Pencil, Trash2, Star, BookUser, Upload, Loader2, Sparkles, Brain,
 } from "lucide-react";
 import { getPassportExpiryStatus, fmtPassportExpiry } from "@/pages/agency/customers";
 import { Button } from "@/components/ui/button";
@@ -807,6 +807,22 @@ export default function CustomerDetailPage() {
   const { data: authData } = useCurrentUser();
   const tenantId = authData?.user?.tenantId;
   const [createOpen, setCreateOpen] = useState(false);
+  const [aiSummary, setAiSummary] = useState("");
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
+  const [aiSummaryRan, setAiSummaryRan] = useState(false);
+
+  async function fetchAiSummary() {
+    if (!tenantId || !customerId) return;
+    setAiSummaryLoading(true);
+    try {
+      const r = await fetch(`/api/tenants/${tenantId}/customers/${customerId}/ai-summary`, { method: "POST", credentials: "include" });
+      if (!r.ok) throw new Error("Failed");
+      const d = await r.json();
+      setAiSummary(d.summary || "");
+    } catch { setAiSummary("Could not generate summary."); }
+    setAiSummaryLoading(false);
+    setAiSummaryRan(true);
+  }
 
   const { data, isLoading, error } = useQuery<CustomerDetailResponse>({
     queryKey: ["/api/tenants", tenantId, "customers", customerId],
@@ -889,6 +905,26 @@ export default function CustomerDetailPage() {
                   </Badge>
                 </div>
               </div>
+            </Card>
+
+            {/* === AI Profile Summary === */}
+            <Card className="p-4 border-[#4055FF]/20 bg-[#4055FF]/5 dark:bg-[#4055FF]/10">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-bold flex items-center gap-2">
+                  <Brain className="w-4 h-4 text-[#4055FF]" />AI Profile Summary
+                </h3>
+                <button
+                  onClick={fetchAiSummary}
+                  disabled={aiSummaryLoading}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-[#4055FF] hover:underline disabled:opacity-50"
+                >
+                  {aiSummaryLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                  {aiSummaryRan ? "Refresh" : "Generate"}
+                </button>
+              </div>
+              {aiSummaryLoading && <p className="text-xs text-muted-foreground">Analysing customer profile…</p>}
+              {!aiSummaryLoading && aiSummary && <p className="text-xs text-muted-foreground leading-relaxed">{aiSummary}</p>}
+              {!aiSummaryRan && !aiSummaryLoading && <p className="text-xs text-muted-foreground">Click Generate for an AI overview of this customer's travel history, application status, and risk profile.</p>}
             </Card>
 
             {/* === Passport library === */}

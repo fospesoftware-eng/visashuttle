@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Link as LinkIcon, QrCode, Trash2, Copy, ExternalLink,
-  Loader2, Send, ClipboardList, MoreVertical, Search, AlertCircle, X,
+  Loader2, Send, ClipboardList, MoreVertical, Search, AlertCircle, X, Brain, Sparkles,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import QRCode from "qrcode";
@@ -120,6 +120,27 @@ export default function ProposalsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [shareProposal, setShareProposal] = useState<Proposal | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Proposal | null>(null);
+  const [aiNotesProposal, setAiNotesProposal] = useState<Proposal | null>(null);
+  const [aiNotes, setAiNotes] = useState("");
+  const [aiNotesLoading, setAiNotesLoading] = useState(false);
+
+  async function handleAiNotes(proposal: Proposal) {
+    setAiNotesProposal(proposal);
+    setAiNotes("");
+    setAiNotesLoading(true);
+    try {
+      const r = await fetch(`/api/tenants/${tenantId}/proposals/ai-notes`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ proposal }),
+      });
+      if (!r.ok) throw new Error("Failed");
+      const d = await r.json();
+      setAiNotes(d.notes || "");
+    } catch { setAiNotes("Could not generate notes."); }
+    setAiNotesLoading(false);
+  }
 
   const proposalsQuery = useQuery<Proposal[]>({
     queryKey: ["/api/tenants", tenantId, "proposals"],
@@ -320,6 +341,10 @@ export default function ProposalsPage() {
                                   </DropdownMenuItem>
                                 )}
                                 <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => handleAiNotes(p)}>
+                                  <Brain className="w-4 h-4 mr-2 text-[#4055FF]" /> AI Notes
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   className="text-red-600 focus:text-red-600"
                                   onClick={() => setConfirmDelete(p)}
@@ -376,6 +401,32 @@ export default function ProposalsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* AI Notes Dialog */}
+      <Dialog open={!!aiNotesProposal} onOpenChange={(open) => { if (!open) { setAiNotesProposal(null); setAiNotes(""); } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Brain className="w-5 h-5 text-[#4055FF]" />AI Proposal Notes</DialogTitle>
+            <DialogDescription>{aiNotesProposal?.customerName} · {aiNotesProposal?.destinationCountry} {aiNotesProposal?.visaType}</DialogDescription>
+          </DialogHeader>
+          {aiNotesLoading ? (
+            <div className="flex items-center justify-center gap-3 py-10 text-muted-foreground">
+              <Loader2 className="w-5 h-5 animate-spin" />Drafting notes…
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="rounded-xl border bg-muted/40 p-4">
+                <pre className="whitespace-pre-wrap font-sans text-sm leading-7">{aiNotes || "No notes generated."}</pre>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" className="gap-2" onClick={() => { navigator.clipboard.writeText(aiNotes); toast({ title: "Copied" }); }}>
+                  <Copy className="w-4 h-4" />Copy
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

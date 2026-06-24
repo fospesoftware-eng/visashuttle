@@ -1,11 +1,11 @@
 import { Link } from "wouter";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Briefcase, Users, FileText, TrendingUp, Clock,
   AlertCircle, CheckCircle, ArrowRight, Plus, Loader2,
   DollarSign, Receipt, Wallet, AlertTriangle, Calendar as CalendarIcon,
-  Globe, Target, FileCheck, XCircle, Building2,
+  Globe, Target, FileCheck, XCircle, Building2, Brain, Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -90,6 +90,22 @@ const APPT_TYPE_LABEL: Record<string, string> = Object.fromEntries(
 export default function AgencyDashboard() {
   const { data: authData, isLoading: authLoading } = useCurrentUser();
   const tenantId = authData?.user?.tenantId;
+  const [aiInsights, setAiInsights] = useState<{ title: string; body: string; type: string }[]>([]);
+  const [aiInsightsLoading, setAiInsightsLoading] = useState(false);
+  const [aiInsightsRan, setAiInsightsRan] = useState(false);
+
+  async function fetchAiInsights() {
+    if (!tenantId) return;
+    setAiInsightsLoading(true);
+    try {
+      const r = await fetch(`/api/tenants/${tenantId}/ai-insights`, { method: "POST", headers: { "content-type": "application/json" }, credentials: "include" });
+      if (!r.ok) throw new Error("Failed");
+      const d = await r.json();
+      setAiInsights(d.insights || []);
+    } catch { setAiInsights([]); }
+    setAiInsightsLoading(false);
+    setAiInsightsRan(true);
+  }
 
   const { data: cases = [], isLoading: casesLoading } = useQuery<Case[]>({
     queryKey: ["/api/tenants", tenantId, "cases"],
@@ -618,6 +634,43 @@ export default function AgencyDashboard() {
                     </CardContent>
                   </Card>
                 )}
+
+                {/* AI Insights */}
+                <Card>
+                  <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Brain className="w-4 h-4 text-[#4055FF]" />AI Insights
+                    </CardTitle>
+                    <button
+                      onClick={fetchAiInsights}
+                      disabled={aiInsightsLoading}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-[#4055FF] hover:underline disabled:opacity-50"
+                    >
+                      {aiInsightsLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                      {aiInsightsRan ? "Refresh" : "Generate"}
+                    </button>
+                  </CardHeader>
+                  <CardContent>
+                    {!aiInsightsRan && !aiInsightsLoading && (
+                      <p className="text-xs text-muted-foreground">Click Generate for AI-powered business insights based on your pipeline.</p>
+                    )}
+                    {aiInsightsLoading && (
+                      <div className="flex items-center gap-2 py-4 text-xs text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin" />Analysing your pipeline…
+                      </div>
+                    )}
+                    {!aiInsightsLoading && aiInsights.length > 0 && (
+                      <div className="space-y-2">
+                        {aiInsights.map((ins, i) => (
+                          <div key={i} className={`p-3 rounded-lg border text-xs leading-relaxed ${ins.type === "warning" ? "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800" : ins.type === "opportunity" ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800" : "bg-[#4055FF]/5 border-[#4055FF]/20"}`}>
+                            <p className="font-bold mb-0.5">{ins.title}</p>
+                            <p className="text-muted-foreground">{ins.body}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
 
                 {/* At-a-glance numbers */}
                 <Card>

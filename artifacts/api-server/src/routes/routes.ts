@@ -10362,6 +10362,153 @@ Include 6-8 steps covering: checking eligibility, gathering documents, completin
     }
   });
 
+  // ── AI Integrations ────────────────────────────────────────────────────────
+
+  async function callClaudeHaiku(apiKey: string, prompt: string, maxTokens = 800): Promise<string> {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+      body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: maxTokens, messages: [{ role: "user", content: prompt }] }),
+    });
+    if (!r.ok) throw new Error(`AI error: ${r.status}`);
+    const d = await r.json();
+    return d.content?.[0]?.text || "";
+  }
+
+  async function getAiKey(): Promise<string | null> {
+    const cfg = await storage.getPlatformAiConfig().catch(() => null);
+    return cfg?.apiKey || process.env.ANTHROPIC_API_KEY || null;
+  }
+
+  // Lead: AI follow-up email drafter
+  app.post("/api/tenants/:tenantId/leads/:leadId/ai-followup", requireAgencyAuth, async (req, res) => {
+    const { tenantId, leadId } = req.params;
+    const apiKey = await getAiKey();
+    if (!apiKey) return res.status(400).json({ error: "AI not configured" });
+    // Read lead data from request body (frontend passes it directly)
+    const l = req.body?.lead || req.body || {};
+    const name = l.name || req.body?.name || "the lead";
+    const dest = l.destinationCountry || req.body?.destinationCountry || "their destination";
+    const visa = l.visaType || req.body?.visaType || "visa";
+    const stage = l.stage || req.body?.stage || "new";
+    const notes = l.notes || req.body?.notes || "";
+    const text = await callClaudeHaiku(apiKey, `Write a professional, friendly follow-up email for a visa agency to send to a potential client.
+
+Client: ${name}
+Destination: ${dest}
+Visa type: ${visa}
+Pipeline stage: ${stage}
+Notes: ${notes || "None"}
+
+Write a short email (4-6 sentences). Be warm, professional. Subject line first, then body. Don't use placeholders like [Agency Name] — use "our team" instead. End with a clear call to action.`);
+    res.json({ email: text });
+  });
+
+  // Dashboard: AI insights
+  app.post("/api/tenants/:tenantId/ai-insights", requireAgencyAuth, async (req, res) => {
+    const { tenantId } = req.params;
+    const apiKey = await getAiKey();
+    if (!apiKey) return res.status(400).json({ error: "AI not configured" });
+    const stats = req.body || {};
+    const text = await callClaudeHaiku(apiKey, `You are a visa agency business analyst. Based on the following agency dashboard data, provide 4 concise, actionable insights and recommendations.
+
+Data:
+- Active applications: ${stats.activeCases ?? 0}
+- Approved this month: ${stats.approvedCases ?? 0}
+- Rejected this month: ${stats.rejectedCases ?? 0}
+- Success rate: ${stats.successRate ?? 0}%
+- Leads in pipeline: ${stats.totalLeads ?? 0}
+- New leads this week: ${stats.newLeads ?? 0}
+- Documents pending review: ${stats.pendingDocs ?? 0}
+- Revenue billed: ${stats.billed ?? 0}
+- Revenue outstanding: ${stats.outstanding ?? 0}
+- Follow-ups due today: ${stats.followUpsDue ?? 0}
+
+Return ONLY a JSON array of 4 insights (no markdown):
+[
+  { "title": "Insight title", "body": "1-2 sentence actionable insight", "type": "positive|warning|info|action" }
+]`, 600);
+    try {
+      const insights = JSON.parse(text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim());
+      res.json({ insights });
+    } catch {
+      res.json({ insights: [{ title: "AI Insights", body: text, type: "info" }] });
+    }
+  });
+
+  // Proposals: AI notes generator
+  app.post("/api/tenants/:tenantId/proposals/ai-notes", requireAgencyAuth, async (req, res) => {
+    const { tenantId } = req.params;
+    const apiKey = await getAiKey();
+    if (!apiKey) return res.status(400).json({ error: "AI not configured" });
+    const { customerName, destinationCountry, visaType, notes } = req.body || {};
+    const text = await callClaudeHaiku(apiKey, `Write a professional proposal note for a visa agency for the following client and visa application.
+
+Client: ${customerName || "the applicant"}
+Destination: ${destinationCountry || "destination country"}
+Visa type: ${visaType || "visa"}
+Additional context: ${notes || "None"}
+
+Write 2-3 professional sentences as proposal notes. Cover: what the proposal includes, a reassurance about the process, and a next step. Tone: helpful, professional, confident. No greetings, no sign-off.`);
+    res.json({ notes: text });
+  });
+
+  // Customer detail: AI profile summary
+  app.post("/api/tenants/:tenantId/customers/:customerId/ai-summary", requireAgencyAuth, async (req, res) => {
+    const { tenantId, customerId } = req.params;
+    const apiKey = await getAiKey();
+    if (!apiKey) return res.status(400).json({ error: "AI not configured" });
+    const profile = req.body || {};
+    const text = await callClaudeHaiku(apiKey, `You are a visa agency officer. Summarise this customer's visa profile in 3-4 sentences covering their travel/visa history, strengths, and any concerns worth noting.
+
+Customer: ${profile.name || "Unknown"}
+Nationality: ${profile.nationality || "Not provided"}
+Passport: ${profile.passportNumber ? "Provided" : "Not provided"}, expires ${profile.passportExpiry || "unknown"}
+Previous visas: ${profile.previousVisas || "Not recorded"}
+Cases: ${profile.caseCount ?? 0} total, ${profile.approvedCount ?? 0} approved, ${profile.rejectedCount ?? 0} rejected
+Notes: ${profile.notes || "None"}
+
+Be concise and professional. Flag any risk signals clearly.`);
+    res.json({ summary: text });
+  });
+
+  // Case detail: AI risk assessment
+  app.post("/api/cases/:caseId/ai-risk", requireAgencyAuth, async (req, res) => {
+    const { caseId } = req.params;
+    const apiKey = await getAiKey();
+    if (!apiKey) return res.status(400).json({ error: "AI not configured" });
+    const caseData = req.body || {};
+    const text = await callClaudeHaiku(apiKey, `You are a senior visa officer. Assess the risk level for this visa application and return a structured JSON risk report.
+
+Application details:
+- Visa type: ${caseData.visaType || "Not specified"}
+- Destination: ${caseData.destinationCountry || "Not specified"}
+- Nationality: ${caseData.nationality || "Not specified"}
+- Status: ${caseData.status || "pending"}
+- Documents complete: ${caseData.docsComplete ?? false}
+- Missing documents: ${(caseData.missingDocs || []).join(", ") || "None"}
+- Previous refusals: ${caseData.previousRefusals || "None"}
+- Travel history: ${caseData.travelHistory || "Not provided"}
+- Notes: ${caseData.notes || "None"}
+
+Return ONLY valid JSON (no markdown):
+{
+  "riskLevel": "low|medium|high",
+  "riskScore": 0-100,
+  "summary": "2-sentence summary",
+  "strengths": ["strength1"],
+  "concerns": ["concern1"],
+  "recommendations": ["action1"],
+  "approvalLikelihood": "likely|uncertain|unlikely"
+}`, 600);
+    try {
+      const report = JSON.parse(text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim());
+      res.json(report);
+    } catch {
+      res.json({ riskLevel: "medium", riskScore: 50, summary: text, strengths: [], concerns: [], recommendations: [], approvalLikelihood: "uncertain" });
+    }
+  });
+
   // ── Platform extensions: granular admin roles, support tickets, tenant
   // subscription billing. The agency pays the platform via Cashfree using
   // PLATFORM creds (not tenant-scoped) — different from the invoice flow.
