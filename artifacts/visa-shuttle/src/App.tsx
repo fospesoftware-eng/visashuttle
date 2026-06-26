@@ -23,6 +23,8 @@ import LoginPage from "@/pages/login";
 import SignupPage from "@/pages/signup";
 import JoinPage from "@/pages/join";
 import SignInPage from "@/pages/sign-in";
+import ForgotPasswordPage from "@/pages/forgot-password";
+import ResetPasswordPage from "@/pages/reset-password";
 import CheckPage from "@/pages/check";
 import AccountPage from "@/pages/account";
 import PricingPage from "@/pages/pricing";
@@ -166,6 +168,8 @@ function Router() {
       <Route path="/growth-hub">{() => <GrowthHubDashboardPage />}</Route>
       <Route path="/join" component={JoinPage} />
       <Route path="/sign-in" component={SignInPage} />
+      <Route path="/forgot-password" component={ForgotPasswordPage} />
+      <Route path="/reset-password" component={ResetPasswordPage} />
       <Route path="/verify-email" component={VerifyEmailPage} />
       <Route path="/check" component={CheckPage} />
       <Route path="/account" component={AccountPage} />

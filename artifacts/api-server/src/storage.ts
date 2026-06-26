@@ -316,6 +316,8 @@ export interface IStorage {
   getB2cUserByEmail(email: string): Promise<B2cUser | undefined>;
   getB2cUserByPhone(phone: string): Promise<B2cUser | undefined>;
   getB2cUserByVerificationToken(token: string): Promise<B2cUser | undefined>;
+  getB2cUserByPasswordResetToken(token: string): Promise<B2cUser | undefined>;
+  setB2cPasswordReset(id: string, token: string | null, expires: Date | null): Promise<void>;
   getAllB2cUsers(): Promise<B2cUser[]>;
   createB2cUser(user: InsertB2cUser): Promise<B2cUser>;
   updateB2cUser(id: string, data: Partial<Omit<B2cUser, 'id' | 'createdAt'>>): Promise<B2cUser | undefined>;
@@ -853,6 +855,8 @@ export class MemStorage implements IStorage {
       adminDeepCheckBonus: 0,
       emailVerified: true,
       emailVerificationToken: null,
+      passwordResetToken: null,
+      passwordResetExpires: null,
       stripeCustomerId: null,
       createdAt: new Date(),
     };
@@ -873,6 +877,8 @@ export class MemStorage implements IStorage {
       adminDeepCheckBonus: 0,
       emailVerified: true,
       emailVerificationToken: null,
+      passwordResetToken: null,
+      passwordResetExpires: null,
       stripeCustomerId: null,
       createdAt: new Date(),
     };
@@ -1960,6 +1966,16 @@ export class MemStorage implements IStorage {
     return Array.from(this.b2cUsersMap.values()).find(u => u.emailVerificationToken === token);
   }
 
+  async getB2cUserByPasswordResetToken(token: string): Promise<B2cUser | undefined> {
+    return Array.from(this.b2cUsersMap.values()).find(u => u.passwordResetToken === token);
+  }
+
+  async setB2cPasswordReset(id: string, token: string | null, expires: Date | null): Promise<void> {
+    const user = this.b2cUsersMap.get(id);
+    if (!user) return;
+    this.b2cUsersMap.set(id, { ...user, passwordResetToken: token, passwordResetExpires: expires });
+  }
+
   async getB2cUserByPhone(phone: string): Promise<B2cUser | undefined> {
     return Array.from(this.b2cUsersMap.values()).find(
       u => u.phone === phone
@@ -1975,6 +1991,8 @@ export class MemStorage implements IStorage {
       subscriptionPlan: user.subscriptionPlan ?? "free",
       checkLimit: user.checkLimit ?? 1,
       deepCheckAccess: user.deepCheckAccess ?? false,
+      passwordResetToken: user.passwordResetToken ?? null,
+      passwordResetExpires: user.passwordResetExpires ?? null,
       stripeCustomerId: user.stripeCustomerId ?? null,
       createdAt: new Date(),
     };
@@ -3755,6 +3773,25 @@ class HybridStorage extends MemStorage {
   async getB2cUserByVerificationToken(token: string): Promise<B2cUser | undefined> {
     const rows = await db.select().from(b2cUsers).where(eq(b2cUsers.emailVerificationToken, token)).limit(1);
     return rows[0];
+  }
+
+  // Idempotent self-migration so password reset works without a manual `db push`.
+  private async ensureB2cAuthColumns(): Promise<void> {
+    await db.execute(sql`ALTER TABLE b2c_users ADD COLUMN IF NOT EXISTS password_reset_token text`);
+    await db.execute(sql`ALTER TABLE b2c_users ADD COLUMN IF NOT EXISTS password_reset_expires timestamp`);
+  }
+
+  async getB2cUserByPasswordResetToken(token: string): Promise<B2cUser | undefined> {
+    await this.ensureB2cAuthColumns();
+    const rows = await db.select().from(b2cUsers).where(eq(b2cUsers.passwordResetToken, token)).limit(1);
+    return rows[0];
+  }
+
+  async setB2cPasswordReset(id: string, token: string | null, expires: Date | null): Promise<void> {
+    await this.ensureB2cAuthColumns();
+    await db.update(b2cUsers)
+      .set({ passwordResetToken: token, passwordResetExpires: expires })
+      .where(eq(b2cUsers.id, id));
   }
 
   async createB2cUser(user: InsertB2cUser): Promise<B2cUser> {

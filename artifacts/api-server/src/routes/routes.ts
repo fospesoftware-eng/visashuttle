@@ -6979,6 +6979,91 @@ Rules:
     }
   });
 
+  // ── B2C Password Reset ────────────────────────────────────────────────────
+
+  // Request a password reset link. Always responds with success so the endpoint
+  // can't be used to discover which emails have accounts.
+  app.post("/api/b2c/auth/forgot-password", authRateLimiter, async (req, res) => {
+    try {
+      const email = String(req.body?.email || "").toLowerCase().trim();
+      const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRe.test(email)) return res.status(400).json({ error: "Please enter a valid email address" });
+
+      const genericOk = {
+        ok: true,
+        message: "If an account exists for that email, we've sent a password reset link. Please check your inbox and spam folder.",
+      };
+
+      const user = await storage.getB2cUserByEmail(email);
+      if (!user) return res.json(genericOk);
+
+      const token = randomBytes(32).toString("hex");
+      const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+      await storage.setB2cPasswordReset(user.id, token, expires);
+
+      const baseUrl = String(req.headers.origin || process.env.APP_BASE_URL || "https://visashuttle.com");
+      const resetUrl = `${baseUrl}/reset-password?token=${token}`;
+
+      await sendTransactionalEmail({
+        to: user.email,
+        toName: user.fullName,
+        subject: "Reset your Visa Shuttle password",
+        html: buildVerificationEmail({
+          name: user.fullName,
+          verifyUrl: resetUrl,
+          title: "Reset your password",
+          bodyText: "We received a request to reset your Visa Shuttle password. Click the button below to choose a new password. <strong>This link expires in 1 hour.</strong>",
+          buttonText: "Reset Password",
+        }),
+        text: `Hi ${user.fullName},\n\nWe received a request to reset your Visa Shuttle password. Use the link below to choose a new one (expires in 1 hour):\n${resetUrl}\n\nIf you didn't request this, you can safely ignore this email — your password won't change.`,
+      });
+
+      res.json(genericOk);
+    } catch (err: any) {
+      req.log.error({ err }, "[b2c/auth/forgot-password] error");
+      res.status(500).json({ error: "Failed to send reset email. Please try again." });
+    }
+  });
+
+  // Validate a reset token so the reset page can show an invalid-link state up front.
+  app.get("/api/b2c/auth/reset-password/validate", async (req, res) => {
+    try {
+      const token = String(req.query.token || "").trim();
+      if (!token) return res.json({ valid: false });
+      const user = await storage.getB2cUserByPasswordResetToken(token);
+      const valid = !!user && !!user.passwordResetExpires
+        && new Date(user.passwordResetExpires).getTime() > Date.now();
+      res.json({ valid });
+    } catch (err: any) {
+      req.log.error({ err }, "[b2c/auth/reset-password/validate] error");
+      res.json({ valid: false });
+    }
+  });
+
+  // Complete the reset with the token + a new password.
+  app.post("/api/b2c/auth/reset-password", authRateLimiter, async (req, res) => {
+    try {
+      const token = String(req.body?.token || "").trim();
+      const password = String(req.body?.password || "");
+      if (!token) return res.status(400).json({ error: "Reset token is missing" });
+      if (password.length < 8) return res.status(400).json({ error: "Password must be at least 8 characters" });
+
+      const user = await storage.getB2cUserByPasswordResetToken(token);
+      if (!user || !user.passwordResetExpires || new Date(user.passwordResetExpires).getTime() < Date.now()) {
+        return res.status(400).json({ error: "This reset link is invalid or has expired. Please request a new one." });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      await storage.updateB2cUser(user.id, { password: hashedPassword });
+      await storage.setB2cPasswordReset(user.id, null, null);
+
+      res.json({ ok: true, message: "Your password has been reset. You can now sign in with your new password." });
+    } catch (err: any) {
+      req.log.error({ err }, "[b2c/auth/reset-password] error");
+      res.status(500).json({ error: "Failed to reset password. Please try again." });
+    }
+  });
+
   // ── B2C Payments: Deep Check / Pro via configured platform gateway ───────
   app.post("/api/b2c/payments/deep-check/coupon", requireB2cAuth, async (req, res) => {
     const price = await getB2cPlanPrice(req.body?.planKey || "deep", req.body?.currency);

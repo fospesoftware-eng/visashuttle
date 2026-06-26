@@ -497,6 +497,8 @@ export const b2cUsers = pgTable("b2c_users", {
   adminDeepCheckBonus: integer("admin_deep_check_bonus").notNull().default(0),
   emailVerified: boolean("email_verified").notNull().default(false),
   emailVerificationToken: text("email_verification_token"),
+  passwordResetToken: text("password_reset_token"),
+  passwordResetExpires: timestamp("password_reset_expires"),
   stripeCustomerId: text("stripe_customer_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
