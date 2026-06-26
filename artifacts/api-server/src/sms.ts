@@ -1,15 +1,20 @@
 /**
  * SMS Gateway Provider Abstraction
  *
- * Providers: MessageCentral (default), MSG91, Zavu
+ * Providers: MessageCentral (default), MSG91, Zavu, Ping4SMS
  *
  * Credentials are read from the database (admin-managed) first,
  * falling back to environment variables if not set in DB.
+ *
+ * Note: MSG91 / MessageCentral / Zavu generate and verify the OTP themselves.
+ * Ping4SMS is a raw SMS gateway, so for that provider we generate the OTP
+ * locally, deliver it as the SMS body, and verify it against the value we
+ * stashed in the session (returned from sendOtp as `verificationId`).
  */
 
 import type { SmsConfig } from "@workspace/db";
 
-export type SmsProvider = "msg91" | "zavu" | "messagecentral";
+export type SmsProvider = "msg91" | "zavu" | "messagecentral" | "ping4sms";
 
 export interface SmsProviderConfig {
   provider?: string;
@@ -19,6 +24,11 @@ export interface SmsProviderConfig {
   zauvApiKey?: string | null;
   mcCustomerId?: string | null;
   mcAuthToken?: string | null;
+  ping4smsApiKey?: string | null;
+  ping4smsSenderId?: string | null;
+  ping4smsRoute?: string | null;
+  ping4smsTemplateId?: string | null;
+  ping4smsOtpTemplate?: string | null;
 }
 
 export interface OtpSendResult {
@@ -44,6 +54,11 @@ function resolveConfig(dbConfig?: SmsProviderConfig | null): SmsProviderConfig {
     zauvApiKey: dbConfig?.zauvApiKey || process.env.ZAVU_API_KEY || null,
     mcCustomerId: dbConfig?.mcCustomerId || process.env.MC_CUSTOMER_ID || null,
     mcAuthToken: dbConfig?.mcAuthToken || process.env.MC_AUTH_TOKEN || null,
+    ping4smsApiKey: dbConfig?.ping4smsApiKey || process.env.PING4SMS_API_KEY || null,
+    ping4smsSenderId: dbConfig?.ping4smsSenderId || process.env.PING4SMS_SENDER_ID || null,
+    ping4smsRoute: dbConfig?.ping4smsRoute || process.env.PING4SMS_ROUTE || "2",
+    ping4smsTemplateId: dbConfig?.ping4smsTemplateId || process.env.PING4SMS_TEMPLATE_ID || null,
+    ping4smsOtpTemplate: dbConfig?.ping4smsOtpTemplate || process.env.PING4SMS_OTP_TEMPLATE || null,
   };
 }
 
@@ -51,6 +66,7 @@ function getActiveProvider(cfg: SmsProviderConfig): SmsProvider {
   const p = (cfg.provider || "messagecentral").toLowerCase();
   if (p === "zavu") return "zavu";
   if (p === "msg91") return "msg91";
+  if (p === "ping4sms") return "ping4sms";
   return "messagecentral";
 }
 
@@ -272,6 +288,90 @@ async function mcVerifyOtp(
   }
 }
 
+// ─── Ping4SMS ─────────────────────────────────────────────────────────────────
+// Raw HTTP SMS gateway. We generate the OTP locally, send it as the message
+// body, and return the code as `verificationId` so the caller can stash it in
+// the session and compare on verify.
+//   Send:  GET https://site.ping4sms.com/api/smsapi?key=&route=&sender=&number=&sms=&templateid=
+//   Returns a numeric message id on success, or a 101–110 error code.
+
+const PING4SMS_BASE = "https://site.ping4sms.com/api";
+const PING4SMS_DEFAULT_OTP_TEMPLATE =
+  "Your Visa Shuttle verification code is {otp}. It is valid for 10 minutes. Do not share it with anyone.";
+
+const PING4SMS_ERRORS: Record<string, string> = {
+  "101": "Invalid user / API key",
+  "102": "Invalid sender ID",
+  "103": "Invalid contact number",
+  "104": "Invalid route",
+  "105": "Invalid message",
+  "106": "Spam blocked",
+  "107": "Promotional content blocked",
+  "108": "Low credits in the selected route",
+  "109": "Promotional route only works between 9am and 8:45pm",
+  "110": "Invalid DLT Template ID",
+};
+
+function generateOtpCode(): string {
+  // 6-digit numeric OTP, no leading-zero loss
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+async function ping4smsSendOtp(phone: string, cfg: SmsProviderConfig): Promise<OtpSendResult> {
+  if (!cfg.ping4smsApiKey) return { success: false, error: "Ping4SMS API key is not configured" };
+  if (!cfg.ping4smsSenderId) return { success: false, error: "Ping4SMS Sender ID is not configured" };
+
+  const number = phone.replace(/\D/g, "");
+  if (!number) return { success: false, error: "Invalid phone number" };
+
+  const code = generateOtpCode();
+  const template = cfg.ping4smsOtpTemplate || PING4SMS_DEFAULT_OTP_TEMPLATE;
+  const message = template.replace(/\{otp\}/gi, code).replace(/\{#var#\}/gi, code);
+
+  const params = new URLSearchParams({
+    key: cfg.ping4smsApiKey,
+    route: cfg.ping4smsRoute || "2",
+    sender: cfg.ping4smsSenderId,
+    number,
+    sms: message,
+  });
+  if (cfg.ping4smsTemplateId) params.set("templateid", cfg.ping4smsTemplateId);
+
+  try {
+    const response = await fetch(`${PING4SMS_BASE}/smsapi?${params.toString()}`, { method: "GET" });
+    const text = (await response.text()).trim();
+
+    if (PING4SMS_ERRORS[text]) {
+      console.error("[Ping4SMS] Send error:", text, PING4SMS_ERRORS[text]);
+      return { success: false, error: `Ping4SMS: ${PING4SMS_ERRORS[text]}` };
+    }
+    // Any numeric value that isn't an error code is the unique message id → sent.
+    if (!/^\d+$/.test(text)) {
+      console.error("[Ping4SMS] Unexpected response:", text);
+      return { success: false, error: `Ping4SMS error: ${text.slice(0, 160) || "no response"}` };
+    }
+
+    return { success: true, verificationId: code };
+  } catch (err) {
+    console.error("[Ping4SMS] Send exception:", err);
+    return { success: false, error: "Ping4SMS service temporarily unavailable" };
+  }
+}
+
+async function ping4smsVerifyOtp(
+  otp: string,
+  verificationId: string,
+): Promise<OtpVerifyResult> {
+  if (!verificationId) {
+    return { success: false, error: "Verification session expired — please request a new OTP" };
+  }
+  const entered = String(otp).replace(/\D/g, "");
+  if (entered.length > 0 && entered === verificationId) {
+    return { success: true };
+  }
+  return { success: false, error: "Invalid or expired OTP code" };
+}
+
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 export async function sendOtp(phone: string, dbConfig?: SmsProviderConfig | null): Promise<OtpSendResult> {
@@ -280,6 +380,7 @@ export async function sendOtp(phone: string, dbConfig?: SmsProviderConfig | null
   console.log(`[SMS] Sending OTP via ${provider} to ${phone}`);
   if (provider === "zavu") return zavuSendOtp(phone, cfg);
   if (provider === "msg91") return msg91SendOtp(phone, cfg);
+  if (provider === "ping4sms") return ping4smsSendOtp(phone, cfg);
   return mcSendOtp(phone, cfg);
 }
 
@@ -294,6 +395,7 @@ export async function verifyOtp(
   console.log(`[SMS] Verifying OTP via ${provider} for ${phone}`);
   if (provider === "zavu") return zavuVerifyOtp(phone, otp, cfg);
   if (provider === "msg91") return msg91VerifyOtp(phone, otp, cfg);
+  if (provider === "ping4sms") return ping4smsVerifyOtp(otp, verificationId ?? "");
   return mcVerifyOtp(phone, otp, cfg, verificationId ?? "");
 }
 
@@ -302,6 +404,7 @@ export function getSmsProviderStatus(dbConfig?: SmsProviderConfig | null): {
   msg91Ready: boolean;
   zavuReady: boolean;
   mcReady: boolean;
+  ping4smsReady: boolean;
   usingDb: boolean;
 } {
   const cfg = resolveConfig(dbConfig);
@@ -310,6 +413,7 @@ export function getSmsProviderStatus(dbConfig?: SmsProviderConfig | null): {
     msg91Ready: !!(cfg.msg91AuthKey && cfg.msg91TemplateId),
     zavuReady: !!cfg.zauvApiKey,
     mcReady: !!(cfg.mcCustomerId && cfg.mcAuthToken),
-    usingDb: !!(dbConfig?.msg91AuthKey || dbConfig?.zauvApiKey || dbConfig?.mcCustomerId),
+    ping4smsReady: !!(cfg.ping4smsApiKey && cfg.ping4smsSenderId),
+    usingDb: !!(dbConfig?.msg91AuthKey || dbConfig?.zauvApiKey || dbConfig?.mcCustomerId || dbConfig?.ping4smsApiKey),
   };
 }

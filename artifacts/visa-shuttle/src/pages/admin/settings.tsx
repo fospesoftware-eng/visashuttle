@@ -26,14 +26,21 @@ interface SmsConfigResponse {
   zauvApiKey: string;
   mcCustomerId: string;
   mcAuthToken: string;
+  ping4smsApiKey: string;
+  ping4smsSenderId: string;
+  ping4smsRoute: string;
+  ping4smsTemplateId: string;
+  ping4smsOtpTemplate: string;
   hasMsg91AuthKey: boolean;
   hasZavuApiKey: boolean;
   hasMcCredentials: boolean;
+  hasPing4smsApiKey: boolean;
   status: {
     provider: string;
     msg91Ready: boolean;
     zavuReady: boolean;
     mcReady: boolean;
+    ping4smsReady: boolean;
     usingDb: boolean;
   };
 }
@@ -1780,6 +1787,8 @@ function SmsGatewayCard() {
   const [testPhone, setTestPhone] = useState("");
   const [showZavu, setShowZavu] = useState(false);
   const [showMc, setShowMc] = useState(false);
+  const [showPing4sms, setShowPing4sms] = useState(false);
+  const [showPing4smsKey, setShowPing4smsKey] = useState(false);
   const [form, setForm] = useState({
     msg91AuthKey: "",
     msg91TemplateId: "",
@@ -1787,6 +1796,11 @@ function SmsGatewayCard() {
     zauvApiKey: "",
     mcCustomerId: "",
     mcAuthToken: "",
+    ping4smsApiKey: "",
+    ping4smsSenderId: "",
+    ping4smsRoute: "2",
+    ping4smsTemplateId: "",
+    ping4smsOtpTemplate: "",
   });
 
   const { data: cfg, isLoading } = useQuery<SmsConfigResponse>({
@@ -1803,6 +1817,11 @@ function SmsGatewayCard() {
         zauvApiKey: cfg.zauvApiKey || "",
         mcCustomerId: cfg.mcCustomerId || "",
         mcAuthToken: cfg.mcAuthToken || "",
+        ping4smsApiKey: cfg.ping4smsApiKey || "",
+        ping4smsSenderId: cfg.ping4smsSenderId || "",
+        ping4smsRoute: cfg.ping4smsRoute || "2",
+        ping4smsTemplateId: cfg.ping4smsTemplateId || "",
+        ping4smsOtpTemplate: cfg.ping4smsOtpTemplate || "",
       });
     }
   }, [cfg]);
@@ -1843,18 +1862,21 @@ function SmsGatewayCard() {
   const isMsg91Ready = cfg?.status?.msg91Ready;
   const isZavuReady = cfg?.status?.zavuReady;
   const isMcReady = cfg?.status?.mcReady;
+  const isPing4smsReady = cfg?.status?.ping4smsReady;
   const activeProvider = cfg?.status?.provider ?? "messagecentral";
 
   function getProviderLabel(p: string) {
     if (p === "msg91") return isMsg91Ready ? "MSG91 Active" : "MSG91 Not Configured";
     if (p === "zavu") return isZavuReady ? "Zavu Active" : "Zavu Not Configured";
     if (p === "messagecentral") return isMcReady ? "MessageCentral Active" : "MessageCentral Not Configured";
+    if (p === "ping4sms") return isPing4smsReady ? "Ping4SMS Active" : "Ping4SMS Not Configured";
     return p;
   }
   function isActiveProviderReady() {
     if (activeProvider === "msg91") return isMsg91Ready;
     if (activeProvider === "zavu") return isZavuReady;
     if (activeProvider === "messagecentral") return isMcReady;
+    if (activeProvider === "ping4sms") return isPing4smsReady;
     return false;
   }
 
@@ -1907,6 +1929,12 @@ function SmsGatewayCard() {
                 <div className="flex items-center gap-2">
                   MessageCentral
                   {isMcReady && <CheckCircle className="w-3.5 h-3.5 text-green-500" />}
+                </div>
+              </SelectItem>
+              <SelectItem value="ping4sms">
+                <div className="flex items-center gap-2">
+                  Ping4SMS
+                  {isPing4smsReady && <CheckCircle className="w-3.5 h-3.5 text-green-500" />}
                 </div>
               </SelectItem>
             </SelectContent>
@@ -2125,6 +2153,135 @@ function SmsGatewayCard() {
                   <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
                   <p className="text-xs text-amber-700 dark:text-amber-300">
                     Customer ID and Auth Token are required to use MessageCentral. Enter both and save.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <Separator />
+
+        {/* ── Ping4SMS Section (collapsible) ────────── */}
+        <div className="space-y-3">
+          <button
+            type="button"
+            className="flex items-center gap-2 text-sm font-medium w-full text-left group"
+            onClick={() => setShowPing4sms(s => !s)}
+            data-testid="button-toggle-ping4sms"
+          >
+            <span className="flex-1 flex items-center gap-2">
+              Ping4SMS Credentials
+              {provider === "ping4sms" && (
+                <Badge variant="outline" className="text-xs border-blue-300 text-blue-600 dark:text-blue-400">Active</Badge>
+              )}
+              {isPing4smsReady && <CheckCircle className="w-4 h-4 text-green-500" />}
+            </span>
+            {showPing4sms ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+          </button>
+
+          {showPing4sms && (
+            <div className="space-y-3 pl-0">
+              <div className="space-y-1.5">
+                <Label htmlFor="ping4smsApiKey">
+                  API Key <span className="text-red-500">*</span>
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="ping4smsApiKey"
+                    type={showPing4smsKey ? "text" : "password"}
+                    placeholder={cfg?.hasPing4smsApiKey ? "Key saved — enter new value to update" : "Paste your Ping4SMS account API key"}
+                    value={form.ping4smsApiKey}
+                    onChange={e => setForm(f => ({ ...f, ping4smsApiKey: e.target.value }))}
+                    className="pr-10 font-mono text-sm"
+                    data-testid="input-ping4sms-api-key"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowPing4smsKey(s => !s)}
+                  >
+                    {showPing4smsKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Your account API key from the{" "}
+                  <a href="https://site.ping4sms.com" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+                    Ping4SMS dashboard
+                  </a>
+                </p>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="ping4smsSenderId">
+                    Sender ID <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="ping4smsSenderId"
+                    placeholder="e.g. ALERTS"
+                    value={form.ping4smsSenderId}
+                    onChange={e => setForm(f => ({ ...f, ping4smsSenderId: e.target.value }))}
+                    className="font-mono text-sm"
+                    data-testid="input-ping4sms-sender-id"
+                  />
+                  <p className="text-xs text-muted-foreground">6-char DLT-approved sender ID</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="ping4smsRoute">Route</Label>
+                  <Select
+                    value={form.ping4smsRoute}
+                    onValueChange={v => setForm(f => ({ ...f, ping4smsRoute: v }))}
+                  >
+                    <SelectTrigger id="ping4smsRoute" data-testid="select-ping4sms-route">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Promotional (1)</SelectItem>
+                      <SelectItem value="2">Transactional (2)</SelectItem>
+                      <SelectItem value="3">Optin (3)</SelectItem>
+                      <SelectItem value="4">Trans OTP (4)</SelectItem>
+                      <SelectItem value="5">Promo DND (5)</SelectItem>
+                      <SelectItem value="7">International (7)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Transactional / Trans OTP for OTPs</p>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="ping4smsTemplateId">DLT Template ID</Label>
+                <Input
+                  id="ping4smsTemplateId"
+                  placeholder="e.g. 1234567890123456789"
+                  value={form.ping4smsTemplateId}
+                  onChange={e => setForm(f => ({ ...f, ping4smsTemplateId: e.target.value }))}
+                  className="font-mono text-sm"
+                  data-testid="input-ping4sms-template-id"
+                />
+                <p className="text-xs text-muted-foreground">Required for Indian DLT routes — must match the OTP message below</p>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="ping4smsOtpTemplate">OTP Message Template</Label>
+                <Input
+                  id="ping4smsOtpTemplate"
+                  placeholder="Your Visa Shuttle verification code is {otp}. It is valid for 10 minutes."
+                  value={form.ping4smsOtpTemplate}
+                  onChange={e => setForm(f => ({ ...f, ping4smsOtpTemplate: e.target.value }))}
+                  className="text-sm"
+                  data-testid="input-ping4sms-otp-template"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Use <code className="font-mono">{"{otp}"}</code> where the code should appear. Must match your registered DLT template. Leave blank for the default message.
+                </p>
+              </div>
+
+              {!isPing4smsReady && (
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                  <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-amber-700 dark:text-amber-300">
+                    API Key and Sender ID are required to use Ping4SMS. A DLT Template ID is also needed for Indian transactional routes.
                   </p>
                 </div>
               )}

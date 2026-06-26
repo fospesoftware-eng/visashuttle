@@ -2141,6 +2141,11 @@ export class MemStorage implements IStorage {
       zauvApiKey: data.zauvApiKey !== undefined ? data.zauvApiKey : existing?.zauvApiKey ?? null,
       mcCustomerId: data.mcCustomerId !== undefined ? data.mcCustomerId : existing?.mcCustomerId ?? null,
       mcAuthToken: data.mcAuthToken !== undefined ? data.mcAuthToken : existing?.mcAuthToken ?? null,
+      ping4smsApiKey: data.ping4smsApiKey !== undefined ? data.ping4smsApiKey : existing?.ping4smsApiKey ?? null,
+      ping4smsSenderId: data.ping4smsSenderId !== undefined ? data.ping4smsSenderId : existing?.ping4smsSenderId ?? null,
+      ping4smsRoute: data.ping4smsRoute !== undefined ? data.ping4smsRoute : existing?.ping4smsRoute ?? null,
+      ping4smsTemplateId: data.ping4smsTemplateId !== undefined ? data.ping4smsTemplateId : existing?.ping4smsTemplateId ?? null,
+      ping4smsOtpTemplate: data.ping4smsOtpTemplate !== undefined ? data.ping4smsOtpTemplate : existing?.ping4smsOtpTemplate ?? null,
       updatedAt: new Date(),
     };
     return this.smsConfigRecord;
@@ -3936,8 +3941,29 @@ class HybridStorage extends MemStorage {
   }
 
   // SMS Config — single-row config stored in DB
+  // Idempotent self-migration so newer SMS providers (e.g. Ping4SMS) work
+  // without a manual `db push`. Memoized so the ALTERs run at most once.
+  private smsConfigColumnsEnsured?: Promise<void>;
+  private ensureSmsConfigColumns(): Promise<void> {
+    if (!this.smsConfigColumnsEnsured) {
+      this.smsConfigColumnsEnsured = (async () => {
+        await db.execute(sql`ALTER TABLE sms_config ADD COLUMN IF NOT EXISTS ping4sms_api_key text`);
+        await db.execute(sql`ALTER TABLE sms_config ADD COLUMN IF NOT EXISTS ping4sms_sender_id text`);
+        await db.execute(sql`ALTER TABLE sms_config ADD COLUMN IF NOT EXISTS ping4sms_route text`);
+        await db.execute(sql`ALTER TABLE sms_config ADD COLUMN IF NOT EXISTS ping4sms_template_id text`);
+        await db.execute(sql`ALTER TABLE sms_config ADD COLUMN IF NOT EXISTS ping4sms_otp_template text`);
+      })().catch((err) => {
+        // Reset so a later call can retry (e.g. transient error, or table created later).
+        this.smsConfigColumnsEnsured = undefined;
+        throw err;
+      });
+    }
+    return this.smsConfigColumnsEnsured;
+  }
+
   async getSmsConfig(): Promise<SmsConfig | undefined> {
     try {
+      await this.ensureSmsConfigColumns();
       const rows = await db.select().from(smsConfigTable).limit(1);
       return rows[0];
     } catch (error) {
@@ -3951,6 +3977,7 @@ class HybridStorage extends MemStorage {
 
   async upsertSmsConfig(data: Partial<InsertSmsConfig>): Promise<SmsConfig> {
     try {
+      await this.ensureSmsConfigColumns();
       const existing = await this.getSmsConfig();
       if (existing) {
         const rows = await db.update(smsConfigTable)

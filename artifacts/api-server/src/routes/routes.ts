@@ -6133,16 +6133,23 @@ Rules:
       zauvApiKey: cfg?.zauvApiKey ? maskKey(cfg.zauvApiKey) : "",
       mcCustomerId: cfg?.mcCustomerId ?? "",
       mcAuthToken: cfg?.mcAuthToken ? maskKey(cfg.mcAuthToken) : "",
+      ping4smsApiKey: cfg?.ping4smsApiKey ? maskKey(cfg.ping4smsApiKey) : "",
+      ping4smsSenderId: cfg?.ping4smsSenderId ?? "",
+      ping4smsRoute: cfg?.ping4smsRoute ?? "2",
+      ping4smsTemplateId: cfg?.ping4smsTemplateId ?? "",
+      ping4smsOtpTemplate: cfg?.ping4smsOtpTemplate ?? "",
       status,
       hasMsg91AuthKey: !!cfg?.msg91AuthKey,
       hasZavuApiKey: !!cfg?.zauvApiKey,
       hasMcCredentials: !!(cfg?.mcCustomerId && cfg?.mcAuthToken),
+      hasPing4smsApiKey: !!cfg?.ping4smsApiKey,
     });
   });
 
   // ── Admin: Save SMS Config ────────────────────────────────────────────────
   app.post("/api/admin/sms-config", requireAdminAuth, async (req, res) => {
-    const { provider, msg91AuthKey, msg91TemplateId, msg91SenderId, zauvApiKey, mcCustomerId, mcAuthToken } = req.body;
+    const { provider, msg91AuthKey, msg91TemplateId, msg91SenderId, zauvApiKey, mcCustomerId, mcAuthToken,
+      ping4smsApiKey, ping4smsSenderId, ping4smsRoute, ping4smsTemplateId, ping4smsOtpTemplate } = req.body;
     // Only overwrite a field if the new value is not a masked placeholder
     const patch: Record<string, any> = { provider };
     if (msg91AuthKey && !msg91AuthKey.includes("•")) patch.msg91AuthKey = msg91AuthKey;
@@ -6151,6 +6158,11 @@ Rules:
     if (zauvApiKey && !zauvApiKey.includes("•")) patch.zauvApiKey = zauvApiKey;
     if (mcCustomerId !== undefined) patch.mcCustomerId = mcCustomerId || null;
     if (mcAuthToken && !mcAuthToken.includes("•")) patch.mcAuthToken = mcAuthToken;
+    if (ping4smsApiKey && !ping4smsApiKey.includes("•")) patch.ping4smsApiKey = ping4smsApiKey;
+    if (ping4smsSenderId !== undefined) patch.ping4smsSenderId = ping4smsSenderId || null;
+    if (ping4smsRoute !== undefined) patch.ping4smsRoute = ping4smsRoute || null;
+    if (ping4smsTemplateId !== undefined) patch.ping4smsTemplateId = ping4smsTemplateId || null;
+    if (ping4smsOtpTemplate !== undefined) patch.ping4smsOtpTemplate = ping4smsOtpTemplate || null;
     await storage.upsertSmsConfig(patch);
     const updated = await storage.getSmsConfig();
     const status = getSmsProviderStatus(updated);

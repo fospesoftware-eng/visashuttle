@@ -616,6 +616,11 @@ export const smsConfig = pgTable("sms_config", {
   zauvApiKey: text("zavu_api_key"),
   mcCustomerId: text("mc_customer_id"),
   mcAuthToken: text("mc_auth_token"),
+  ping4smsApiKey: text("ping4sms_api_key"),
+  ping4smsSenderId: text("ping4sms_sender_id"),
+  ping4smsRoute: text("ping4sms_route"),
+  ping4smsTemplateId: text("ping4sms_template_id"),
+  ping4smsOtpTemplate: text("ping4sms_otp_template"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
