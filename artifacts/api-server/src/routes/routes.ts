@@ -7011,12 +7011,21 @@ Rules:
 
       const token = randomBytes(32).toString("hex");
       const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-      await storage.setB2cPasswordReset(user.id, token, expires);
+
+      // Persist the reset token. Isolated so a DB/migration failure is logged
+      // distinctly from an email-delivery failure.
+      try {
+        await storage.setB2cPasswordReset(user.id, token, expires);
+      } catch (dbErr: any) {
+        req.log.error({ err: dbErr }, "[b2c/auth/forgot-password] failed to persist reset token");
+        return res.status(500).json({ error: "Could not start password reset. Please try again." });
+      }
 
       const baseUrl = String(req.headers.origin || process.env.APP_BASE_URL || "https://visashuttle.com");
       const resetUrl = `${baseUrl}/reset-password?token=${token}`;
 
-      await sendTransactionalEmail({
+      // Delivered through the ZeptoMail config managed in SaaS Admin → Settings → Email.
+      const sendResult = await sendTransactionalEmail({
         to: user.email,
         toName: user.fullName,
         subject: "Reset your Visa Shuttle password",
@@ -7029,6 +7038,20 @@ Rules:
         }),
         text: `Hi ${user.fullName},\n\nWe received a request to reset your Visa Shuttle password. Use the link below to choose a new one (expires in 1 hour):\n${resetUrl}\n\nIf you didn't request this, you can safely ignore this email — your password won't change.`,
       });
+
+      if (!sendResult.ok) {
+        req.log.error(
+          { error: sendResult.error, status: sendResult.status, detail: sendResult.detail },
+          "[b2c/auth/forgot-password] ZeptoMail send failed",
+        );
+        // Surface the real provider error so the admin can fix the ZeptoMail
+        // setup (e.g. "ZeptoMail is not configured", bad sender, invalid token).
+        return res.status(502).json({
+          error: sendResult.error
+            ? `Could not send the reset email: ${sendResult.error}`
+            : "Could not send the reset email. Please check the ZeptoMail settings in SaaS Admin → Settings → Email.",
+        });
+      }
 
       res.json(genericOk);
     } catch (err: any) {
