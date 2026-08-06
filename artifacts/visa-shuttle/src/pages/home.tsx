@@ -65,13 +65,13 @@ const POOL: VisaScoreSample[] = [
   { from: "South Africa", to: "United Kingdom", type: "Visit Visa", score: 71 },
   { from: "South Africa", to: "Schengen", type: "Tourist Visa", score: 68 },
   { from: "South Africa", to: "United States", type: "Tourist Visa", score: 63 },
-  { from: "Brazil", to: "Schengen", type: "Tourist Visa", score: 74 },
+  { from: "Brazil", to: "Schengen", type: "Visa Free (No Visa Needed)", score: 100 },
   { from: "Brazil", to: "United States", type: "Tourist Visa", score: 66 },
-  { from: "Brazil", to: "United Kingdom", type: "Visit Visa", score: 69 },
+  { from: "Brazil", to: "United Kingdom", type: "Visa Free (No Visa Needed)", score: 100 },
   { from: "Colombia", to: "United States", type: "Tourist Visa", score: 52 },
   { from: "Colombia", to: "Schengen", type: "Tourist Visa", score: 58 },
   { from: "Mexico", to: "United States", type: "Tourist Visa", score: 72 },
-  { from: "Mexico", to: "Schengen", type: "Tourist Visa", score: 81 },
+  { from: "Mexico", to: "Schengen", type: "Visa Free (No Visa Needed)", score: 100 },
   { from: "China", to: "United States", type: "Tourist Visa", score: 55 },
   { from: "China", to: "Schengen", type: "Tourist Visa", score: 60 },
   { from: "China", to: "United Kingdom", type: "Visit Visa", score: 57 },
@@ -95,13 +95,13 @@ const POOL: VisaScoreSample[] = [
   { from: "Saudi Arabia", to: "Schengen", type: "Tourist Visa", score: 79 },
   { from: "Saudi Arabia", to: "United Kingdom", type: "Visit Visa", score: 74 },
   { from: "Russia", to: "Schengen", type: "Tourist Visa", score: 51 },
-  { from: "Ukraine", to: "Schengen", type: "Tourist Visa", score: 69 },
-  { from: "United States", to: "Schengen", type: "Tourist Visa", score: 94 },
-  { from: "United Kingdom", to: "Schengen", type: "Tourist Visa", score: 91 },
-  { from: "Canada", to: "Schengen", type: "Tourist Visa", score: 93 },
-  { from: "Australia", to: "United States", type: "Tourist Visa", score: 92 },
-  { from: "Germany", to: "United States", type: "Tourist Visa", score: 90 },
-  { from: "France", to: "United States", type: "Tourist Visa", score: 89 },
+  { from: "Ukraine", to: "Schengen", type: "Visa Free (No Visa Needed)", score: 100 },
+  { from: "United States", to: "Schengen", type: "Visa Free (No Visa Needed)", score: 100 },
+  { from: "United Kingdom", to: "Schengen", type: "Visa Free (No Visa Needed)", score: 100 },
+  { from: "Canada", to: "Schengen", type: "Visa Free (No Visa Needed)", score: 100 },
+  { from: "Australia", to: "United States", type: "Visa Free (ESTA)", score: 100 },
+  { from: "Germany", to: "United States", type: "Visa Free (ESTA)", score: 100 },
+  { from: "France", to: "United States", type: "Visa Free (ESTA)", score: 100 },
 ].filter(s => LIVE_SCORE_DESTINATIONS.has(s.to));
 
 // Popular destinations per nationality (fallback if no IP match)
@@ -113,7 +113,8 @@ const NATIONALITY_DESTINATIONS: Record<string, string[]> = {
   "Bahrain": ["Schengen", "United Kingdom", "United States"],
 };
 
-function scoreToLabel(score: number): { label: string; color: string } {
+function scoreToLabel(score: number, type?: string): { label: string; color: string } {
+  if (score >= 100 || (type && type.includes("Visa Free"))) return { label: "Visa Free", color: "text-emerald-700 bg-emerald-100 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-700 font-bold" };
   if (score >= 80) return { label: "High Chance", color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800" };
   if (score >= 65) return { label: "Good Chance", color: "text-blue-600 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800" };
   if (score >= 45) return { label: "Moderate", color: "text-amber-600 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800" };
@@ -375,7 +376,8 @@ export default function HomePage() {
                           </div>
                         ))
                       : samples.map((s) => {
-                          const { label, color } = scoreToLabel(s.score);
+                          const isVisaFree = s.score >= 100 || s.type.includes("Visa Free");
+                          const { label, color } = scoreToLabel(s.score, s.type);
                           return (
                             <div
                               key={`${s.from}-${s.to}-${pulse}`}
@@ -390,7 +392,7 @@ export default function HomePage() {
                                 <p className="text-xs text-muted-foreground">{s.type}</p>
                               </div>
                               <div className="text-right flex-shrink-0">
-                                <div className="text-xl font-black">{s.score}%</div>
+                                <div className="text-xl font-black">{isVisaFree ? "100%" : `${s.score}%`}</div>
                                 <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${color}`}>{label}</span>
                               </div>
                             </div>

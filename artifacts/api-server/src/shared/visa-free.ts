@@ -4,125 +4,197 @@
  * Value = array of destination country names where entry is visa-free
  */
 
+export const SCHENGEN_COUNTRIES = [
+  "Schengen", "Schengen Area", "Germany", "France", "Italy", "Spain", "Netherlands",
+  "Belgium", "Switzerland", "Austria", "Portugal", "Greece", "Sweden", "Norway",
+  "Denmark", "Finland", "Czech Republic", "Hungary", "Poland", "Slovakia", "Slovenia",
+  "Croatia", "Estonia", "Latvia", "Lithuania", "Malta", "Luxembourg", "Iceland", "Liechtenstein"
+];
+
+const EU_WESTERN_DESTINATIONS = [
+  "Schengen", "Schengen Area", "United States", "Canada", "United Kingdom", "Australia", "New Zealand", "Japan",
+  "South Korea", "Singapore", "Malaysia", "Thailand", "Philippines", "Indonesia", "UAE", "Saudi Arabia", "Qatar",
+  "Kuwait", "Bahrain", "Oman", "Mexico", "Brazil", "Argentina", "Chile", "Colombia", "Peru", "Uruguay", "Paraguay",
+  "Costa Rica", "Panama", "Dominican Republic", "Jamaica", "Israel", "Turkey", "Georgia", "Armenia", "Serbia",
+  "Montenegro", "Albania", "Bosnia and Herzegovina", "North Macedonia", "Moldova", "Ukraine", "Vietnam", "Taiwan",
+  "Hong Kong", "Macao", "Germany", "France", "Italy", "Spain", "Netherlands", "Belgium", "Switzerland", "Austria",
+  "Portugal", "Ireland", "Greece", "Sweden", "Norway", "Denmark", "Finland", "Czech Republic", "Hungary", "Poland",
+  "Slovakia", "Slovenia", "Croatia", "Estonia", "Latvia", "Lithuania", "Malta", "Luxembourg", "Iceland",
+];
+
+const EU_EEA_COUNTRIES = [
+  "Germany", "France", "Italy", "Spain", "Netherlands", "Belgium", "Switzerland", "Austria",
+  "Portugal", "Ireland", "Greece", "Sweden", "Norway", "Denmark", "Finland", "Czech Republic",
+  "Hungary", "Poland", "Slovakia", "Slovenia", "Croatia", "Estonia", "Latvia", "Lithuania",
+  "Malta", "Luxembourg", "Iceland", "Liechtenstein", "Cyprus", "Romania", "Bulgaria",
+  "Andorra", "Monaco", "San Marino", "Vatican City"
+];
+
 export const VISA_FREE: Record<string, string[]> = {
   "India": [
     "Nepal", "Bhutan", "Mauritius", "Seychelles", "Jamaica", "Haiti",
     "El Salvador", "Micronesia", "Montserrat", "Niue", "Samoa",
-    "Senegal", "Trinidad and Tobago",
+    "Senegal", "Trinidad and Tobago", "Thailand", "Malaysia", "Kenya", "Iran"
   ],
-  "Pakistan": ["Maldives", "Nepal", "Tajikistan"],
-  "Bangladesh": ["Nepal", "Haiti", "Dominica", "Micronesia"],
-  "Sri Lanka": ["Maldives"],
-  "Nepal": ["India", "Maldives"],
+  "Pakistan": ["Maldives", "Nepal", "Tajikistan", "Qatar", "Kenya", "Rwanda"],
+  "Bangladesh": ["Nepal", "Bhutan", "Maldives", "Sri Lanka", "Dominica", "Haiti", "Grenada", "Kenya"],
+  "Sri Lanka": ["Maldives", "Seychelles", "Singapore", "Cambodia", "Laos", "Indonesia"],
+  "Nepal": ["India", "Maldives", "Seychelles"],
   "United States": [
-    "Canada", "Mexico", "United Kingdom", "Australia", "Japan", "Germany",
+    "Schengen", "Schengen Area", "Canada", "Mexico", "United Kingdom", "Australia", "Japan", "Germany",
     "France", "Italy", "Spain", "Netherlands", "Belgium", "Switzerland",
     "Austria", "Portugal", "Ireland", "Greece", "Sweden", "Norway", "Denmark",
     "Finland", "Czech Republic", "Hungary", "Poland", "Slovakia", "Slovenia",
     "Croatia", "Estonia", "Latvia", "Lithuania", "Malta", "Luxembourg",
     "Iceland", "New Zealand", "South Korea", "Singapore", "Chile", "Colombia",
-    "Israel", "Taiwan",
+    "Israel", "Taiwan", "Dominican Republic", "Jamaica", "Bahamas", "Barbados", "Trinidad and Tobago", "Costa Rica", "Panama"
   ],
   "United Kingdom": [
-    "United States", "Canada", "Australia", "New Zealand", "Japan",
+    "Schengen", "Schengen Area", "United States", "Canada", "Australia", "New Zealand", "Japan",
     "South Korea", "Singapore", "Israel", "Chile", "Colombia",
     "Germany", "France", "Italy", "Spain", "Netherlands", "Belgium",
     "Switzerland", "Austria", "Portugal", "Ireland", "Greece", "Sweden",
     "Norway", "Denmark", "Finland", "Czech Republic", "Hungary", "Poland",
     "Slovakia", "Slovenia", "Croatia", "Estonia", "Latvia", "Lithuania",
-    "Malta", "Luxembourg", "Iceland",
-  ],
-  "Germany": [
-    "United States", "Canada", "Australia", "Japan", "New Zealand",
-    "South Korea", "Singapore", "United Kingdom", "France", "Italy", "Spain",
-    "Netherlands", "Belgium", "Switzerland", "Austria", "Portugal", "Ireland",
-    "Greece", "Sweden", "Norway", "Denmark", "Finland", "Czech Republic",
-    "Hungary", "Poland", "Slovakia", "Slovenia", "Croatia", "Estonia",
-    "Latvia", "Lithuania", "Malta", "Luxembourg", "Iceland", "Israel", "Chile",
-  ],
-  "France": [
-    "United States", "Canada", "Australia", "Japan", "New Zealand",
-    "South Korea", "Singapore", "United Kingdom", "Germany", "Italy",
-    "Spain", "Netherlands", "Belgium", "Switzerland", "Austria", "Portugal",
-    "Ireland", "Greece", "Sweden", "Norway", "Denmark", "Finland",
-    "Czech Republic", "Hungary", "Poland", "Slovakia", "Slovenia", "Croatia",
-    "Estonia", "Latvia", "Lithuania", "Malta", "Luxembourg", "Iceland",
-    "Israel", "Chile",
+    "Malta", "Luxembourg", "Iceland", "Mexico", "Brazil", "Argentina", "Costa Rica", "Panama"
   ],
   "Canada": [
-    "United States", "United Kingdom", "Australia", "Japan", "Germany",
+    "Schengen", "Schengen Area", "United States", "United Kingdom", "Australia", "Japan", "Germany",
     "France", "Italy", "Spain", "Netherlands", "Belgium", "Switzerland",
     "Austria", "Portugal", "Ireland", "Greece", "Sweden", "Norway", "Denmark",
     "Finland", "Czech Republic", "Mexico", "New Zealand", "South Korea",
-    "Singapore", "Israel", "Chile", "Colombia",
+    "Singapore", "Israel", "Chile", "Colombia", "Brazil", "Argentina", "Costa Rica", "Panama"
   ],
   "Australia": [
-    "United States", "Canada", "United Kingdom", "Japan", "Germany",
+    "Schengen", "Schengen Area", "United States", "Canada", "United Kingdom", "Japan", "Germany",
     "France", "Italy", "Spain", "Netherlands", "Belgium", "Switzerland",
     "Austria", "Portugal", "Ireland", "Greece", "Sweden", "Norway", "Denmark",
     "Finland", "Czech Republic", "New Zealand", "South Korea", "Singapore",
-    "Israel", "Chile", "Colombia",
+    "Israel", "Chile", "Colombia", "Fiji", "Samoa", "Vanuatu"
+  ],
+  "New Zealand": [
+    "Schengen", "Schengen Area", "United States", "Canada", "United Kingdom", "Australia", "Japan",
+    "South Korea", "Singapore", "Germany", "France", "Italy", "Spain", "Netherlands", "Belgium",
+    "Switzerland", "Austria", "Portugal", "Ireland", "Greece", "Sweden", "Norway", "Denmark",
+    "Finland", "Fiji", "Samoa", "Tonga", "Vanuatu", "Chile", "Colombia"
   ],
   "Japan": [
-    "United States", "Canada", "United Kingdom", "Australia", "Germany",
+    "Schengen", "Schengen Area", "United States", "Canada", "United Kingdom", "Australia", "Germany",
     "France", "Italy", "Spain", "Netherlands", "Belgium", "Switzerland",
     "Austria", "Portugal", "Ireland", "Greece", "Sweden", "Norway", "Denmark",
     "Finland", "New Zealand", "South Korea", "Singapore", "Hong Kong",
-    "Taiwan", "Israel",
+    "Taiwan", "Israel", "China", "Thailand", "Malaysia", "Indonesia", "Vietnam"
   ],
   "South Korea": [
-    "United States", "Canada", "United Kingdom", "Australia", "Japan",
+    "Schengen", "Schengen Area", "United States", "Canada", "United Kingdom", "Australia", "Japan",
     "Germany", "France", "Italy", "Spain", "Netherlands", "Belgium",
     "Switzerland", "Austria", "Portugal", "Ireland", "Greece", "Sweden",
     "Norway", "Denmark", "Finland", "New Zealand", "Singapore", "Taiwan",
+    "Thailand", "Malaysia", "Indonesia", "Vietnam", "UAE", "Qatar"
   ],
   "Singapore": [
-    "United States", "Canada", "United Kingdom", "Australia", "Japan",
+    "Schengen", "Schengen Area", "United States", "Canada", "United Kingdom", "Australia", "Japan",
     "Germany", "France", "Italy", "Spain", "Netherlands", "Belgium",
     "Switzerland", "Austria", "Portugal", "Ireland", "Greece", "Sweden",
     "Norway", "Denmark", "Finland", "New Zealand", "South Korea",
     "Indonesia", "Malaysia", "Thailand", "Philippines", "Vietnam",
-    "Cambodia", "Laos", "Myanmar",
+    "Cambodia", "Laos", "Myanmar", "China"
   ],
   "Malaysia": [
+    "Schengen", "Schengen Area", "United Kingdom", "Japan", "South Korea", "Australia",
     "Indonesia", "Thailand", "Philippines", "Singapore", "Vietnam",
-    "Cambodia", "Laos", "Myanmar", "Japan", "South Korea", "Australia",
+    "Cambodia", "Laos", "Myanmar", "UAE", "Turkey"
   ],
   "Indonesia": [
     "Malaysia", "Singapore", "Thailand", "Philippines", "Vietnam",
-    "Cambodia", "Laos", "Myanmar",
+    "Cambodia", "Laos", "Myanmar", "Japan", "Brazil", "Chile", "Turkey"
   ],
   "Thailand": [
     "Malaysia", "Singapore", "Indonesia", "Philippines", "Vietnam",
-    "Cambodia", "Laos", "Myanmar",
+    "Cambodia", "Laos", "Myanmar", "Japan", "South Korea", "Russia", "Brazil", "Chile", "Turkey"
   ],
   "Philippines": [
     "Indonesia", "Malaysia", "Singapore", "Thailand", "Vietnam",
-    "Cambodia", "Laos", "Myanmar",
+    "Cambodia", "Laos", "Myanmar", "Brazil", "Colombia", "Peru", "Israel"
+  ],
+  "United Arab Emirates": [
+    "Schengen", "Schengen Area", "United Kingdom", "Canada", "Japan", "South Korea", "Singapore",
+    "Malaysia", "Thailand", "Indonesia", "Philippines", "New Zealand", "Georgia", "Armenia",
+    "Serbia", "Montenegro", "Albania", "Jordan", "Lebanon", "Egypt", "Turkey",
+    "Saudi Arabia", "Qatar", "Kuwait", "Bahrain", "Oman"
+  ],
+  "Saudi Arabia": [
+    "United Arab Emirates", "Qatar", "Kuwait", "Bahrain", "Oman", "United Kingdom",
+    "Malaysia", "Singapore", "Thailand", "Indonesia", "Georgia", "Armenia", "Jordan",
+    "Albania", "Bosnia and Herzegovina", "Serbia", "Turkey", "Egypt"
+  ],
+  "Qatar": [
+    "United Arab Emirates", "Saudi Arabia", "Kuwait", "Bahrain", "Oman", "United Kingdom",
+    "Schengen", "Schengen Area", "Malaysia", "Singapore", "Thailand", "Indonesia",
+    "Georgia", "Armenia", "Jordan", "Turkey", "Egypt"
+  ],
+  "Kuwait": [
+    "United Arab Emirates", "Saudi Arabia", "Qatar", "Bahrain", "Oman", "United Kingdom",
+    "Malaysia", "Singapore", "Thailand", "Indonesia", "Georgia", "Armenia", "Jordan", "Turkey"
+  ],
+  "Bahrain": [
+    "United Arab Emirates", "Saudi Arabia", "Qatar", "Kuwait", "Oman", "United Kingdom",
+    "Malaysia", "Singapore", "Thailand", "Indonesia", "Georgia", "Armenia", "Jordan", "Turkey"
+  ],
+  "Oman": [
+    "United Arab Emirates", "Saudi Arabia", "Qatar", "Kuwait", "Bahrain", "United Kingdom",
+    "Malaysia", "Singapore", "Thailand", "Indonesia", "Georgia", "Armenia", "Jordan", "Turkey"
   ],
   "Turkey": [
-    "Azerbaijan", "Georgia", "Jordan", "Ukraine",
+    "Azerbaijan", "Georgia", "Jordan", "Ukraine", "Japan", "South Korea", "Singapore",
+    "Malaysia", "Thailand", "Colombia", "Brazil", "Argentina", "Chile", "Qatar"
   ],
   "Russia": [
     "Belarus", "Kazakhstan", "Kyrgyzstan", "Armenia", "Azerbaijan",
-    "Ukraine", "Serbia", "Turkey",
+    "Ukraine", "Serbia", "Turkey", "Thailand", "Vietnam", "UAE", "Qatar", "Brazil", "Argentina"
   ],
   "Brazil": [
-    "Argentina", "Chile", "Colombia", "Peru", "Venezuela", "Bolivia",
+    "Schengen", "Schengen Area", "Argentina", "Chile", "Colombia", "Peru", "Venezuela", "Bolivia",
     "Paraguay", "Uruguay", "Ecuador", "United States", "Canada",
-    "United Kingdom", "European Union",
+    "United Kingdom", "European Union", "Russia", "South Africa", "Turkey"
   ],
   "Argentina": [
-    "Brazil", "Chile", "Colombia", "Peru", "Bolivia", "Paraguay",
-    "Uruguay", "Ecuador", "Venezuela",
+    "Schengen", "Schengen Area", "Brazil", "Chile", "Colombia", "Peru", "Bolivia", "Paraguay",
+    "Uruguay", "Ecuador", "Venezuela", "United Kingdom", "Russia", "Turkey", "Israel"
+  ],
+  "Chile": [
+    "Schengen", "Schengen Area", "United States", "United Kingdom", "Canada", "Japan", "South Korea",
+    "Argentina", "Brazil", "Colombia", "Peru", "Uruguay", "Paraguay", "Ecuador", "Mexico"
+  ],
+  "Mexico": [
+    "Schengen", "Schengen Area", "United Kingdom", "Japan", "South Korea", "Singapore",
+    "Colombia", "Chile", "Peru", "Argentina", "Brazil", "Costa Rica", "Panama"
+  ],
+  "Colombia": [
+    "Schengen", "Schengen Area", "United Kingdom", "Turkey", "Brazil", "Argentina", "Chile", "Peru",
+    "Ecuador", "Uruguay", "Paraguay", "Panama", "Costa Rica", "Mexico"
   ],
   "South Africa": [
     "Zimbabwe", "Botswana", "Lesotho", "Swaziland", "Mozambique",
-    "Namibia", "Zambia", "Malawi",
+    "Namibia", "Zambia", "Malawi", "Brazil", "Argentina", "Russia", "Israel", "Thailand", "Singapore"
   ],
-  "Nigeria": ["Benin", "Niger", "Chad", "Cameroon", "Togo", "Ghana"],
-  "Kenya": ["Uganda", "Tanzania", "Rwanda", "Burundi"],
+  "Nigeria": ["Benin", "Niger", "Chad", "Cameroon", "Togo", "Ghana", "Sierra Leone", "Gambia", "Liberia"],
+  "Kenya": ["Uganda", "Tanzania", "Rwanda", "Burundi", "Ethiopia", "South Sudan"],
   "Ethiopia": ["Kenya", "Uganda", "Tanzania", "Rwanda"],
+  "Israel": [
+    "Schengen", "Schengen Area", "United States", "United Kingdom", "Canada", "Japan", "South Korea",
+    "Singapore", "Mexico", "Brazil", "Argentina", "Chile", "Colombia", "Peru", "Georgia"
+  ],
+  "Taiwan": [
+    "Schengen", "Schengen Area", "United States", "Canada", "United Kingdom", "Japan", "South Korea",
+    "Singapore", "Malaysia", "Thailand", "Israel", "Chile", "Colombia", "Peru"
+  ],
+  "Hong Kong": [
+    "Schengen", "Schengen Area", "United Kingdom", "Japan", "South Korea", "Singapore", "Malaysia",
+    "Thailand", "Israel", "Chile", "Colombia", "Peru", "Brazil", "Argentina"
+  ],
+  // Auto-populate all EU/EEA countries with EU_WESTERN_DESTINATIONS
+  ...Object.fromEntries(EU_EEA_COUNTRIES.map((c) => [c, EU_WESTERN_DESTINATIONS])),
 };
 
 /**
@@ -170,22 +242,31 @@ export function getEntryRequirement(
 ): EntryRequirement {
   if (!nationality || !destination) return null;
 
+  const isSchengenDest = destination === "Schengen" || destination === "Schengen Area";
+
   // 1. Citizen of destination by nationality
   if (nationality === destination) return "visa_free";
+  if (isSchengenDest && SCHENGEN_COUNTRIES.includes(nationality)) return "visa_free";
 
   // 2. Passport issued by destination country → citizen
-  if (opts?.passportCountry && opts.passportCountry === destination) return "visa_free";
+  if (opts?.passportCountry && (opts.passportCountry === destination || (isSchengenDest && SCHENGEN_COUNTRIES.includes(opts.passportCountry)))) return "visa_free";
 
   // 3. Already a legal resident of destination → no new visa required
-  if (opts?.countryOfResidence && opts.countryOfResidence === destination) return "resident";
+  if (opts?.countryOfResidence && (opts.countryOfResidence === destination || (isSchengenDest && SCHENGEN_COUNTRIES.includes(opts.countryOfResidence)))) return "resident";
 
   // 4. Bilateral visa-free agreements
   const free = VISA_FREE[nationality];
-  if (free?.includes(destination)) return "visa_free";
+  if (free) {
+    if (free.includes(destination)) return "visa_free";
+    if (isSchengenDest && free.some((c) => SCHENGEN_COUNTRIES.includes(c))) return "visa_free";
+  }
 
   // 5. Visa on arrival
   const voa = VISA_ON_ARRIVAL[nationality];
-  if (voa?.includes(destination)) return "visa_on_arrival";
+  if (voa) {
+    if (voa.includes(destination)) return "visa_on_arrival";
+    if (isSchengenDest && voa.some((c) => SCHENGEN_COUNTRIES.includes(c))) return "visa_on_arrival";
+  }
 
   return null;
 }

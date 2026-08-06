@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { pgTable, text, varchar, timestamp, integer, boolean, jsonb, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod/v4";
+import { z } from "zod";
 
 // Granular permission flags for agency team members. The agency owner always
 // has every permission implicitly; for staff/managers these checkboxes drive
@@ -35,7 +35,7 @@ export const users = pgTable("users", {
 });
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
-export type InsertUser = z.infer<typeof insertUserSchema>;
+export type InsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 
 // Tenants (Agencies) table
@@ -65,7 +65,7 @@ export const tenants = pgTable("tenants", {
 });
 
 export const insertTenantSchema = createInsertSchema(tenants).omit({ id: true, createdAt: true });
-export type InsertTenant = z.infer<typeof insertTenantSchema>;
+export type InsertTenant = typeof tenants.$inferInsert;
 export type Tenant = typeof tenants.$inferSelect;
 
 // Leads table
@@ -86,7 +86,7 @@ export const leads = pgTable("leads", {
 });
 
 export const insertLeadSchema = createInsertSchema(leads).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertLead = z.infer<typeof insertLeadSchema>;
+export type InsertLead = typeof leads.$inferInsert;
 export type Lead = typeof leads.$inferSelect;
 
 // Proposals table — a shareable, tokenized invitation that the agency sends
@@ -141,7 +141,7 @@ export const proposals = pgTable("proposals", {
 export const insertProposalSchema = createInsertSchema(proposals).omit({
   id: true, createdAt: true, updatedAt: true, appliedCaseId: true, appliedAt: true, viewedAt: true, customerDraftData: true, customerDraftSavedAt: true,
 });
-export type InsertProposal = z.infer<typeof insertProposalSchema>;
+export type InsertProposal = typeof proposals.$inferInsert;
 export type Proposal = typeof proposals.$inferSelect;
 
 // Cases table
@@ -200,7 +200,7 @@ export const cases = pgTable("cases", {
 });
 
 export const insertCaseSchema = createInsertSchema(cases).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertCase = z.infer<typeof insertCaseSchema>;
+export type InsertCase = typeof cases.$inferInsert;
 export type Case = typeof cases.$inferSelect;
 
 // --- Visa workflow constants (shared between client + server) ---
@@ -270,7 +270,7 @@ export const appointments = pgTable("appointments", {
 export const insertAppointmentSchema = createInsertSchema(appointments).omit({
   id: true, createdAt: true, updatedAt: true,
 });
-export type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
+export type InsertAppointment = typeof appointments.$inferInsert;
 export type Appointment = typeof appointments.$inferSelect;
 
 export const APPOINTMENT_TYPES = [
@@ -321,7 +321,7 @@ export const caseCoTravellers = pgTable("case_co_travellers", {
 });
 
 export const insertCaseCoTravellerSchema = createInsertSchema(caseCoTravellers).omit({ id: true, createdAt: true });
-export type InsertCaseCoTraveller = z.infer<typeof insertCaseCoTravellerSchema>;
+export type InsertCaseCoTraveller = typeof caseCoTravellers.$inferInsert;
 export type CaseCoTraveller = typeof caseCoTravellers.$inferSelect;
 
 // Documents table
@@ -341,7 +341,7 @@ export const documents = pgTable("documents", {
 });
 
 export const insertDocumentSchema = createInsertSchema(documents).omit({ id: true, uploadedAt: true, reviewedAt: true });
-export type InsertDocument = z.infer<typeof insertDocumentSchema>;
+export type InsertDocument = typeof documents.$inferInsert;
 export type Document = typeof documents.$inferSelect;
 
 // Messages table
@@ -356,7 +356,7 @@ export const messages = pgTable("messages", {
 });
 
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
-export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type InsertMessage = typeof messages.$inferInsert;
 export type Message = typeof messages.$inferSelect;
 
 // Visa Templates table
@@ -375,7 +375,7 @@ export const visaTemplates = pgTable("visa_templates", {
 });
 
 export const insertVisaTemplateSchema = createInsertSchema(visaTemplates).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertVisaTemplate = z.infer<typeof insertVisaTemplateSchema>;
+export type InsertVisaTemplate = typeof visaTemplates.$inferInsert;
 export type VisaTemplate = typeof visaTemplates.$inferSelect;
 
 // Per-agency checklist overrides. These replace the effective checklist for a
@@ -390,7 +390,7 @@ export const tenantDocumentChecklists = pgTable("tenant_document_checklists", {
 });
 
 export const insertTenantDocumentChecklistSchema = createInsertSchema(tenantDocumentChecklists).omit({ id: true, updatedAt: true });
-export type InsertTenantDocumentChecklist = z.infer<typeof insertTenantDocumentChecklistSchema>;
+export type InsertTenantDocumentChecklist = typeof tenantDocumentChecklists.$inferInsert;
 export type TenantDocumentChecklist = typeof tenantDocumentChecklists.$inferSelect;
 
 // Activity Logs table
@@ -406,7 +406,7 @@ export const activityLogs = pgTable("activity_logs", {
 });
 
 export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({ id: true, createdAt: true });
-export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
+export type InsertActivityLog = typeof activityLogs.$inferInsert;
 export type ActivityLog = typeof activityLogs.$inferSelect;
 
 // Customer Accounts table (White-label portal customers)
@@ -421,7 +421,7 @@ export const customerAccounts = pgTable("customer_accounts", {
 });
 
 export const insertCustomerAccountSchema = createInsertSchema(customerAccounts).omit({ id: true, createdAt: true });
-export type InsertCustomerAccount = z.infer<typeof insertCustomerAccountSchema>;
+export type InsertCustomerAccount = typeof customerAccounts.$inferInsert;
 export type CustomerAccount = typeof customerAccounts.$inferSelect;
 
 // Customer-Tenant Link table (allows customers to have cases with multiple agencies)
@@ -434,7 +434,7 @@ export const customerTenantLinks = pgTable("customer_tenant_links", {
 });
 
 export const insertCustomerTenantLinkSchema = createInsertSchema(customerTenantLinks).omit({ id: true, createdAt: true });
-export type InsertCustomerTenantLink = z.infer<typeof insertCustomerTenantLinkSchema>;
+export type InsertCustomerTenantLink = typeof customerTenantLinks.$inferInsert;
 export type CustomerTenantLink = typeof customerTenantLinks.$inferSelect;
 
 // --- Passport library (customer-owned, reusable across applications) ---
@@ -479,7 +479,7 @@ export const passports = pgTable("passports", {
 export const insertPassportSchema = createInsertSchema(passports).omit({
   id: true, createdAt: true, updatedAt: true,
 });
-export type InsertPassport = z.infer<typeof insertPassportSchema>;
+export type InsertPassport = typeof passports.$inferInsert;
 export type Passport = typeof passports.$inferSelect;
 
 // B2C User Profiles (Visa Checker users — separate from agency users)
@@ -504,7 +504,7 @@ export const b2cUsers = pgTable("b2c_users", {
 });
 
 export const insertB2cUserSchema = createInsertSchema(b2cUsers).omit({ id: true, createdAt: true });
-export type InsertB2cUser = z.infer<typeof insertB2cUserSchema>;
+export type InsertB2cUser = typeof b2cUsers.$inferInsert;
 export type B2cUser = typeof b2cUsers.$inferSelect;
 
 // Visa Checks table (B2C AI check results)
@@ -521,7 +521,7 @@ export const visaChecks = pgTable("visa_checks", {
 });
 
 export const insertVisaCheckSchema = createInsertSchema(visaChecks).omit({ id: true, createdAt: true });
-export type InsertVisaCheck = z.infer<typeof insertVisaCheckSchema>;
+export type InsertVisaCheck = typeof visaChecks.$inferInsert;
 export type VisaCheck = typeof visaChecks.$inferSelect;
 
 // Visa Tools fraud-risk checks (B2C signed-in users)
@@ -539,7 +539,7 @@ export const visaToolChecks = pgTable("visa_tool_checks", {
 });
 
 export const insertVisaToolCheckSchema = createInsertSchema(visaToolChecks).omit({ id: true, createdAt: true });
-export type InsertVisaToolCheck = z.infer<typeof insertVisaToolCheckSchema>;
+export type InsertVisaToolCheck = typeof visaToolChecks.$inferInsert;
 export type VisaToolCheck = typeof visaToolChecks.$inferSelect;
 
 // Saved Traveler Profiles (B2C)
@@ -584,7 +584,7 @@ export const savedProfiles = pgTable("saved_profiles", {
 });
 
 export const insertSavedProfileSchema = createInsertSchema(savedProfiles).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertSavedProfile = z.infer<typeof insertSavedProfileSchema>;
+export type InsertSavedProfile = typeof savedProfiles.$inferInsert;
 export type SavedProfile = typeof savedProfiles.$inferSelect;
 
 // OTP Codes table — exactly one of `email` or `phone` is set (the identifier
@@ -603,7 +603,7 @@ export const otpCodes = pgTable("otp_codes", {
 });
 
 export const insertOTPCodeSchema = createInsertSchema(otpCodes).omit({ id: true, createdAt: true });
-export type InsertOTPCode = z.infer<typeof insertOTPCodeSchema>;
+export type InsertOTPCode = typeof otpCodes.$inferInsert;
 export type OTPCode = typeof otpCodes.$inferSelect;
 
 // ── SMS Provider Config ───────────────────────────────────────────────────────
@@ -625,7 +625,7 @@ export const smsConfig = pgTable("sms_config", {
 });
 
 export const insertSmsConfigSchema = createInsertSchema(smsConfig).omit({ id: true, updatedAt: true });
-export type InsertSmsConfig = z.infer<typeof insertSmsConfigSchema>;
+export type InsertSmsConfig = typeof smsConfig.$inferInsert;
 export type SmsConfig = typeof smsConfig.$inferSelect;
 
 // ── Platform AI Provider Config ───────────────────────────────────────────────
@@ -637,7 +637,7 @@ export const platformAiConfig = pgTable("platform_ai_config", {
 });
 
 export const insertPlatformAiConfigSchema = createInsertSchema(platformAiConfig).omit({ id: true, updatedAt: true });
-export type InsertPlatformAiConfig = z.infer<typeof insertPlatformAiConfigSchema>;
+export type InsertPlatformAiConfig = typeof platformAiConfig.$inferInsert;
 export type PlatformAiConfig = typeof platformAiConfig.$inferSelect;
 
 // ── Platform Transactional Email Config (ZeptoMail) ──────────────────────────
@@ -661,7 +661,7 @@ export const zeptoMailConfig = pgTable("zeptomail_config", {
 });
 
 export const insertZeptoMailConfigSchema = createInsertSchema(zeptoMailConfig).omit({ id: true, updatedAt: true });
-export type InsertZeptoMailConfig = z.infer<typeof insertZeptoMailConfigSchema>;
+export type InsertZeptoMailConfig = typeof zeptoMailConfig.$inferInsert;
 export type ZeptoMailConfig = typeof zeptoMailConfig.$inferSelect;
 
 // ── Platform Email Templates (B2C) ───────────────────────────────────────────
@@ -682,7 +682,7 @@ export const emailTemplates = pgTable("email_templates", {
 });
 
 export const insertEmailTemplateSchema = createInsertSchema(emailTemplates).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertEmailTemplate = z.infer<typeof insertEmailTemplateSchema>;
+export type InsertEmailTemplate = typeof emailTemplates.$inferInsert;
 export type EmailTemplate = typeof emailTemplates.$inferSelect;
 
 // ── Payment Gateway Config ───────────────────────────────────────────────────
@@ -719,7 +719,7 @@ export const paymentGatewayConfig = pgTable("payment_gateway_config", {
 });
 
 export const insertPaymentGatewayConfigSchema = createInsertSchema(paymentGatewayConfig).omit({ id: true, updatedAt: true });
-export type InsertPaymentGatewayConfig = z.infer<typeof insertPaymentGatewayConfigSchema>;
+export type InsertPaymentGatewayConfig = typeof paymentGatewayConfig.$inferInsert;
 export type PaymentGatewayConfig = typeof paymentGatewayConfig.$inferSelect;
 
 // ── B2C Checkout Coupons ─────────────────────────────────────────────────────
@@ -737,7 +737,7 @@ export const b2cCoupons = pgTable("b2c_coupons", {
 });
 
 export const insertB2cCouponSchema = createInsertSchema(b2cCoupons).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertB2cCoupon = z.infer<typeof insertB2cCouponSchema>;
+export type InsertB2cCoupon = typeof b2cCoupons.$inferInsert;
 export type B2cCoupon = typeof b2cCoupons.$inferSelect;
 
 // ── B2C Public Plans ────────────────────────────────────────────────────────
@@ -763,7 +763,7 @@ export const b2cPlans = pgTable("b2c_plans", {
 });
 
 export const insertB2cPlanSchema = createInsertSchema(b2cPlans).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertB2cPlan = z.infer<typeof insertB2cPlanSchema>;
+export type InsertB2cPlan = typeof b2cPlans.$inferInsert;
 export type B2cPlan = typeof b2cPlans.$inferSelect;
 
 export const b2cCreditOrders = pgTable("b2c_credit_orders", {
@@ -780,7 +780,7 @@ export const b2cCreditOrders = pgTable("b2c_credit_orders", {
 });
 
 export const insertB2cCreditOrderSchema = createInsertSchema(b2cCreditOrders).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertB2cCreditOrder = z.infer<typeof insertB2cCreditOrderSchema>;
+export type InsertB2cCreditOrder = typeof b2cCreditOrders.$inferInsert;
 export type B2cCreditOrder = typeof b2cCreditOrders.$inferSelect;
 
 // ── Per-Tenant Payment Gateway Config (Cashfree) ─────────────────────────────
@@ -802,7 +802,7 @@ export const tenantPaymentGatewayConfig = pgTable("tenant_payment_gateway_config
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 export const insertTenantPaymentGatewayConfigSchema = createInsertSchema(tenantPaymentGatewayConfig).omit({ id: true, updatedAt: true });
-export type InsertTenantPaymentGatewayConfig = z.infer<typeof insertTenantPaymentGatewayConfigSchema>;
+export type InsertTenantPaymentGatewayConfig = typeof tenantPaymentGatewayConfig.$inferInsert;
 export type TenantPaymentGatewayConfig = typeof tenantPaymentGatewayConfig.$inferSelect;
 
 // ── Per-Tenant SMS Config (MessageCentral) ───────────────────────────────────
@@ -819,7 +819,7 @@ export const tenantSmsConfig = pgTable("tenant_sms_config", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 export const insertTenantSmsConfigSchema = createInsertSchema(tenantSmsConfig).omit({ id: true, updatedAt: true });
-export type InsertTenantSmsConfig = z.infer<typeof insertTenantSmsConfigSchema>;
+export type InsertTenantSmsConfig = typeof tenantSmsConfig.$inferInsert;
 export type TenantSmsConfig = typeof tenantSmsConfig.$inferSelect;
 
 // ===== Accounting =====
@@ -849,7 +849,7 @@ export const feeTemplates = pgTable("fee_templates", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 export const insertFeeTemplateSchema = createInsertSchema(feeTemplates).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertFeeTemplate = z.infer<typeof insertFeeTemplateSchema>;
+export type InsertFeeTemplate = typeof feeTemplates.$inferInsert;
 export type FeeTemplate = typeof feeTemplates.$inferSelect;
 
 // Per-tenant invoice settings (one row per tenant)
@@ -886,7 +886,7 @@ export const invoiceSettings = pgTable("invoice_settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 export const insertInvoiceSettingsSchema = createInsertSchema(invoiceSettings).omit({ id: true, updatedAt: true });
-export type InsertInvoiceSettings = z.infer<typeof insertInvoiceSettingsSchema>;
+export type InsertInvoiceSettings = typeof invoiceSettings.$inferInsert;
 export type InvoiceSettings = typeof invoiceSettings.$inferSelect;
 
 // Invoices table
@@ -932,7 +932,7 @@ export const invoices = pgTable("invoices", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
+export type InsertInvoice = typeof invoices.$inferInsert;
 export type Invoice = typeof invoices.$inferSelect;
 
 // Invoice line items
@@ -956,7 +956,7 @@ export const invoiceItems = pgTable("invoice_items", {
   taxable: boolean("taxable").notNull().default(true),
 });
 export const insertInvoiceItemSchema = createInsertSchema(invoiceItems).omit({ id: true });
-export type InsertInvoiceItem = z.infer<typeof insertInvoiceItemSchema>;
+export type InsertInvoiceItem = typeof invoiceItems.$inferInsert;
 export type InvoiceItem = typeof invoiceItems.$inferSelect;
 
 // Payments against invoices
@@ -975,7 +975,7 @@ export const payments = pgTable("payments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 export const insertPaymentSchema = createInsertSchema(payments).omit({ id: true, createdAt: true });
-export type InsertPayment = z.infer<typeof insertPaymentSchema>;
+export type InsertPayment = typeof payments.$inferInsert;
 export type Payment = typeof payments.$inferSelect;
 
 // Shared payment-method enum used by both the agency UI dropdown and the
@@ -1019,7 +1019,7 @@ export const apiKeys = pgTable("api_keys", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 export const insertApiKeySchema = createInsertSchema(apiKeys).omit({ id: true, createdAt: true });
-export type InsertApiKey = z.infer<typeof insertApiKeySchema>;
+export type InsertApiKey = typeof apiKeys.$inferInsert;
 export type ApiKey = typeof apiKeys.$inferSelect;
 
 // Per-call audit log. One row per attempted API call (success or paid failure).
@@ -1036,7 +1036,7 @@ export const apiUsage = pgTable("api_usage", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 export const insertApiUsageSchema = createInsertSchema(apiUsage).omit({ id: true, createdAt: true });
-export type InsertApiUsage = z.infer<typeof insertApiUsageSchema>;
+export type InsertApiUsage = typeof apiUsage.$inferInsert;
 export type ApiUsage = typeof apiUsage.$inferSelect;
 
 // Platform-wide (admin-controlled) per-call price for each endpoint, in cents.
@@ -1050,7 +1050,7 @@ export const apiPricing = pgTable("api_pricing", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 export const insertApiPricingSchema = createInsertSchema(apiPricing).omit({ id: true, updatedAt: true });
-export type InsertApiPricing = z.infer<typeof insertApiPricingSchema>;
+export type InsertApiPricing = typeof apiPricing.$inferInsert;
 export type ApiPricing = typeof apiPricing.$inferSelect;
 
 // One wallet per tenant. `balanceCents` is the source of truth and is
@@ -1062,7 +1062,7 @@ export const tenantWallet = pgTable("tenant_wallet", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 export const insertTenantWalletSchema = createInsertSchema(tenantWallet).omit({ updatedAt: true });
-export type InsertTenantWallet = z.infer<typeof insertTenantWalletSchema>;
+export type InsertTenantWallet = typeof tenantWallet.$inferInsert;
 export type TenantWallet = typeof tenantWallet.$inferSelect;
 
 // Append-only ledger of every wallet movement: top-up, debit, refund,
@@ -1078,7 +1078,7 @@ export const tenantWalletLedger = pgTable("tenant_wallet_ledger", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 export const insertTenantWalletLedgerSchema = createInsertSchema(tenantWalletLedger).omit({ id: true, createdAt: true });
-export type InsertTenantWalletLedger = z.infer<typeof insertTenantWalletLedgerSchema>;
+export type InsertTenantWalletLedger = typeof tenantWalletLedger.$inferInsert;
 export type TenantWalletLedger = typeof tenantWalletLedger.$inferSelect;
 
 // Reseller link: parent (reseller) tenant earns a fixed per-call commission
@@ -1092,7 +1092,7 @@ export const resellerLinks = pgTable("reseller_links", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 export const insertResellerLinkSchema = createInsertSchema(resellerLinks).omit({ id: true, createdAt: true });
-export type InsertResellerLink = z.infer<typeof insertResellerLinkSchema>;
+export type InsertResellerLink = typeof resellerLinks.$inferInsert;
 export type ResellerLink = typeof resellerLinks.$inferSelect;
 
 // ─── Platform admin roles ──────────────────────────────────────────────────────
@@ -1135,7 +1135,7 @@ export const supportTickets = pgTable("support_tickets", {
 export const insertSupportTicketSchema = createInsertSchema(supportTickets).omit({
   id: true, createdAt: true, updatedAt: true, lastMessageAt: true, lastMessageBy: true, assignedToUserId: true,
 });
-export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
+export type InsertSupportTicket = typeof supportTickets.$inferInsert;
 export type SupportTicket = typeof supportTickets.$inferSelect;
 
 export const supportTicketMessages = pgTable("support_ticket_messages", {
@@ -1151,7 +1151,7 @@ export const supportTicketMessages = pgTable("support_ticket_messages", {
 export const insertSupportTicketMessageSchema = createInsertSchema(supportTicketMessages).omit({
   id: true, createdAt: true,
 });
-export type InsertSupportTicketMessage = z.infer<typeof insertSupportTicketMessageSchema>;
+export type InsertSupportTicketMessage = typeof supportTicketMessages.$inferInsert;
 export type SupportTicketMessage = typeof supportTicketMessages.$inferSelect;
 
 // ─── Tenant subscription billing ───────────────────────────────────────────────
@@ -1179,7 +1179,7 @@ export const tenantSubscriptions = pgTable("tenant_subscriptions", {
 export const insertTenantSubscriptionSchema = createInsertSchema(tenantSubscriptions).omit({
   id: true, createdAt: true, updatedAt: true,
 });
-export type InsertTenantSubscription = z.infer<typeof insertTenantSubscriptionSchema>;
+export type InsertTenantSubscription = typeof tenantSubscriptions.$inferInsert;
 export type TenantSubscription = typeof tenantSubscriptions.$inferSelect;
 
 export const tenantSubscriptionInvoices = pgTable("tenant_subscription_invoices", {
@@ -1206,7 +1206,7 @@ export const tenantSubscriptionInvoices = pgTable("tenant_subscription_invoices"
 export const insertTenantSubscriptionInvoiceSchema = createInsertSchema(tenantSubscriptionInvoices).omit({
   id: true, createdAt: true,
 });
-export type InsertTenantSubscriptionInvoice = z.infer<typeof insertTenantSubscriptionInvoiceSchema>;
+export type InsertTenantSubscriptionInvoice = typeof tenantSubscriptionInvoices.$inferInsert;
 export type TenantSubscriptionInvoice = typeof tenantSubscriptionInvoices.$inferSelect;
 
 // ── Public contact submissions (homepage form, etc.) ────────────────────────────────────────────────────────
@@ -1223,7 +1223,7 @@ export const contacts = pgTable("contacts", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 export const insertContactSchema = createInsertSchema(contacts).omit({ id: true, createdAt: true });
-export type InsertContact = z.infer<typeof insertContactSchema>;
+export type InsertContact = typeof contacts.$inferInsert;
 export type Contact = typeof contacts.$inferSelect;
 
 // ── VisaDesk Counselling beta ────────────────────────────────────────────────
@@ -1284,7 +1284,7 @@ export const counsellingStudents = pgTable("counselling_students", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 export const insertCounsellingStudentSchema = createInsertSchema(counsellingStudents).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertCounsellingStudent = z.infer<typeof insertCounsellingStudentSchema>;
+export type InsertCounsellingStudent = typeof counsellingStudents.$inferInsert;
 export type CounsellingStudent = typeof counsellingStudents.$inferSelect;
 
 export const counsellingSessions = pgTable("counselling_sessions", {
@@ -1308,7 +1308,7 @@ export const counsellingSessions = pgTable("counselling_sessions", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 export const insertCounsellingSessionSchema = createInsertSchema(counsellingSessions).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertCounsellingSession = z.infer<typeof insertCounsellingSessionSchema>;
+export type InsertCounsellingSession = typeof counsellingSessions.$inferInsert;
 export type CounsellingSession = typeof counsellingSessions.$inferSelect;
 
 export const counsellingShortlists = pgTable("counselling_shortlists", {
@@ -1331,7 +1331,7 @@ export const counsellingShortlists = pgTable("counselling_shortlists", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 export const insertCounsellingShortlistSchema = createInsertSchema(counsellingShortlists).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertCounsellingShortlist = z.infer<typeof insertCounsellingShortlistSchema>;
+export type InsertCounsellingShortlist = typeof counsellingShortlists.$inferInsert;
 export type CounsellingShortlist = typeof counsellingShortlists.$inferSelect;
 
 export const counsellingAdmissions = pgTable("counselling_admissions", {
@@ -1352,7 +1352,7 @@ export const counsellingAdmissions = pgTable("counselling_admissions", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 export const insertCounsellingAdmissionSchema = createInsertSchema(counsellingAdmissions).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertCounsellingAdmission = z.infer<typeof insertCounsellingAdmissionSchema>;
+export type InsertCounsellingAdmission = typeof counsellingAdmissions.$inferInsert;
 export type CounsellingAdmission = typeof counsellingAdmissions.$inferSelect;
 
 export const counsellingDocuments = pgTable("counselling_documents", {
@@ -1372,7 +1372,7 @@ export const counsellingDocuments = pgTable("counselling_documents", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 export const insertCounsellingDocumentSchema = createInsertSchema(counsellingDocuments).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertCounsellingDocument = z.infer<typeof insertCounsellingDocumentSchema>;
+export type InsertCounsellingDocument = typeof counsellingDocuments.$inferInsert;
 export type CounsellingDocument = typeof counsellingDocuments.$inferSelect;
 
 export const counsellingTasks = pgTable("counselling_tasks", {
@@ -1389,7 +1389,7 @@ export const counsellingTasks = pgTable("counselling_tasks", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 export const insertCounsellingTaskSchema = createInsertSchema(counsellingTasks).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertCounsellingTask = z.infer<typeof insertCounsellingTaskSchema>;
+export type InsertCounsellingTask = typeof counsellingTasks.$inferInsert;
 export type CounsellingTask = typeof counsellingTasks.$inferSelect;
 
 export const counsellingAiAssessments = pgTable("counselling_ai_assessments", {
@@ -1406,5 +1406,5 @@ export const counsellingAiAssessments = pgTable("counselling_ai_assessments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 export const insertCounsellingAiAssessmentSchema = createInsertSchema(counsellingAiAssessments).omit({ id: true, createdAt: true });
-export type InsertCounsellingAiAssessment = z.infer<typeof insertCounsellingAiAssessmentSchema>;
+export type InsertCounsellingAiAssessment = typeof counsellingAiAssessments.$inferInsert;
 export type CounsellingAiAssessment = typeof counsellingAiAssessments.$inferSelect;
