@@ -2156,7 +2156,7 @@ export class MemStorage implements IStorage {
     this.platformAiConfigRecord = {
       id: existing?.id ?? 1,
       anthropicApiKey: data.anthropicApiKey !== undefined ? data.anthropicApiKey : existing?.anthropicApiKey ?? null,
-      anthropicModel: data.anthropicModel !== undefined ? data.anthropicModel : existing?.anthropicModel ?? "claude-sonnet-4-6",
+      anthropicModel: data.anthropicModel !== undefined ? data.anthropicModel : existing?.anthropicModel ?? "claude-3-5-sonnet-20241022",
       updatedAt: new Date(),
     };
     return this.platformAiConfigRecord;
@@ -4023,7 +4023,7 @@ class HybridStorage extends MemStorage {
         return rows[0];
       }
       const rows = await db.insert(platformAiConfigTable).values({
-        anthropicModel: "claude-sonnet-4-6",
+        anthropicModel: "claude-3-5-sonnet-20241022",
         ...data,
       }).returning();
       return rows[0];

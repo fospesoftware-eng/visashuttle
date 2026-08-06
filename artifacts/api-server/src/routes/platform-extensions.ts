@@ -16,6 +16,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
+import { getCleanApiKey, normalizeClaudeModel } from "../ai";
 import {
   supportTickets, supportTicketMessages,
   tenantSubscriptions, tenantSubscriptionInvoices,
@@ -314,8 +315,8 @@ function fallbackCustomizationEstimate(prompt: string) {
 
 async function estimateCustomizationWithAnthropic(prompt: string, imageBase64?: string, imageMimeType?: string) {
   const cfg = await storage.getPlatformAiConfig().catch(() => undefined);
-  const apiKey = cfg?.anthropicApiKey || process.env.ANTHROPIC_API_KEY;
-  const model = cfg?.anthropicModel || process.env.ANTHROPIC_MODEL || "claude-opus-4-5";
+  const apiKey = getCleanApiKey(cfg?.anthropicApiKey, process.env.ANTHROPIC_API_KEY);
+  const model = normalizeClaudeModel(cfg?.anthropicModel || process.env.ANTHROPIC_MODEL);
   if (!apiKey) return { ...fallbackCustomizationEstimate(prompt), provider: "heuristic" };
 
   const content: any[] = [

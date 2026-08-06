@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage, isMissingRelationError, getVirtualStickersByUser, createVirtualSticker, getVirtualStickerBySession, collectTravelSticker, getTravelStickerPayments } from "../storage";
-import { runVisaCheck, runDeepCheck, scanPassportImage, isPassportScanConfigured } from "../ai";
+import { runVisaCheck, runDeepCheck, scanPassportImage, isPassportScanConfigured, getCleanApiKey, normalizeClaudeModel } from "../ai";
 import { registerApiPlatformRoutes } from "./api-platform";
 import { registerPlatformExtensions } from "./platform-extensions";
 import express from "express";
@@ -2345,7 +2345,7 @@ export async function registerRoutes(
     if (country && visaType) {
       try {
         const aiConfig = await storage.getPlatformAiConfig();
-        const apiKey = aiConfig?.anthropicApiKey || process.env.ANTHROPIC_API_KEY;
+        const apiKey = getCleanApiKey(aiConfig?.anthropicApiKey, process.env.ANTHROPIC_API_KEY);
         if (!apiKey) throw new Error("Anthropic API key not configured");
         const nationalityLine = nationality ? `Applicant nationality: ${nationality}` : "";
         const prompt = `You are a visa documentation expert. Generate a complete document checklist for:
@@ -2376,7 +2376,7 @@ Rules:
           method: "POST",
           signal: controller.signal,
           headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
-          body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 800, messages: [{ role: "user", content: prompt }] }),
+          body: JSON.stringify({ model: normalizeClaudeModel(aiConfig?.anthropicModel || "claude-3-5-haiku-20241022"), max_tokens: 800, messages: [{ role: "user", content: prompt }] }),
         });
         clearTimeout(timeout);
         if (!resp.ok) throw new Error(`Claude checklist error: ${resp.status}`);
@@ -5285,7 +5285,7 @@ Rules:
     } catch (_) { /* use empty list if checklist unavailable */ }
 
     const aiConfig = await storage.getPlatformAiConfig();
-    const aiApiKey = aiConfig?.anthropicApiKey || process.env.ANTHROPIC_API_KEY;
+    const aiApiKey = getCleanApiKey(aiConfig?.anthropicApiKey, process.env.ANTHROPIC_API_KEY);
     if (!aiApiKey) return res.status(500).json({ error: "Anthropic API key not configured" });
 
     const today = new Date().toISOString().slice(0, 10);
@@ -5339,7 +5339,7 @@ Rules:
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-api-key": aiApiKey, "anthropic-version": "2023-06-01" },
-        body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 2000, messages: [{ role: "user", content: prompt }] }),
+        body: JSON.stringify({ model: normalizeClaudeModel(aiConfig?.anthropicModel), max_tokens: 2000, messages: [{ role: "user", content: prompt }] }),
       });
       if (!response.ok) throw new Error(`Claude error: ${response.status}`);
       const data = await response.json() as any;
@@ -10062,7 +10062,7 @@ Rules:
     let responseJson: any;
     try {
       const aiCfg = await storage.getPlatformAiConfig();
-      const apiKey = aiCfg?.apiKey || process.env.ANTHROPIC_API_KEY;
+      const apiKey = getCleanApiKey(aiCfg?.anthropicApiKey, process.env.ANTHROPIC_API_KEY);
       if (!apiKey) throw new Error("AI not configured");
       const prompt = `You are a study abroad counselling expert. Analyze this student profile and return a JSON assessment.
 
@@ -10103,7 +10103,7 @@ Return ONLY valid JSON (no markdown):
       const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-        body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 1500, messages: [{ role: "user", content: prompt }] }),
+        body: JSON.stringify({ model: normalizeClaudeModel(aiCfg?.anthropicModel || "claude-3-5-haiku-20241022"), max_tokens: 1500, messages: [{ role: "user", content: prompt }] }),
       });
       if (!aiRes.ok) throw new Error(`AI error: ${aiRes.status}`);
       const aiData = await aiRes.json();
@@ -10146,7 +10146,7 @@ Return ONLY valid JSON (no markdown):
     let draft: string;
     try {
       const aiCfg = await storage.getPlatformAiConfig();
-      const apiKey = aiCfg?.apiKey || process.env.ANTHROPIC_API_KEY;
+      const apiKey = getCleanApiKey(aiCfg?.anthropicApiKey, process.env.ANTHROPIC_API_KEY);
       if (!apiKey) throw new Error("AI not configured");
       const prompt = `Write a compelling Statement of Purpose (SOP) draft for a student visa application. Make it professional, genuine, and 400-500 words.
 
@@ -10165,7 +10165,7 @@ Write a complete SOP draft starting with "Statement of Purpose" as the heading. 
       const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-        body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 1000, messages: [{ role: "user", content: prompt }] }),
+        body: JSON.stringify({ model: normalizeClaudeModel(aiCfg?.anthropicModel || "claude-3-5-haiku-20241022"), max_tokens: 1000, messages: [{ role: "user", content: prompt }] }),
       });
       if (!aiRes.ok) throw new Error(`AI error: ${aiRes.status}`);
       const aiData = await aiRes.json();
@@ -10859,7 +10859,7 @@ Write a complete SOP draft starting with "Statement of Purpose" as the heading. 
 
     try {
       const aiCfg = await storage.getPlatformAiConfig();
-      const apiKey = aiCfg?.apiKey || process.env.ANTHROPIC_API_KEY;
+      const apiKey = getCleanApiKey(aiCfg?.anthropicApiKey, process.env.ANTHROPIC_API_KEY);
       if (!apiKey) throw new Error("AI not configured");
 
       const prompt = `You are a visa application expert. Generate a comprehensive, accurate self-application guide for:
@@ -10901,7 +10901,7 @@ Include 6-8 steps covering: checking eligibility, gathering documents, completin
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001",
+          model: normalizeClaudeModel(aiCfg?.anthropicModel || "claude-3-5-haiku-20241022"),
           max_tokens: 2000,
           messages: [{ role: "user", content: prompt }],
         }),
@@ -10921,10 +10921,11 @@ Include 6-8 steps covering: checking eligibility, gathering documents, completin
   // ── AI Integrations ────────────────────────────────────────────────────────
 
   async function callClaudeHaiku(apiKey: string, prompt: string, maxTokens = 800): Promise<string> {
+    const cleanKey = apiKey.trim().replace(/^["']|["']$/g, "");
     const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: maxTokens, messages: [{ role: "user", content: prompt }] }),
+      headers: { "x-api-key": cleanKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+      body: JSON.stringify({ model: "claude-3-5-haiku-20241022", max_tokens: maxTokens, messages: [{ role: "user", content: prompt }] }),
     });
     if (!r.ok) throw new Error(`AI error: ${r.status}`);
     const d = await r.json();
@@ -10933,7 +10934,7 @@ Include 6-8 steps covering: checking eligibility, gathering documents, completin
 
   async function getAiKey(): Promise<string | null> {
     const cfg = await storage.getPlatformAiConfig().catch(() => null);
-    return cfg?.apiKey || process.env.ANTHROPIC_API_KEY || null;
+    return getCleanApiKey(cfg?.anthropicApiKey, process.env.ANTHROPIC_API_KEY);
   }
 
   // Lead: AI follow-up email drafter

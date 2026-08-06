@@ -1,7 +1,33 @@
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-5";
+const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-20241022";
 const AI_PROVIDER = process.env.AI_PROVIDER || "openai";
+
+export function normalizeClaudeModel(modelStr?: string | null): string {
+  if (!modelStr) return "claude-3-5-sonnet-20241022";
+  const s = modelStr.trim().toLowerCase().replace(/^["']|["']$/g, "");
+
+  if (s === "claude-opus-4-5" || s === "claude-sonnet-4-6" || s === "claude-haiku-4-5-20251001") {
+    if (s.includes("haiku")) return "claude-3-5-haiku-20241022";
+    if (s.includes("opus")) return "claude-3-opus-20240229";
+    return "claude-3-5-sonnet-20241022";
+  }
+
+  if (s.includes("3-7") || s.includes("3.7")) return "claude-3-7-sonnet-20250219";
+  if (s.includes("3-5-sonnet") || s.includes("3.5-sonnet") || s.includes("sonnet")) return "claude-3-5-sonnet-20241022";
+  if (s.includes("3-5-haiku") || s.includes("3.5-haiku") || s.includes("haiku")) return "claude-3-5-haiku-20241022";
+  if (s.includes("opus")) return "claude-3-opus-20240229";
+
+  if (s.startsWith("claude-")) return s;
+  return "claude-3-5-sonnet-20241022";
+}
+
+export function getCleanApiKey(configKey?: string | null, envKey?: string | null): string | null {
+  const k = configKey || envKey;
+  if (!k) return null;
+  const trimmed = k.trim().replace(/^["']|["']$/g, "");
+  return trimmed.length > 0 ? trimmed : null;
+}
 
 export interface AnthropicRuntimeConfig {
   anthropicApiKey?: string | null;
@@ -279,8 +305,8 @@ async function callOpenAI(form: VisaCheckFormData): Promise<AIVisaResult> {
 }
 
 async function callClaude(form: VisaCheckFormData, config?: AnthropicRuntimeConfig): Promise<AIVisaResult> {
-  const apiKey = config?.anthropicApiKey || ANTHROPIC_API_KEY;
-  const model = config?.anthropicModel || "claude-3-haiku-20240307";
+  const apiKey = getCleanApiKey(config?.anthropicApiKey, ANTHROPIC_API_KEY);
+  const model = normalizeClaudeModel(config?.anthropicModel || "claude-3-5-haiku-20241022");
   if (!apiKey) throw new Error("Anthropic API key not configured");
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -739,8 +765,8 @@ function buildDeepCheckUserPrompt(form: DeepCheckFormData): string {
 }
 
 async function callClaudeDeepCheck(form: DeepCheckFormData, config?: AnthropicRuntimeConfig): Promise<DeepCheckResult> {
-  const apiKey = config?.anthropicApiKey || ANTHROPIC_API_KEY;
-  const model = config?.anthropicModel || ANTHROPIC_MODEL;
+  const apiKey = getCleanApiKey(config?.anthropicApiKey, ANTHROPIC_API_KEY);
+  const model = normalizeClaudeModel(config?.anthropicModel || ANTHROPIC_MODEL);
   if (!apiKey) throw new Error("Anthropic API key not configured");
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -752,7 +778,7 @@ async function callClaudeDeepCheck(form: DeepCheckFormData, config?: AnthropicRu
     },
     body: JSON.stringify({
       model,
-      max_tokens: 8192,
+      max_tokens: 4000,
       system: buildDeepCheckSystemPrompt(),
       messages: [{ role: "user", content: buildDeepCheckUserPrompt(form) }],
     }),
@@ -888,8 +914,8 @@ export async function scanPassportImage(
   mimeType: string,
   config?: AnthropicRuntimeConfig,
 ): Promise<PassportScanResult> {
-  const apiKey = config?.anthropicApiKey || ANTHROPIC_API_KEY;
-  const model = config?.anthropicModel || ANTHROPIC_MODEL;
+  const apiKey = getCleanApiKey(config?.anthropicApiKey, ANTHROPIC_API_KEY);
+  const model = normalizeClaudeModel(config?.anthropicModel || ANTHROPIC_MODEL);
   if (!apiKey) throw new Error("Anthropic API key not configured");
 
   const supportedMime = ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(mimeType)
