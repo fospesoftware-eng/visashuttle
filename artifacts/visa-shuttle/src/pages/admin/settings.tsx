@@ -647,6 +647,8 @@ interface B2cCouponResponse {
   code: string;
   description: string | null;
   discountPercent: number;
+  maxUses: number | null;
+  usedCount: number;
   active: boolean;
   expiresAt: string | null;
   createdAt: string;
@@ -972,7 +974,7 @@ function B2cPlansCard() {
 // ── B2C Coupons Card ───────────────────────────────────────────────────────
 function B2cCouponsCard() {
   const { toast } = useToast();
-  const emptyForm = { id: "", code: "", description: "", discountPercent: 10, active: true, expiresAt: "" };
+  const emptyForm = { id: "", code: "", description: "", discountPercent: 10, maxUses: "", active: true, expiresAt: "" };
   const [form, setForm] = useState(emptyForm);
 
   const { data = [], isLoading } = useQuery<B2cCouponResponse[]>({
@@ -985,6 +987,7 @@ function B2cCouponsCard() {
         code: form.code.trim().toUpperCase(),
         description: form.description.trim() || null,
         discountPercent: Number(form.discountPercent),
+        maxUses: form.maxUses !== "" ? Number(form.maxUses) : null,
         active: form.active,
         expiresAt: form.expiresAt || null,
       };
@@ -1015,8 +1018,21 @@ function B2cCouponsCard() {
       code: coupon.code,
       description: coupon.description || "",
       discountPercent: coupon.discountPercent,
+      maxUses: coupon.maxUses != null ? String(coupon.maxUses) : "",
       active: !!coupon.active,
       expiresAt: coupon.expiresAt ? coupon.expiresAt.slice(0, 10) : "",
+    });
+  }
+
+  function applyPreset(code: string, percent: number, desc: string) {
+    setForm({
+      id: "",
+      code,
+      discountPercent: percent,
+      description: desc,
+      maxUses: "50",
+      active: true,
+      expiresAt: "",
     });
   }
 
@@ -1025,11 +1041,11 @@ function B2cCouponsCard() {
       <CardHeader>
         <div className="flex items-center justify-between gap-3">
           <div>
-            <CardTitle className="text-base flex items-center gap-2"><Tag className="w-4 h-4" />B2C Checkout Coupons</CardTitle>
-            <CardDescription>Create percentage-based coupon codes for Deep Check checkout. Max discount is 95%.</CardDescription>
+            <CardTitle className="text-base flex items-center gap-2"><Tag className="w-4 h-4 text-indigo-500" />B2C Coupon Management System</CardTitle>
+            <CardDescription>Create & manage discount coupon codes for B2C Deep Check and checkout. Set percentage (1–100%), maximum usage limits, and expiry dates.</CardDescription>
           </div>
           <Button variant="outline" size="sm" className="gap-2" onClick={() => setForm(emptyForm)}>
-            <Plus className="w-4 h-4" /> New
+            <Plus className="w-4 h-4" /> New Coupon
           </Button>
         </div>
       </CardHeader>
@@ -1037,64 +1053,106 @@ function B2cCouponsCard() {
         <div className="space-y-2">
           {isLoading && <p className="text-sm text-muted-foreground">Loading coupons...</p>}
           {!isLoading && data.length === 0 && (
-            <div className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground">No coupons yet.</div>
+            <div className="rounded-xl border border-dashed p-5 text-sm text-muted-foreground text-center">
+              No active coupons found. Create your first coupon using the form.
+            </div>
           )}
           {data.map(coupon => {
             const expired = coupon.expiresAt && new Date(coupon.expiresAt).getTime() < Date.now();
+            const depleted = coupon.maxUses != null && (coupon.usedCount ?? 0) >= coupon.maxUses;
+            const is100Percent = coupon.discountPercent >= 100;
+            const statusLabel = !coupon.active ? "Disabled" : expired ? "Expired" : depleted ? "Depleted" : "Active";
+            const badgeVariant = statusLabel === "Active" ? "default" : statusLabel === "Disabled" ? "secondary" : "destructive";
+
             return (
               <button
                 key={coupon.id}
                 type="button"
                 onClick={() => editCoupon(coupon)}
-                className={`w-full rounded-xl border p-3 text-left transition hover:border-primary/50 ${form.id === coupon.id ? "border-primary bg-primary/5" : "bg-background"}`}
+                className={`w-full rounded-xl border p-3.5 text-left transition hover:border-primary/50 ${form.id === coupon.id ? "border-primary bg-primary/5 shadow-sm" : "bg-background"}`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <p className="font-mono text-sm font-bold">{coupon.code}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-mono text-sm font-bold tracking-wide">{coupon.code}</p>
+                    {is100Percent && <span className="text-[10px] uppercase font-bold text-emerald-600 bg-emerald-100 dark:bg-emerald-950 px-1.5 py-0.5 rounded">100% Free</span>}
+                  </div>
                   <div className="flex items-center gap-1.5">
-                    <Badge variant={coupon.active && !expired ? "default" : "secondary"}>{coupon.active && !expired ? "Active" : expired ? "Expired" : "Off"}</Badge>
-                    <Badge variant="outline">{coupon.discountPercent}%</Badge>
+                    <Badge variant={badgeVariant as any}>{statusLabel}</Badge>
+                    <Badge variant="outline" className="font-bold">{coupon.discountPercent}% Off</Badge>
                   </div>
                 </div>
                 {coupon.description && <p className="mt-1 text-xs text-muted-foreground">{coupon.description}</p>}
-                {coupon.expiresAt && <p className="mt-1 text-xs text-muted-foreground">Expires {new Date(coupon.expiresAt).toLocaleDateString()}</p>}
+                <div className="mt-2 flex flex-wrap items-center justify-between text-xs text-muted-foreground gap-2 pt-1 border-t border-border/50">
+                  <span>Usage: <strong>{coupon.usedCount ?? 0}</strong> {coupon.maxUses != null ? `/ ${coupon.maxUses} max` : "(Unlimited)"}</span>
+                  {coupon.expiresAt ? (
+                    <span>Expires: {new Date(coupon.expiresAt).toLocaleDateString()}</span>
+                  ) : (
+                    <span>No Expiry Date</span>
+                  )}
+                </div>
               </button>
             );
           })}
         </div>
 
-        <div className="rounded-xl border p-4 space-y-3">
+        <div className="rounded-xl border p-4 space-y-4 bg-muted/20">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-semibold">{form.id ? "Edit Coupon" : "Create New Coupon"}</h4>
+            <div className="flex items-center gap-1">
+              <Button type="button" variant="ghost" size="xs" onClick={() => applyPreset("FREE100", 100, "100% Free VIP Access")}>+ 100% Free</Button>
+              <Button type="button" variant="ghost" size="xs" onClick={() => applyPreset("SAVE50", 50, "50% Off Promo")}>+ 50% Off</Button>
+              <Button type="button" variant="ghost" size="xs" onClick={() => applyPreset("WELCOME20", 20, "20% Welcome Code")}>+ 20% Off</Button>
+            </div>
+          </div>
+
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label>Coupon Code</Label>
-              <Input value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} placeholder="WELCOME10" className="font-mono" />
+              <Label className="text-xs font-semibold">Coupon Code</Label>
+              <Input value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} placeholder="SUMMER50" className="font-mono" />
             </div>
             <div className="space-y-1.5">
-              <Label>Discount %</Label>
-              <Input type="number" min={1} max={95} value={form.discountPercent} onChange={e => setForm(f => ({ ...f, discountPercent: Number(e.target.value) }))} />
+              <Label className="text-xs font-semibold">Discount Percentage (1–100%)</Label>
+              <Input type="number" min={1} max={100} value={form.discountPercent} onChange={e => setForm(f => ({ ...f, discountPercent: Math.min(100, Math.max(1, Number(e.target.value))) }))} />
             </div>
           </div>
+
           <div className="space-y-1.5">
-            <Label>Description</Label>
-            <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Launch offer for B2C Deep Check" />
+            <Label className="text-xs font-semibold">Description / Notes</Label>
+            <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Launch promo for B2C Deep Check" />
           </div>
-          <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+
+          <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label>Expiry Date</Label>
+              <Label className="text-xs font-semibold">Max Usage Limit (Optional)</Label>
+              <Input type="number" min={1} value={form.maxUses} onChange={e => setForm(f => ({ ...f, maxUses: e.target.value }))} placeholder="Leave empty for unlimited" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Expiry Date (Optional)</Label>
               <Input type="date" value={form.expiresAt} onChange={e => setForm(f => ({ ...f, expiresAt: e.target.value }))} />
             </div>
-            <div className="flex items-center gap-2 rounded-lg border px-3 py-2.5">
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border p-3 bg-background">
+            <div>
+              <p className="text-xs font-semibold">Coupon Status</p>
+              <p className="text-[11px] text-muted-foreground">Toggle whether users can redeem this coupon code.</p>
+            </div>
+            <div className="flex items-center gap-2">
               <Switch checked={form.active} onCheckedChange={active => setForm(f => ({ ...f, active }))} />
-              <span className="text-sm">Active</span>
+              <span className="text-xs font-medium">{form.active ? "Active" : "Disabled"}</span>
             </div>
           </div>
-          <div className="flex justify-between gap-2 pt-2">
+
+          <div className="flex justify-between gap-2 pt-1">
             {form.id ? (
               <Button variant="outline" className="gap-2 text-red-600 hover:text-red-700" onClick={() => deleteMutation.mutate(form.id)} disabled={deleteMutation.isPending}>
                 <Trash2 className="w-4 h-4" /> Delete
               </Button>
-            ) : <span />}
+            ) : (
+              <Button variant="ghost" size="sm" onClick={() => setForm(emptyForm)}>Reset</Button>
+            )}
             <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || !form.code.trim() || Number(form.discountPercent) < 1} className="gap-2">
-              <Save className="w-4 h-4" /> Save Coupon
+              <Save className="w-4 h-4" /> {form.id ? "Update Coupon" : "Create Coupon"}
             </Button>
           </div>
         </div>

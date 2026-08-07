@@ -730,6 +730,8 @@ export const b2cCoupons = pgTable("b2c_coupons", {
   code: text("code").notNull().unique(),
   description: text("description"),
   discountPercent: integer("discount_percent").notNull().default(0),
+  maxUses: integer("max_uses"),
+  usedCount: integer("used_count").notNull().default(0),
   active: boolean("active").notNull().default(true),
   expiresAt: timestamp("expires_at"),
   createdAt: timestamp("created_at").defaultNow(),

@@ -364,6 +364,7 @@ export interface IStorage {
   getB2cCouponByCode(code: string): Promise<B2cCoupon | undefined>;
   createB2cCoupon(data: InsertB2cCoupon): Promise<B2cCoupon>;
   updateB2cCoupon(id: string, data: Partial<InsertB2cCoupon>): Promise<B2cCoupon | undefined>;
+  incrementB2cCouponUsage(id: string): Promise<B2cCoupon | undefined>;
   deleteB2cCoupon(id: string): Promise<boolean>;
   getB2cPlans(): Promise<B2cPlan[]>;
   getB2cPlan(planKey: string): Promise<B2cPlan | undefined>;
@@ -2311,6 +2312,8 @@ export class MemStorage implements IStorage {
       code: data.code.trim().toUpperCase(),
       description: data.description ?? null,
       discountPercent: data.discountPercent,
+      maxUses: data.maxUses ?? null,
+      usedCount: 0,
       active: data.active ?? true,
       expiresAt: data.expiresAt ?? null,
       createdAt: now,
@@ -2330,6 +2333,14 @@ export class MemStorage implements IStorage {
     } as B2cCoupon;
     this.b2cCouponsMap.set(id, updated);
     return updated;
+  }
+  async incrementB2cCouponUsage(id: string): Promise<B2cCoupon | undefined> {
+    const existing = this.b2cCouponsMap.get(id);
+    if (!existing) return undefined;
+    existing.usedCount = (existing.usedCount ?? 0) + 1;
+    existing.updatedAt = new Date();
+    this.b2cCouponsMap.set(id, existing);
+    return existing;
   }
   async deleteB2cCoupon(id: string): Promise<boolean> {
     return this.b2cCouponsMap.delete(id);
@@ -4312,11 +4323,15 @@ class HybridStorage extends MemStorage {
         code text NOT NULL UNIQUE,
         description text,
         discount_percent integer NOT NULL DEFAULT 0,
+        max_uses integer,
+        used_count integer NOT NULL DEFAULT 0,
         active boolean NOT NULL DEFAULT true,
         expires_at timestamp,
         created_at timestamp DEFAULT now(),
         updated_at timestamp DEFAULT now()
-      )
+      );
+      ALTER TABLE b2c_coupons ADD COLUMN IF NOT EXISTS max_uses integer;
+      ALTER TABLE b2c_coupons ADD COLUMN IF NOT EXISTS used_count integer DEFAULT 0;
     `);
   }
 
@@ -4399,6 +4414,22 @@ class HybridStorage extends MemStorage {
       }
       if (shouldUseMemoryFallback(error)) return super.updateB2cCoupon(id, data);
       throw error;
+    }
+  }
+
+  async incrementB2cCouponUsage(id: string): Promise<B2cCoupon | undefined> {
+    try {
+      const rows = await db.update(b2cCouponsTable)
+        .set({
+          usedCount: sql`${b2cCouponsTable.usedCount} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(b2cCouponsTable.id, id))
+        .returning();
+      return rows[0];
+    } catch (error) {
+      if (shouldUseMemoryFallback(error)) return super.incrementB2cCouponUsage(id);
+      return undefined;
     }
   }
 

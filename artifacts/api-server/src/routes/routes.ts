@@ -983,6 +983,9 @@ async function getValidB2cCoupon(codeInput: unknown) {
   if (coupon.expiresAt && new Date(coupon.expiresAt).getTime() < Date.now()) {
     return { code, coupon: undefined, error: "Coupon code has expired." };
   }
+  if (coupon.maxUses != null && (coupon.usedCount ?? 0) >= coupon.maxUses) {
+    return { code, coupon: undefined, error: "Coupon usage limit has been reached." };
+  }
   return { code, coupon, error: "" };
 }
 
@@ -6390,7 +6393,8 @@ Rules:
   const couponBodySchema = z.object({
     code: z.string().trim().min(2).max(32),
     description: z.string().trim().max(240).optional().nullable(),
-    discountPercent: z.coerce.number().int().min(1).max(95),
+    discountPercent: z.coerce.number().int().min(1).max(100),
+    maxUses: z.coerce.number().int().min(1).optional().nullable(),
     active: z.boolean().optional().default(true),
     expiresAt: z.string().trim().optional().nullable(),
   });
@@ -6443,6 +6447,8 @@ Rules:
         code: normalizeCouponCode(parsed.code),
         description: parsed.description || null,
         discountPercent: parsed.discountPercent,
+        maxUses: parsed.maxUses ?? null,
+        usedCount: 0,
         active: parsed.active,
         expiresAt: parsed.expiresAt ? new Date(parsed.expiresAt) : null,
       } as any);
@@ -6460,6 +6466,7 @@ Rules:
         ...(parsed.code !== undefined ? { code: normalizeCouponCode(parsed.code) } : {}),
         ...(parsed.description !== undefined ? { description: parsed.description || null } : {}),
         ...(parsed.discountPercent !== undefined ? { discountPercent: parsed.discountPercent } : {}),
+        ...(parsed.maxUses !== undefined ? { maxUses: parsed.maxUses ?? null } : {}),
         ...(parsed.active !== undefined ? { active: parsed.active } : {}),
         ...(parsed.expiresAt !== undefined ? { expiresAt: parsed.expiresAt ? new Date(parsed.expiresAt) : null } : {}),
       } as any);
