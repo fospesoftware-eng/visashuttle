@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
 import { POPULAR_DESTINATIONS, VISA_TYPES } from "@/shared/destinations";
 import { formatB2cPrice, getStoredB2cCurrency } from "@/lib/b2c-pricing";
+import { getEntryRequirement } from "@/shared/visa-free";
 
 // ── Large pool of country-pair visa data ──────────────────────────────────────
 type VisaScoreSample = {
@@ -29,89 +30,8 @@ type VisaScoreSample = {
 const LIVE_SCORE_DESTINATIONS = new Set([
   "United States", "Canada", "Schengen", "United Kingdom",
   "Australia", "New Zealand", "Japan", "South Korea", "Singapore",
+  "Spain", "Italy", "Germany", "France", "Netherlands", "Switzerland", "Portugal", "Austria",
 ]);
-
-const POOL: VisaScoreSample[] = [
-  { from: "India", to: "Schengen", type: "Tourist Visa", score: 61 },
-  { from: "India", to: "United Kingdom", type: "Visit Visa", score: 55 },
-  { from: "India", to: "United States", type: "Tourist Visa", score: 47 },
-  { from: "India", to: "Canada", type: "Tourist Visa", score: 53 },
-  { from: "India", to: "Australia", type: "Tourist Visa", score: 59 },
-  { from: "India", to: "Japan", type: "Tourist Visa", score: 72 },
-  { from: "India", to: "New Zealand", type: "Tourist Visa", score: 64 },
-  { from: "India", to: "Singapore", type: "Tourist Visa", score: 68 },
-  { from: "India", to: "South Korea", type: "Tourist Visa", score: 65 },
-  { from: "Pakistan", to: "United Kingdom", type: "Visit Visa", score: 42 },
-  { from: "Pakistan", to: "United States", type: "Tourist Visa", score: 34 },
-  { from: "Pakistan", to: "Schengen", type: "Tourist Visa", score: 38 },
-  { from: "Pakistan", to: "Canada", type: "Tourist Visa", score: 40 },
-  { from: "Philippines", to: "Schengen", type: "Tourist Visa", score: 57 },
-  { from: "Philippines", to: "United Kingdom", type: "Visit Visa", score: 52 },
-  { from: "Philippines", to: "Japan", type: "Tourist Visa", score: 81 },
-  { from: "Philippines", to: "South Korea", type: "Tourist Visa", score: 76 },
-  { from: "Nigeria", to: "United States", type: "Tourist Visa", score: 31 },
-  { from: "Nigeria", to: "United Kingdom", type: "Visit Visa", score: 36 },
-  { from: "Nigeria", to: "Schengen", type: "Tourist Visa", score: 33 },
-  { from: "Nigeria", to: "Canada", type: "Tourist Visa", score: 37 },
-  { from: "Bangladesh", to: "United Kingdom", type: "Student Visa", score: 58 },
-  { from: "Bangladesh", to: "United States", type: "Tourist Visa", score: 29 },
-  { from: "Bangladesh", to: "Canada", type: "Student Visa", score: 54 },
-  { from: "Ghana", to: "United Kingdom", type: "Visit Visa", score: 44 },
-  { from: "Ghana", to: "Schengen", type: "Tourist Visa", score: 40 },
-  { from: "Ghana", to: "Canada", type: "Tourist Visa", score: 41 },
-  { from: "Kenya", to: "United Kingdom", type: "Visit Visa", score: 49 },
-  { from: "Kenya", to: "United States", type: "Tourist Visa", score: 38 },
-  { from: "Kenya", to: "Canada", type: "Tourist Visa", score: 44 },
-  { from: "South Africa", to: "United Kingdom", type: "Visit Visa", score: 71 },
-  { from: "South Africa", to: "Schengen", type: "Tourist Visa", score: 68 },
-  { from: "South Africa", to: "United States", type: "Tourist Visa", score: 63 },
-  { from: "Brazil", to: "Schengen", type: "Visa Free (No Visa Needed)", score: 100 },
-  { from: "Brazil", to: "United States", type: "Tourist Visa", score: 66 },
-  { from: "Brazil", to: "United Kingdom", type: "Visa Free (No Visa Needed)", score: 100 },
-  { from: "Colombia", to: "United States", type: "Tourist Visa", score: 52 },
-  { from: "Colombia", to: "Schengen", type: "Tourist Visa", score: 58 },
-  { from: "Mexico", to: "United States", type: "Tourist Visa", score: 72 },
-  { from: "Mexico", to: "Schengen", type: "Visa Free (No Visa Needed)", score: 100 },
-  { from: "China", to: "United States", type: "Tourist Visa", score: 55 },
-  { from: "China", to: "Schengen", type: "Tourist Visa", score: 60 },
-  { from: "China", to: "United Kingdom", type: "Visit Visa", score: 57 },
-  { from: "Vietnam", to: "United States", type: "Tourist Visa", score: 45 },
-  { from: "Vietnam", to: "Schengen", type: "Tourist Visa", score: 51 },
-  { from: "Vietnam", to: "Japan", type: "Tourist Visa", score: 78 },
-  { from: "Indonesia", to: "Schengen", type: "Tourist Visa", score: 63 },
-  { from: "Indonesia", to: "Australia", type: "Tourist Visa", score: 69 },
-  { from: "Thailand", to: "Schengen", type: "Tourist Visa", score: 72 },
-  { from: "Thailand", to: "United States", type: "Tourist Visa", score: 66 },
-  { from: "Nepal", to: "United States", type: "Tourist Visa", score: 32 },
-  { from: "Nepal", to: "Australia", type: "Tourist Visa", score: 58 },
-  { from: "Sri Lanka", to: "United Kingdom", type: "Visit Visa", score: 47 },
-  { from: "Sri Lanka", to: "Australia", type: "Tourist Visa", score: 61 },
-  { from: "Morocco", to: "Schengen", type: "Tourist Visa", score: 48 },
-  { from: "Morocco", to: "United Kingdom", type: "Visit Visa", score: 44 },
-  { from: "Turkey", to: "Schengen", type: "Tourist Visa", score: 67 },
-  { from: "Turkey", to: "United Kingdom", type: "Visit Visa", score: 62 },
-  { from: "Jordan", to: "Schengen", type: "Tourist Visa", score: 65 },
-  { from: "Jordan", to: "United Kingdom", type: "Visit Visa", score: 61 },
-  { from: "Saudi Arabia", to: "Schengen", type: "Tourist Visa", score: 79 },
-  { from: "Saudi Arabia", to: "United Kingdom", type: "Visit Visa", score: 74 },
-  { from: "Russia", to: "Schengen", type: "Tourist Visa", score: 51 },
-  { from: "Ukraine", to: "Schengen", type: "Visa Free (No Visa Needed)", score: 100 },
-  { from: "United States", to: "Schengen", type: "Visa Free (No Visa Needed)", score: 100 },
-  { from: "United Kingdom", to: "Schengen", type: "Visa Free (No Visa Needed)", score: 100 },
-  { from: "Canada", to: "Schengen", type: "Visa Free (No Visa Needed)", score: 100 },
-  { from: "Australia", to: "United States", type: "Visa Free (ESTA)", score: 100 },
-  { from: "Germany", to: "United States", type: "Visa Free (ESTA)", score: 100 },
-  { from: "France", to: "United States", type: "Visa Free (ESTA)", score: 100 },
-].filter(s => LIVE_SCORE_DESTINATIONS.has(s.to));
-
-// Popular destinations per nationality (fallback if no IP match)
-const NATIONALITY_DESTINATIONS: Record<string, string[]> = {
-  "United Arab Emirates": ["United Kingdom", "Schengen", "United States"],
-  "Saudi Arabia": ["Schengen", "United Kingdom", "United States"],
-  "Qatar": ["Schengen", "United Kingdom", "United States"],
-  "Kuwait": ["Schengen", "United Kingdom", "United States"],
-  "Bahrain": ["Schengen", "United Kingdom", "United States"],
-};
 
 function scoreToLabel(score: number, type?: string): { label: string; color: string } {
   if (score >= 100 || (type && type.includes("Visa Free"))) return { label: "Visa Free", color: "text-emerald-700 bg-emerald-100 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-700 font-bold" };
@@ -122,48 +42,149 @@ function scoreToLabel(score: number, type?: string): { label: string; color: str
 }
 
 const COUNTRY_FLAG_CODES: Record<string, string> = {
-  Australia: "au",
-  Bangladesh: "bd",
-  Brazil: "br",
-  Canada: "ca",
-  China: "cn",
-  Colombia: "co",
-  France: "fr",
-  Germany: "de",
-  Ghana: "gh",
-  India: "in",
-  Indonesia: "id",
-  Japan: "jp",
-  Jordan: "jo",
-  Kenya: "ke",
-  Mexico: "mx",
-  Morocco: "ma",
-  Nepal: "np",
-  "New Zealand": "nz",
-  Nigeria: "ng",
-  Pakistan: "pk",
-  Philippines: "ph",
-  Russia: "ru",
-  "Saudi Arabia": "sa",
-  Schengen: "eu",
-  Singapore: "sg",
-  "South Africa": "za",
-  "South Korea": "kr",
-  "Sri Lanka": "lk",
-  Thailand: "th",
-  Turkey: "tr",
-  Ukraine: "ua",
+  "Andorra": "ad",
+  "United Arab Emirates": "ae",
+  "UAE": "ae",
+  "Afghanistan": "af",
+  "Albania": "al",
+  "Armenia": "am",
+  "Argentina": "ar",
+  "Austria": "at",
+  "Australia": "au",
+  "Azerbaijan": "az",
+  "Bosnia and Herzegovina": "ba",
+  "Bangladesh": "bd",
+  "Belgium": "be",
+  "Bulgaria": "bg",
+  "Bahrain": "bh",
+  "Bolivia": "bo",
+  "Brazil": "br",
+  "Bhutan": "bt",
+  "Botswana": "bw",
+  "Belarus": "by",
+  "Belize": "bz",
+  "Canada": "ca",
+  "Switzerland": "ch",
+  "Chile": "cl",
+  "China": "cn",
+  "Colombia": "co",
+  "Costa Rica": "cr",
+  "Cuba": "cu",
+  "Cyprus": "cy",
+  "Czech Republic": "cz",
+  "Czechia": "cz",
+  "Germany": "de",
+  "Denmark": "dk",
+  "Dominican Republic": "do",
+  "Ecuador": "ec",
+  "Estonia": "ee",
+  "Egypt": "eg",
+  "Spain": "es",
+  "Ethiopia": "et",
+  "Finland": "fi",
+  "Fiji": "fj",
+  "France": "fr",
   "United Kingdom": "gb",
+  "UK": "gb",
+  "Georgia": "ge",
+  "Ghana": "gh",
+  "Greece": "gr",
+  "Guatemala": "gt",
+  "Hong Kong": "hk",
+  "Honduras": "hn",
+  "Croatia": "hr",
+  "Hungary": "hu",
+  "Indonesia": "id",
+  "Ireland": "ie",
+  "Israel": "il",
+  "India": "in",
+  "Iraq": "iq",
+  "Iran": "ir",
+  "Iceland": "is",
+  "Italy": "it",
+  "Jamaica": "jm",
+  "Jordan": "jo",
+  "Japan": "jp",
+  "Kenya": "ke",
+  "Kyrgyzstan": "kg",
+  "Cambodia": "kh",
+  "South Korea": "kr",
+  "Korea": "kr",
+  "Kuwait": "kw",
+  "Kazakhstan": "kz",
+  "Laos": "la",
+  "Lebanon": "lb",
+  "Liechtenstein": "li",
+  "Sri Lanka": "lk",
+  "Lithuania": "lt",
+  "Luxembourg": "lu",
+  "Latvia": "lv",
+  "Morocco": "ma",
+  "Monaco": "mc",
+  "Moldova": "md",
+  "Montenegro": "me",
+  "North Macedonia": "mk",
+  "Myanmar": "mm",
+  "Mongolia": "mn",
+  "Maldives": "mv",
+  "Mexico": "mx",
+  "Malaysia": "my",
+  "Nigeria": "ng",
+  "Nicaragua": "ni",
+  "Netherlands": "nl",
+  "Norway": "no",
+  "Nepal": "np",
+  "New Zealand": "nz",
+  "Oman": "om",
+  "Panama": "pa",
+  "Peru": "pe",
+  "Philippines": "ph",
+  "Pakistan": "pk",
+  "Poland": "pl",
+  "Portugal": "pt",
+  "Paraguay": "py",
+  "Qatar": "qa",
+  "Romania": "ro",
+  "Serbia": "rs",
+  "Russia": "ru",
+  "Rwanda": "rw",
+  "Saudi Arabia": "sa",
+  "Sweden": "se",
+  "Singapore": "sg",
+  "Slovenia": "si",
+  "Slovakia": "sk",
+  "San Marino": "sm",
+  "Senegal": "sn",
+  "El Salvador": "sv",
+  "Thailand": "th",
+  "Tajikistan": "tj",
+  "Turkmenistan": "tm",
+  "Tunisia": "tn",
+  "Turkey": "tr",
+  "Taiwan": "tw",
+  "Tanzania": "tz",
+  "Ukraine": "ua",
+  "Uganda": "ug",
   "United States": "us",
-  Vietnam: "vn",
+  "USA": "us",
+  "Uruguay": "uy",
+  "Uzbekistan": "uz",
+  "Vatican City": "va",
+  "Venezuela": "ve",
+  "Vietnam": "vn",
+  "South Africa": "za",
+  "Zimbabwe": "zw",
+  "Schengen": "eu",
+  "Schengen Area": "eu",
+  "European Union": "eu",
 };
 
 function CountryWithFlag({ name, code }: { name: string; code?: string | null }) {
   const flagCode = (code || COUNTRY_FLAG_CODES[name] || "").toLowerCase();
   return (
-    <span className="inline-flex items-center gap-1 min-w-0">
+    <span className="inline-flex items-center gap-1.5 min-w-0">
       {flagCode ? (
-        <span className={`fi fi-${flagCode} visa-country-flag`} aria-hidden="true" />
+        <span className={`fi fi-${flagCode} visa-country-flag shadow-sm rounded-sm`} aria-hidden="true" />
       ) : (
         <Globe className="w-4 h-4 text-muted-foreground flex-shrink-0" />
       )}
@@ -181,24 +202,50 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-function fallbackSamples(): VisaScoreSample[] {
-  const fallbackFrom = "India";
-  // Pick from the master POPULAR_DESTINATIONS so the home-page widget stays
-  // in sync with the rest of the app. We add "Schengen" explicitly because
-  // visa-free / scoring logic keys on that exact label.
-  const candidates = [...POPULAR_DESTINATIONS, "Schengen"].filter(c => c !== fallbackFrom);
-  const destinations = shuffle(candidates).slice(0, 4);
-  const visaTypes = shuffle(VISA_TYPES.filter(t => [
-    "Tourist Visa", "Visit Visa", "Work Visa", "Student Visa", "Business Visa",
-  ].includes(t)));
-  return destinations.map((to, index) => ({
-    from: fallbackFrom,
-    to,
-    type: visaTypes[index % visaTypes.length],
-    score: 50 + Math.floor(Math.random() * 32),
-    fromCode: "in",
-    toCode: COUNTRY_FLAG_CODES[to] || null,
-  }));
+function buildCountrySamples(fromCountry = "India"): VisaScoreSample[] {
+  const fromCode = COUNTRY_FLAG_CODES[fromCountry] || "in";
+  const candidates = ["Schengen", "United States", "United Kingdom", "Australia", "Japan", "Canada"];
+  const selectedTo = candidates.filter(c => c !== fromCountry).slice(0, 4);
+
+  return selectedTo.map((to, idx) => {
+    const req = getEntryRequirement(fromCountry, to);
+    const toCode = COUNTRY_FLAG_CODES[to] || "eu";
+
+    if (req === "visa_free") {
+      return {
+        from: fromCountry,
+        to,
+        type: "Visa Free (No Visa Needed)",
+        score: 100,
+        fromCode,
+        toCode,
+      };
+    }
+
+    if (req === "visa_on_arrival") {
+      return {
+        from: fromCountry,
+        to,
+        type: "Visa on Arrival",
+        score: 95,
+        fromCode,
+        toCode,
+      };
+    }
+
+    const visaTypes = ["Tourist Visa", "Visit Visa", "Business Visa", "Student Visa"];
+    const type = visaTypes[idx % visaTypes.length];
+    const score = 52 + ((fromCountry.charCodeAt(0) * (idx + 1) * 7) % 32);
+
+    return {
+      from: fromCountry,
+      to,
+      type,
+      score,
+      fromCode,
+      toCode,
+    };
+  });
 }
 
 const STEPS = [
@@ -220,7 +267,7 @@ export default function HomePage() {
   useEffect(() => {
     const fallback = () => {
       setUserCountry("India");
-      setSamples(fallbackSamples());
+      setSamples(buildCountrySamples("India"));
     };
     const controller = new AbortController();
 
@@ -233,10 +280,28 @@ export default function HomePage() {
         return r.json();
       })
       .then((data: { country?: string | null; scores?: VisaScoreSample[] }) => {
-        const scores = data.scores?.length ? data.scores : fallbackSamples();
-        const fromCountry = data.country || scores[0]?.from || "India";
+        const fromCountry = data.country || "India";
         setUserCountry(fromCountry);
-        setSamples(scores.map(score => ({ ...score, from: fromCountry })));
+
+        let finalScores: VisaScoreSample[] = [];
+        if (data.scores && data.scores.length > 0) {
+          finalScores = data.scores.map(s => {
+            const req = getEntryRequirement(fromCountry, s.to);
+            const isFree = req === "visa_free";
+            return {
+              ...s,
+              from: fromCountry,
+              fromCode: COUNTRY_FLAG_CODES[fromCountry] || s.fromCode || null,
+              toCode: COUNTRY_FLAG_CODES[s.to] || s.toCode || null,
+              score: isFree ? 100 : s.score,
+              type: isFree ? "Visa Free (No Visa Needed)" : s.type,
+            };
+          });
+        } else {
+          finalScores = buildCountrySamples(fromCountry);
+        }
+
+        setSamples(finalScores);
       })
       .catch(err => {
         if (err.name !== "AbortError") fallback();

@@ -1304,34 +1304,23 @@ function buildLiveVisaScores(origin: string | null): { country: string | null; s
   const from = origin || "India";
   if (from.toLowerCase() === "india") return buildIndiaLiveVisaScores();
 
-  let destinations = shuffle([...(ORIGIN_DESTINATIONS[from] || FALLBACK_DESTINATIONS)])
-    .filter(destination => ALLOWED_LIVE_DESTINATIONS.has(destination))
-    .filter(destination => destination !== from)
-    .filter(destination => getEntryRequirement(from, destination) !== "visa_free")
-    .slice(0, 4);
-
-  if (destinations.length < 4) {
-    const extras = shuffle(FALLBACK_DESTINATIONS)
-      .filter(destination => ALLOWED_LIVE_DESTINATIONS.has(destination))
-      .filter(destination => destination !== from)
-      .filter(destination => !destinations.includes(destination))
-      .filter(destination => getEntryRequirement(from, destination) !== "visa_free")
-      .slice(0, 4 - destinations.length);
-    destinations = [...destinations, ...extras];
-  }
-
+  const candidates = ["Schengen", "United States", "United Kingdom", "Australia", "Japan", "Canada"];
+  const destinations = shuffle(candidates.filter(d => d !== from)).slice(0, 4);
   const visaTypes = shuffle(LIVE_VISA_TYPES);
 
   return {
     country: from,
-    scores: destinations.map((to, index) => ({
-      from,
-      to,
-      type: visaTypeForDestination(to, index, visaTypes),
-      score: liveScoreForRoute(from, to),
-      fromCode: flagCodeForCountry(from),
-      toCode: flagCodeForCountry(to),
-    })),
+    scores: destinations.map((to, index) => {
+      const isFree = getEntryRequirement(from, to) === "visa_free";
+      return {
+        from,
+        to,
+        type: isFree ? "Visa Free (No Visa Needed)" : visaTypeForDestination(to, index, visaTypes),
+        score: isFree ? 100 : liveScoreForRoute(from, to),
+        fromCode: flagCodeForCountry(from),
+        toCode: flagCodeForCountry(to),
+      };
+    }),
   };
 }
 
