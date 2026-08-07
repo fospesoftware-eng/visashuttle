@@ -204,7 +204,11 @@ function shuffle<T>(arr: T[]): T[] {
 
 function buildCountrySamples(fromCountry = "India"): VisaScoreSample[] {
   const fromCode = COUNTRY_FLAG_CODES[fromCountry] || "in";
-  const candidates = ["Schengen", "United States", "United Kingdom", "Australia", "Japan", "Canada"];
+  let candidates = ["Schengen", "United States", "United Kingdom", "Canada", "Australia", "Japan", "Singapore", "Thailand"];
+  if (fromCountry === "India") {
+    candidates = ["Schengen", "United Kingdom", "United States", "Canada", "Australia", "Japan", "Singapore"];
+  }
+
   const selectedTo = candidates.filter(c => c !== fromCountry).slice(0, 4);
 
   return selectedTo.map((to, idx) => {
@@ -235,7 +239,22 @@ function buildCountrySamples(fromCountry = "India"): VisaScoreSample[] {
 
     const visaTypes = ["Tourist Visa", "Visit Visa", "Business Visa", "Student Visa"];
     const type = visaTypes[idx % visaTypes.length];
-    const score = 52 + ((fromCountry.charCodeAt(0) * (idx + 1) * 7) % 32);
+
+    let score = 56;
+    if (fromCountry === "India") {
+      const indiaScores: Record<string, number> = {
+        Schengen: 61,
+        "United Kingdom": 55,
+        "United States": 47,
+        Canada: 53,
+        Australia: 59,
+        Japan: 72,
+        Singapore: 68,
+      };
+      score = indiaScores[to] || 56;
+    } else {
+      score = 52 + ((fromCountry.charCodeAt(0) * (idx + 1) * 7) % 32);
+    }
 
     return {
       from: fromCountry,

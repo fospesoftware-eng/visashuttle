@@ -1251,13 +1251,34 @@ function liveScoreForRoute(from: string, to: string): number {
 function buildIndiaLiveVisaScores(): { country: string; scores: LiveVisaScore[] } {
   const countries = shuffle(INDIA_VISA_CHANCE_COUNTRIES)
     .filter(item => ALLOWED_LIVE_REGIONS.has(item.region) || ALLOWED_LIVE_DESTINATIONS.has(item.country))
-    .filter(item => getEntryRequirement("India", item.country) !== "visa_free")
     .slice(0, 4);
   const visaTypes = shuffle(INDIA_DATASET_VISA_TYPES);
 
   return {
     country: "India",
     scores: countries.map((item, index) => {
+      const req = getEntryRequirement("India", item.country);
+      if (req === "visa_free") {
+        return {
+          from: "India",
+          to: item.country,
+          type: "Visa Free (No Visa Needed)",
+          score: 100,
+          fromCode: "in",
+          toCode: flagCodeForCountry(item.country, item.iso2),
+        };
+      }
+      if (req === "visa_on_arrival") {
+        return {
+          from: "India",
+          to: item.country,
+          type: "Visa on Arrival",
+          score: 95,
+          fromCode: "in",
+          toCode: flagCodeForCountry(item.country, item.iso2),
+        };
+      }
+
       const visaType = visaTypes[index % visaTypes.length];
       const range = item.approval_chance_percent[visaType.key];
 
