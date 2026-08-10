@@ -1,16 +1,31 @@
 import { Link } from "wouter";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronRight, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { CurrencySwitcher } from "@/components/currency-switcher";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
-import { formatB2cPrice, getStoredB2cCurrency } from "@/lib/b2c-pricing";
+import { formatB2cPrice, getStoredB2cCurrency, type B2cCurrency } from "@/lib/b2c-pricing";
 
 export function SiteHeader() {
   const { user } = useB2cAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const basicCheckPrice = formatB2cPrice(getStoredB2cCurrency(), 0);
+  const [currency, setCurrency] = useState<B2cCurrency>(() => getStoredB2cCurrency());
+  const basicCheckPrice = formatB2cPrice(currency, 0);
+
+  useEffect(() => {
+    const handleCurrencyChange = (e: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (detail?.currency) {
+        setCurrency(detail.currency);
+      }
+    };
+    window.addEventListener("visashuttle:currency-changed", handleCurrencyChange);
+    return () => {
+      window.removeEventListener("visashuttle:currency-changed", handleCurrencyChange);
+    };
+  }, []);
 
   const closeMobileMenu = () => setMobileMenuOpen(false);
 
@@ -41,6 +56,7 @@ export function SiteHeader() {
           )}
         </nav>
         <div className="flex items-center gap-2 sm:gap-3">
+          <CurrencySwitcher variant="outline" size="sm" />
           <ThemeToggle />
           {user ? (
             <Link href="/account" className="hidden md:inline-flex">

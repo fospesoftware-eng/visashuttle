@@ -18,12 +18,20 @@ export type B2cPlan = {
   active: boolean;
 };
 
+export const B2C_CURRENCY_SYMBOLS: Record<B2cCurrency, string> = {
+  USD: "$",
+  GBP: "£",
+  EUR: "€",
+  INR: "₹",
+  AED: "AED",
+};
+
 export const B2C_DEEP_CHECK_PRICES: Record<B2cCurrency, { amount: number; symbol: string; label: string }> = {
-  USD: { amount: 15, symbol: "$", label: "US Dollar" },
-  GBP: { amount: 11, symbol: "£", label: "British Pound" },
-  EUR: { amount: 12, symbol: "€", label: "Euro" },
-  INR: { amount: 1000, symbol: "₹", label: "Indian Rupee" },
-  AED: { amount: 55, symbol: "AED", label: "UAE Dirham" },
+  USD: { amount: 15, symbol: "$", label: "US Dollar ($)" },
+  GBP: { amount: 11, symbol: "£", label: "British Pound (£)" },
+  EUR: { amount: 12, symbol: "€", label: "Euro (€)" },
+  INR: { amount: 1000, symbol: "₹", label: "Indian Rupee (₹)" },
+  AED: { amount: 55, symbol: "AED", label: "UAE Dirham (AED)" },
 };
 
 export const B2C_CURRENCIES = Object.keys(B2C_DEEP_CHECK_PRICES) as B2cCurrency[];
@@ -107,11 +115,37 @@ export function isB2cCurrency(value: string | null | undefined): value is B2cCur
   return !!value && B2C_CURRENCIES.includes(value as B2cCurrency);
 }
 
-export function formatB2cPrice(currency: B2cCurrency, amount = B2C_DEEP_CHECK_PRICES[currency].amount): string {
-  const price = B2C_DEEP_CHECK_PRICES[currency];
-  if (currency === "AED") return `AED ${amount}`;
+/**
+ * Maps visitor country name to Visa Shuttle supported currencies.
+ * - India -> INR (₹)
+ * - UK -> GBP (£)
+ * - Eurozone -> EUR (€)
+ * - GCC / UAE -> AED
+ * - US -> USD ($)
+ * - ALL OTHER COUNTRIES (Canada, Australia, Philippines, Nigeria, Pakistan, Kenya, etc.) -> USD ($)
+ */
+export function countryToB2cCurrency(countryName: string | null | undefined): B2cCurrency {
+  if (!countryName) return "USD";
+  const name = countryName.trim();
+  if (name === "India") return "INR";
+  if (name === "United Kingdom" || name === "UK") return "GBP";
+  if (["United Arab Emirates", "UAE", "Saudi Arabia", "Qatar", "Kuwait", "Bahrain", "Oman"].includes(name)) return "AED";
+  if ([
+    "Germany", "France", "Italy", "Spain", "Netherlands", "Belgium", "Austria",
+    "Portugal", "Ireland", "Greece", "Finland", "Estonia", "Latvia", "Lithuania",
+    "Slovakia", "Slovenia", "Luxembourg", "Malta", "Cyprus", "Croatia", "Europe",
+  ].includes(name)) return "EUR";
+  if (name === "United States" || name === "USA") return "USD";
 
-  return `${price.symbol}${amount}`;
+  // Default to USD for all non-listed countries (Canada, Australia, Nigeria, Pakistan, Philippines, etc.)
+  return "USD";
+}
+
+export function formatB2cPrice(currency: B2cCurrency, amount = B2C_DEEP_CHECK_PRICES[currency]?.amount ?? 15): string {
+  const symbol = B2C_CURRENCY_SYMBOLS[currency] || "$";
+  if (currency === "AED") return `AED ${amount.toLocaleString()}`;
+
+  return `${symbol}${amount.toLocaleString()}`;
 }
 
 export function getB2cPlanPrice(plan: B2cPlan, currency: B2cCurrency): number {
@@ -139,14 +173,55 @@ export function normalizeB2cPlans(input: unknown): B2cPlan[] {
 
 export function getStoredB2cCurrency(): B2cCurrency {
   if (typeof window === "undefined") return DEFAULT_B2C_CURRENCY;
+
+  // 1. Explicit URL parameter override ?currency=INR
   const fromQuery = new URLSearchParams(window.location.search).get("currency");
-  if (isB2cCurrency(fromQuery)) return fromQuery;
+  if (isB2cCurrency(fromQuery)) {
+    storeB2cCurrency(fromQuery);
+    return fromQuery;
+  }
+
+  // 2. Explicit user selection stored in localStorage
   const stored = window.localStorage.getItem("visaShuttleB2cCurrency");
-  return isB2cCurrency(stored) ? stored : DEFAULT_B2C_CURRENCY;
+  if (isB2cCurrency(stored)) return stored;
+
+  // 3. Auto-detected country currency from Geo IP
+  const cachedAutoCurrency = window.localStorage.getItem("visaShuttleAutoCurrency");
+  if (isB2cCurrency(cachedAutoCurrency)) return cachedAutoCurrency;
+
+  return DEFAULT_B2C_CURRENCY;
 }
 
 export function storeB2cCurrency(currency: B2cCurrency) {
   if (typeof window !== "undefined") {
     window.localStorage.setItem("visaShuttleB2cCurrency", currency);
+    // Broadcast custom event so all open React pages refresh live prices immediately
+    window.dispatchEvent(new CustomEvent("visashuttle:currency-changed", { detail: { currency } }));
   }
+}
+
+/**
+ * Auto-detects visitor country via IP endpoint and initializes default currency.
+ */
+export async function initAutoDetectedCurrency(): Promise<B2cCurrency> {
+  if (typeof window === "undefined") return "USD";
+
+  try {
+    const res = await fetch("/api/public/user-country", { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json() as { country?: string | null; currency?: B2cCurrency };
+      const autoCurrency = data.currency && isB2cCurrency(data.currency) ? data.currency : countryToB2cCurrency(data.country);
+      window.localStorage.setItem("visaShuttleAutoCurrency", autoCurrency);
+
+      const hasManualOverride = isB2cCurrency(window.localStorage.getItem("visaShuttleB2cCurrency"));
+      if (!hasManualOverride) {
+        storeB2cCurrency(autoCurrency);
+      }
+      return autoCurrency;
+    }
+  } catch (_) {
+    // Fail gracefully
+  }
+
+  return getStoredB2cCurrency();
 }

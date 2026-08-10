@@ -14,6 +14,7 @@ import {
   formatB2cPrice,
   formatB2cPlanPrice,
   getStoredB2cCurrency,
+  initAutoDetectedCurrency,
   normalizeB2cPlans,
   storeB2cCurrency,
 } from "@/lib/b2c-pricing";
@@ -28,6 +29,23 @@ export default function PricingPage() {
   const { user } = useB2cAuth();
   const [currency, setCurrency] = useState<B2cCurrency>(() => getStoredB2cCurrency());
   const basicPrice = formatB2cPrice(currency, 0);
+
+  useEffect(() => {
+    initAutoDetectedCurrency().then((detected) => {
+      setCurrency(detected);
+    });
+    const handleCurrencyEvent = (e: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (detail?.currency) {
+        setCurrency(detail.currency);
+      }
+    };
+    window.addEventListener("visashuttle:currency-changed", handleCurrencyEvent);
+    return () => {
+      window.removeEventListener("visashuttle:currency-changed", handleCurrencyEvent);
+    };
+  }, []);
+
   const { data: planData } = useQuery<B2cPlan[]>({ queryKey: ["/api/public/b2c-plans"] });
   const plans = normalizeB2cPlans(planData);
   const freePlan = plans.find(plan => plan.planKey === "free");

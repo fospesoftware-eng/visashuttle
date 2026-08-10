@@ -7,9 +7,10 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { CurrencySwitcher } from "@/components/currency-switcher";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
 import { Button } from "@/components/ui/button";
-import { formatB2cPrice, getStoredB2cCurrency } from "@/lib/b2c-pricing";
+import { formatB2cPrice, getStoredB2cCurrency, type B2cCurrency } from "@/lib/b2c-pricing";
 
 const NAV_ITEMS = [
   { icon: Compass, label: "Dashboard", href: "/account" },
@@ -18,8 +19,8 @@ const NAV_ITEMS = [
   { icon: ShieldAlert, label: "Visa Tools", href: "/visa-tools" },
   { icon: Luggage, label: "Saved Profile", href: "/saved-profile" },
   { icon: ScrollText, label: "Check History", href: "/history" },
-  { icon: Sticker, label: "Travel Stickers", href: "/travel-sticker", highlight: true },
-  { icon: Ticket, label: "Pricing", href: "/pricing" },
+  { icon: Sticker, label: "Travel Sticker", href: "/travel-sticker" },
+  { icon: Ticket, label: "Bookings & Itinerary", href: "/itinerary" },
   { icon: SlidersHorizontal, label: "Settings", href: "/settings" },
 ];
 
@@ -37,12 +38,25 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
     enabled: !!user,
   });
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [currency, setCurrency] = useState<B2cCurrency>(() => getStoredB2cCurrency());
   const planLabel = user?.subscriptionPlan === "pro" ? "Pro" : user?.subscriptionPlan === "deep" ? "Deep Check" : user?.subscriptionPlan || "free";
-  const deepCheckPrice = formatB2cPrice(getStoredB2cCurrency());
+  const deepCheckPrice = formatB2cPrice(currency);
   const remainingVisaToolCredits = creditSummary?.remainingCredits ?? 0;
   const hasVisaToolCredits = remainingVisaToolCredits > 0;
 
   useEffect(() => { setSidebarOpen(false); }, [location]);
+  useEffect(() => {
+    const handleCurrencyChange = (e: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (detail?.currency) {
+        setCurrency(detail.currency);
+      }
+    };
+    window.addEventListener("visashuttle:currency-changed", handleCurrencyChange);
+    return () => {
+      window.removeEventListener("visashuttle:currency-changed", handleCurrencyChange);
+    };
+  }, []);
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full overflow-hidden">
@@ -201,6 +215,7 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
               )}
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
+              <CurrencySwitcher variant="outline" size="sm" />
               <ThemeToggle className="h-9 w-9 rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800" />
               {user && !canCheck && (
                 <Link href="/payment/deep-check">

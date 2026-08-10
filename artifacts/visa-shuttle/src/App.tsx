@@ -394,7 +394,13 @@ function SiteChrome() {
   );
 }
 
+import { initAutoDetectedCurrency } from "@/lib/b2c-pricing";
+
 function App() {
+  useEffect(() => {
+    void initAutoDetectedCurrency();
+  }, []);
+
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>

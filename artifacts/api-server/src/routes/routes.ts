@@ -1338,6 +1338,23 @@ async function getCountryFromRequest(req: Request): Promise<string | null> {
   return ip ? lookupCountryByIp(ip) : null;
 }
 
+function getCurrencyForCountry(country: string | null): string {
+  if (!country) return "USD";
+  const name = country.trim();
+  if (name === "India") return "INR";
+  if (name === "United Kingdom" || name === "UK") return "GBP";
+  if (["United Arab Emirates", "UAE", "Saudi Arabia", "Qatar", "Kuwait", "Bahrain", "Oman"].includes(name)) return "AED";
+  if ([
+    "Germany", "France", "Italy", "Spain", "Netherlands", "Belgium", "Austria",
+    "Portugal", "Ireland", "Greece", "Finland", "Estonia", "Latvia", "Lithuania",
+    "Slovakia", "Slovenia", "Luxembourg", "Malta", "Cyprus", "Croatia", "Europe",
+  ].includes(name)) return "EUR";
+  if (name === "United States" || name === "USA") return "USD";
+
+  // For ALL other countries not in listed supported currencies (e.g. Canada, Australia, Philippines, Nigeria, Pakistan, Kenya, etc.) -> default USD
+  return "USD";
+}
+
 function buildLiveVisaScores(origin: string | null): { country: string | null; scores: LiveVisaScore[] } {
   const from = origin || "India";
   if (from.toLowerCase() === "india") return buildIndiaLiveVisaScores();
@@ -1480,6 +1497,13 @@ export async function registerRoutes(
   app.get("/api/public/live-visa-scores", async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     res.json(buildLiveVisaScores(await getCountryFromRequest(req)));
+  });
+
+  app.get("/api/public/user-country", async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    const country = await getCountryFromRequest(req);
+    const currency = getCurrencyForCountry(country);
+    res.json({ country, currency });
   });
 
   // === Auth Routes ===
