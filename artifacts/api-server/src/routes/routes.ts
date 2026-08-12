@@ -7,7 +7,7 @@ import { registerPlatformExtensions } from "./platform-extensions";
 import express from "express";
 import { db, pool } from "../db";
 import { sendOtp, verifyOtp, getSmsProviderStatus } from "../sms";
-import { getEntryRequirement } from "../shared/visa-free";
+import { getEntryRequirement, getDetailedEntryRequirement } from "../shared/visa-free";
 import indiaVisaChanceDataset from "../shared/india_visa_chance_dataset_non_visa_free_2026.json" assert { type: "json" };
 import meaRegisteredAgentsDataset from "../shared/mea_registered_agents_2026_05_25.json" assert { type: "json" };
 import meaUnregisteredAgencyGrievancesDataset from "../shared/mea_unregistered_agencies_grievances_2026_05_25.json" assert { type: "json" };
@@ -1366,21 +1366,15 @@ function buildLiveVisaScores(origin: string | null): { country: string | null; s
   return {
     country: from,
     scores: destinations.map((to, index) => {
-      const req = getEntryRequirement(from, to);
-      const isFree = req === "visa_free";
-      const isVoa = req === "visa_on_arrival";
+      const detailed = getDetailedEntryRequirement(from, to);
+      const isSpecial = detailed.category !== "visa_required";
 
-      let score = 65;
-      let type = visaTypeForDestination(to, index, visaTypes);
+      let score = detailed.score;
+      let type = detailed.label;
 
-      if (isFree) {
-        score = 100;
-        type = "Visa Free (No Visa Needed)";
-      } else if (isVoa) {
-        score = 95;
-        type = "Visa on Arrival";
-      } else {
+      if (!isSpecial) {
         score = liveScoreForRoute(from, to);
+        type = visaTypeForDestination(to, index, visaTypes);
       }
 
       return {

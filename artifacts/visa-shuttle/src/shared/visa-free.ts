@@ -226,6 +226,86 @@ export const VISA_ON_ARRIVAL: Record<string, string[]> = {
   ],
 };
 
+export type RequirementCategory = "visa_free" | "eta_required" | "esta_required" | "etias_required" | "visa_on_arrival" | "visa_required";
+
+export interface DetailedRequirement {
+  category: RequirementCategory;
+  label: string;
+  badge: string;
+  score: number; // Max 99%, never 100%
+}
+
+export function getDetailedEntryRequirement(
+  nationality: string,
+  destination: string,
+  opts?: { passportCountry?: string; countryOfResidence?: string }
+): DetailedRequirement {
+  const req = getEntryRequirement(nationality, destination, opts);
+  const isSchengen = destination === "Schengen" || destination === "Schengen Area" || SCHENGEN_COUNTRIES.includes(destination);
+
+  if (req === "visa_free" || nationality === destination) {
+    // 1. ESTA (for UK, EU, Japan, Singapore, Australia, NZ citizens going to US)
+    if (destination === "United States" && ["United Kingdom", "Germany", "France", "Italy", "Spain", "Netherlands", "Belgium", "Switzerland", "Austria", "Portugal", "Sweden", "Norway", "Denmark", "Finland", "Japan", "South Korea", "Singapore", "Australia", "New Zealand"].includes(nationality)) {
+      return {
+        category: "esta_required",
+        label: "ESTA Required (Visa Waiver)",
+        badge: "ESTA Required",
+        score: 99,
+      };
+    }
+
+    // 2. Canada passport holders
+    if (nationality === "Canada") {
+      if (destination === "Australia") {
+        return { category: "eta_required", label: "eTA Required (Australia ETA)", badge: "eTA Required", score: 99 };
+      }
+      if (destination === "United Kingdom" || destination === "UK") {
+        return { category: "eta_required", label: "eTA Required (UK ETA)", badge: "eTA Required", score: 99 };
+      }
+      if (isSchengen) {
+        return { category: "etias_required", label: "ETIAS Required (EU Authorization)", badge: "ETIAS Required", score: 99 };
+      }
+      if (destination === "New Zealand" || destination === "South Korea") {
+        return { category: "eta_required", label: "eTA Required", badge: "eTA Required", score: 99 };
+      }
+      if (destination === "United States") {
+        return { category: "visa_free", label: "Visa Free (No Visa Needed)", badge: "Visa Free", score: 99 };
+      }
+    }
+
+    // 3. United States passport holders
+    if (nationality === "United States") {
+      if (destination === "Canada") {
+        return { category: "visa_free", label: "Visa Free (No Visa Needed)", badge: "Visa Free", score: 99 };
+      }
+      if (destination === "United Kingdom" || destination === "UK") {
+        return { category: "eta_required", label: "eTA Required (UK ETA)", badge: "eTA Required", score: 99 };
+      }
+      if (destination === "Australia") {
+        return { category: "eta_required", label: "eTA Required (Australia ETA)", badge: "eTA Required", score: 99 };
+      }
+      if (isSchengen) {
+        return { category: "etias_required", label: "ETIAS Required (EU Authorization)", badge: "ETIAS Required", score: 99 };
+      }
+    }
+
+    // 4. ETIAS for non-EU visa-free citizens going to Schengen Area
+    if (isSchengen && ["United States", "United Kingdom", "Canada", "Australia", "New Zealand", "Japan", "South Korea", "Singapore", "Israel", "Chile", "Brazil", "Mexico", "United Arab Emirates"].includes(nationality)) {
+      return { category: "etias_required", label: "ETIAS Required (EU Authorization)", badge: "ETIAS Required", score: 99 };
+    }
+
+    // Default pure Visa Free (max score 99%)
+    return { category: "visa_free", label: "Visa Free (No Visa Needed)", badge: "Visa Free", score: 99 };
+  }
+
+  if (req === "visa_on_arrival") {
+    return { category: "visa_on_arrival", label: "Visa on Arrival", badge: "Visa on Arrival", score: 97 };
+  }
+
+  // Embassy Visa Required
+  return { category: "visa_required", label: "Tourist Visa Required", badge: "Visa Required", score: 55 };
+}
+
 export type EntryRequirement = "visa_free" | "visa_on_arrival" | "resident" | null;
 
 /**

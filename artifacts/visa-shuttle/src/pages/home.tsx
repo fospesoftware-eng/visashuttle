@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
 import { POPULAR_DESTINATIONS, VISA_TYPES } from "@/shared/destinations";
 import { formatB2cPrice, getStoredB2cCurrency } from "@/lib/b2c-pricing";
-import { getEntryRequirement } from "@/shared/visa-free";
+import { getEntryRequirement, getDetailedEntryRequirement } from "@/shared/visa-free";
 
 // ── Large pool of country-pair visa data ──────────────────────────────────────
 type VisaScoreSample = {
@@ -34,7 +34,12 @@ const LIVE_SCORE_DESTINATIONS = new Set([
 ]);
 
 function scoreToLabel(score: number, type?: string): { label: string; color: string } {
-  if (score >= 100 || (type && type.includes("Visa Free"))) return { label: "Visa Free", color: "text-emerald-700 bg-emerald-100 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-700 font-bold" };
+  if (type && type.includes("eTA Required")) return { label: "eTA Required", color: "text-blue-700 bg-blue-100 dark:bg-blue-950/50 border border-blue-300 dark:border-blue-700 font-bold" };
+  if (type && type.includes("ESTA Required")) return { label: "ESTA Required", color: "text-indigo-700 bg-indigo-100 dark:bg-indigo-950/50 border border-indigo-300 dark:border-indigo-700 font-bold" };
+  if (type && type.includes("ETIAS Required")) return { label: "ETIAS Required", color: "text-[#4055FF] bg-[#4055FF]/10 dark:bg-[#4055FF]/20 border border-[#4055FF]/30 font-bold" };
+  if (type && type.includes("Visa Free")) return { label: "Visa Free", color: "text-emerald-700 bg-emerald-100 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-700 font-bold" };
+  if (type && type.includes("Visa on Arrival")) return { label: "Visa on Arrival", color: "text-teal-700 bg-teal-100 dark:bg-teal-950/50 border border-teal-300 dark:border-teal-700 font-bold" };
+
   if (score >= 80) return { label: "High Chance", color: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800" };
   if (score >= 65) return { label: "Good Chance", color: "text-blue-600 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800" };
   if (score >= 45) return { label: "Moderate", color: "text-amber-600 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800" };
@@ -212,26 +217,15 @@ function buildCountrySamples(fromCountry = "India"): VisaScoreSample[] {
   const selectedTo = candidates.filter(c => c !== fromCountry).slice(0, 4);
 
   return selectedTo.map((to, idx) => {
-    const req = getEntryRequirement(fromCountry, to);
+    const detailed = getDetailedEntryRequirement(fromCountry, to);
     const toCode = COUNTRY_FLAG_CODES[to] || "eu";
 
-    if (req === "visa_free") {
+    if (detailed.category !== "visa_required") {
       return {
         from: fromCountry,
         to,
-        type: "Visa Free (No Visa Needed)",
-        score: 100,
-        fromCode,
-        toCode,
-      };
-    }
-
-    if (req === "visa_on_arrival") {
-      return {
-        from: fromCountry,
-        to,
-        type: "Visa on Arrival",
-        score: 95,
+        type: detailed.label,
+        score: detailed.score,
         fromCode,
         toCode,
       };
@@ -305,15 +299,15 @@ export default function HomePage() {
         let finalScores: VisaScoreSample[] = [];
         if (data.scores && data.scores.length > 0) {
           finalScores = data.scores.map(s => {
-            const req = getEntryRequirement(fromCountry, s.to);
-            const isFree = req === "visa_free";
+            const detailed = getDetailedEntryRequirement(fromCountry, s.to);
+            const isSpecial = detailed.category !== "visa_required";
             return {
               ...s,
               from: fromCountry,
               fromCode: COUNTRY_FLAG_CODES[fromCountry] || s.fromCode || null,
               toCode: COUNTRY_FLAG_CODES[s.to] || s.toCode || null,
-              score: isFree ? 100 : s.score,
-              type: isFree ? "Visa Free (No Visa Needed)" : s.type,
+              score: isSpecial ? detailed.score : s.score,
+              type: isSpecial ? detailed.label : s.type,
             };
           });
         } else {
@@ -460,7 +454,6 @@ export default function HomePage() {
                           </div>
                         ))
                       : samples.map((s) => {
-                          const isVisaFree = s.score >= 100 || s.type.includes("Visa Free");
                           const { label, color } = scoreToLabel(s.score, s.type);
                           return (
                             <div
@@ -476,7 +469,7 @@ export default function HomePage() {
                                 <p className="text-xs text-muted-foreground">{s.type}</p>
                               </div>
                               <div className="text-right flex-shrink-0">
-                                <div className="text-xl font-black">{isVisaFree ? "100%" : `${s.score}%`}</div>
+                                <div className="text-xl font-black">{s.score}%</div>
                                 <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${color}`}>{label}</span>
                               </div>
                             </div>
