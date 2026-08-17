@@ -8636,6 +8636,209 @@ Rules:
     }
   });
 
+  // ================= VISA PROTECTION PLAN ROUTES =================
+  const GOVERNMENT_VISA_FEES_USD: Record<string, number> = {
+    "United States": 185, "US": 185, "USA": 185,
+    "Schengen": 98, "Schengen Area": 98, "Germany": 98, "France": 98, "Italy": 98, "Spain": 98,
+    "Netherlands": 98, "Switzerland": 98, "Austria": 98, "Belgium": 98, "Portugal": 98, "Greece": 98,
+    "United Kingdom": 148, "UK": 148,
+    "Canada": 75,
+    "Australia": 125,
+    "Japan": 22,
+    "Singapore": 30,
+    "United Arab Emirates": 90, "UAE": 90, "Dubai": 90,
+    "Saudi Arabia": 110,
+    "China": 140,
+    "New Zealand": 130,
+    "South Korea": 35,
+    "Thailand": 40,
+    "Malaysia": 25,
+    "Vietnam": 25,
+    "Egypt": 25,
+    "Turkey": 50,
+  };
+
+  const VPP_CURRENCY_CONVERSION_RATES: Record<string, number> = {
+    USD: 1,
+    INR: 84,
+    EUR: 0.92,
+    GBP: 0.78,
+    AED: 3.67,
+  };
+
+  const VPP_CURRENCY_SYMBOLS: Record<string, string> = {
+    USD: "$",
+    INR: "₹",
+    EUR: "€",
+    GBP: "£",
+    AED: "AED ",
+  };
+
+  function calculateVisaProtection(destinationCountry: string, currency = "USD") {
+    const destName = (destinationCountry || "").trim();
+    const feeUSD = GOVERNMENT_VISA_FEES_USD[destName] || 100;
+    const rate = VPP_CURRENCY_CONVERSION_RATES[currency] || 1;
+    const symbol = VPP_CURRENCY_SYMBOLS[currency] || "$";
+
+    const governmentFeeInCents = Math.round(feeUSD * rate * 100);
+    const protectionFeeInCents = Math.round(governmentFeeInCents * 0.20); // 20% of Government Visa Fee
+
+    const visaFeeAmount = governmentFeeInCents / 100;
+    const protectionFeeAmount = protectionFeeInCents / 100;
+
+    const formattedVisaFee = currency === "AED" ? `AED ${visaFeeAmount.toLocaleString()}` : `${symbol}${visaFeeAmount.toLocaleString()}`;
+    const formattedProtectionFee = currency === "AED" ? `AED ${protectionFeeAmount.toLocaleString()}` : `${symbol}${protectionFeeAmount.toLocaleString()}`;
+
+    return {
+      destinationCountry: destName,
+      governmentFeeUSD: feeUSD,
+      currency,
+      governmentFeeInCents,
+      protectionFeeInCents,
+      visaFeeAmount,
+      protectionFeeAmount,
+      formattedVisaFee,
+      formattedProtectionFee,
+      protectionRatePercentage: 20,
+      refundCoveragePercentage: 100,
+    };
+  }
+
+  // 1. Calculate Visa Protection Plan fee
+  app.post("/api/b2c/visa-protection/calculate", async (req, res) => {
+    try {
+      const { destinationCountry, currency } = req.body || {};
+      const calculation = calculateVisaProtection(destinationCountry || "Schengen", currency || "USD");
+      res.json(calculation);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Calculation failed" });
+    }
+  });
+
+  // 2. Get Protection Plan Status for a Deep Check
+  app.get("/api/b2c/visa-protection/status/:deepCheckId", requireB2cAuth, async (req, res) => {
+    try {
+      const userId = req.session.b2cUserId!;
+      const checkId = req.params.deepCheckId;
+      const check = await storage.getVisaCheck(checkId);
+      if (!check || check.userId !== userId) {
+        return res.status(404).json({ error: "Deep Check not found" });
+      }
+
+      const score = check.approvalChance ?? 0;
+      const form = (check.formData || {}) as Record<string, any>;
+      const dest = form.destinationCountry || "Schengen";
+      const currency = req.query.currency ? String(req.query.currency) : "USD";
+      const calculation = calculateVisaProtection(dest, currency);
+
+      const existingPlan = await storage.getVisaProtectionPlanByDeepCheckId(check.id);
+      res.json({
+        exists: !!existingPlan,
+        plan: existingPlan || null,
+        eligible: score >= 80,
+        approvalScore: score,
+        requiredScore: 80,
+        calculation,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to fetch protection status" });
+    }
+  });
+
+  // 3. Activate Protection Plan
+  app.post("/api/b2c/visa-protection/activate", requireB2cAuth, async (req, res) => {
+    try {
+      const userId = req.session.b2cUserId!;
+      const { deepCheckId, currency } = req.body || {};
+
+      const check = await storage.getVisaCheck(deepCheckId);
+      if (!check || check.userId !== userId) {
+        return res.status(404).json({ error: "Deep Check report not found" });
+      }
+
+      const score = check.approvalChance ?? 0;
+      if (score < 80) {
+        return res.status(400).json({ error: "Visa Protection Plan requires an AI Deep Check Score of 80% or higher." });
+      }
+
+      const existing = await storage.getVisaProtectionPlanByDeepCheckId(deepCheckId);
+      if (existing) {
+        return res.json({ success: true, plan: existing, message: "Visa Protection Plan is already active for this check." });
+      }
+
+      const form = (check.formData || {}) as Record<string, any>;
+      const dest = form.destinationCountry || "Schengen";
+      const visaType = form.visaType || "Tourist Visa";
+      const activeCurrency = currency || "USD";
+
+      const calc = calculateVisaProtection(dest, activeCurrency);
+      const randomId = Math.floor(10000 + Math.random() * 90000);
+      const certNum = `VPP-2026-${randomId}-${(dest || "GLOBAL").substring(0, 3).toUpperCase()}`;
+
+      const newPlan = await storage.createVisaProtectionPlan({
+        userId,
+        deepCheckId,
+        destinationCountry: dest,
+        visaType,
+        approvalScore: score,
+        currency: activeCurrency,
+        governmentFeeAmountCents: calc.governmentFeeInCents,
+        protectionFeeAmountCents: calc.protectionFeeInCents,
+        status: "active",
+        certificateNumber: certNum,
+      });
+
+      res.json({
+        success: true,
+        plan: newPlan,
+        certificateNumber: certNum,
+        message: "🎉 Visa Protection Plan activated! You are covered for a 100% refund of your government visa fee in case of rejection.",
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to activate Visa Protection Plan" });
+    }
+  });
+
+  // 4. Claim Refund
+  app.post("/api/b2c/visa-protection/claim", requireB2cAuth, async (req, res) => {
+    try {
+      const userId = req.session.b2cUserId!;
+      const { planId, claimReason, rejectionLetterUrl } = req.body || {};
+
+      const plans = await storage.getVisaProtectionPlansByUserId(userId);
+      const plan = plans.find(p => p.id === planId);
+      if (!plan) {
+        return res.status(404).json({ error: "Protection plan not found" });
+      }
+
+      const updated = await storage.updateVisaProtectionPlan(planId, {
+        status: "claimed",
+        claimReason: claimReason || "Embassy visa application rejected",
+        claimRejectionLetterUrl: rejectionLetterUrl || null,
+        claimedAt: new Date(),
+      } as any);
+
+      res.json({
+        success: true,
+        plan: updated,
+        message: "Your refund claim has been submitted successfully. Our claims team will verify your document submission and process your 100% visa fee refund within 48 hours.",
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to submit claim" });
+    }
+  });
+
+  // 5. Get User's Active Protection Plans
+  app.get("/api/b2c/visa-protection/my-plans", requireB2cAuth, async (req, res) => {
+    try {
+      const userId = req.session.b2cUserId!;
+      const plans = await storage.getVisaProtectionPlansByUserId(userId);
+      res.json(plans);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to fetch protection plans" });
+    }
+  });
+
   // === B2C Visa Tools Routes ===
 
   app.get("/api/b2c/visa-tools/checks", requireB2cAuth, async (req, res) => {

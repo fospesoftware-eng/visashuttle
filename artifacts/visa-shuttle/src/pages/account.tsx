@@ -217,6 +217,11 @@ export default function AccountPage() {
     enabled: !!user,
   });
 
+  const { data: protectionPlans = [] } = useQuery<any[]>({
+    queryKey: ["/api/b2c/visa-protection/my-plans"],
+    enabled: !!user,
+  });
+
   if (authLoading || !user) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
       <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -368,6 +373,44 @@ export default function AccountPage() {
             </Link>
           </div>
         </div>
+
+        {/* Active Visa Protection Plans */}
+        {protectionPlans.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Active Visa Protection Plans</h2>
+            <div className="grid gap-3">
+              {protectionPlans.map((p) => (
+                <Card key={p.id} className="border border-indigo-200 dark:border-indigo-800 bg-gradient-to-r from-indigo-50/50 via-purple-50/20 to-white dark:from-slate-900 dark:to-slate-800">
+                  <CardContent className="p-4 flex items-center justify-between gap-4 flex-wrap">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-indigo-500/20">
+                        🛡️
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                            {p.destinationCountry} — {p.visaType}
+                          </h4>
+                          <Badge className={p.status === "active" ? "bg-emerald-100 text-emerald-800 border-emerald-300" : "bg-amber-100 text-amber-800 border-amber-300"}>
+                            {p.status === "active" ? "100% Visa Fee Refund Guarantee" : p.status.toUpperCase()}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Cert #{p.certificateNumber} · Deep Check AI Score: {p.approvalScore}%
+                        </p>
+                      </div>
+                    </div>
+                    <Link href={`/history/${p.deepCheckId}`}>
+                      <Button variant="outline" size="sm" className="gap-1.5 text-xs border-indigo-200 hover:bg-indigo-50 font-semibold">
+                        View Certificate & Details <ChevronRight className="w-3.5 h-3.5" />
+                      </Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Recent checks */}

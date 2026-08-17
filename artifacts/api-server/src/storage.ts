@@ -71,7 +71,8 @@ import {
   counsellingAdmissions as counsellingAdmissionsTable,
   counsellingDocuments as counsellingDocumentsTable,
   counsellingTasks as counsellingTasksTable,
-  counsellingAiAssessments as counsellingAiAssessmentsTable,
+  type VisaProtectionPlan, type InsertVisaProtectionPlan,
+  visaProtectionPlans as visaProtectionPlansTable,
 } from "@workspace/db";
 import { and, eq, desc, asc, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -374,6 +375,12 @@ export interface IStorage {
   createB2cCreditOrder(data: InsertB2cCreditOrder): Promise<B2cCreditOrder>;
   markB2cCreditOrderPaid(orderId: string): Promise<B2cCreditOrder | undefined>;
 
+  // Visa Protection Plans
+  createVisaProtectionPlan(plan: InsertVisaProtectionPlan): Promise<VisaProtectionPlan>;
+  getVisaProtectionPlanByDeepCheckId(deepCheckId: string): Promise<VisaProtectionPlan | undefined>;
+  getVisaProtectionPlansByUserId(userId: string): Promise<VisaProtectionPlan[]>;
+  updateVisaProtectionPlan(id: string, data: Partial<InsertVisaProtectionPlan>): Promise<VisaProtectionPlan | undefined>;
+
   // Per-tenant Payment Gateway Config (Cashfree)
   getTenantPaymentGatewayConfig(tenantId: string): Promise<TenantPaymentGatewayConfig | undefined>;
   upsertTenantPaymentGatewayConfig(tenantId: string, data: Partial<InsertTenantPaymentGatewayConfig>): Promise<TenantPaymentGatewayConfig>;
@@ -438,6 +445,7 @@ export class MemStorage implements IStorage {
   private b2cCouponsMap: Map<string, B2cCoupon> = new Map();
   private b2cPlansMap: Map<string, B2cPlan> = new Map();
   private b2cCreditOrdersMap: Map<string, B2cCreditOrder> = new Map();
+  private visaProtectionPlansMap: Map<string, VisaProtectionPlan> = new Map();
   private tenantPaymentGatewayConfigByTenant: Map<string, TenantPaymentGatewayConfig> = new Map();
   private tenantSmsConfigByTenant: Map<string, TenantSmsConfig> = new Map();
   private feeTemplates: Map<string, FeeTemplate> = new Map();
@@ -2403,6 +2411,50 @@ export class MemStorage implements IStorage {
     if (!existing) return undefined;
     const updated = { ...existing, status: "paid", creditedAt: existing.creditedAt ?? new Date(), updatedAt: new Date() } as B2cCreditOrder;
     this.b2cCreditOrdersMap.set(existing.id, updated);
+    return updated;
+  }
+
+  async createVisaProtectionPlan(plan: InsertVisaProtectionPlan): Promise<VisaProtectionPlan> {
+    const id = randomUUID();
+    const now = new Date();
+    const certNum = plan.certificateNumber || `VPP-${now.getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}-${(plan.destinationCountry || "GLOBAL").substring(0, 2).toUpperCase()}`;
+    const row: VisaProtectionPlan = {
+      id,
+      userId: plan.userId,
+      deepCheckId: plan.deepCheckId,
+      destinationCountry: plan.destinationCountry,
+      visaType: plan.visaType,
+      approvalScore: plan.approvalScore,
+      currency: plan.currency || "USD",
+      governmentFeeAmountCents: plan.governmentFeeAmountCents,
+      protectionFeeAmountCents: plan.protectionFeeAmountCents,
+      status: plan.status || "active",
+      certificateNumber: certNum,
+      termsAgreedAt: now,
+      claimReason: plan.claimReason || null,
+      claimRejectionLetterUrl: plan.claimRejectionLetterUrl || null,
+      claimedAt: null,
+      refundedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.visaProtectionPlansMap.set(id, row);
+    return row;
+  }
+
+  async getVisaProtectionPlanByDeepCheckId(deepCheckId: string): Promise<VisaProtectionPlan | undefined> {
+    return Array.from(this.visaProtectionPlansMap.values()).find(p => p.deepCheckId === deepCheckId);
+  }
+
+  async getVisaProtectionPlansByUserId(userId: string): Promise<VisaProtectionPlan[]> {
+    return Array.from(this.visaProtectionPlansMap.values()).filter(p => p.userId === userId).sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+  }
+
+  async updateVisaProtectionPlan(id: string, data: Partial<InsertVisaProtectionPlan>): Promise<VisaProtectionPlan | undefined> {
+    const existing = this.visaProtectionPlansMap.get(id);
+    if (!existing) return undefined;
+    const updated = { ...existing, ...data, updatedAt: new Date() } as VisaProtectionPlan;
+    this.visaProtectionPlansMap.set(id, updated);
     return updated;
   }
 }
@@ -4443,6 +4495,81 @@ class HybridStorage extends MemStorage {
         return false;
       }
       if (shouldUseMemoryFallback(error)) return super.deleteB2cCoupon(id);
+      throw error;
+    }
+  }
+
+  private async ensureVisaProtectionPlansTable(): Promise<void> {
+    if (this.ensuredTables.has("visa_protection_plans")) return;
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS visa_protection_plans (
+          id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+          user_id VARCHAR NOT NULL,
+          deep_check_id VARCHAR NOT NULL,
+          destination_country TEXT NOT NULL,
+          visa_type TEXT NOT NULL,
+          approval_score INT NOT NULL,
+          currency TEXT NOT NULL DEFAULT 'USD',
+          government_fee_amount_cents INT NOT NULL,
+          protection_fee_amount_cents INT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'active',
+          certificate_number TEXT NOT NULL UNIQUE,
+          terms_agreed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          claim_reason TEXT,
+          claim_rejection_letter_url TEXT,
+          claimed_at TIMESTAMP,
+          refunded_at TIMESTAMP,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      this.ensuredTables.add("visa_protection_plans");
+    } catch (e) {
+      console.warn("[ensureVisaProtectionPlansTable] DDL notice:", e);
+    }
+  }
+
+  async createVisaProtectionPlan(plan: InsertVisaProtectionPlan): Promise<VisaProtectionPlan> {
+    try {
+      const rows = await db.insert(visaProtectionPlansTable).values(plan as any).returning();
+      return rows[0];
+    } catch (error) {
+      if (isMissingRelationError(error)) {
+        await this.ensureVisaProtectionPlansTable();
+        const rows = await db.insert(visaProtectionPlansTable).values(plan as any).returning();
+        return rows[0];
+      }
+      if (shouldUseMemoryFallback(error)) return super.createVisaProtectionPlan(plan);
+      throw error;
+    }
+  }
+
+  async getVisaProtectionPlanByDeepCheckId(deepCheckId: string): Promise<VisaProtectionPlan | undefined> {
+    try {
+      const rows = await db.select().from(visaProtectionPlansTable).where(eq(visaProtectionPlansTable.deepCheckId, deepCheckId)).limit(1);
+      return rows[0];
+    } catch (error) {
+      if (shouldUseMemoryFallback(error)) return super.getVisaProtectionPlanByDeepCheckId(deepCheckId);
+      return super.getVisaProtectionPlanByDeepCheckId(deepCheckId);
+    }
+  }
+
+  async getVisaProtectionPlansByUserId(userId: string): Promise<VisaProtectionPlan[]> {
+    try {
+      return await db.select().from(visaProtectionPlansTable).where(eq(visaProtectionPlansTable.userId, userId)).orderBy(desc(visaProtectionPlansTable.createdAt));
+    } catch (error) {
+      if (shouldUseMemoryFallback(error)) return super.getVisaProtectionPlansByUserId(userId);
+      return super.getVisaProtectionPlansByUserId(userId);
+    }
+  }
+
+  async updateVisaProtectionPlan(id: string, data: Partial<InsertVisaProtectionPlan>): Promise<VisaProtectionPlan | undefined> {
+    try {
+      const rows = await db.update(visaProtectionPlansTable).set({ ...data, updatedAt: new Date() } as any).where(eq(visaProtectionPlansTable.id, id)).returning();
+      return rows[0];
+    } catch (error) {
+      if (shouldUseMemoryFallback(error)) return super.updateVisaProtectionPlan(id, data);
       throw error;
     }
   }

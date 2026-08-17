@@ -28,6 +28,7 @@ import { formatB2cPrice, getStoredB2cCurrency } from "@/lib/b2c-pricing";
 
 import { COUNTRIES, VISA_TYPES } from "@/shared/destinations";
 import { NextStepsSection } from "@/components/next-steps-section";
+import { VisaProtectionCard } from "@/components/visa-protection-card";
 
 const YES_NO = ["Yes", "No"];
 const YES_NO_MAYBE = ["Yes", "No", "Planning to get"];
@@ -899,6 +900,16 @@ export default function DeepCheckPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Visa Protection Plan Add-on */}
+          {resultCheckId && (
+            <VisaProtectionCard
+              deepCheckId={resultCheckId}
+              score={score}
+              destinationCountry={form.destinationCountry || "Schengen"}
+              visaType={form.visaType || "Tourist Visa"}
+            />
+          )}
 
           {/* Profile dimension scores */}
           {dims && (

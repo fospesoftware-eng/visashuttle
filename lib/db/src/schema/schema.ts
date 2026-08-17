@@ -1410,3 +1410,27 @@ export const counsellingAiAssessments = pgTable("counselling_ai_assessments", {
 export const insertCounsellingAiAssessmentSchema = createInsertSchema(counsellingAiAssessments).omit({ id: true, createdAt: true });
 export type InsertCounsellingAiAssessment = typeof counsellingAiAssessments.$inferInsert;
 export type CounsellingAiAssessment = typeof counsellingAiAssessments.$inferSelect;
+
+export const visaProtectionPlans = pgTable("visa_protection_plans", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  deepCheckId: varchar("deep_check_id").notNull(),
+  destinationCountry: text("destination_country").notNull(),
+  visaType: text("visa_type").notNull(),
+  approvalScore: integer("approval_score").notNull(),
+  currency: text("currency").notNull().default("USD"),
+  governmentFeeAmountCents: integer("government_fee_amount_cents").notNull(),
+  protectionFeeAmountCents: integer("protection_fee_amount_cents").notNull(),
+  status: text("status").notNull().default("active"), // active, claimed, refunded, expired, rejected
+  certificateNumber: text("certificate_number").notNull().unique(),
+  termsAgreedAt: timestamp("terms_agreed_at").defaultNow(),
+  claimReason: text("claim_reason"),
+  claimRejectionLetterUrl: text("claim_rejection_letter_url"),
+  claimedAt: timestamp("claimed_at"),
+  refundedAt: timestamp("refunded_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export const insertVisaProtectionPlanSchema = createInsertSchema(visaProtectionPlans).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertVisaProtectionPlan = typeof visaProtectionPlans.$inferInsert;
+export type VisaProtectionPlan = typeof visaProtectionPlans.$inferSelect;

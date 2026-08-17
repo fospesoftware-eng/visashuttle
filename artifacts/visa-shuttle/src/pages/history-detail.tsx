@@ -16,6 +16,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { NextStepsSection } from "@/components/next-steps-section";
+import { VisaProtectionCard } from "@/components/visa-protection-card";
 import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
@@ -277,6 +278,16 @@ export default function HistoryDetailPage() {
             </CardContent>
           )}
         </Card>
+
+        {/* Visa Protection Plan Card (if Deep Check) */}
+        {check.checkType === "deep" && score !== null && (
+          <VisaProtectionCard
+            deepCheckId={check.id}
+            score={score}
+            destinationCountry={form.destinationCountry || "Schengen"}
+            visaType={form.visaType || "Tourist Visa"}
+          />
+        )}
 
         {dims && (
           <Card>
