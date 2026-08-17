@@ -173,20 +173,17 @@ if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
 }
 
 const PgStore = connectPgSimple(session);
+const isSecureEnv = Boolean(process.env.REPLIT_DOMAINS || process.env.NODE_ENV === "production");
+
 const sessionOptions: session.SessionOptions = {
   secret: process.env.SESSION_SECRET || "visa-shuttle-dev-secret",
   resave: false,
   saveUninitialized: false,
   cookie: {
-    // Replit always serves the public domain over HTTPS (even in dev), and
-    // we trust the proxy above, so secure cookies work in every environment.
-    // The mobile app talks to the API cross-origin from the Expo subdomain,
-    // which requires `SameSite=None; Secure` for the session cookie to be
-    // accepted by the browser.
-    secure: true,
+    secure: isSecureEnv,
     httpOnly: true,
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    sameSite: "none",
+    sameSite: isSecureEnv ? "none" : "lax",
   },
 };
 
