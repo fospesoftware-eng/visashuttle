@@ -107,6 +107,26 @@ export default function SignInPage() {
               </div>
             )}
 
+            {/* Quick Demo Credentials Fill Button */}
+            <div className="mb-6 p-3.5 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/40 dark:to-purple-950/30 border border-indigo-200 dark:border-indigo-800 flex items-center justify-between gap-3 flex-wrap">
+              <div className="text-xs">
+                <span className="font-bold text-indigo-900 dark:text-indigo-200 block">⚡ Quick Demo Login</span>
+                <span className="text-indigo-700 dark:text-indigo-300">demo@visashuttle.com</span>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="border-indigo-300 text-indigo-700 hover:bg-indigo-100 dark:border-indigo-700 dark:text-indigo-300 font-semibold flex-shrink-0 text-xs"
+                onClick={() => {
+                  setForm({ email: "demo@visashuttle.com", password: "Demo@12345" });
+                  setError("");
+                }}
+              >
+                Fill Demo Credentials
+              </Button>
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="email">Email Address</Label>
