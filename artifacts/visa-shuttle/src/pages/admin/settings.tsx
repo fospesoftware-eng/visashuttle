@@ -685,259 +685,7 @@ function formatPlanMoney(amount: number, currency: string) {
   return `${symbols[currency] ?? `${currency} `}${amount}`;
 }
 
-// ── SaaS Pricing Admin Control Card ───────────────────────────────────────
-function SaasPricingAdminCard() {
-  const { toast } = useToast();
-  const [form, setForm] = useState({
-    deepCheckBasePrices: { USD: 15, GBP: 11, EUR: 12, INR: 1000, AED: 55 },
-    visaProtectionFeePercent: 20,
-    visaProtectionMinScore: 80,
-    officialVisaFees: {
-      "United States": 185,
-      "Schengen Area": 98,
-      "United Kingdom": 148,
-      "Canada": 75,
-      "Australia": 125,
-    },
-    b2bPlans: {
-      starter: { USD: 49, GBP: 39, EUR: 45, INR: 3999, AED: 180 },
-      growth: { USD: 149, GBP: 119, EUR: 139, INR: 11999, AED: 549 },
-      enterprise: { USD: 499, GBP: 399, EUR: 459, INR: 39999, AED: 1830 },
-    },
-    apiPlatformPricing: {
-      deepCheckApiPriceUsd: 1.99,
-      visaRequirementsApiPriceUsd: 0.25,
-      passportScanApiPriceUsd: 0.50,
-    },
-  });
 
-  const { data, isLoading } = useQuery<any>({
-    queryKey: ["/api/admin/saas-pricing-settings"],
-  });
-
-  useEffect(() => {
-    if (data) {
-      setForm(prev => ({
-        ...prev,
-        ...data,
-        deepCheckBasePrices: { ...prev.deepCheckBasePrices, ...(data.deepCheckBasePrices || {}) },
-        officialVisaFees: { ...prev.officialVisaFees, ...(data.officialVisaFees || {}) },
-        b2bPlans: {
-          starter: { ...prev.b2bPlans.starter, ...(data.b2bPlans?.starter || {}) },
-          growth: { ...prev.b2bPlans.growth, ...(data.b2bPlans?.growth || {}) },
-          enterprise: { ...prev.b2bPlans.enterprise, ...(data.b2bPlans?.enterprise || {}) },
-        },
-        apiPlatformPricing: { ...prev.apiPlatformPricing, ...(data.apiPlatformPricing || {}) },
-      }));
-    }
-  }, [data]);
-
-  const saveMutation = useMutation({
-    mutationFn: (payload: any) => apiRequest("PUT", "/api/admin/saas-pricing-settings", payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/saas-pricing-settings"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/public/saas-pricing-settings"] });
-      toast({ title: "Pricing settings saved", description: "All B2C, B2B SaaS and Visa Protection plan prices have been updated live across the platform." });
-    },
-    onError: (err: any) => toast({ title: "Save failed", description: err.message || "Failed to save pricing", variant: "destructive" }),
-  });
-
-  return (
-    <Card className="border-[#4055FF]/20 shadow-md">
-      <CardHeader className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-t-xl">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <CardTitle className="text-lg flex items-center gap-2 text-white">
-              <Crown className="w-5 h-5 text-amber-400" />
-              SaaS Pricing &amp; Currency Control Center
-            </CardTitle>
-            <CardDescription className="text-slate-300">
-              Adjust multi-currency prices for B2C Deep Checks, Visa Protection Plans, B2B Agency SaaS Tiers, and API Platform usage.
-            </CardDescription>
-          </div>
-          <Button
-            onClick={() => saveMutation.mutate(form)}
-            disabled={saveMutation.isPending || isLoading}
-            className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold gap-2 flex-shrink-0"
-          >
-            {saveMutation.isPending ? <span className="w-4 h-4 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" /> : <Save className="w-4 h-4" />}
-            Save All Pricing
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="p-6 space-y-8">
-        {/* 1. B2C Deep Check Multi-Currency Prices */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 pb-2 border-b">
-            <Sparkles className="w-4 h-4 text-[#4055FF]" />
-            <h3 className="font-bold text-base">1. B2C Deep Check Base Prices (All Currencies)</h3>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            {(["USD", "INR", "GBP", "EUR", "AED"] as const).map(curr => (
-              <div key={curr} className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border">
-                <Label className="text-xs font-bold uppercase text-slate-500">{curr} Base Price</Label>
-                <Input
-                  type="number"
-                  value={form.deepCheckBasePrices[curr]}
-                  onChange={e => setForm(f => ({
-                    ...f,
-                    deepCheckBasePrices: { ...f.deepCheckBasePrices, [curr]: Number(e.target.value) || 0 }
-                  }))}
-                  className="font-mono font-bold"
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* 2. Visa Protection Plan Settings */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 pb-2 border-b">
-            <Shield className="w-4 h-4 text-emerald-600" />
-            <h3 className="font-bold text-base">2. Visa Protection Plan (Add-On &amp; Refund Guarantee)</h3>
-          </div>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="space-y-1.5 p-4 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800">
-              <Label className="text-sm font-semibold">Protection Plan Fee % (of Official Visa Fee)</Label>
-              <Input
-                type="number"
-                value={form.visaProtectionFeePercent}
-                onChange={e => setForm(f => ({ ...f, visaProtectionFeePercent: Number(e.target.value) || 0 }))}
-                className="font-mono font-bold"
-              />
-              <p className="text-xs text-muted-foreground">Default 20%. User pays 20% of official visa fee for 100% visa fee refund guarantee.</p>
-            </div>
-            <div className="space-y-1.5 p-4 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800">
-              <Label className="text-sm font-semibold">Min. Deep Check Score Required to Unlock Protection (%)</Label>
-              <Input
-                type="number"
-                value={form.visaProtectionMinScore}
-                onChange={e => setForm(f => ({ ...f, visaProtectionMinScore: Number(e.target.value) || 0 }))}
-                className="font-mono font-bold"
-              />
-              <p className="text-xs text-muted-foreground">Default 80%. Only applicants scoring at or above this threshold can purchase protection.</p>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-xs font-bold uppercase text-slate-500">Official Visa Fees (USD Base per Country / Region)</Label>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              {Object.keys(form.officialVisaFees).map(country => (
-                <div key={country} className="p-3 rounded-xl border bg-background space-y-1">
-                  <span className="text-xs font-semibold block truncate">{country}</span>
-                  <Input
-                    type="number"
-                    value={form.officialVisaFees[country as keyof typeof form.officialVisaFees]}
-                    onChange={e => setForm(f => ({
-                      ...f,
-                      officialVisaFees: { ...f.officialVisaFees, [country]: Number(e.target.value) || 0 }
-                    }))}
-                    className="font-mono text-sm font-bold"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* 3. B2B Agency SaaS Subscription Plans */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 pb-2 border-b">
-            <Zap className="w-4 h-4 text-purple-600" />
-            <h3 className="font-bold text-base">3. B2B / Agency SaaS Plan Prices (Monthly per Currency)</h3>
-          </div>
-          {(["starter", "growth", "enterprise"] as const).map(planKey => (
-            <div key={planKey} className="p-4 rounded-xl border bg-slate-50/60 dark:bg-slate-800/40 space-y-2">
-              <span className="font-extrabold uppercase text-xs tracking-wider text-purple-700 dark:text-purple-300 block">
-                {planKey} Plan
-              </span>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                {(["USD", "INR", "GBP", "EUR", "AED"] as const).map(curr => (
-                  <div key={curr} className="space-y-1">
-                    <span className="text-[10px] font-bold text-muted-foreground">{curr} Price</span>
-                    <Input
-                      type="number"
-                      value={form.b2bPlans[planKey][curr]}
-                      onChange={e => setForm(f => ({
-                        ...f,
-                        b2bPlans: {
-                          ...f.b2bPlans,
-                          [planKey]: { ...f.b2bPlans[planKey], [curr]: Number(e.target.value) || 0 }
-                        }
-                      }))}
-                      className="font-mono font-bold"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* 4. API Platform Usage Pricing */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 pb-2 border-b">
-            <Key className="w-4 h-4 text-blue-600" />
-            <h3 className="font-bold text-base">4. B2B API Platform Per-Call Pricing (USD $)</h3>
-          </div>
-          <div className="grid md:grid-cols-3 gap-4">
-            <div className="p-3.5 rounded-xl border bg-background space-y-1.5">
-              <Label className="text-xs font-semibold">Deep Check API Price ($/call)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={form.apiPlatformPricing.deepCheckApiPriceUsd}
-                onChange={e => setForm(f => ({
-                  ...f,
-                  apiPlatformPricing: { ...f.apiPlatformPricing, deepCheckApiPriceUsd: Number(e.target.value) || 0 }
-                }))}
-                className="font-mono font-bold"
-              />
-            </div>
-            <div className="p-3.5 rounded-xl border bg-background space-y-1.5">
-              <Label className="text-xs font-semibold">Visa Requirements API Price ($/call)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={form.apiPlatformPricing.visaRequirementsApiPriceUsd}
-                onChange={e => setForm(f => ({
-                  ...f,
-                  apiPlatformPricing: { ...f.apiPlatformPricing, visaRequirementsApiPriceUsd: Number(e.target.value) || 0 }
-                }))}
-                className="font-mono font-bold"
-              />
-            </div>
-            <div className="p-3.5 rounded-xl border bg-background space-y-1.5">
-              <Label className="text-xs font-semibold">Passport OCR Scan API Price ($/call)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={form.apiPlatformPricing.passportScanApiPriceUsd}
-                onChange={e => setForm(f => ({
-                  ...f,
-                  apiPlatformPricing: { ...f.apiPlatformPricing, passportScanApiPriceUsd: Number(e.target.value) || 0 }
-                }))}
-                className="font-mono font-bold"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="pt-4 flex justify-end">
-          <Button
-            onClick={() => saveMutation.mutate(form)}
-            disabled={saveMutation.isPending}
-            size="lg"
-            className="bg-[#4055FF] hover:bg-[#3044EE] text-white font-bold gap-2 px-8"
-          >
-            {saveMutation.isPending ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save className="w-5 h-5" />}
-            Save All Pricing Settings
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 // ── B2C Plans Card ─────────────────────────────────────────────────────────
 export function B2cPlansCard() {
@@ -2907,15 +2655,48 @@ export default function AdminSettingsPage() {
             <SmsGatewayCard />
           </TabsContent>
 
-          {/* ── Pricing & Plans Control Center ─────────────────────────────── */}
+          {/* ── B2C Pricing Tab ───────────────────────────────────────────── */}
           <TabsContent value="b2c-pricing" className="space-y-6">
-            <SaasPricingAdminCard />
+            <Card className="border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/20">
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2 text-slate-900 dark:text-slate-100">
+                    <Shield className="w-5 h-5 text-emerald-600" /> Dedicated B2C Pricing &amp; Protection Page
+                  </CardTitle>
+                  <CardDescription>
+                    Configure Visa Protection Plan parameters, embassy fee estimates, and Deep Check prices.
+                  </CardDescription>
+                </div>
+                <Link href="/admin/pricing/b2c">
+                  <Button className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-2">
+                    Open B2C Pricing Page &rarr;
+                  </Button>
+                </Link>
+              </CardHeader>
+            </Card>
             <B2cPlansCard />
             <B2cCouponsCard />
           </TabsContent>
 
+          {/* ── B2B Pricing Tab ───────────────────────────────────────────── */}
           <TabsContent value="b2b-pricing" className="space-y-6">
-            <SaasPricingAdminCard />
+            <Card className="border-purple-500/30 bg-purple-50/50 dark:bg-purple-950/20">
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2 text-slate-900 dark:text-slate-100">
+                    <Zap className="w-5 h-5 text-purple-600" /> Dedicated B2B SaaS &amp; API Pricing Page
+                  </CardTitle>
+                  <CardDescription>
+                    Configure agency tier subscription plans (Starter, Growth, Enterprise) and API platform rates.
+                  </CardDescription>
+                </div>
+                <Link href="/admin/pricing/b2b">
+                  <Button className="bg-purple-600 hover:bg-purple-700 text-white font-bold gap-2">
+                    Open B2B Pricing Page &rarr;
+                  </Button>
+                </Link>
+              </CardHeader>
+            </Card>
           </TabsContent>
 
           <TabsContent value="email-templates" className="space-y-4">

@@ -48,13 +48,8 @@ const adminNavItems: NavItem[] = [
   { icon: ClipboardList, label: "Operations", href: "/admin/operations" },
   { icon: CreditCard, label: "Finance", href: "/admin/finance" },
   { icon: Wallet, label: "Subscriptions", href: "/admin/subscriptions" },
-  {
-    icon: DollarSign, label: "Pricing & Plans", href: "/admin/pricing/b2c",
-    children: [
-      { icon: Shield, label: "B2C & Protection", href: "/admin/pricing/b2c" },
-      { icon: Zap, label: "B2B SaaS Pricing", href: "/admin/pricing/b2b" },
-    ],
-  },
+  { icon: ShieldCheck, label: "B2C Pricing", href: "/admin/pricing/b2c" },
+  { icon: Zap, label: "B2B Pricing", href: "/admin/pricing/b2b" },
   { icon: Ticket, label: "Travel Stickers", href: "/admin/travel-stickers" },
   { icon: FileText, label: "Pages", href: "/admin/pages" },
   { icon: Newspaper, label: "Updates", href: "/admin/updates" },
