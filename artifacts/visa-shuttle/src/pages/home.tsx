@@ -13,7 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
 import { POPULAR_DESTINATIONS, VISA_TYPES } from "@/shared/destinations";
-import { formatB2cPrice, getStoredB2cCurrency } from "@/lib/b2c-pricing";
+import { formatB2cPrice, getStoredB2cCurrency, initAutoDetectedCurrency, type B2cCurrency } from "@/lib/b2c-pricing";
 import { getEntryRequirement, getDetailedEntryRequirement } from "@/shared/visa-free";
 
 // ── Large pool of country-pair visa data ──────────────────────────────────────
