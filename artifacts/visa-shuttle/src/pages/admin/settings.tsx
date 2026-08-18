@@ -940,7 +940,7 @@ function SaasPricingAdminCard() {
 }
 
 // ── B2C Plans Card ─────────────────────────────────────────────────────────
-function B2cPlansCard() {
+export function B2cPlansCard() {
   const { toast } = useToast();
   const { data = [], isLoading } = useQuery<B2cPlanResponse[]>({
     queryKey: ["/api/admin/b2c-plans"],
@@ -1226,7 +1226,7 @@ function B2cPlansCard() {
 }
 
 // ── B2C Coupons Card ───────────────────────────────────────────────────────
-function B2cCouponsCard() {
+export function B2cCouponsCard() {
   const { toast } = useToast();
   const emptyForm = { id: "", code: "", description: "", discountPercent: 10, maxUses: "", active: true, expiresAt: "" };
   const [form, setForm] = useState(emptyForm);
@@ -2698,7 +2698,8 @@ export default function AdminSettingsPage() {
             <TabsTrigger value="general" data-testid="tab-general">General</TabsTrigger>
             <TabsTrigger value="security" data-testid="tab-security">Security</TabsTrigger>
             <TabsTrigger value="limits" data-testid="tab-limits">Defaults</TabsTrigger>
-            <TabsTrigger value="b2c-pricing" data-testid="tab-b2c-pricing">B2C Pricing</TabsTrigger>
+            <TabsTrigger value="b2c-pricing" data-testid="tab-b2c-pricing">B2C Pricing &amp; Protection</TabsTrigger>
+            <TabsTrigger value="b2b-pricing" data-testid="tab-b2b-pricing">B2B SaaS Pricing</TabsTrigger>
             <TabsTrigger value="cashfree" data-testid="tab-cashfree">Cashfree</TabsTrigger>
             <TabsTrigger value="paypal" data-testid="tab-paypal">PayPal</TabsTrigger>
             <TabsTrigger value="stripe" data-testid="tab-stripe">Stripe</TabsTrigger>
@@ -2911,6 +2912,10 @@ export default function AdminSettingsPage() {
             <SaasPricingAdminCard />
             <B2cPlansCard />
             <B2cCouponsCard />
+          </TabsContent>
+
+          <TabsContent value="b2b-pricing" className="space-y-6">
+            <SaasPricingAdminCard />
           </TabsContent>
 
           <TabsContent value="email-templates" className="space-y-4">

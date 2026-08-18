@@ -91,6 +91,8 @@ import AdminVisaToolsPage from "@/pages/admin/visa-tools";
 import AdminAuditPage from "@/pages/admin/audit";
 import AdminTravelStickersPage from "@/pages/admin/travel-stickers";
 import AdminSettingsPage from "@/pages/admin/settings";
+import AdminB2cPricingPage from "@/pages/admin/pricing-b2c";
+import AdminB2bPricingPage from "@/pages/admin/pricing-b2b";
 import AdminOperationsPage from "@/pages/admin/operations";
 import AdminFinancePage from "@/pages/admin/finance";
 import AdminSupportPage from "@/pages/admin/support";
@@ -324,6 +326,9 @@ function Router() {
       <Route path="/admin/finance" component={AdminFinancePage} />
       <Route path="/admin/support" component={AdminSupportPage} />
       <Route path="/admin/subscriptions" component={AdminSubscriptionsPage} />
+      <Route path="/admin/pricing/b2c" component={AdminB2cPricingPage} />
+      <Route path="/admin/pricing/b2b" component={AdminB2bPricingPage} />
+      <Route path="/admin/pricing" component={AdminB2cPricingPage} />
       <Route path="/admin/pages" component={AdminPagesPage} />
       <Route path="/admin/updates" component={AdminUpdatesPage} />
       <Route path="/admin/version-logs" component={AdminVersionLogsPage} />
