@@ -324,7 +324,17 @@ function StepCard({ step }: { step: Step }) {
 
 export default function HelpPage() {
   const [tab, setTab] = useState<"travelers" | "agencies">("travelers");
-  const basicCheckPrice = formatB2cPrice(getStoredB2cCurrency(), 0);
+  const [currency, setCurrency] = useState<B2cCurrency>(() => getStoredB2cCurrency());
+
+  useEffect(() => {
+    initAutoDetectedCurrency().then((detected) => setCurrency(detected));
+    const handleCurrencyEvent = (e: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (detail?.currency) setCurrency(detail.currency);
+    };
+    window.addEventListener("visashuttle:currency-changed", handleCurrencyEvent);
+    return () => window.removeEventListener("visashuttle:currency-changed", handleCurrencyEvent);
+  }, []);
 
   useEffect(() => {
     const hash = window.location.hash.replace("#", "");
@@ -338,9 +348,12 @@ export default function HelpPage() {
     }
   };
 
+  const basicCheckPrice = formatB2cPrice(currency, 0);
+  const deepCheckPrice = formatB2cPrice(currency);
+
   const travelerFaqsWithCurrency = travelerFaqs.map((faq) =>
     faq.q === "Is the Basic Check really free?"
-      ? { ...faq, a: `Yes. The Basic Check is ${basicCheckPrice} — no credit card needed. You only pay if you want a Deep Check. Pricing is USD 15, GBP 11, EUR 12, INR 1000, or AED 55.` }
+      ? { ...faq, a: `Yes. The Basic Check is ${basicCheckPrice} — no credit card needed. You only pay if you want a Deep Check (${deepCheckPrice}).` }
       : faq
   );
   const travelerStepsWithCurrency = travelerSteps.map((step) =>

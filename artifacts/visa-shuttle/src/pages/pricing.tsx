@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CheckCircle, Sparkles, Crown, ArrowRight, Info, Zap, ShieldCheck, Gauge, FileText, Coins } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";

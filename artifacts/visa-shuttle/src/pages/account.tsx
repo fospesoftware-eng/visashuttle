@@ -258,6 +258,18 @@ export default function AccountPage() {
     </div>
   );
 
+  const [currency, setCurrency] = useState<B2cCurrency>(() => getStoredB2cCurrency());
+
+  useEffect(() => {
+    initAutoDetectedCurrency().then((detected) => setCurrency(detected));
+    const handleCurrencyEvent = (e: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (detail?.currency) setCurrency(detail.currency);
+    };
+    window.addEventListener("visashuttle:currency-changed", handleCurrencyEvent);
+    return () => window.removeEventListener("visashuttle:currency-changed", handleCurrencyEvent);
+  }, []);
+
   const showOnboarding = !dismissedOnboarding && !profileLoading && profile !== undefined && !profile?.fullName;
 
   const recentChecks = checks.slice(0, 3);
@@ -265,8 +277,8 @@ export default function AccountPage() {
   const lastCheck = checks[0];
   const checksLeftLabel = Number.isFinite(checksRemaining) ? checksRemaining : "Unlimited";
   const planLabel = user.subscriptionPlan === "pro" ? "Pro" : user.subscriptionPlan === "deep" ? "Deep Check" : user.subscriptionPlan.charAt(0).toUpperCase() + user.subscriptionPlan.slice(1);
-  const deepCheckPrice = formatB2cPrice(getStoredB2cCurrency());
-  const basicCheckPrice = formatB2cPrice(getStoredB2cCurrency(), 0);
+  const deepCheckPrice = formatB2cPrice(currency);
+  const basicCheckPrice = formatB2cPrice(currency, 0);
 
   const notifications = [
     !canCheck && { type: "warn", msg: `You've used your Basic Check. Get Deep Check for ${deepCheckPrice}.` },

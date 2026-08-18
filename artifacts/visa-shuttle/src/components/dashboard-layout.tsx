@@ -109,7 +109,7 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
                 >
                   <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-white" : highlight ? "text-[#9033F5]" : "text-slate-400 group-hover:text-[#4055FF]"} transition-colors`} />
                   <span className="text-sm font-medium flex-1 leading-none">{label}</span>
-                  {highlight && !isActive && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full text-white" style={{background:"linear-gradient(135deg,#4055FF,#FF2060)"}}>$1</span>}
+                  {highlight && !isActive && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full text-white" style={{background:"linear-gradient(135deg,#4055FF,#FF2060)"}}>{deepCheckPrice}</span>}
                   {isLocked && <Crown className="w-3 h-3 text-amber-500 flex-shrink-0" />}
                   {isActive && <ChevronRight className="w-3.5 h-3.5 text-white/60 flex-shrink-0" />}
                 </div>

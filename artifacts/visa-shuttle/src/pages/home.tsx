@@ -272,9 +272,28 @@ export default function HomePage() {
   const [, setLocation] = useLocation();
   const [samples, setSamples] = useState<VisaScoreSample[]>([]);
   const [userCountry, setUserCountry] = useState<string | null>(null);
+  const [currency, setCurrency] = useState<B2cCurrency>(() => getStoredB2cCurrency());
   const [pulse, setPulse] = useState(0); // increments to trigger subtle "live" animation
   const pulseRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const basicCheckPrice = formatB2cPrice(getStoredB2cCurrency(), 0);
+
+  useEffect(() => {
+    initAutoDetectedCurrency().then((detected) => {
+      setCurrency(detected);
+    });
+
+    const handleCurrencyEvent = (e: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (detail?.currency) {
+        setCurrency(detail.currency);
+      }
+    };
+    window.addEventListener("visashuttle:currency-changed", handleCurrencyEvent);
+    return () => {
+      window.removeEventListener("visashuttle:currency-changed", handleCurrencyEvent);
+    };
+  }, []);
+
+  const basicCheckPrice = formatB2cPrice(currency, 0);
 
   // Build a fresh, visitor-country-aware list on every page visit.
   useEffect(() => {

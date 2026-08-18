@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
 import { useToast } from "@/hooks/use-toast";
-import { formatB2cPrice, getStoredB2cCurrency } from "@/lib/b2c-pricing";
+import { formatB2cPrice, getStoredB2cCurrency, initAutoDetectedCurrency, type B2cCurrency } from "@/lib/b2c-pricing";
 
 export default function SettingsPage() {
   const { user, isLoading: authLoading } = useB2cAuth();
@@ -49,8 +49,20 @@ export default function SettingsPage() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  const [currency, setCurrency] = useState<B2cCurrency>(() => getStoredB2cCurrency());
+
+  useEffect(() => {
+    initAutoDetectedCurrency().then((detected) => setCurrency(detected));
+    const handleCurrencyEvent = (e: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (detail?.currency) setCurrency(detail.currency);
+    };
+    window.addEventListener("visashuttle:currency-changed", handleCurrencyEvent);
+    return () => window.removeEventListener("visashuttle:currency-changed", handleCurrencyEvent);
+  }, []);
+
   const planLabel = user.subscriptionPlan === "pro" ? "Pro" : user.subscriptionPlan === "deep" ? "Deep Check" : user.subscriptionPlan === "starter" ? "Starter" : "Free";
-  const deepCheckPrice = formatB2cPrice(getStoredB2cCurrency());
+  const deepCheckPrice = formatB2cPrice(currency);
 
   return (
     <DashboardLayout title="Settings" subtitle="Manage your account and preferences">
