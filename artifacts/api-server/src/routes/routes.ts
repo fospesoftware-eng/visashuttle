@@ -6497,8 +6497,34 @@ Rules:
     }
   });
 
-  app.get("/api/admin/b2c-coupons", requireAdminAuth, async (_req, res) => {
-    res.json(await storage.getB2cCoupons());
+  // Public SaaS Pricing Settings (for frontend price display)
+  app.get("/api/public/saas-pricing-settings", async (_req, res) => {
+    try {
+      const settings = await storage.getSaasPricingSettings();
+      res.json(settings);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to fetch pricing settings" });
+    }
+  });
+
+  // Admin GET SaaS Pricing Settings
+  app.get("/api/admin/saas-pricing-settings", requireAdminAuth, async (_req, res) => {
+    try {
+      const settings = await storage.getSaasPricingSettings();
+      res.json(settings);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to fetch pricing settings" });
+    }
+  });
+
+  // Admin PUT SaaS Pricing Settings
+  app.put("/api/admin/saas-pricing-settings", requireAdminAuth, async (req, res) => {
+    try {
+      const updated = await storage.updateSaasPricingSettings(req.body);
+      res.json(updated);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message || "Failed to update pricing settings" });
+    }
   });
 
   app.post("/api/admin/b2c-coupons", requireAdminAuth, async (req, res) => {

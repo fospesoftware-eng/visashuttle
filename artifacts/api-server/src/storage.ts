@@ -308,6 +308,9 @@ export interface IStorage {
 
   createOTPCode(otp: InsertOTPCode): Promise<OTPCode>;
   getActiveOTPCode(email: string, tenantId: string): Promise<OTPCode | undefined>;
+
+  getSaasPricingSettings(): Promise<any>;
+  updateSaasPricingSettings(patch: any): Promise<any>;
   getActiveOTPCodeByPhone(phone: string, tenantId: string): Promise<OTPCode | undefined>;
   markOTPUsed(id: string): Promise<void>;
   incrementOTPAttempts(id: string): Promise<void>;
@@ -2456,6 +2459,49 @@ export class MemStorage implements IStorage {
     const updated = { ...existing, ...data, updatedAt: new Date() } as VisaProtectionPlan;
     this.visaProtectionPlansMap.set(id, updated);
     return updated;
+  }
+
+  private saasPricingSettingsRecord: any = {
+    deepCheckBasePrices: { USD: 15, GBP: 11, EUR: 12, INR: 1000, AED: 55 },
+    visaProtectionFeePercent: 20,
+    visaProtectionMinScore: 80,
+    officialVisaFees: {
+      "United States": 185,
+      "Schengen Area": 98,
+      "United Kingdom": 148,
+      "Canada": 75,
+      "Australia": 125,
+    },
+    b2bPlans: {
+      starter: { USD: 49, GBP: 39, EUR: 45, INR: 3999, AED: 180 },
+      growth: { USD: 149, GBP: 119, EUR: 139, INR: 11999, AED: 549 },
+      enterprise: { USD: 499, GBP: 399, EUR: 459, INR: 39999, AED: 1830 },
+    },
+    apiPlatformPricing: {
+      deepCheckApiPriceUsd: 1.99,
+      visaRequirementsApiPriceUsd: 0.25,
+      passportScanApiPriceUsd: 0.50,
+    },
+  };
+
+  async getSaasPricingSettings(): Promise<any> {
+    return this.saasPricingSettingsRecord;
+  }
+
+  async updateSaasPricingSettings(patch: any): Promise<any> {
+    this.saasPricingSettingsRecord = {
+      ...this.saasPricingSettingsRecord,
+      ...patch,
+      deepCheckBasePrices: { ...this.saasPricingSettingsRecord.deepCheckBasePrices, ...(patch.deepCheckBasePrices || {}) },
+      officialVisaFees: { ...this.saasPricingSettingsRecord.officialVisaFees, ...(patch.officialVisaFees || {}) },
+      b2bPlans: {
+        starter: { ...this.saasPricingSettingsRecord.b2bPlans?.starter, ...(patch.b2bPlans?.starter || {}) },
+        growth: { ...this.saasPricingSettingsRecord.b2bPlans?.growth, ...(patch.b2bPlans?.growth || {}) },
+        enterprise: { ...this.saasPricingSettingsRecord.b2bPlans?.enterprise, ...(patch.b2bPlans?.enterprise || {}) },
+      },
+      apiPlatformPricing: { ...this.saasPricingSettingsRecord.apiPlatformPricing, ...(patch.apiPlatformPricing || {}) },
+    };
+    return this.saasPricingSettingsRecord;
   }
 }
 
