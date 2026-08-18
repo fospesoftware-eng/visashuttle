@@ -120,7 +120,12 @@ export default function LoginPage() {
         localStorage.setItem("agency_tenant_slug", data.tenantSlug);
       }
 
-      // Invalidate the me query so the new session is reflected
+      // Immediately prime the auth cache so protected layouts recognize the authenticated session with zero latency
+      queryClient.setQueryData(["/api/auth/me"], {
+        authenticated: true,
+        user: data.user,
+        tenant: data.tenant || null,
+      });
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
 
       toast({
@@ -130,15 +135,20 @@ export default function LoginPage() {
 
       // Route based on role
       const role = data.user.role;
+      let targetPath = "/app";
       if (role === "saas_admin") {
-        setLocation("/admin");
-      } else if (role === "agency_owner" || role === "agency_manager" || role === "agency_staff") {
-        setLocation("/app");
+        targetPath = "/admin";
       } else if (role === "customer") {
-        setLocation("/customer");
-      } else {
-        setLocation("/app");
+        targetPath = "/customer";
       }
+
+      // Smooth, immediate navigation to dashboard
+      setLocation(targetPath);
+      setTimeout(() => {
+        if (typeof window !== "undefined" && window.location.pathname === "/login") {
+          window.location.href = targetPath;
+        }
+      }, 50);
     } catch {
       setError("Network error. Please try again.");
     } finally {
