@@ -65,18 +65,7 @@ const adminNavItems: NavItem[] = [
   { icon: FileSearch, label: "Visa Tools", href: "/admin/visa-tools" },
   { icon: Sparkles, label: "Growth Hub", href: "/admin/growth-hub", badge: "Beta" },
   { icon: Activity, label: "Audit Logs", href: "/admin/audit" },
-  {
-    icon: Settings, label: "Settings", href: "/admin/settings",
-    children: [
-      { icon: Sliders, label: "General", href: "/admin/settings/general" },
-      { icon: CreditCard, label: "Payment Gateways", href: "/admin/settings/payments" },
-      { icon: Cpu, label: "AI Provider", href: "/admin/settings/ai" },
-      { icon: Database, label: "Database", href: "/admin/settings/database" },
-      { icon: Bell, label: "Notifications", href: "/admin/settings/notifications" },
-      { icon: Lock, label: "Security", href: "/admin/settings/security" },
-      { icon: Server, label: "Other", href: "/admin/settings/other" },
-    ],
-  },
+  { icon: Settings, label: "Settings", href: "/admin/settings" },
 ];
 
 const agencyNavItems: NavItem[] = [
