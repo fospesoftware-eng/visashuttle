@@ -1,0 +1,107 @@
+/* =================================================================== */
+/* Wide Layout
+====================================================================== */
+
+	body {
+		background: #fff;
+		font: 12px Arial, sans-serif;
+		color: #666;
+		-webkit-font-smoothing: antialiased; /* Fix for webkit rendering */
+		-webkit-text-size-adjust: 100%;
+		overflow-x: hidden;
+		border-top: 4px solid #444;
+	 }
+	 
+	#wrapper {
+		background: #fff;
+		-webkit-box-shadow: none;
+		box-shadow: none;
+		width: 100%;
+		padding: 25px 0 35px 0;
+		margin: 0 auto;
+	}
+	
+	#footer {
+		background: #303030;
+		width: 100%;
+		padding: 15px 0 0 0;
+		margin: 0 auto;
+	}
+	
+
+/* Smaller than standard 1029 (devices and browsers)
+====================================================================== */
+@media only screen and (max-width: 1029px) {
+
+	#wrapper {
+		margin: 0 auto;
+		padding: 25px 0 30px 0;
+		-webkit-box-shadow: none;
+		box-shadow: none;
+		width: 100%;
+	}
+	
+	body {
+		background: #fff
+	}
+	
+	#footer {
+		margin: 0 auto;
+		padding: 15px 0 0 0;
+		width: 100% !important;
+	}
+	
+}
+	
+/* Tablet Portrait (devices and browsers)
+====================================================================== */
+@media only screen and (min-width: 768px) and (max-width: 959px) {
+
+	#footer {
+		padding: 10px 0 0 0;
+	}
+}
+
+/* All Mobile Sizes (devices and browser)
+====================================================================== */
+@media only screen and (max-width: 767px) {
+
+	#wrapper {
+		margin: 0 auto;
+		padding: 15px 0 30px 0;
+		-webkit-box-shadow: none;
+		box-shadow: none;
+		width: 100%;
+	}
+	
+	body {
+		background: #fff
+	}
+	
+	#footer {
+		margin: 0 auto;
+		padding: 15px 0 0 0;
+		width: 100% !important;
+	}
+}
+
+/*
+     FILE ARCHIVED ON 22:42:40 May 20, 2014 AND RETRIEVED FROM THE
+     INTERNET ARCHIVE ON 10:50:39 Jun 16, 2026.
+     JAVASCRIPT APPENDED BY WAYBACK MACHINE, COPYRIGHT INTERNET ARCHIVE.
+
+     ALL OTHER CONTENT MAY ALSO BE PROTECTED BY COPYRIGHT (17 U.S.C.
+     SECTION 108(a)(3)).
+*/
+/*
+playback timings (ms):
+  captures_list: 0.593
+  exclusion.robots: 0.088
+  exclusion.robots.policy: 0.075
+  esindex: 0.01
+  cdx.remote: 163.476
+  LoadShardBlock: 243.615 (3)
+  PetaboxLoader3.datanode: 122.766 (4)
+  PetaboxLoader3.resolve: 646.511 (2)
+  load_resource: 571.004
+*/

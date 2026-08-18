@@ -335,6 +335,13 @@ function Router() {
       <Route path="/admin/audit" component={AdminAuditPage} />
       <Route path="/admin/travel-stickers" component={AdminTravelStickersPage} />
       <Route path="/admin/settings" component={AdminSettingsPage} />
+      <Route path="/admin/settings/general">{() => <AdminSettingsPage initialSection="general" />}</Route>
+      <Route path="/admin/settings/payments">{() => <AdminSettingsPage initialSection="payments" />}</Route>
+      <Route path="/admin/settings/ai">{() => <AdminSettingsPage initialSection="ai" />}</Route>
+      <Route path="/admin/settings/database">{() => <AdminSettingsPage initialSection="database" />}</Route>
+      <Route path="/admin/settings/notifications">{() => <AdminSettingsPage initialSection="notifications" />}</Route>
+      <Route path="/admin/settings/security">{() => <AdminSettingsPage initialSection="security" />}</Route>
+      <Route path="/admin/settings/other">{() => <AdminSettingsPage initialSection="other" />}</Route>
 
       <Route path="/w/:slug" component={AgencyHomePage} />
       <Route path="/w/:slug/login" component={WhiteLabelLoginPage} />

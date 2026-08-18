@@ -184,10 +184,8 @@ httpServer.listen({ port, host: "0.0.0.0" }, () => {
       }
     });
 
-    if (process.env.NODE_ENV === "production") {
-      serveStatic(fullApp);
-      bootLog("serveStatic mounted");
-    }
+    serveStatic(fullApp);
+    bootLog("serveStatic mounted");
 
     // Atomic swap: from this point on the stub delegates every request to
     // the real app, including session/CORS/CSRF middleware.

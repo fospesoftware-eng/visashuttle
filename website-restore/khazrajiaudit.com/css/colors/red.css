@@ -1,0 +1,55 @@
+/* =================================================================== */
+/* Red #c62020
+====================================================================== */
+
+#navigation ul li a:hover, 
+#navigation ul li:hover > a, 
+#bolded-line, 
+.button.gray:hover, 
+.button.light:hover, 
+.button.color, 
+input[type="button"] {
+	background: #c62020;
+}
+
+.flex-direction-nav .flex-prev:hover, 
+.flex-direction-nav .flex-next:hover, 
+#scroll-top-top a, 
+.post-icon {
+	background-color:#c62020;
+}
+
+.mr-rotato-prev:hover, 
+.mr-rotato-next:hover,
+li.current, 
+.tags a:hover {
+	background-color: #c62020;
+	border-color: #c62020;
+}
+
+#filters a:hover, 
+.selected, 
+#portfolio-navi a:hover {
+	background-color: #c62020 !important;
+	border: 1px solid #c62020 !important;
+}
+/*
+     FILE ARCHIVED ON 23:39:53 May 20, 2014 AND RETRIEVED FROM THE
+     INTERNET ARCHIVE ON 10:49:54 Jun 16, 2026.
+     JAVASCRIPT APPENDED BY WAYBACK MACHINE, COPYRIGHT INTERNET ARCHIVE.
+
+     ALL OTHER CONTENT MAY ALSO BE PROTECTED BY COPYRIGHT (17 U.S.C.
+     SECTION 108(a)(3)).
+*/
+/*
+playback timings (ms):
+  captures_list: 1.054
+  exclusion.robots: 0.06
+  exclusion.robots.policy: 0.049
+  esindex: 0.01
+  cdx.remote: 15.091
+  LoadShardBlock: 165.805 (3)
+  PetaboxLoader3.datanode: 148.67 (4)
+  PetaboxLoader3.resolve: 460.871 (3)
+  load_resource: 480.106
+*/
