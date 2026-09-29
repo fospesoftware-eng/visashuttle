@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean, jsonb, serial } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, jsonb, serial, real } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -1417,11 +1417,25 @@ export const visaProtectionPlans = pgTable("visa_protection_plans", {
   deepCheckId: varchar("deep_check_id").notNull(),
   destinationCountry: text("destination_country").notNull(),
   visaType: text("visa_type").notNull(),
+  nationality: text("nationality"),
+  visaCategory: text("visa_category"),
   approvalScore: integer("approval_score").notNull(),
   currency: text("currency").notNull().default("USD"),
   governmentFeeAmountCents: integer("government_fee_amount_cents").notNull(),
   protectionFeeAmountCents: integer("protection_fee_amount_cents").notNull(),
-  status: text("status").notNull().default("active"), // active, claimed, refunded, expired, rejected
+  protectedFeeAmountCents: integer("protected_fee_amount_cents"),
+  biometricFeeCents: integer("biometric_fee_cents"),
+  mandatoryLevyCents: integer("mandatory_levy_cents"),
+  otherChargesCents: integer("other_charges_cents"),
+  feeCurrency: text("fee_currency"),
+  fxRateToInr: real("fx_rate_to_inr"),
+  premiumBand: text("premium_band"),
+  premiumPercent: integer("premium_percent"),
+  destinationRiskFactor: real("destination_risk_factor"),
+  officialSource: text("official_source"),
+  feeSnapshot: jsonb("fee_snapshot"),
+  orderId: varchar("order_id"),
+  status: text("status").notNull().default("active"), // pending_payment, active, claimed, refunded, expired, rejected
   certificateNumber: text("certificate_number").notNull().unique(),
   termsAgreedAt: timestamp("terms_agreed_at").defaultNow(),
   claimReason: text("claim_reason"),

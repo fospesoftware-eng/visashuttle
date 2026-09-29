@@ -36,6 +36,7 @@ import TravelStickerPage from "@/pages/travel-sticker";
 import DeepCheckPage from "@/pages/deep-check";
 import DeepCheckPaymentPage from "@/pages/deep-check-payment";
 import PaymentFailurePage from "@/pages/payment-failure";
+import VisaProtectionPaymentPage from "@/pages/visa-protection-payment";
 import VisaToolsCreditPaymentPage from "@/pages/visa-tools-credit-payment";
 import SavedProfilePage from "@/pages/saved-profile";
 import SettingsPage from "@/pages/settings";
@@ -191,6 +192,8 @@ function Router() {
       <Route path="/payment/deep-check/failure" component={PaymentFailurePage} />
       <Route path="/payment/deep-check/return" component={DeepCheckPaymentPage} />
       <Route path="/payment/deep-check" component={DeepCheckPaymentPage} />
+      <Route path="/payment/visa-protection/return" component={VisaProtectionPaymentPage} />
+      <Route path="/payment/visa-protection/failure" component={VisaProtectionPaymentPage} />
       <Route path="/payment/visa-tools-credits/return" component={VisaToolsCreditPaymentPage} />
       <Route path="/payment/visa-tools-credits" component={VisaToolsCreditPaymentPage} />
       <Route path="/saved-profile" component={SavedProfilePage} />

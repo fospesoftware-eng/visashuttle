@@ -2,6 +2,17 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage, isMissingRelationError, getVirtualStickersByUser, createVirtualSticker, getVirtualStickerBySession, collectTravelSticker, getTravelStickerPayments } from "../storage";
 import { runVisaCheck, runDeepCheck, scanPassportImage, isPassportScanConfigured, getCleanApiKey, normalizeClaudeModel } from "../ai";
+import {
+  VISA_FEE_TABLE,
+  lookupVisaFee,
+  calculateVisaProtectionV2,
+  formatMoney,
+  resolveCountry,
+  fromInr,
+  FX_SOURCE,
+  getDefaultProtectionSettings,
+  type ProtectionPricingSettings,
+} from "../visa-fee-engine";
 import { registerApiPlatformRoutes } from "./api-platform";
 import { registerPlatformExtensions } from "./platform-extensions";
 import express from "express";
@@ -8789,86 +8800,89 @@ Rules:
     }
   });
 
-  // ================= VISA PROTECTION PLAN ROUTES =================
-  const GOVERNMENT_VISA_FEES_USD: Record<string, number> = {
-    "United States": 185, "US": 185, "USA": 185,
-    "Schengen": 98, "Schengen Area": 98, "Germany": 98, "France": 98, "Italy": 98, "Spain": 98,
-    "Netherlands": 98, "Switzerland": 98, "Austria": 98, "Belgium": 98, "Portugal": 98, "Greece": 98,
-    "United Kingdom": 148, "UK": 148,
-    "Canada": 75,
-    "Australia": 125,
-    "Japan": 22,
-    "Singapore": 30,
-    "United Arab Emirates": 90, "UAE": 90, "Dubai": 90,
-    "Saudi Arabia": 110,
-    "China": 140,
-    "New Zealand": 130,
-    "South Korea": 35,
-    "Thailand": 40,
-    "Malaysia": 25,
-    "Vietnam": 25,
-    "Egypt": 25,
-    "Turkey": 50,
-  };
+  // ============ VISA FEE ENGINE + VISA PROTECTION PLAN ROUTES ============
+  // The Visa Fee Engine is a core VisaShuttle module (see src/visa-fee-engine.ts).
+  // Visa Protection is an upsell gated by Deep Check and priced by the engine.
 
-  const VPP_CURRENCY_CONVERSION_RATES: Record<string, number> = {
-    USD: 1,
-    INR: 84,
-    EUR: 0.92,
-    GBP: 0.78,
-    AED: 3.67,
-  };
-
-  const VPP_CURRENCY_SYMBOLS: Record<string, string> = {
-    USD: "$",
-    INR: "₹",
-    EUR: "€",
-    GBP: "£",
-    AED: "AED ",
-  };
-
-  function calculateVisaProtection(destinationCountry: string, currency = "USD") {
-    const destName = (destinationCountry || "").trim();
-    const feeUSD = GOVERNMENT_VISA_FEES_USD[destName] || 100;
-    const rate = VPP_CURRENCY_CONVERSION_RATES[currency] || 1;
-    const symbol = VPP_CURRENCY_SYMBOLS[currency] || "$";
-
-    const governmentFeeInCents = Math.round(feeUSD * rate * 100);
-    const protectionFeeInCents = Math.round(governmentFeeInCents * 0.20); // 20% of Government Visa Fee
-
-    const visaFeeAmount = governmentFeeInCents / 100;
-    const protectionFeeAmount = protectionFeeInCents / 100;
-
-    const formattedVisaFee = currency === "AED" ? `AED ${visaFeeAmount.toLocaleString()}` : `${symbol}${visaFeeAmount.toLocaleString()}`;
-    const formattedProtectionFee = currency === "AED" ? `AED ${protectionFeeAmount.toLocaleString()}` : `${symbol}${protectionFeeAmount.toLocaleString()}`;
-
+  async function getProtectionPricingSettings(): Promise<ProtectionPricingSettings> {
+    const s: any = await storage.getSaasPricingSettings();
+    const defaults = getDefaultProtectionSettings();
     return {
-      destinationCountry: destName,
-      governmentFeeUSD: feeUSD,
-      currency,
-      governmentFeeInCents,
-      protectionFeeInCents,
-      visaFeeAmount,
-      protectionFeeAmount,
-      formattedVisaFee,
-      formattedProtectionFee,
-      protectionRatePercentage: 20,
-      refundCoveragePercentage: 100,
+      visaProtectionMinScore: Number(s?.visaProtectionMinScore ?? defaults.visaProtectionMinScore),
+      visaProtectionMinProtectedFeeInr: Number(s?.visaProtectionMinProtectedFeeInr ?? defaults.visaProtectionMinProtectedFeeInr),
+      visaProtectionPremiumBands: Array.isArray(s?.visaProtectionPremiumBands) && s.visaProtectionPremiumBands.length
+        ? s.visaProtectionPremiumBands
+        : defaults.visaProtectionPremiumBands,
+      visaProtectionDestinationRisk: s?.visaProtectionDestinationRisk || defaults.visaProtectionDestinationRisk,
+      visaFeeEngineFx: s?.visaFeeEngineFx || defaults.visaFeeEngineFx,
     };
   }
 
-  // 1. Calculate Visa Protection Plan fee
-  app.post("/api/b2c/visa-protection/calculate", async (req, res) => {
+  // --- Visa Fee Engine endpoints ---
+
+  app.get("/api/b2c/visa-fee-engine/destinations", requireB2cAuth, async (_req, res) => {
+    const settings = await getProtectionPricingSettings();
+    res.json({
+      destinations: VISA_FEE_TABLE.map((r) => ({
+        ...r,
+        protectedFeeInrMinor: lookupVisaFee({ country: r.country }).protectedFeeInrMinor,
+      })),
+      fx: settings.visaFeeEngineFx,
+      fxSource: FX_SOURCE,
+    });
+  });
+
+  app.get("/api/b2c/visa-fee-engine/lookup", requireB2cAuth, async (req, res) => {
     try {
-      const { destinationCountry, currency } = req.body || {};
-      const calculation = calculateVisaProtection(destinationCountry || "Schengen", currency || "USD");
+      const country = String(req.query.country || "");
+      const nationality = String(req.query.nationality || "");
+      const visaType = String(req.query.visaType || "");
+      const visaCategory = String(req.query.visaCategory || "");
+      const lookup = lookupVisaFee({ country, nationality, visaType, visaCategory });
+      if (!lookup.record) {
+        return res.status(404).json({
+          error: `No official fee record found for ${resolveCountry(country) || "this destination"}`,
+          matchLevel: "none",
+        });
+      }
+      const r = lookup.record;
+      res.json({
+        record: r,
+        matchLevel: lookup.matchLevel,
+        protectedFeeInrMinor: lookup.protectedFeeInrMinor,
+        formattedGovernmentFee: formatMoney(r.governmentFee, r.feeCurrency),
+        formattedBiometricFee: formatMoney(r.biometricFee, r.feeCurrency),
+        formattedMandatoryLevy: formatMoney(r.mandatoryLevy, r.feeCurrency),
+        formattedOtherCharges: formatMoney(r.otherMandatoryCharges, r.feeCurrency),
+        formattedProtectedFeeInr: formatMoney(lookup.protectedFeeInrMinor, "INR"),
+        fxSource: FX_SOURCE,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Visa fee lookup failed" });
+    }
+  });
+
+  // 1. Calculate Visa Protection (risk-based pricing preview)
+  app.post("/api/b2c/visa-protection/calculate", requireB2cAuth, async (req, res) => {
+    try {
+      const { destinationCountry, nationality, visaType, visaCategory, score, currency } = req.body || {};
+      const settings = await getProtectionPricingSettings();
+      const calculation = calculateVisaProtectionV2({
+        score: Number(score || 0),
+        destinationCountry: destinationCountry || "Schengen",
+        nationality,
+        visaType,
+        visaCategory,
+        currency: currency || "USD",
+        settings,
+      });
       res.json(calculation);
     } catch (err: any) {
       res.status(500).json({ error: err.message || "Calculation failed" });
     }
   });
 
-  // 2. Get Protection Plan Status for a Deep Check
+  // 2. Protection Plan status for a Deep Check (fee-engine v2 response)
   app.get("/api/b2c/visa-protection/status/:deepCheckId", requireB2cAuth, async (req, res) => {
     try {
       const userId = req.session.b2cUserId!;
@@ -8880,17 +8894,30 @@ Rules:
 
       const score = check.approvalChance ?? 0;
       const form = (check.formData || {}) as Record<string, any>;
-      const dest = form.destinationCountry || "Schengen";
       const currency = req.query.currency ? String(req.query.currency) : "USD";
-      const calculation = calculateVisaProtection(dest, currency);
+      const settings = await getProtectionPricingSettings();
+      const calculation = calculateVisaProtectionV2({
+        score,
+        destinationCountry: form.destinationCountry || "Schengen",
+        nationality: form.nationality,
+        visaType: form.visaType,
+        visaCategory: form.visaCategory,
+        currency,
+        settings,
+      });
 
       const existingPlan = await storage.getVisaProtectionPlanByDeepCheckId(check.id);
       res.json({
         exists: !!existingPlan,
         plan: existingPlan || null,
-        eligible: score >= 80,
+        eligible: calculation.eligible && !existingPlan,
+        purchasable: calculation.eligible,
         approvalScore: score,
-        requiredScore: 80,
+        requiredScore: calculation.requiredScore,
+        ineligibleReasons: calculation.ineligibleReasons,
+        scoreBand: calculation.scoreBand,
+        destinationRiskFactor: calculation.destinationRiskFactor,
+        premiumPercent: calculation.premiumPercent,
         calculation,
       });
     } catch (err: any) {
@@ -8898,61 +8925,325 @@ Rules:
     }
   });
 
-  // 3. Activate Protection Plan
-  app.post("/api/b2c/visa-protection/activate", requireB2cAuth, async (req, res) => {
+  // 3. Create Visa Protection payment order (gateway flow: Cashfree / PayPal)
+  app.post("/api/b2c/payments/visa-protection/order", requireB2cAuth, async (req, res) => {
     try {
-      const userId = req.session.b2cUserId!;
-      const { deepCheckId, currency } = req.body || {};
+      const user = await storage.getB2cUser(req.session.b2cUserId!);
+      if (!user) return res.status(401).json({ error: "User not found" });
 
-      const check = await storage.getVisaCheck(deepCheckId);
-      if (!check || check.userId !== userId) {
+      const { deepCheckId, currency } = req.body || {};
+      const check = await storage.getVisaCheck(String(deepCheckId || ""));
+      if (!check || check.userId !== user.id) {
         return res.status(404).json({ error: "Deep Check report not found" });
       }
 
       const score = check.approvalChance ?? 0;
-      if (score < 80) {
-        return res.status(400).json({ error: "Visa Protection Plan requires an AI Deep Check Score of 80% or higher." });
-      }
-
-      const existing = await storage.getVisaProtectionPlanByDeepCheckId(deepCheckId);
-      if (existing) {
-        return res.json({ success: true, plan: existing, message: "Visa Protection Plan is already active for this check." });
-      }
-
       const form = (check.formData || {}) as Record<string, any>;
-      const dest = form.destinationCountry || "Schengen";
-      const visaType = form.visaType || "Tourist Visa";
-      const activeCurrency = currency || "USD";
+      const activeCurrency = String(currency || "USD").toUpperCase();
+      const settings = await getProtectionPricingSettings();
+      const calc = calculateVisaProtectionV2({
+        score,
+        destinationCountry: form.destinationCountry || "Schengen",
+        nationality: form.nationality,
+        visaType: form.visaType,
+        visaCategory: form.visaCategory,
+        currency: activeCurrency,
+        settings,
+      });
 
-      const calc = calculateVisaProtection(dest, activeCurrency);
-      const randomId = Math.floor(10000 + Math.random() * 90000);
-      const certNum = `VPP-2026-${randomId}-${(dest || "GLOBAL").substring(0, 3).toUpperCase()}`;
+      if (!calc.eligible) {
+        return res.status(400).json({
+          error: "Visa Protection Plan is not available for this application.",
+          reasons: calc.ineligibleReasons,
+        });
+      }
 
-      const newPlan = await storage.createVisaProtectionPlan({
-        userId,
-        deepCheckId,
-        destinationCountry: dest,
-        visaType,
+      const existing = await storage.getVisaProtectionPlanByDeepCheckId(check.id);
+      if (existing && existing.status === "active") {
+        return res.json({ alreadyActive: true, plan: existing, redirectUrl: "/deep-check" });
+      }
+
+      const origin = getRequestOrigin(req);
+      const cfg = await storage.getPaymentGatewayConfig();
+      const internalOrderRef = `VS_VPP_${activeCurrency}_${Date.now()}_${randomUUID().slice(0, 8)}`;
+      const certNum = existing?.certificateNumber
+        || `VPP-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}-${(calc.destinationCountry || "GLOBAL").substring(0, 3).toUpperCase()}`;
+
+      // Persist (or refresh) the pending plan snapshot before checkout
+      const planPayload = {
+        userId: user.id,
+        deepCheckId: check.id,
+        destinationCountry: calc.destinationCountry,
+        visaType: calc.visaType || form.visaType || "Tourist Visa",
+        nationality: calc.nationality || form.nationality || null,
+        visaCategory: calc.visaCategory || null,
         approvalScore: score,
         currency: activeCurrency,
-        governmentFeeAmountCents: calc.governmentFeeInCents,
-        protectionFeeAmountCents: calc.protectionFeeInCents,
-        status: "active",
+        governmentFeeAmountCents: calc.protectedFeeMinor, // display-currency protected charges (legacy column)
+        protectionFeeAmountCents: calc.premiumMinor, // display-currency premium
+        protectedFeeAmountCents: calc.protectedFeeMinor,
+        biometricFeeCents: calc.biometricFeeMinor,
+        mandatoryLevyCents: calc.mandatoryLevyMinor,
+        otherChargesCents: calc.otherChargesMinor,
+        feeCurrency: calc.feeCurrency,
+        fxRateToInr: calc.fxRateToInr,
+        premiumBand: calc.scoreBand?.label || null,
+        premiumPercent: calc.premiumPercent,
+        destinationRiskFactor: calc.destinationRiskFactor,
+        officialSource: calc.officialSource,
+        feeSnapshot: calc as any,
+        orderId: internalOrderRef,
         certificateNumber: certNum,
-      });
+      };
+      const plan = existing
+        ? await storage.updateVisaProtectionPlan(existing.id, planPayload)
+        : await storage.createVisaProtectionPlan(planPayload as any);
+      if (!plan) return res.status(500).json({ error: "Could not persist protection plan" });
+
+      const premiumMajor = calc.premiumMinor / 100;
+      if (premiumMajor <= 0) {
+        return res.status(400).json({ error: "Protection premium could not be calculated." });
+      }
+
+      if (gatewayForCheckoutCurrency(activeCurrency) === "paypal") {
+        const paypal = getPayPalCredentials(cfg);
+        if (!paypal.clientId || !paypal.clientSecret) {
+          return res.status(503).json({ error: `PayPal ${paypal.mode} credentials are not configured. Please add them in SaaS Admin > PayPal.` });
+        }
+        try {
+          const usdBase = fromInr(calc.premiumInrMinor, "USD", settings.visaFeeEngineFx) / 100;
+          const paypalMoney = getPayPalCheckoutMoney(activeCurrency, premiumMajor, usdBase);
+          const paypalOrder = await createPayPalOrder(paypal, {
+            intent: "CAPTURE",
+            purchase_units: [{
+              reference_id: internalOrderRef,
+              custom_id: `b2c_vpp:${user.id}:${plan.id}`,
+              invoice_id: internalOrderRef,
+              description: `Visa Shuttle Visa Protection (${calc.destinationCountry})`,
+              amount: {
+                currency_code: paypalMoney.currency,
+                value: formatPayPalAmount(paypalMoney.currency, paypalMoney.amount),
+              },
+            }],
+            payment_source: {
+              paypal: {
+                experience_context: {
+                  brand_name: "Visa Shuttle",
+                  shipping_preference: "NO_SHIPPING",
+                  user_action: "PAY_NOW",
+                  return_url: `${origin}/payment/visa-protection/return?provider=paypal`,
+                  cancel_url: `${origin}/payment/visa-protection/failure?provider=paypal&reason=canceled`,
+                },
+              },
+            },
+          });
+          const approvalUrl = getPayPalApprovalUrl(paypalOrder);
+          if (!approvalUrl) return res.status(502).json({ error: "PayPal did not return an approval URL" });
+          await storage.updateVisaProtectionPlan(plan.id, { orderId: paypalOrder.id } as any);
+          return res.json({
+            provider: "paypal",
+            orderId: paypalOrder.id,
+            approvalUrl,
+            mode: paypal.mode,
+            amount: premiumMajor,
+            currency: activeCurrency,
+            gatewayAmount: paypalMoney.amount,
+            gatewayCurrency: paypalMoney.currency,
+            planId: plan.id,
+          });
+        } catch (err: any) {
+          console.error("[PayPal] Create Visa Protection order failed:", err?.data || err);
+          const message = String(err?.message || "Unable to create PayPal order");
+          const isAuthError = err?.status === 401 || /auth|credential|client|secret/i.test(message);
+          return res.status(isAuthError ? 400 : err?.status >= 500 ? 503 : err?.status || 502).json({
+            error: isAuthError
+              ? `PayPal authentication failed in ${paypal.mode.toUpperCase()} mode. Please verify Client ID, Client Secret, and environment in SaaS Admin > PayPal.`
+              : message,
+          });
+        }
+      }
+
+      const cashfree = getCashfreeCredentials(cfg);
+      if (!cashfree.clientId || !cashfree.clientSecret) {
+        return res.status(503).json({
+          error: `Cashfree ${cashfree.mode} credentials are not configured. Please add them in SaaS Admin > Integrations.`,
+        });
+      }
+      const modeError = validateCashfreeMode(cashfree.mode, cashfree.clientId, cashfree.clientSecret);
+      if (modeError) {
+        return res.status(400).json({ error: modeError });
+      }
+      const requestId = randomUUID();
+      const payload = {
+        order_id: internalOrderRef,
+        order_amount: premiumMajor,
+        order_currency: activeCurrency,
+        order_note: `Visa Shuttle Visa Protection (${calc.destinationCountry})`,
+        customer_details: {
+          customer_id: user.id.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 45),
+          customer_email: user.email,
+          customer_name: user.fullName,
+          customer_phone: getCashfreePhone(user.phone),
+        },
+        order_meta: {
+          return_url: `${origin}/payment/visa-protection/return?order_id=${internalOrderRef}`,
+        },
+        order_tags: {
+          product: "visa_protection",
+          plan_id: plan.id,
+          deep_check_id: check.id,
+          user_id: user.id,
+          currency: activeCurrency,
+        },
+      };
+
+      let response: globalThis.Response;
+      try {
+        response = await fetch(`${cashfree.baseUrl}/orders`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-version": cashfree.apiVersion,
+            "x-client-id": cashfree.clientId,
+            "x-client-secret": cashfree.clientSecret,
+            "x-request-id": requestId,
+            "x-idempotency-key": randomUUID(),
+          },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(20000),
+        });
+      } catch (err) {
+        console.error("[Cashfree] Create Visa Protection order network error:", err);
+        return res.status(503).json({
+          error: "Cashfree checkout is temporarily unreachable. Please try again in a few minutes.",
+        });
+      }
+
+      const data = await readCashfreeBody(response);
+      if (!response.ok) {
+        console.error("[Cashfree] Create Visa Protection order failed:", { status: response.status, requestId, response: data });
+        const message = data?.message || data?.error || data?.type || "Unable to create Cashfree order";
+        const isAuthError = response.status === 401 || /auth|credential|client/i.test(String(message));
+        const status = response.status >= 500 ? 503 : response.status;
+        return res.status(status).json({
+          error: response.status >= 500
+            ? "Cashfree gateway is temporarily unavailable. Please try again in a few minutes."
+            : isAuthError
+              ? `Cashfree authentication failed in ${cashfree.mode.toUpperCase()} mode. Please verify the App ID and Secret Key in SaaS Admin > Integrations.`
+              : message,
+        });
+      }
 
       res.json({
-        success: true,
-        plan: newPlan,
-        certificateNumber: certNum,
-        message: "🎉 Visa Protection Plan activated! You are covered for a 100% refund of your government visa fee in case of rejection.",
+        orderId: data.order_id || internalOrderRef,
+        paymentSessionId: data.payment_session_id,
+        mode: cashfree.mode,
+        amount: premiumMajor,
+        currency: activeCurrency,
+        planId: plan.id,
+        certificateNumber: plan.certificateNumber,
       });
     } catch (err: any) {
-      res.status(500).json({ error: err.message || "Failed to activate Visa Protection Plan" });
+      console.error("[Visa Protection] Order creation failed:", err);
+      res.status(500).json({ error: err?.message || "Failed to create protection order" });
     }
   });
 
-  // 4. Claim Refund
+  // 4. Verify Visa Protection payment order → activate the plan when paid
+  app.get("/api/b2c/payments/visa-protection/order/:orderId", requireB2cAuth, async (req, res) => {
+    const user = await storage.getB2cUser(req.session.b2cUserId!);
+    if (!user) return res.status(401).json({ error: "User not found" });
+
+    const orderId = req.params.orderId;
+    const cfg = await storage.getPaymentGatewayConfig();
+
+    const findAndActivate = async (): Promise<any> => {
+      const plans = await storage.getVisaProtectionPlansByUserId(user.id);
+      const plan = plans.find((p) => p.orderId === orderId);
+      if (!plan) return undefined;
+      if (plan.status === "pending_payment") {
+        return storage.updateVisaProtectionPlan(plan.id, {
+          status: "active",
+          termsAgreedAt: new Date(),
+        } as any);
+      }
+      return plan;
+    };
+
+    const isPayPalOrder = req.query.provider === "paypal" || /^[A-Z0-9]{10,30}$/.test(orderId);
+    if (isPayPalOrder) {
+      const paypal = getPayPalCredentials(cfg);
+      if (!paypal.clientId || !paypal.clientSecret) {
+        return res.status(503).json({ error: "PayPal credentials are not configured" });
+      }
+      try {
+        const data = await capturePayPalOrder(paypal, orderId);
+        const capture = data?.purchase_units?.[0]?.payments?.captures?.[0];
+        const isPaid = data?.status === "COMPLETED" || capture?.status === "COMPLETED";
+        const customId = String(capture?.custom_id || data?.purchase_units?.[0]?.custom_id || "");
+        const [, customUserId] = customId.split(":");
+        if (customUserId && customUserId !== user.id) return res.status(403).json({ error: "Order does not belong to this user" });
+        const plan = isPaid ? await findAndActivate() : undefined;
+        return res.json({
+          orderId,
+          status: data?.status || capture?.status,
+          paid: isPaid,
+          provider: "paypal",
+          plan: plan || null,
+        });
+      } catch (err: any) {
+        console.error("[PayPal] Verify Visa Protection order failed:", err?.data || err);
+        return res.status(err?.status >= 500 ? 503 : err?.status || 502).json({ error: err?.message || "Unable to verify PayPal order" });
+      }
+    }
+
+    if (!/^VS_VPP_[a-zA-Z0-9_-]+$/.test(orderId)) {
+      return res.status(400).json({ error: "Invalid order id" });
+    }
+
+    const cashfree = getCashfreeCredentials(cfg);
+    if (!cashfree.clientId || !cashfree.clientSecret) {
+      return res.status(503).json({ error: "Cashfree credentials are not configured" });
+    }
+
+    let response: globalThis.Response;
+    try {
+      response = await fetch(`${cashfree.baseUrl}/orders/${encodeURIComponent(orderId)}`, {
+        headers: {
+          "x-api-version": cashfree.apiVersion,
+          "x-client-id": cashfree.clientId,
+          "x-client-secret": cashfree.clientSecret,
+          "x-request-id": randomUUID(),
+        },
+        signal: AbortSignal.timeout(20000),
+      });
+    } catch (err) {
+      console.error("[Cashfree] Verify Visa Protection order network error:", err);
+      return res.status(503).json({ error: "Cashfree checkout is temporarily unreachable. Please try again in a few minutes." });
+    }
+
+    const data = await readCashfreeBody(response);
+    if (!response.ok) {
+      console.error("[Cashfree] Verify Visa Protection order failed:", data);
+      return res.status(response.status >= 500 ? 503 : response.status).json({
+        error: response.status >= 500
+          ? "Cashfree gateway is temporarily unavailable. Please try again in a few minutes."
+          : data?.message || "Unable to verify Cashfree order",
+      });
+    }
+
+    const isPaid = data.order_status === "PAID";
+    const plan = isPaid ? await findAndActivate() : undefined;
+
+    res.json({
+      orderId: data.order_id || orderId,
+      status: data.order_status,
+      paid: isPaid,
+      plan: plan || null,
+    });
+  });
+
+  // 5. Claim Refund (v2 — refund = protected government charges snapshot; Deep Check + premium are non-refundable)
   app.post("/api/b2c/visa-protection/claim", requireB2cAuth, async (req, res) => {
     try {
       const userId = req.session.b2cUserId!;
@@ -8963,6 +9254,17 @@ Rules:
       if (!plan) {
         return res.status(404).json({ error: "Protection plan not found" });
       }
+      if (plan.status !== "active") {
+        return res.status(400).json({ error: `Refund claim is only available for activated plans (current status: "${plan.status}")` });
+      }
+
+      // Protected fee = government fee + biometric + mandatory levy + other mandatory charges (from the plan snapshot)
+      const refundCurrency = plan.feeCurrency || "USD";
+      const refundMinor =
+        (plan.protectedFeeAmountCents ?? 0) +
+        (plan.biometricFeeCents ?? 0) +
+        (plan.mandatoryLevyCents ?? 0) +
+        (plan.otherChargesCents ?? 0);
 
       const updated = await storage.updateVisaProtectionPlan(planId, {
         status: "claimed",
@@ -8974,7 +9276,14 @@ Rules:
       res.json({
         success: true,
         plan: updated,
-        message: "Your refund claim has been submitted successfully. Our claims team will verify your document submission and process your 100% visa fee refund within 48 hours.",
+        refund: {
+          amountMinor: refundMinor,
+          currency: refundCurrency,
+          formatted: formatMoney(refundMinor, refundCurrency),
+          label: "100% of protected government charges",
+          nonRefundable: ["Deep Check fee", "Visa Protection premium"],
+        },
+        message: `Your refund claim has been submitted. Our claims team will verify your refusal document and process a 100% refund of your protected government charges (${formatMoney(refundMinor, refundCurrency)}) within 48 hours. Deep Check and Visa Protection fees are non-refundable.`,
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message || "Failed to submit claim" });
