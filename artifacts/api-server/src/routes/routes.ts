@@ -7130,6 +7130,13 @@ Rules:
             deepCheckAccess: true,
             emailVerified: true,
           } as any);
+        } else if (!user.emailVerified || !user.deepCheckAccess) {
+          // Repair a stale demo row (created before verified seeds).
+          user = (await storage.updateB2cUser(user.id, {
+            emailVerified: true,
+            emailVerificationToken: null,
+            deepCheckAccess: true,
+          } as any)) ?? user;
         }
         req.session.b2cUserId = user.id;
         return req.session.save((err) => {

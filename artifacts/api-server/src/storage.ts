@@ -3499,18 +3499,33 @@ class HybridStorage extends MemStorage {
 
   private async ensureDemoB2cEntitlements(user: B2cUser | undefined): Promise<B2cUser | undefined> {
     if (!user || user.email !== "demo@visashuttle.com") return user;
-    if (user.subscriptionPlan === "pro" && user.checkLimit >= 5 && user.deepCheckAccess) return user;
 
-    const checkLimit = Math.max(user.checkLimit || 0, 5);
+    // Demo/QA account is always entitled and verified. Repairs stale rows
+    // (e.g. created before emailVerified was seeded) on first read so no
+    // manual database update is needed after deploy.
+    const needsPlanFix = user.subscriptionPlan !== "pro" || user.checkLimit < 5 || !user.deepCheckAccess;
+    const needsVerificationFix = !user.emailVerified;
+    if (!needsPlanFix && !needsVerificationFix) return user;
+
+    const patch: Record<string, unknown> = {};
+    if (needsPlanFix) {
+      patch.subscriptionPlan = "pro";
+      patch.checkLimit = Math.max(user.checkLimit || 0, 5);
+      patch.deepCheckAccess = true;
+    }
+    if (needsVerificationFix) {
+      patch.emailVerified = true;
+      patch.emailVerificationToken = null;
+    }
     const rows = await db.update(b2cUsers)
-      .set({
-        subscriptionPlan: "pro",
-        checkLimit,
-        deepCheckAccess: true,
-      })
+      .set(patch)
       .where(eq(b2cUsers.id, user.id))
       .returning();
-    return rows[0] ?? { ...user, subscriptionPlan: "pro", checkLimit, deepCheckAccess: true };
+    return rows[0] ?? {
+      ...user,
+      ...(needsPlanFix ? { subscriptionPlan: "pro" as const, checkLimit: Math.max(user.checkLimit || 0, 5), deepCheckAccess: true } : {}),
+      ...(needsVerificationFix ? { emailVerified: true, emailVerificationToken: null } : {}),
+    };
   }
 
   async getProposalsByTenantId(tenantId: string): Promise<Proposal[]> {
