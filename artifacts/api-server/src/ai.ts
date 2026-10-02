@@ -1,25 +1,90 @@
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-20241022";
+const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 const AI_PROVIDER = process.env.AI_PROVIDER || "openai";
 
+// Default model for Deep Check / visa reasoning. Must be a currently-available
+// Anthropic model ID — gen-3 IDs (claude-3-*) were retired and return 404.
+export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-6";
+
+// Claude 4.x/5.x model IDs and aliases that are valid against the Messages API
+// (verified against Anthropic's current model catalogue, Oct 2026).
+const CURRENT_CLAUDE_MODELS = new Set([
+  "claude-fable-5-1",
+  "claude-fable-5",
+  "claude-opus-5-5",
+  "claude-opus-5",
+  "claude-sonnet-5-5",
+  "claude-sonnet-5",
+  "claude-opus-4-8",
+  "claude-opus-4-7",
+  "claude-opus-4-6",
+  "claude-sonnet-4-6",
+  "claude-opus-4-5",
+  "claude-opus-4-5-20251101",
+  "claude-sonnet-4-5",
+  "claude-sonnet-4-5-20250929",
+  "claude-haiku-4-5",
+  "claude-haiku-4-5-20251001",
+]);
+
+/**
+ * Resolve an admin/env-supplied model string to a model ID the Anthropic API
+ * accepts. Current-generation IDs and dated snapshots pass through unchanged;
+ * fuzzy labels and retired gen-3 IDs map onto current aliases.
+ */
 export function normalizeClaudeModel(modelStr?: string | null): string {
-  if (!modelStr) return "claude-3-5-sonnet-20241022";
+  if (!modelStr) return DEFAULT_CLAUDE_MODEL;
   const s = modelStr.trim().toLowerCase().replace(/^["']|["']$/g, "");
+  if (!s) return DEFAULT_CLAUDE_MODEL;
 
-  if (s === "claude-opus-4-5" || s === "claude-sonnet-4-6" || s === "claude-haiku-4-5-20251001") {
-    if (s.includes("haiku")) return "claude-3-5-haiku-20241022";
-    if (s.includes("opus")) return "claude-3-opus-20240229";
-    return "claude-3-5-sonnet-20241022";
-  }
+  if (CURRENT_CLAUDE_MODELS.has(s)) return s;
+  // Any other explicit current-gen ID or pinned dated snapshot (e.g.
+  // claude-opus-4-6-20260101) — forward as-is rather than guessing.
+  if (/^claude-(fable|opus|sonnet|haiku)-[4-9]/.test(s)) return s;
 
-  if (s.includes("3-7") || s.includes("3.7")) return "claude-3-7-sonnet-20250219";
-  if (s.includes("3-5-sonnet") || s.includes("3.5-sonnet") || s.includes("sonnet")) return "claude-3-5-sonnet-20241022";
-  if (s.includes("3-5-haiku") || s.includes("3.5-haiku") || s.includes("haiku")) return "claude-3-5-haiku-20241022";
-  if (s.includes("opus")) return "claude-3-opus-20240229";
-
+  // Fuzzy labels and retired gen-3 model IDs → current aliases.
+  if (s.includes("fable")) return "claude-fable-5";
+  if (s.includes("haiku")) return "claude-haiku-4-5";
+  if (s.includes("opus")) return "claude-opus-5";
+  if (s.includes("sonnet")) return "claude-sonnet-5";
+  // Legacy gen-3 generic IDs and anything else explicit.
+  if (s.startsWith("claude-3-")) return DEFAULT_CLAUDE_MODEL;
   if (s.startsWith("claude-")) return s;
-  return "claude-3-5-sonnet-20241022";
+  return DEFAULT_CLAUDE_MODEL;
+}
+
+/**
+ * Turn a raw Claude API failure (message shaped like
+ * `Claude Deep Check error: <status> <body>`) into a truthful, actionable
+ * customer-facing message. Returns null when the error is not an API failure.
+ */
+export function describeClaudeApiError(err: unknown): string | null {
+  const raw = err instanceof Error ? err.message : String((err as any)?.message || err || "");
+  if (raw.includes("Anthropic API key not configured")) {
+    return "Deep Check AI service is not configured. An administrator must add an Anthropic API key in Settings → AI Provider.";
+  }
+  const match = raw.match(/Claude (?:Deep Check |passport scan )?error: (\d{3})([\s\S]*)$/);
+  if (!match) return null;
+  const status = Number(match[1]);
+  let body: any = null;
+  try { body = JSON.parse(match[2].trim()); } catch { /* non-JSON error body */ }
+  const type: string = body?.error?.type || "";
+
+  if (status === 401 || type === "authentication_error") {
+    return "Deep Check is unavailable: the platform's Anthropic API key was rejected. An administrator must update the key in Settings → AI Provider.";
+  }
+  if (status === 403 || type === "permission_error") {
+    return "Deep Check is unavailable: this Anthropic API key lacks permission (check API access, workspace restrictions, and billing).";
+  }
+  if (status === 404 || type === "not_found_error") {
+    return "Deep Check is unavailable: the configured Claude model has been retired or is not available. An administrator must select a current model in Settings → AI Provider.";
+  }
+  if (status === 429 || type === "rate_limit_error") {
+    return "The AI service is rate-limited or out of credits. Please try again in a few minutes.";
+  }
+  if (status >= 500) return "The Claude AI service is temporarily unavailable. Please try again shortly.";
+  return `Deep Check AI request failed (${status}${type ? `: ${type}` : ""}). Please try again.`;
 }
 
 export function getCleanApiKey(configKey?: string | null, envKey?: string | null): string | null {
@@ -306,7 +371,7 @@ async function callOpenAI(form: VisaCheckFormData): Promise<AIVisaResult> {
 
 async function callClaude(form: VisaCheckFormData, config?: AnthropicRuntimeConfig): Promise<AIVisaResult> {
   const apiKey = getCleanApiKey(config?.anthropicApiKey, ANTHROPIC_API_KEY);
-  const model = normalizeClaudeModel(config?.anthropicModel || "claude-3-5-haiku-20241022");
+  const model = normalizeClaudeModel(config?.anthropicModel || DEFAULT_CLAUDE_MODEL);
   if (!apiKey) throw new Error("Anthropic API key not configured");
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {

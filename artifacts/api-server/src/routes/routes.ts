@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage, isMissingRelationError, getVirtualStickersByUser, createVirtualSticker, getVirtualStickerBySession, collectTravelSticker, getTravelStickerPayments } from "../storage";
-import { runVisaCheck, runDeepCheck, scanPassportImage, isPassportScanConfigured, getCleanApiKey, normalizeClaudeModel } from "../ai";
+import { runVisaCheck, runDeepCheck, scanPassportImage, isPassportScanConfigured, getCleanApiKey, normalizeClaudeModel, describeClaudeApiError, DEFAULT_CLAUDE_MODEL } from "../ai";
 import {
   VISA_FEE_TABLE,
   lookupVisaFee,
@@ -5817,8 +5817,8 @@ Rules:
     file?: { name: string; type: string; size: number; base64: string } | null;
   }) {
     const aiConfig = await storage.getPlatformAiConfig();
-    const apiKey = aiConfig?.anthropicApiKey || process.env.ANTHROPIC_API_KEY;
-    const model = aiConfig?.anthropicModel || process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
+    const apiKey = getCleanApiKey(aiConfig?.anthropicApiKey, process.env.ANTHROPIC_API_KEY);
+    const model = normalizeClaudeModel(aiConfig?.anthropicModel || process.env.ANTHROPIC_MODEL);
     if (!apiKey) throw new Error("Anthropic API key not configured");
 
     const meaRegistryCheck = payload.toolType === "fake_agency"
@@ -6272,7 +6272,8 @@ Rules:
     const dbKeyConfigured = !!cfg?.anthropicApiKey;
     res.json({
       anthropicApiKey: cfg?.anthropicApiKey ? maskKey(cfg.anthropicApiKey) : "",
-      anthropicModel: cfg?.anthropicModel || process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6",
+      anthropicModel: normalizeClaudeModel(cfg?.anthropicModel || process.env.ANTHROPIC_MODEL),
+      rawStoredModel: cfg?.anthropicModel || process.env.ANTHROPIC_MODEL || null,
       hasAnthropicApiKey: dbKeyConfigured || envKeyConfigured,
       usingDb: dbKeyConfigured,
       usingEnvFallback: !dbKeyConfigured && envKeyConfigured,
@@ -6282,13 +6283,13 @@ Rules:
   app.post("/api/admin/ai-config", requireAdminAuth, async (req, res) => {
     const { anthropicApiKey, anthropicModel } = req.body;
     const patch: Record<string, any> = {};
-    if (anthropicApiKey && !anthropicApiKey.includes("•")) patch.anthropicApiKey = anthropicApiKey;
-    if (anthropicModel !== undefined) patch.anthropicModel = anthropicModel || "claude-sonnet-4-6";
+    if (anthropicApiKey && !anthropicApiKey.includes("•")) patch.anthropicApiKey = anthropicApiKey.trim();
+    if (anthropicModel !== undefined) patch.anthropicModel = normalizeClaudeModel(anthropicModel);
     const updated = await storage.upsertPlatformAiConfig(patch);
     res.json({
       success: true,
       anthropicApiKey: updated.anthropicApiKey ? maskKey(updated.anthropicApiKey) : "",
-      anthropicModel: updated.anthropicModel || "claude-sonnet-4-6",
+      anthropicModel: normalizeClaudeModel(updated.anthropicModel || process.env.ANTHROPIC_MODEL),
       hasAnthropicApiKey: !!updated.anthropicApiKey,
       usingDb: !!updated.anthropicApiKey,
       usingEnvFallback: !updated.anthropicApiKey && !!process.env.ANTHROPIC_API_KEY,
@@ -6370,16 +6371,111 @@ Rules:
   });
 
   // ── Admin AI Test Endpoint ───────────────────────────────────────────────
+  // Real connectivity + auth + model validation. Performs a minimal Messages
+  // API call using the EXACT same key resolution and model normalization as
+  // Deep Check, so a green result genuinely means Deep Check can run.
   app.post("/api/admin/ai-config/test", requireAdminAuth, async (req, res) => {
+    const provider = String(req.body?.provider || "anthropic").toLowerCase();
     try {
-      const { provider, model } = req.body || {};
-      res.json({
+      const cfg = await storage.getPlatformAiConfig();
+      const started = Date.now();
+
+      if (provider === "openai") {
+        const apiKey = getCleanApiKey(null, process.env.OPENAI_API_KEY);
+        if (!apiKey) return res.json({ success: false, error: "OpenAI is not configured on this server (OPENAI_API_KEY missing)." });
+        const model = String(req.body?.model || process.env.OPENAI_MODEL || "gpt-4o-mini");
+        const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({ model, max_tokens: 8, messages: [{ role: "user", content: "Reply with: ok" }] }),
+        });
+        const latencyMs = Date.now() - started;
+        if (!openaiRes.ok) {
+          const bodyText = await openaiRes.text();
+          return res.json({ success: false, latencyMs, model, guidance: `OpenAI rejected the request (status ${openaiRes.status}). Verify the key and model.`, error: `OpenAI ${openaiRes.status}: ${bodyText.slice(0, 400)}` });
+        }
+        return res.json({ success: true, latencyMs, model, message: `OpenAI responded OK using ${model} (${latencyMs}ms).` });
+      }
+
+      const rawDbKey = (cfg?.anthropicApiKey || "").trim();
+      const rawEnvKey = (process.env.ANTHROPIC_API_KEY || "").trim();
+      const apiKey = getCleanApiKey(cfg?.anthropicApiKey, process.env.ANTHROPIC_API_KEY);
+      const keySource = rawDbKey ? "database (Settings → AI Provider)" : rawEnvKey ? "server environment (ANTHROPIC_API_KEY)" : "none";
+      const model = normalizeClaudeModel(req.body?.model || cfg?.anthropicModel || process.env.ANTHROPIC_MODEL);
+
+      if (!apiKey) {
+        return res.json({
+          success: false,
+          keySource,
+          model,
+          guidance: "No Anthropic API key found. Paste a valid key in the field above and click Save AI Settings, then test again.",
+          error: "No Anthropic API key configured.",
+        });
+      }
+
+      const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 16,
+          messages: [{ role: "user", content: "Reply with the single word: ok" }],
+        }),
+      });
+      const latencyMs = Date.now() - started;
+      const bodyText = await anthropicRes.text();
+      let parsed: any = null;
+      try { parsed = JSON.parse(bodyText); } catch { /* non-JSON body */ }
+
+      if (!anthropicRes.ok) {
+        const errType: string = parsed?.error?.type || `http_${anthropicRes.status}`;
+        const errMessage: string = parsed?.error?.message || bodyText.slice(0, 400) || "Unknown error";
+        let guidance = "";
+        if (anthropicRes.status === 401 || errType === "authentication_error") {
+          guidance = "Anthropic rejected the key as invalid, expired, or revoked. Create/copy a fresh key from console.anthropic.com → Settings → API Keys, paste it above and Save. Note: a key saved here overrides the server environment variable.";
+        } else if (anthropicRes.status === 403 || errType === "permission_error") {
+          guidance = "The key is authenticated but not permitted — enable API access / billing for the Anthropic account, or check workspace restrictions.";
+        } else if (anthropicRes.status === 404 || errType === "not_found_error") {
+          guidance = `The model "${model}" is retired or unavailable for this account. Pick a current model (e.g. ${DEFAULT_CLAUDE_MODEL}) and Save.`;
+        } else if (anthropicRes.status === 429 || errType === "rate_limit_error") {
+          guidance = "Rate limited or out of credits — check billing/usage limits at console.anthropic.com and retry shortly.";
+        } else if (anthropicRes.status >= 500) {
+          guidance = "Anthropic is temporarily unavailable (server-side). Retry in a few minutes.";
+        } else {
+          guidance = "Check the Anthropic error detail below.";
+        }
+        return res.json({
+          success: false,
+          status: anthropicRes.status,
+          errorType: errType,
+          anthropicMessage: errMessage,
+          guidance,
+          model,
+          keySource,
+          keyHint: maskKey(rawDbKey || rawEnvKey),
+          latencyMs,
+          error: `Anthropic ${anthropicRes.status} ${errType}: ${errMessage}`,
+        });
+      }
+
+      return res.json({
         success: true,
-        message: `${provider === "openai" ? "OpenAI" : "Anthropic"} connection test passed (${model || "default model"}). Latency: 420ms`,
-        latencyMs: 420,
+        model,
+        keySource,
+        keyHint: maskKey(rawDbKey || rawEnvKey),
+        latencyMs,
+        message: `Anthropic responded OK using ${model} (${latencyMs}ms). Key source: ${keySource}. Deep Check will use this exact configuration.`,
       });
     } catch (err: any) {
-      res.status(400).json({ error: err.message || "AI test failed" });
+      return res.status(502).json({
+        success: false,
+        errorType: "network",
+        error: `Could not reach the AI provider from this server: ${err?.message || err}. Check outbound network/DNS/firewall access to api.anthropic.com.`,
+      });
     }
   });
 
@@ -8696,10 +8792,8 @@ Rules:
       res.json({ check: visaCheck, result });
     } catch (err: any) {
       console.error("[Deep Check] Error:", err);
-      const message = err?.message === "Anthropic API key not configured"
-        ? "Deep Check AI service is not configured. Please set ANTHROPIC_API_KEY."
-        : "Failed to run deep check through Claude API. Please try again.";
-      res.status(500).json({ error: message });
+      const message = describeClaudeApiError(err) || "Failed to run deep check through Claude API. Please try again.";
+      res.status(502).json({ error: message });
     }
   });
 

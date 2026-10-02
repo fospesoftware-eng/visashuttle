@@ -685,12 +685,21 @@ function PaymentGatewaysSection() {
 }
 
 // ── 3. AI Settings Section ────────────────────────────────────────────────
+// Currently-available Anthropic model IDs. Retired gen-3 IDs (claude-3-*)
+// return 404 from the Messages API and must not be offered.
+const CLAUDE_MODEL_OPTIONS: { value: string; label: string }[] = [
+  { value: "claude-sonnet-5-5", label: "Claude Sonnet 5.5 (Latest — Recommended)" },
+  { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 (Stable & Fast)" },
+  { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5 (Fastest, Lowest Cost)" },
+  { value: "claude-opus-5-5", label: "Claude Opus 5.5 (Highest Capability)" },
+];
+
 function AiSettingsSection() {
   const { toast } = useToast();
   const [showAnthropicKey, setShowAnthropicKey] = useState(false);
   const [showOpenAiKey, setShowOpenAiKey] = useState(false);
   const [anthropicKey, setAnthropicKey] = useState("");
-  const [anthropicModel, setAnthropicModel] = useState("claude-3-7-sonnet-20250219");
+  const [anthropicModel, setAnthropicModel] = useState("claude-sonnet-4-6");
   const [openAiKey, setOpenAiKey] = useState("");
   const [openAiModel, setOpenAiModel] = useState("gpt-4o");
 
@@ -701,7 +710,7 @@ function AiSettingsSection() {
   useEffect(() => {
     if (cfg) {
       setAnthropicKey(cfg.anthropicApiKey || "");
-      setAnthropicModel(cfg.anthropicModel || "claude-3-7-sonnet-20250219");
+      setAnthropicModel(cfg.anthropicModel || "claude-sonnet-4-6");
     }
   }, [cfg]);
 
@@ -716,8 +725,20 @@ function AiSettingsSection() {
 
   const testAiMutation = useMutation({
     mutationFn: (provider: string) => apiRequest("POST", "/api/admin/ai-config/test", { provider, model: provider === "anthropic" ? anthropicModel : openAiModel }),
-    onSuccess: (data: any) => toast({ title: "AI Test Passed", description: data.message }),
-    onError: (err: any) => toast({ title: "AI Test Failed", description: err.message, variant: "destructive" }),
+    onSuccess: (data: any) => {
+      if (data?.success === false) {
+        const detail = [data.guidance, data.error].filter(Boolean).join(" — ");
+        toast({
+          title: `AI Test Failed${data.status ? ` (${data.status} ${data.errorType || ""})`.trim() : ""}`,
+          description: detail || "The provider rejected the test request.",
+          variant: "destructive",
+          duration: 12000,
+        });
+      } else {
+        toast({ title: "AI Test Passed", description: data.message, duration: 8000 });
+      }
+    },
+    onError: (err: any) => toast({ title: "AI Test Failed", description: err.message, variant: "destructive", duration: 12000 }),
   });
 
   return (
@@ -776,11 +797,21 @@ function AiSettingsSection() {
                 <Select value={anthropicModel} onValueChange={setAnthropicModel}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="claude-3-7-sonnet-20250219">Claude 3.7 Sonnet (Latest &amp; Recommended)</SelectItem>
-                    <SelectItem value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet v2</SelectItem>
-                    <SelectItem value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Fast)</SelectItem>
+                    {CLAUDE_MODEL_OPTIONS.map(o => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                    {!CLAUDE_MODEL_OPTIONS.some(o => o.value === anthropicModel) && anthropicModel && (
+                      <SelectItem value={anthropicModel}>{anthropicModel} (current/raw setting)</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  {cfg?.usingDb
+                    ? "Using the API key saved on this page — it overrides the server environment variable."
+                    : cfg?.usingEnvFallback
+                      ? "No saved key — falling back to the server's ANTHROPIC_API_KEY environment variable."
+                      : "Paste an API key and save to enable Claude-powered Deep Check."}
+                </p>
               </div>
             </CardContent>
           </Card>
