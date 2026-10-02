@@ -18,7 +18,7 @@ import { COUNTRIES as OB_COUNTRIES } from "@/shared/destinations";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { MIN_DOB_ISO, TODAY_ISO, getApplicantAge, validateAdultApplicantDob } from "@/lib/applicant-age";
-import { formatB2cPrice, getStoredB2cCurrency } from "@/lib/b2c-pricing";
+import { formatB2cPrice, getStoredB2cCurrency, initAutoDetectedCurrency, type B2cCurrency } from "@/lib/b2c-pricing";
 
 interface VisaCheck {
   id: string;
@@ -252,12 +252,6 @@ export default function AccountPage() {
     enabled: !!user,
   });
 
-  if (authLoading || !user) return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
-      <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
-
   const [currency, setCurrency] = useState<B2cCurrency>(() => getStoredB2cCurrency());
 
   useEffect(() => {
@@ -269,6 +263,12 @@ export default function AccountPage() {
     window.addEventListener("visashuttle:currency-changed", handleCurrencyEvent);
     return () => window.removeEventListener("visashuttle:currency-changed", handleCurrencyEvent);
   }, []);
+
+  if (authLoading || !user) return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 
   const showOnboarding = !dismissedOnboarding && !profileLoading && profile !== undefined && !profile?.fullName;
 
