@@ -12,7 +12,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { SiteHeader } from "@/components/site-header";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
@@ -314,52 +313,7 @@ export default function LoginPage() {
                 </Button>
               </form>
 
-              {/* Quick Fill Demo Accounts */}
-              <div className="mt-5 p-4 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white space-y-3 shadow-lg">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
-                    <Sparkles className="w-3.5 h-3.5" /> Demo Login Quick Fill
-                  </span>
-                  <Badge variant="outline" className="text-[10px] border-amber-400/40 text-amber-300">Instant</Badge>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="bg-white/10 hover:bg-white/20 text-white border-white/20 text-xs justify-start h-auto py-2 px-3 text-left"
-                    onClick={() => {
-                      setLoginMode("agency");
-                      setEmail("admin@visashuttle.com");
-                      setPassword("Admin@12345");
-                      setError("");
-                    }}
-                  >
-                    <div className="min-w-0">
-                      <span className="font-bold block text-amber-300 text-xs">👑 SaaS Admin</span>
-                      <span className="text-[10px] opacity-80 truncate block">admin@visashuttle.com</span>
-                    </div>
-                  </Button>
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="bg-white/10 hover:bg-white/20 text-white border-white/20 text-xs justify-start h-auto py-2 px-3 text-left"
-                    onClick={() => {
-                      setLoginMode("agency");
-                      setEmail("owner@demoagency.com");
-                      setPassword("Demo@12345");
-                      setError("");
-                    }}
-                  >
-                    <div className="min-w-0">
-                      <span className="font-bold block text-blue-300 text-xs">🏢 Agency Owner</span>
-                      <span className="text-[10px] opacity-80 truncate block">owner@demoagency.com</span>
-                    </div>
-                  </Button>
-                </div>
-              </div>
+              {/* Quick Fill Demo Accounts removed — credentials must be entered manually */}
 
               <div className="mt-6 rounded-2xl border border-[#4055FF]/10 bg-[#4055FF]/5 p-4">
                 <div className="flex items-start gap-3">
