@@ -685,15 +685,13 @@ function PaymentGatewaysSection() {
 }
 
 // ── 3. AI Settings Section ────────────────────────────────────────────────
-// Currently-available Anthropic model IDs. Retired gen-3 IDs (claude-3-*)
-// return 404 from the Messages API and must not be offered.
 // Internal model tiers shown in the admin console. Option VALUES are the
-// real upstream model IDs sent over the wire; labels never expose the vendor.
+// verified current model IDs sent over the wire (Opus 4.7 / Sonnet 4.6 /
+// Haiku 4.5); labels never expose the vendor.
 const CLAUDE_MODEL_OPTIONS: { value: string; label: string }[] = [
-  { value: "claude-sonnet-5-5", label: "Shuttle AI Pro (Latest — Recommended)" },
-  { value: "claude-sonnet-4-6", label: "Shuttle AI Standard (Stable & Fast)" },
+  { value: "claude-sonnet-4-6", label: "Shuttle AI Standard (Balanced — Recommended)" },
+  { value: "claude-opus-4-7", label: "Shuttle AI Max (Highest Capability)" },
   { value: "claude-haiku-4-5-20251001", label: "Shuttle AI Turbo (Fastest, Lowest Cost)" },
-  { value: "claude-opus-5-5", label: "Shuttle AI Max (Highest Capability)" },
 ];
 
 function AiSettingsSection() {

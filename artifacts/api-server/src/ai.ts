@@ -3,25 +3,22 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
 const AI_PROVIDER = process.env.AI_PROVIDER || "openai";
 
-// Default model for Deep Check / visa reasoning. Must be a currently-available
-// Anthropic model ID — gen-3 IDs (claude-3-*) were retired and return 404.
+// Default model for Deep Check / visa reasoning. Verified against
+// https://docs.anthropic.com/en/docs/about-claude/models/overview (Oct 2026):
+// current lineup is Opus 4.7, Sonnet 4.6, Haiku 4.5. Gen-3 IDs are retired.
 export const DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-6";
+const TOP_CLAUDE_MODEL = "claude-opus-4-7";
+const FAST_CLAUDE_MODEL = "claude-haiku-4-5-20251001";
 
-// Claude 4.x/5.x model IDs and aliases that are valid against the Messages API
-// (verified against Anthropic's current model catalogue, Oct 2026).
+// Exact IDs known to be accepted by the Messages API. Anything NOT in this
+// set must be remapped — never forward an unverified ID (a retired or
+// non-existent model fails every call with a 404).
 const CURRENT_CLAUDE_MODELS = new Set([
-  "claude-fable-5-1",
-  "claude-fable-5",
-  "claude-opus-5-5",
-  "claude-opus-5",
-  "claude-sonnet-5-5",
-  "claude-sonnet-5",
-  "claude-opus-4-8",
   "claude-opus-4-7",
   "claude-opus-4-6",
-  "claude-sonnet-4-6",
   "claude-opus-4-5",
   "claude-opus-4-5-20251101",
+  "claude-sonnet-4-6",
   "claude-sonnet-4-5",
   "claude-sonnet-4-5-20250929",
   "claude-haiku-4-5",
@@ -29,9 +26,9 @@ const CURRENT_CLAUDE_MODELS = new Set([
 ]);
 
 /**
- * Resolve an admin/env-supplied model string to a model ID the Anthropic API
- * accepts. Current-generation IDs and dated snapshots pass through unchanged;
- * fuzzy labels and retired gen-3 IDs map onto current aliases.
+ * Resolve an admin/env-supplied model string to a model ID the Messages API
+ * accepts. Verified IDs and their dated snapshots pass through; fuzzy labels,
+ * retired gen-3 IDs, and unknown/future IDs map onto a current verified alias.
  */
 export function normalizeClaudeModel(modelStr?: string | null): string {
   if (!modelStr) return DEFAULT_CLAUDE_MODEL;
@@ -39,18 +36,16 @@ export function normalizeClaudeModel(modelStr?: string | null): string {
   if (!s) return DEFAULT_CLAUDE_MODEL;
 
   if (CURRENT_CLAUDE_MODELS.has(s)) return s;
-  // Any other explicit current-gen ID or pinned dated snapshot (e.g.
-  // claude-opus-4-6-20260101) — forward as-is rather than guessing.
-  if (/^claude-(fable|opus|sonnet|haiku)-[4-9]/.test(s)) return s;
+  // Allow a pinned dated snapshot of a verified family (e.g.
+  // claude-sonnet-4-6-20260101) — forward as-is rather than guessing.
+  if (/^claude-(opus-4-[567]|sonnet-4-[56]|haiku-4-5)-\d{8}$/.test(s)) return s;
 
-  // Fuzzy labels and retired gen-3 model IDs → current aliases.
-  if (s.includes("fable")) return "claude-fable-5";
-  if (s.includes("haiku")) return "claude-haiku-4-5";
-  if (s.includes("opus")) return "claude-opus-5";
-  if (s.includes("sonnet")) return "claude-sonnet-5";
-  // Legacy gen-3 generic IDs and anything else explicit.
-  if (s.startsWith("claude-3-")) return DEFAULT_CLAUDE_MODEL;
-  if (s.startsWith("claude-")) return s;
+  // Fuzzy labels, retired gen-3 IDs, and speculative 5.x/future IDs →
+  // current verified aliases by family.
+  if (s.includes("haiku")) return FAST_CLAUDE_MODEL;
+  if (s.includes("opus")) return TOP_CLAUDE_MODEL;
+  if (s.includes("sonnet")) return DEFAULT_CLAUDE_MODEL;
+  if (s.startsWith("claude-")) return DEFAULT_CLAUDE_MODEL;
   return DEFAULT_CLAUDE_MODEL;
 }
 
