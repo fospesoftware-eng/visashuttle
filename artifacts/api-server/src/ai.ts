@@ -55,36 +55,36 @@ export function normalizeClaudeModel(modelStr?: string | null): string {
 }
 
 /**
- * Turn a raw Claude API failure (message shaped like
- * `Claude Deep Check error: <status> <body>`) into a truthful, actionable
- * customer-facing message. Returns null when the error is not an API failure.
+ * Turn a raw AI-engine failure (message shaped like
+ * `AI engine Deep Check error: <status> <body>`) into a truthful,
+ * customer-facing message that never names an upstream model vendor.
+ * Returns null when the error is not an upstream API failure.
  */
 export function describeClaudeApiError(err: unknown): string | null {
   const raw = err instanceof Error ? err.message : String((err as any)?.message || err || "");
-  if (raw.includes("Anthropic API key not configured")) {
-    return "Deep Check AI service is not configured. An administrator must add an Anthropic API key in Settings → AI Provider.";
+  if (/AI engine API key not configured|Anthropic API key not configured/i.test(raw)) {
+    return "Deep Check is temporarily unavailable. Please try again shortly — our team has been notified.";
   }
-  const match = raw.match(/Claude (?:Deep Check |passport scan )?error: (\d{3})([\s\S]*)$/);
+  const match = raw.match(/AI engine (?:Deep Check |passport scan )?error: (\d{3})([\s\S]*)$|Claude (?:Deep Check |passport scan )?error: (\d{3})([\s\S]*)$/);
   if (!match) return null;
-  const status = Number(match[1]);
+  const status = Number(match[1] || match[3]);
+  const bodyText = match[2] || match[4] || "";
   let body: any = null;
-  try { body = JSON.parse(match[2].trim()); } catch { /* non-JSON error body */ }
+  try { body = JSON.parse(bodyText.trim()); } catch { /* non-JSON error body */ }
   const type: string = body?.error?.type || "";
 
-  if (status === 401 || type === "authentication_error") {
-    return "Deep Check is unavailable: the platform's Anthropic API key was rejected. An administrator must update the key in Settings → AI Provider.";
-  }
-  if (status === 403 || type === "permission_error") {
-    return "Deep Check is unavailable: this Anthropic API key lacks permission (check API access, workspace restrictions, and billing).";
+  if (status === 401 || status === 403 || type === "authentication_error" || type === "permission_error") {
+    // Internal key/permission problem — never expose provider details to customers.
+    return "Deep Check is temporarily unavailable. Please try again shortly — our team has been notified.";
   }
   if (status === 404 || type === "not_found_error") {
-    return "Deep Check is unavailable: the configured Claude model has been retired or is not available. An administrator must select a current model in Settings → AI Provider.";
+    return "Deep Check is temporarily unavailable while our AI engine is being updated. Please try again shortly.";
   }
   if (status === 429 || type === "rate_limit_error") {
-    return "The AI service is rate-limited or out of credits. Please try again in a few minutes.";
+    return "The Visa Shuttle AI engine is handling a high volume of requests. Please try again in a few minutes.";
   }
-  if (status >= 500) return "The Claude AI service is temporarily unavailable. Please try again shortly.";
-  return `Deep Check AI request failed (${status}${type ? `: ${type}` : ""}). Please try again.`;
+  if (status >= 500) return "The Visa Shuttle AI engine is temporarily unavailable. Please try again shortly.";
+  return "Deep Check could not be completed. Please try again.";
 }
 
 export function getCleanApiKey(configKey?: string | null, envKey?: string | null): string | null {
@@ -372,7 +372,7 @@ async function callOpenAI(form: VisaCheckFormData): Promise<AIVisaResult> {
 async function callClaude(form: VisaCheckFormData, config?: AnthropicRuntimeConfig): Promise<AIVisaResult> {
   const apiKey = getCleanApiKey(config?.anthropicApiKey, ANTHROPIC_API_KEY);
   const model = normalizeClaudeModel(config?.anthropicModel || DEFAULT_CLAUDE_MODEL);
-  if (!apiKey) throw new Error("Anthropic API key not configured");
+  if (!apiKey) throw new Error("AI engine API key not configured");
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -389,12 +389,12 @@ async function callClaude(form: VisaCheckFormData, config?: AnthropicRuntimeConf
     }),
   });
 
-  if (!response.ok) throw new Error(`Claude error: ${response.status} ${await response.text()}`);
+  if (!response.ok) throw new Error(`AI engine error: ${response.status} ${await response.text()}`);
   const data = await response.json() as any;
   const content = data.content[0]?.text;
-  if (!content) throw new Error("No content from Claude");
+  if (!content) throw new Error("AI engine returned no content");
   const jsonMatch = content.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("No JSON in Claude response");
+  if (!jsonMatch) throw new Error("AI engine response was not valid JSON");
   return JSON.parse(jsonMatch[0]) as AIVisaResult;
 }
 
@@ -832,7 +832,7 @@ function buildDeepCheckUserPrompt(form: DeepCheckFormData): string {
 async function callClaudeDeepCheck(form: DeepCheckFormData, config?: AnthropicRuntimeConfig): Promise<DeepCheckResult> {
   const apiKey = getCleanApiKey(config?.anthropicApiKey, ANTHROPIC_API_KEY);
   const model = normalizeClaudeModel(config?.anthropicModel || ANTHROPIC_MODEL);
-  if (!apiKey) throw new Error("Anthropic API key not configured");
+  if (!apiKey) throw new Error("AI engine API key not configured");
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -851,16 +851,16 @@ async function callClaudeDeepCheck(form: DeepCheckFormData, config?: AnthropicRu
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Claude Deep Check error: ${response.status} ${errorText}`);
+    throw new Error(`AI engine Deep Check error: ${response.status} ${errorText}`);
   }
 
   const data = await response.json() as any;
   const content = data.content[0]?.text;
-  if (!content) throw new Error("No content from Claude");
+  if (!content) throw new Error("AI engine returned no content");
 
   // Extract the outermost complete JSON object (brace-depth tracking avoids greedy-regex truncation issues)
   const jsonStr = extractOutermostJson(content);
-  if (!jsonStr) throw new Error("No JSON in Claude response");
+  if (!jsonStr) throw new Error("AI engine response was not valid JSON");
 
   const parsed = JSON.parse(jsonStr) as DeepCheckResult;
   parsed.statusLabel = getStatusLabel(parsed.approvalChance);
@@ -981,7 +981,7 @@ export async function scanPassportImage(
 ): Promise<PassportScanResult> {
   const apiKey = getCleanApiKey(config?.anthropicApiKey, ANTHROPIC_API_KEY);
   const model = normalizeClaudeModel(config?.anthropicModel || ANTHROPIC_MODEL);
-  if (!apiKey) throw new Error("Anthropic API key not configured");
+  if (!apiKey) throw new Error("AI engine API key not configured");
 
   const supportedMime = ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(mimeType)
     ? mimeType
@@ -1018,15 +1018,15 @@ export async function scanPassportImage(
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Claude passport scan error: ${response.status} ${errorText}`);
+    throw new Error(`AI engine passport scan error: ${response.status} ${errorText}`);
   }
 
   const data = await response.json() as any;
   const content = data.content?.[0]?.text;
-  if (!content) throw new Error("No content from Claude passport scan");
+  if (!content) throw new Error("AI engine returned no passport scan content");
 
   const jsonStr = extractOutermostJson(content);
-  if (!jsonStr) throw new Error("Claude returned no JSON for passport scan");
+  if (!jsonStr) throw new Error("AI engine returned no data for passport scan");
 
   const raw = JSON.parse(jsonStr);
   // Normalise: trim strings, coerce empty string to null, validate gender enum.

@@ -544,9 +544,9 @@ export default function AdminDashboard() {
                   />
                   <HealthRow
                     icon={Sparkles}
-                    label="AI (Claude)"
+                    label="AI Engine"
                     ok={!!stats?.integrationsHealth?.ai?.configured}
-                    detail={stats?.integrationsHealth?.ai?.configured ? "Anthropic key active" : "API key missing"}
+                    detail={stats?.integrationsHealth?.ai?.configured ? "AI engine connected" : "API key missing"}
                   />
                 </>
               )}

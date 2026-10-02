@@ -244,7 +244,7 @@ export default function HistoryDetailPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-3 flex-wrap">
                   <Badge className="bg-white/20 text-white border-0 capitalize">{check.checkType} check</Badge>
-                  {check.aiProvider && <Badge className="bg-white/20 text-white border-0">AI: {check.aiProvider}</Badge>}
+                  {check.aiProvider && check.aiProvider !== "mock" && <Badge className="bg-white/20 text-white border-0">Visa Shuttle AI</Badge>}
                 </div>
                 <p className="text-white/75 text-sm mb-1">AI Approval Estimate</p>
                 <h2 className="text-2xl md:text-3xl font-bold leading-tight mb-2">{form.visaType || "Visa Check"}</h2>

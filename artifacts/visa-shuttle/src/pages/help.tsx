@@ -257,7 +257,7 @@ const agencyFaqs = [
   },
   {
     q: "What integrations are supported out of the box?",
-    a: "Cashfree (payments), MSG91 / MessageCentral (SMS / OTP), Anthropic (AI), Email (SMTP). All keys are stored encrypted and managed from your agency Settings — never shared across tenants.",
+    a: "Cashfree (payments), MSG91 / MessageCentral (SMS / OTP), the Visa Shuttle AI engine, Email (SMTP). All keys are stored encrypted and managed from your agency Settings — never shared across tenants.",
   },
   {
     q: "Is there an API rate limit?",

@@ -366,7 +366,7 @@ Pricing rule: priceCents = estimatedHours * 250000 (INR paise, equal to INR 2,50
   });
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    throw new Error(text || `Anthropic estimate failed (${response.status})`);
+    throw new Error(text || `AI engine estimate failed (${response.status})`);
   }
   const data: any = await response.json();
   const text = data?.content?.find((part: any) => part?.type === "text")?.text ?? "";

@@ -687,11 +687,13 @@ function PaymentGatewaysSection() {
 // ── 3. AI Settings Section ────────────────────────────────────────────────
 // Currently-available Anthropic model IDs. Retired gen-3 IDs (claude-3-*)
 // return 404 from the Messages API and must not be offered.
+// Internal model tiers shown in the admin console. Option VALUES are the
+// real upstream model IDs sent over the wire; labels never expose the vendor.
 const CLAUDE_MODEL_OPTIONS: { value: string; label: string }[] = [
-  { value: "claude-sonnet-5-5", label: "Claude Sonnet 5.5 (Latest — Recommended)" },
-  { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 (Stable & Fast)" },
-  { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5 (Fastest, Lowest Cost)" },
-  { value: "claude-opus-5-5", label: "Claude Opus 5.5 (Highest Capability)" },
+  { value: "claude-sonnet-5-5", label: "Shuttle AI Pro (Latest — Recommended)" },
+  { value: "claude-sonnet-4-6", label: "Shuttle AI Standard (Stable & Fast)" },
+  { value: "claude-haiku-4-5-20251001", label: "Shuttle AI Turbo (Fastest, Lowest Cost)" },
+  { value: "claude-opus-5-5", label: "Shuttle AI Max (Highest Capability)" },
 ];
 
 function AiSettingsSection() {
@@ -746,23 +748,23 @@ function AiSettingsSection() {
       <Tabs defaultValue="anthropic" className="space-y-6">
         <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border">
           <TabsTrigger value="anthropic" className="font-bold gap-2">
-            <Cpu className="w-4 h-4 text-purple-600" /> Anthropic Claude APIs
+            <Cpu className="w-4 h-4 text-purple-600" /> Primary AI Engine
           </TabsTrigger>
           <TabsTrigger value="openai" className="font-bold gap-2">
-            <Sparkles className="w-4 h-4 text-emerald-600" /> OpenAI APIs
+            <Sparkles className="w-4 h-4 text-emerald-600" /> Secondary AI Engine
           </TabsTrigger>
           <TabsTrigger value="routing" className="font-bold gap-2">
             <Sliders className="w-4 h-4 text-blue-600" /> AI Task Routing
           </TabsTrigger>
         </TabsList>
 
-        {/* Anthropic Tab */}
+        {/* Primary AI Engine Tab */}
         <TabsContent value="anthropic" className="space-y-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Cpu className="w-4 h-4 text-purple-600" /> Anthropic Claude API Configuration
+                  <Cpu className="w-4 h-4 text-purple-600" /> Primary AI Engine Configuration
                 </CardTitle>
                 <CardDescription>Powers deep visa eligibility reasoning, case evaluations, and checklist audits.</CardDescription>
               </div>
@@ -773,16 +775,16 @@ function AiSettingsSection() {
                 disabled={testAiMutation.isPending}
                 className="gap-1.5 text-xs font-bold"
               >
-                <Play className="w-3.5 h-3.5" /> Test Anthropic API
+                <Play className="w-3.5 h-3.5" /> Test AI Connection
               </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Anthropic API Key (sk-ant-...)</Label>
+                <Label>AI Engine API Key</Label>
                 <div className="relative">
                   <Input
                     type={showAnthropicKey ? "text" : "password"}
-                    placeholder="sk-ant-..."
+                    placeholder="Paste your AI engine API key"
                     value={anthropicKey}
                     onChange={e => setAnthropicKey(e.target.value)}
                     className="font-mono pr-10"
@@ -793,7 +795,7 @@ function AiSettingsSection() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Default Claude Model</Label>
+                <Label>Default AI Model</Label>
                 <Select value={anthropicModel} onValueChange={setAnthropicModel}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -801,16 +803,16 @@ function AiSettingsSection() {
                       <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
                     ))}
                     {!CLAUDE_MODEL_OPTIONS.some(o => o.value === anthropicModel) && anthropicModel && (
-                      <SelectItem value={anthropicModel}>{anthropicModel} (current/raw setting)</SelectItem>
+                      <SelectItem value={anthropicModel}>Provisioned AI model (current setting)</SelectItem>
                     )}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
                   {cfg?.usingDb
-                    ? "Using the API key saved on this page — it overrides the server environment variable."
+                    ? "Using the API key saved on this page — it overrides the key provisioned on the server."
                     : cfg?.usingEnvFallback
-                      ? "No saved key — falling back to the server's ANTHROPIC_API_KEY environment variable."
-                      : "Paste an API key and save to enable Claude-powered Deep Check."}
+                      ? "No saved key — using the key provisioned on the server."
+                      : "Paste an API key and save to enable the Visa Shuttle AI engine."}
                 </p>
               </div>
             </CardContent>
@@ -823,9 +825,9 @@ function AiSettingsSection() {
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-emerald-600" /> OpenAI API Configuration
+                  <Sparkles className="w-4 h-4 text-emerald-600" /> Secondary AI Engine Configuration
                 </CardTitle>
-                <CardDescription>Alternative / fallback model provider for embeddings and multi-language chat.</CardDescription>
+                <CardDescription>Reserve engine for embeddings, multi-language chat, and failover workloads.</CardDescription>
               </div>
               <Button
                 variant="outline"
@@ -834,16 +836,16 @@ function AiSettingsSection() {
                 disabled={testAiMutation.isPending}
                 className="gap-1.5 text-xs font-bold"
               >
-                <Play className="w-3.5 h-3.5" /> Test OpenAI API
+                <Play className="w-3.5 h-3.5" /> Test AI Connection
               </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>OpenAI API Key (sk-proj-...)</Label>
+                <Label>AI Engine API Key</Label>
                 <div className="relative">
                   <Input
                     type={showOpenAiKey ? "text" : "password"}
-                    placeholder="sk-proj-..."
+                    placeholder="Paste your AI engine API key"
                     value={openAiKey}
                     onChange={e => setOpenAiKey(e.target.value)}
                     className="font-mono pr-10"
@@ -854,14 +856,14 @@ function AiSettingsSection() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Default OpenAI Model</Label>
+                <Label>Default AI Model</Label>
                 <Select value={openAiModel} onValueChange={setOpenAiModel}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="gpt-4o">GPT-4o (Flagship Omni)</SelectItem>
-                    <SelectItem value="gpt-4o-mini">GPT-4o Mini (Fast &amp; Cost-Effective)</SelectItem>
-                    <SelectItem value="o1">o1 (Complex Reasoning)</SelectItem>
-                    <SelectItem value="o3-mini">o3-mini (High Speed Reasoning)</SelectItem>
+                    <SelectItem value="gpt-4o">Shuttle AI Standard (Flagship Omni)</SelectItem>
+                    <SelectItem value="gpt-4o-mini">Shuttle AI Turbo (Fast &amp; Cost-Effective)</SelectItem>
+                    <SelectItem value="o1">Shuttle AI Deep Reasoning</SelectItem>
+                    <SelectItem value="o3-mini">Shuttle AI Rapid Reasoning</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -883,7 +885,7 @@ function AiSettingsSection() {
                 <div className="p-3.5 rounded-xl border bg-slate-50 dark:bg-slate-800 space-y-2">
                   <p className="font-bold text-xs uppercase tracking-wider text-primary">Deep Check Reports</p>
                   <p className="text-xs text-muted-foreground">Detailed visa odds scoring &amp; risk factors</p>
-                  <Badge className="bg-purple-600 text-white text-[11px]">Claude 3.7 Sonnet</Badge>
+                  <Badge className="bg-purple-600 text-white text-[11px]">Shuttle AI Pro</Badge>
                 </div>
                 <div className="p-3.5 rounded-xl border bg-slate-50 dark:bg-slate-800 space-y-2">
                   <p className="font-bold text-xs uppercase tracking-wider text-primary">Passport MRZ &amp; OCR Parsing</p>

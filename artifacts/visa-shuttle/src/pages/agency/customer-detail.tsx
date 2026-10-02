@@ -282,7 +282,7 @@ function PassportFormDialog({
   const set = (patch: Partial<PassportFormState>) =>
     setForm(prev => ({ ...prev, ...patch }));
 
-  // === Passport scanner (Claude vision) ===
+  // === Passport scanner (AI engine vision) ===
   // Reads the chosen image as a base64 data URI, POSTs the bytes to the
   // shared /api/passport/scan endpoint, and merges any fields the OCR
   // returned into the form. We only overwrite fields that came back
@@ -424,7 +424,7 @@ function PassportFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Scanner: upload a passport bio-page image and let Claude
+        {/* Scanner: upload a passport bio-page image and let the AI engine
             pre-fill the fields. Failure is non-fatal — the rest of the
             form still works for manual entry. */}
         <div className="rounded-md border border-dashed border-border bg-muted/30 p-3 mb-1">

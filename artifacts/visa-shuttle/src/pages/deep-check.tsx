@@ -1374,7 +1374,7 @@ export default function DeepCheckPage() {
     };
     setIsSubmitting(true);
     try {
-      // Start Claude API call immediately — runs in parallel with the animation timer
+      // Start the AI engine call immediately — runs in parallel with the animation timer
       const [res] = await Promise.all([
         apiRequest("POST", "/api/b2c/deep-check", { formData: enrichedForm }),
         new Promise(resolve => setTimeout(resolve, DEEP_MIN_PROGRESS_MS)),

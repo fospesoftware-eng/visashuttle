@@ -481,7 +481,7 @@ export default function CheckPage() {
                   </div>
                   {aiProvider && aiProvider !== "mock" && (
                     <Badge className="bg-white/20 text-white border-0 text-xs">
-                      Powered by {aiProvider === "openai" ? "OpenAI GPT-4" : "Claude AI"}
+                      Powered by Visa Shuttle AI
                     </Badge>
                   )}
                 </div>

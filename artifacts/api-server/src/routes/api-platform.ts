@@ -433,7 +433,7 @@ export async function registerApiPlatformRoutes(
     } catch (err: unknown) {
       await logRejectedCall({ tenantId: ak.tenantId, apiKeyId: ak.id, endpoint: "deep-check", status: 502, latencyMs: Date.now() - startedAt, errorCode: "upstream_error", ip: req.ip });
       const message = err instanceof Error ? err.message : String(err);
-      const code = /Anthropic API key not configured/i.test(message) ? "ai_not_configured" : "upstream_error";
+      const code = /AI engine API key not configured|Anthropic API key not configured/i.test(message) ? "ai_not_configured" : "upstream_error";
       res.status(code === "ai_not_configured" ? 503 : 502).json({ error: { code, message: code === "ai_not_configured" ? "Deep Check is temporarily unavailable." : "Deep Check failed to complete. Please retry." } });
       return;
     }

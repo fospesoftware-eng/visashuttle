@@ -2421,7 +2421,7 @@ export async function registerRoutes(
       try {
         const aiConfig = await storage.getPlatformAiConfig();
         const apiKey = getCleanApiKey(aiConfig?.anthropicApiKey, process.env.ANTHROPIC_API_KEY);
-        if (!apiKey) throw new Error("Anthropic API key not configured");
+        if (!apiKey) throw new Error("AI engine API key not configured");
         const nationalityLine = nationality ? `Applicant nationality: ${nationality}` : "";
         const prompt = `You are a visa documentation expert. Generate a complete document checklist for:
 Destination country: ${country}
@@ -2451,10 +2451,10 @@ Rules:
           method: "POST",
           signal: controller.signal,
           headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
-          body: JSON.stringify({ model: normalizeClaudeModel(aiConfig?.anthropicModel || "claude-3-5-haiku-20241022"), max_tokens: 800, messages: [{ role: "user", content: prompt }] }),
+          body: JSON.stringify({ model: normalizeClaudeModel(aiConfig?.anthropicModel || DEFAULT_CLAUDE_MODEL), max_tokens: 800, messages: [{ role: "user", content: prompt }] }),
         });
         clearTimeout(timeout);
-        if (!resp.ok) throw new Error(`Claude checklist error: ${resp.status}`);
+        if (!resp.ok) throw new Error(`AI checklist error: ${resp.status}`);
         const data = await resp.json() as any;
         const text = (data.content || []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n");
         const match = text.match(/\[[\s\S]*\]/);
@@ -5361,7 +5361,7 @@ Rules:
 
     const aiConfig = await storage.getPlatformAiConfig();
     const aiApiKey = getCleanApiKey(aiConfig?.anthropicApiKey, process.env.ANTHROPIC_API_KEY);
-    if (!aiApiKey) return res.status(500).json({ error: "Anthropic API key not configured" });
+    if (!aiApiKey) return res.status(500).json({ error: "The AI engine is not configured. Please add the API key in Admin → Settings → AI Provider." });
 
     const today = new Date().toISOString().slice(0, 10);
     const nationalityLine = nationality ? `\nApplicant nationality: ${nationality}` : "";
@@ -5416,7 +5416,7 @@ Rules:
         headers: { "Content-Type": "application/json", "x-api-key": aiApiKey, "anthropic-version": "2023-06-01" },
         body: JSON.stringify({ model: normalizeClaudeModel(aiConfig?.anthropicModel), max_tokens: 2000, messages: [{ role: "user", content: prompt }] }),
       });
-      if (!response.ok) throw new Error(`Claude error: ${response.status}`);
+      if (!response.ok) throw new Error(`AI engine error: ${response.status}`);
       const data = await response.json() as any;
 
       const text = (data.content || []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n") || "{}";
@@ -5819,7 +5819,7 @@ Rules:
     const aiConfig = await storage.getPlatformAiConfig();
     const apiKey = getCleanApiKey(aiConfig?.anthropicApiKey, process.env.ANTHROPIC_API_KEY);
     const model = normalizeClaudeModel(aiConfig?.anthropicModel || process.env.ANTHROPIC_MODEL);
-    if (!apiKey) throw new Error("Anthropic API key not configured");
+    if (!apiKey) throw new Error("AI engine API key not configured");
 
     const meaRegistryCheck = payload.toolType === "fake_agency"
       ? findMeaRegisteredAgent(payload.fields, payload.manualText)
@@ -6074,25 +6074,25 @@ Rules:
 
       if (!response.ok) {
         const text = await response.text();
-        throw new Error(`Claude Visa Tools error: ${response.status} ${truncateVisaToolText(text, 500)}`);
+        throw new Error(`AI Visa Tools error: ${response.status} ${truncateVisaToolText(text, 500)}`);
       }
       const data = await response.json() as any;
       // With web_search tool, content may have tool_result and multiple text blocks — get the last text block which contains the final JSON
       const textBlocks = (data.content || []).filter((p: any) => p.type === "text");
       const text = textBlocks.map((p: any) => p.text || "").join("\n");
       const jsonText = extractJsonObject(text);
-      if (!jsonText) throw new Error("Claude did not return valid JSON");
+      if (!jsonText) throw new Error("AI engine did not return valid JSON");
       parsed = JSON.parse(jsonText);
     } catch (err: any) {
-      console.error("[Visa Tools] Claude API error:", err?.message || err);
+      console.error("[Visa Tools] AI engine error:", err?.message || err);
       if (payload.toolType === "fake_agency") {
         return buildAgencyFallbackResult(err?.message || "AI provider unavailable.");
       }
       // For all other tools, surface a clear error
       const isApiKeyError = String(err?.message || "").includes("API key") || String(err?.message || "").includes("401");
       const isModelError = String(err?.message || "").includes("model") || String(err?.message || "").includes("404");
-      if (isApiKeyError) throw new Error("Anthropic API key not configured or invalid. Please update it in SaaS Admin > Settings > AI.");
-      if (isModelError) throw new Error("The configured AI model is unavailable. Please update the model in SaaS Admin > Settings > AI.");
+      if (isApiKeyError) throw new Error("The Visa Shuttle AI engine is not configured. Please contact support.");
+      if (isModelError) throw new Error("The Visa Shuttle AI engine is being updated. Please try again shortly.");
       throw new Error(`AI analysis failed: ${truncateVisaToolText(err?.message || "Unknown error", 200)}`);
     }
 
@@ -6394,13 +6394,13 @@ Rules:
           const bodyText = await openaiRes.text();
           return res.json({ success: false, latencyMs, model, guidance: `OpenAI rejected the request (status ${openaiRes.status}). Verify the key and model.`, error: `OpenAI ${openaiRes.status}: ${bodyText.slice(0, 400)}` });
         }
-        return res.json({ success: true, latencyMs, model, message: `OpenAI responded OK using ${model} (${latencyMs}ms).` });
+        return res.json({ success: true, latencyMs, model, message: `Secondary AI engine responded OK (${latencyMs}ms).` });
       }
 
       const rawDbKey = (cfg?.anthropicApiKey || "").trim();
       const rawEnvKey = (process.env.ANTHROPIC_API_KEY || "").trim();
       const apiKey = getCleanApiKey(cfg?.anthropicApiKey, process.env.ANTHROPIC_API_KEY);
-      const keySource = rawDbKey ? "database (Settings → AI Provider)" : rawEnvKey ? "server environment (ANTHROPIC_API_KEY)" : "none";
+      const keySource = rawDbKey ? "saved in platform settings" : rawEnvKey ? "provisioned on the server" : "none";
       const model = normalizeClaudeModel(req.body?.model || cfg?.anthropicModel || process.env.ANTHROPIC_MODEL);
 
       if (!apiKey) {
@@ -6408,8 +6408,8 @@ Rules:
           success: false,
           keySource,
           model,
-          guidance: "No Anthropic API key found. Paste a valid key in the field above and click Save AI Settings, then test again.",
-          error: "No Anthropic API key configured.",
+          guidance: "No AI engine API key found. Paste a valid key in the field above and click Save AI Settings, then test again.",
+          error: "AI engine API key not configured.",
         });
       }
 
@@ -6433,32 +6433,30 @@ Rules:
 
       if (!anthropicRes.ok) {
         const errType: string = parsed?.error?.type || `http_${anthropicRes.status}`;
-        const errMessage: string = parsed?.error?.message || bodyText.slice(0, 400) || "Unknown error";
         let guidance = "";
         if (anthropicRes.status === 401 || errType === "authentication_error") {
-          guidance = "Anthropic rejected the key as invalid, expired, or revoked. Create/copy a fresh key from console.anthropic.com → Settings → API Keys, paste it above and Save. Note: a key saved here overrides the server environment variable.";
+          guidance = "The AI engine rejected the API key as invalid, expired, or revoked. Generate a fresh key from your AI provider's API console, paste it above and Save. Note: a key saved here overrides the key provisioned on the server.";
         } else if (anthropicRes.status === 403 || errType === "permission_error") {
-          guidance = "The key is authenticated but not permitted — enable API access / billing for the Anthropic account, or check workspace restrictions.";
+          guidance = "The key is valid but not permitted — enable API access/billing for the AI provider account, or check workspace restrictions.";
         } else if (anthropicRes.status === 404 || errType === "not_found_error") {
-          guidance = `The model "${model}" is retired or unavailable for this account. Pick a current model (e.g. ${DEFAULT_CLAUDE_MODEL}) and Save.`;
+          guidance = "The selected AI model is retired or unavailable for this account. Pick a current model from the dropdown and Save.";
         } else if (anthropicRes.status === 429 || errType === "rate_limit_error") {
-          guidance = "Rate limited or out of credits — check billing/usage limits at console.anthropic.com and retry shortly.";
+          guidance = "Rate limited or out of credits — check the AI provider billing/usage limits and retry shortly.";
         } else if (anthropicRes.status >= 500) {
-          guidance = "Anthropic is temporarily unavailable (server-side). Retry in a few minutes.";
+          guidance = "The AI engine is temporarily unavailable (provider-side). Retry in a few minutes.";
         } else {
-          guidance = "Check the Anthropic error detail below.";
+          guidance = "Review the provider error detail and retry, or contact engineering.";
         }
         return res.json({
           success: false,
           status: anthropicRes.status,
           errorType: errType,
-          anthropicMessage: errMessage,
           guidance,
           model,
           keySource,
           keyHint: maskKey(rawDbKey || rawEnvKey),
           latencyMs,
-          error: `Anthropic ${anthropicRes.status} ${errType}: ${errMessage}`,
+          error: `AI engine request rejected (${anthropicRes.status}). ${guidance}`,
         });
       }
 
@@ -6468,13 +6466,13 @@ Rules:
         keySource,
         keyHint: maskKey(rawDbKey || rawEnvKey),
         latencyMs,
-        message: `Anthropic responded OK using ${model} (${latencyMs}ms). Key source: ${keySource}. Deep Check will use this exact configuration.`,
+        message: `AI engine connection successful (${latencyMs}ms). Key ${keySource}. Deep Check will use this configuration.`,
       });
     } catch (err: any) {
       return res.status(502).json({
         success: false,
         errorType: "network",
-        error: `Could not reach the AI provider from this server: ${err?.message || err}. Check outbound network/DNS/firewall access to api.anthropic.com.`,
+        error: `Could not reach the AI engine from this server: ${err?.message || err}. Check outbound network/DNS/firewall access.`,
       });
     }
   });
@@ -8792,7 +8790,7 @@ Rules:
       res.json({ check: visaCheck, result });
     } catch (err: any) {
       console.error("[Deep Check] Error:", err);
-      const message = describeClaudeApiError(err) || "Failed to run deep check through Claude API. Please try again.";
+      const message = describeClaudeApiError(err) || "Deep Check could not be completed. Please try again.";
       res.status(502).json({ error: message });
     }
   });
@@ -9688,8 +9686,8 @@ Rules:
       res.json({ check, result: check.claudeResponseJson, credits: await getB2cCreditSummary(user) });
     } catch (err: any) {
       console.error("[Visa Tools] Error:", err);
-      const message = err?.message === "Anthropic API key not configured"
-        ? "Visa Tools AI service is not configured. Add the Anthropic API key in SaaS Admin > Settings > AI, or set ANTHROPIC_API_KEY in Replit Secrets."
+      const message = /AI engine API key not configured|Anthropic API key not configured/i.test(String(err?.message || ""))
+        ? "Visa Tools AI service is temporarily unavailable. Please try again shortly."
         : "Failed to analyze this item. Please try again.";
       res.status(500).json({ error: message });
     }

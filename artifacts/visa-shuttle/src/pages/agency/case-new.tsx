@@ -1618,7 +1618,7 @@ export default function NewCasePage() {
     return created;
   };
 
-  // === Passport scan mutation (Claude vision OCR) ===
+  // === Passport scan mutation (AI engine vision OCR) ===
   // Uses module-level helpers `scanPassportApi`, `classifyScanResult`, `pickEmpty`
   // so applicant + co-traveller scan flows share one source of truth for the
   // not-a-passport heuristic. Don't re-implement the regex inline here.

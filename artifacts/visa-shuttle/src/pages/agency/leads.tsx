@@ -578,7 +578,7 @@ export default function LeadsPage() {
       const data = await res.json();
       setAiFollowupResult(data.email || "Could not generate email.");
     } catch {
-      setAiFollowupResult("AI not configured. Please add an Anthropic API key in Admin → Settings.");
+      setAiFollowupResult("AI follow-up is not available yet. Please ask your administrator to enable the AI engine.");
     } finally {
       setAiFollowupLoading(false);
     }
