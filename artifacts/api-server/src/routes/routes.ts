@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage, isMissingRelationError, getVirtualStickersByUser, createVirtualSticker, getVirtualStickerBySession, collectTravelSticker, getTravelStickerPayments } from "../storage";
-import { runVisaCheck, runDeepCheck, scanPassportImage, isPassportScanConfigured, getCleanApiKey, normalizeClaudeModel, describeClaudeApiError, DEFAULT_CLAUDE_MODEL } from "../ai";
+import { runVisaCheck, runDeepCheck, scanPassportImage, isPassportScanConfigured, getCleanApiKey, normalizeClaudeModel, describeClaudeApiError, aiFetch, isAiNetworkError, DEFAULT_CLAUDE_MODEL } from "../ai";
 import {
   VISA_FEE_TABLE,
   lookupVisaFee,
@@ -5411,11 +5411,11 @@ Rules:
 - readyToSubmit is true only if all required documents are present and none are expired`;
 
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const response = await aiFetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-api-key": aiApiKey, "anthropic-version": "2023-06-01" },
         body: JSON.stringify({ model: normalizeClaudeModel(aiConfig?.anthropicModel), max_tokens: 2000, messages: [{ role: "user", content: prompt }] }),
-      });
+      }, 60_000);
       if (!response.ok) throw new Error(`AI engine error: ${response.status}`);
       const data = await response.json() as any;
 
@@ -6061,7 +6061,7 @@ Rules:
         requestBody.tools = [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }];
       }
 
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const response = await aiFetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -6070,7 +6070,7 @@ Rules:
           ...(isFakeAgency ? { "anthropic-beta": "web-search-2025-03-05" } : {}),
         },
         body: JSON.stringify(requestBody),
-      });
+      }, 120_000);
 
       if (!response.ok) {
         const text = await response.text();
@@ -6376,19 +6376,19 @@ Rules:
   // Deep Check, so a green result genuinely means Deep Check can run.
   app.post("/api/admin/ai-config/test", requireAdminAuth, async (req, res) => {
     const provider = String(req.body?.provider || "anthropic").toLowerCase();
+    const started = Date.now();
     try {
       const cfg = await storage.getPlatformAiConfig();
-      const started = Date.now();
 
       if (provider === "openai") {
         const apiKey = getCleanApiKey(null, process.env.OPENAI_API_KEY);
         if (!apiKey) return res.json({ success: false, error: "OpenAI is not configured on this server (OPENAI_API_KEY missing)." });
         const model = String(req.body?.model || process.env.OPENAI_MODEL || "gpt-4o-mini");
-        const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+        const openaiRes = await aiFetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
           body: JSON.stringify({ model, max_tokens: 8, messages: [{ role: "user", content: "Reply with: ok" }] }),
-        });
+        }, 20_000);
         const latencyMs = Date.now() - started;
         if (!openaiRes.ok) {
           const bodyText = await openaiRes.text();
@@ -6413,7 +6413,7 @@ Rules:
         });
       }
 
-      const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
+      const anthropicRes = await aiFetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -6425,7 +6425,7 @@ Rules:
           max_tokens: 16,
           messages: [{ role: "user", content: "Reply with the single word: ok" }],
         }),
-      });
+      }, 30_000);
       const latencyMs = Date.now() - started;
       const bodyText = await anthropicRes.text();
       let parsed: any = null;
@@ -6469,10 +6469,17 @@ Rules:
         message: `AI engine connection successful (${latencyMs}ms). Key ${keySource}. Deep Check will use this configuration.`,
       });
     } catch (err: any) {
-      return res.status(502).json({
+      const timedOut = /AI engine timeout/i.test(String(err?.message || ""));
+      return res.status(504).json({
         success: false,
-        errorType: "network",
-        error: `Could not reach the AI engine from this server: ${err?.message || err}. Check outbound network/DNS/firewall access.`,
+        errorType: timedOut ? "timeout" : "network",
+        latencyMs: Date.now() - started,
+        guidance: timedOut
+          ? "The server opened a connection but the AI engine did not reply within the deadline. This usually means egress traffic is being throttled or proxied (corporate firewall / NAT gateway / region block), or the upstream service is degraded."
+          : "This server cannot establish a connection to the AI engine (DNS, firewall, or proxy). Verify outbound HTTPS access from the production host.",
+        error: timedOut
+          ? `Timed out waiting for the AI engine: ${err?.message || err}`
+          : `Could not reach the AI engine from this server: ${err?.message || err}. Check outbound network/DNS/firewall access.`,
       });
     }
   });
@@ -8778,9 +8785,11 @@ Rules:
     const dobError = validateB2cApplicantDob(formData.dateOfBirth, true);
     if (dobError) return res.status(400).json({ error: dobError });
 
+    const dcStarted = Date.now();
     try {
       const aiConfig = await storage.getPlatformAiConfig();
       const deepResult = await runDeepCheck(formData, aiConfig);
+      console.info(`[Deep Check] AI engine responded in ${Date.now() - dcStarted}ms (model: ${normalizeClaudeModel(aiConfig?.anthropicModel)})`);
       const result = deepResult.result;
       const provider = deepResult.provider;
 
@@ -8796,9 +8805,9 @@ Rules:
 
       res.json({ check: visaCheck, result });
     } catch (err: any) {
-      console.error("[Deep Check] Error:", err);
+      console.error(`[Deep Check] Failed after ${Date.now() - dcStarted}ms:`, err);
       const message = describeClaudeApiError(err) || "Deep Check could not be completed. Please try again.";
-      res.status(502).json({ error: message });
+      res.status(isAiNetworkError(err) ? 504 : 502).json({ error: message });
     }
   });
 
@@ -10932,11 +10941,11 @@ Return ONLY valid JSON (no markdown):
   "improvementActions": [{ "action": "...", "priority": "high|medium|low", "impact": "..." }],
   "disclaimer": "AI-assisted guidance only. Counsellor review required."
 }`;
-      const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
+      const aiRes = await aiFetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-        body: JSON.stringify({ model: normalizeClaudeModel(aiCfg?.anthropicModel || "claude-3-5-haiku-20241022"), max_tokens: 1500, messages: [{ role: "user", content: prompt }] }),
-      });
+        body: JSON.stringify({ model: normalizeClaudeModel(aiCfg?.anthropicModel || DEFAULT_CLAUDE_MODEL), max_tokens: 1500, messages: [{ role: "user", content: prompt }] }),
+      }, 60_000);
       if (!aiRes.ok) throw new Error(`AI error: ${aiRes.status}`);
       const aiData = await aiRes.json();
       const raw = aiData.content?.[0]?.text || "{}";
@@ -10994,11 +11003,11 @@ Student details:
 - Previous visa refusals: ${student.previousVisaRefusals || "None"}
 
 Write a complete SOP draft starting with "Statement of Purpose" as the heading. Include: motivation for this course, academic background relevance, career goals, why this institution/country, financial capability, and intent to return home after studies. Add [EDIT: ...] placeholders where the counsellor should add specific details.`;
-      const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
+      const aiRes = await aiFetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-        body: JSON.stringify({ model: normalizeClaudeModel(aiCfg?.anthropicModel || "claude-3-5-haiku-20241022"), max_tokens: 1000, messages: [{ role: "user", content: prompt }] }),
-      });
+        body: JSON.stringify({ model: normalizeClaudeModel(aiCfg?.anthropicModel || DEFAULT_CLAUDE_MODEL), max_tokens: 1000, messages: [{ role: "user", content: prompt }] }),
+      }, 60_000);
       if (!aiRes.ok) throw new Error(`AI error: ${aiRes.status}`);
       const aiData = await aiRes.json();
       draft = aiData.content?.[0]?.text || "";
@@ -11725,7 +11734,7 @@ Return ONLY valid JSON (no markdown, no code fences) matching this exact structu
 
 Include 6-8 steps covering: checking eligibility, gathering documents, completing application form, booking appointment/submitting online, paying fees, attending interview if needed, tracking application, collecting passport. Include 10-15 documents in the checklist. Provide real official website URLs where known. Make the guide accurate and specific to ${destination} ${visaType} visa.`;
 
-      const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
+      const aiRes = await aiFetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
           "x-api-key": apiKey,
@@ -11733,11 +11742,11 @@ Include 6-8 steps covering: checking eligibility, gathering documents, completin
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          model: normalizeClaudeModel(aiCfg?.anthropicModel || "claude-3-5-haiku-20241022"),
+          model: normalizeClaudeModel(aiCfg?.anthropicModel || DEFAULT_CLAUDE_MODEL),
           max_tokens: 2000,
           messages: [{ role: "user", content: prompt }],
         }),
-      });
+      }, 90_000);
 
       if (!aiRes.ok) throw new Error(`AI error: ${aiRes.status}`);
       const aiData = await aiRes.json();
@@ -11754,11 +11763,11 @@ Include 6-8 steps covering: checking eligibility, gathering documents, completin
 
   async function callClaudeHaiku(apiKey: string, prompt: string, maxTokens = 800): Promise<string> {
     const cleanKey = apiKey.trim().replace(/^["']|["']$/g, "");
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
+    const r = await aiFetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "x-api-key": cleanKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: "claude-3-5-haiku-20241022", max_tokens: maxTokens, messages: [{ role: "user", content: prompt }] }),
-    });
+      body: JSON.stringify({ model: DEFAULT_CLAUDE_MODEL, max_tokens: maxTokens, messages: [{ role: "user", content: prompt }] }),
+    }, 45_000);
     if (!r.ok) throw new Error(`AI error: ${r.status}`);
     const d = await r.json();
     return d.content?.[0]?.text || "";

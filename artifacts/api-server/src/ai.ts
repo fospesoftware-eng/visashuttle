@@ -60,6 +60,12 @@ export function describeClaudeApiError(err: unknown): string | null {
   if (/AI engine API key not configured|Anthropic API key not configured/i.test(raw)) {
     return "Deep Check is temporarily unavailable. Please try again shortly — our team has been notified.";
   }
+  if (/AI engine timeout/i.test(raw)) {
+    return "The Visa Shuttle AI engine took longer than expected to respond. Please try again in a moment.";
+  }
+  if (/fetch failed|ENOTFOUND|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|socket hang up|NetworkError/i.test(raw)) {
+    return "Deep Check is temporarily unavailable (our AI engine could not be reached). Please try again shortly.";
+  }
   const match = raw.match(/AI engine (?:Deep Check |passport scan )?error: (\d{3})([\s\S]*)$|Claude (?:Deep Check |passport scan )?error: (\d{3})([\s\S]*)$/);
   if (!match) return null;
   const status = Number(match[1] || match[3]);
@@ -87,6 +93,40 @@ export function getCleanApiKey(configKey?: string | null, envKey?: string | null
   if (!k) return null;
   const trimmed = k.trim().replace(/^["']|["']$/g, "");
   return trimmed.length > 0 ? trimmed : null;
+}
+
+/**
+ * fetch with a hard deadline. Without this, a stalled upstream connection
+ * (blocked egress, DNS/proxy hang, silent packet loss) keeps Node's undici
+ * socket open for several minutes and the customer just watches a spinner
+ * until an opaque gateway error appears.
+ */
+export async function aiFetch(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err: any) {
+    if (err?.name === "AbortError") {
+      throw new Error(`AI engine timeout after ${Math.round(timeoutMs / 1000)}s — no response from the AI engine`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** True when a raw error is a network/timeout failure rather than an HTTP status. */
+export function isAiNetworkError(err: unknown): boolean {
+  const raw = (err instanceof Error ? err.message : String((err as any)?.message || err || "")).toLowerCase();
+  return raw.includes("ai engine timeout")
+    || raw.includes("fetch failed")
+    || raw.includes("enotfound")
+    || raw.includes("econnrefused")
+    || raw.includes("etimedout")
+    || raw.includes("eai_again")
+    || raw.includes("socket hang up")
+    || raw.includes("networkerror");
 }
 
 export interface AnthropicRuntimeConfig {
@@ -339,7 +379,7 @@ function buildUserPrompt(form: VisaCheckFormData): string {
 }
 
 async function callOpenAI(form: VisaCheckFormData): Promise<AIVisaResult> {
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  const response = await aiFetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -355,9 +395,9 @@ async function callOpenAI(form: VisaCheckFormData): Promise<AIVisaResult> {
       max_tokens: 1500,
       response_format: { type: "json_object" },
     }),
-  });
+  }, 45_000);
 
-  if (!response.ok) throw new Error(`OpenAI error: ${response.status} ${await response.text()}`);
+  if (!response.ok) throw new Error(`AI engine error: ${response.status} ${await response.text()}`);
   const data = await response.json() as any;
   const content = data.choices[0]?.message?.content;
   if (!content) throw new Error("No content from OpenAI");
@@ -369,7 +409,7 @@ async function callClaude(form: VisaCheckFormData, config?: AnthropicRuntimeConf
   const model = normalizeClaudeModel(config?.anthropicModel || DEFAULT_CLAUDE_MODEL);
   if (!apiKey) throw new Error("AI engine API key not configured");
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const response = await aiFetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -382,7 +422,7 @@ async function callClaude(form: VisaCheckFormData, config?: AnthropicRuntimeConf
       system: buildSystemPrompt(),
       messages: [{ role: "user", content: buildUserPrompt(form) }],
     }),
-  });
+  }, 45_000);
 
   if (!response.ok) throw new Error(`AI engine error: ${response.status} ${await response.text()}`);
   const data = await response.json() as any;
@@ -829,7 +869,7 @@ async function callClaudeDeepCheck(form: DeepCheckFormData, config?: AnthropicRu
   const model = normalizeClaudeModel(config?.anthropicModel || ANTHROPIC_MODEL);
   if (!apiKey) throw new Error("AI engine API key not configured");
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const response = await aiFetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -842,7 +882,7 @@ async function callClaudeDeepCheck(form: DeepCheckFormData, config?: AnthropicRu
       system: buildDeepCheckSystemPrompt(),
       messages: [{ role: "user", content: buildDeepCheckUserPrompt(form) }],
     }),
-  });
+  }, 120_000);
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -982,7 +1022,7 @@ export async function scanPassportImage(
     ? mimeType
     : "image/jpeg";
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const response = await aiFetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -1009,7 +1049,7 @@ export async function scanPassportImage(
         },
       ],
     }),
-  });
+  }, 60_000);
 
   if (!response.ok) {
     const errorText = await response.text();
