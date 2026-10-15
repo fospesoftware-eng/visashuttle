@@ -54,3 +54,14 @@ Thumbs.db
 .local/
 .pnpm-store/
 
+# Trae IDE + sandbox scratch
+.trae/
+
+# Intentional untracked deliverables (pitch decks, design artifacts)
+artifacts/pitch-deck/
+*.key
+*.pptx
+
+# Sandbox git-push workaround
+scripts/push_via_api.py
+
