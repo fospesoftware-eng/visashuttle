@@ -1166,38 +1166,117 @@ export default function VisaToolCheckPage() {
                 {analyzeMutation.isPending ? "Running check..." : "Run Check"}
               </Button>
 
-              {/* AI Check overlay — Visa Shuttle logo + progress % */}
+              {/* AI Check overlay — premium glass + Visa Shuttle brand */}
               {(analyzeMutation.isPending || aiProgress === 100) && (
                 <div
-                  className={`absolute inset-0 z-10 flex flex-col items-center justify-center bg-gradient-to-br from-white/95 via-white/90 to-white/95 backdrop-blur-sm transition-opacity duration-300 ${
+                  className={`absolute inset-0 z-10 overflow-hidden transition-opacity duration-500 ${
                     aiProgress === 100 ? "opacity-0" : "opacity-100"
                   }`}
                 >
-                  <div className="relative mb-5">
-                    <div
-                      className="absolute -inset-4 rounded-2xl opacity-40 blur-xl"
-                      style={{ background: "conic-gradient(from 0deg,#4055FF,#9033F5,#FF2060,#4055FF)" }}
-                    />
-                    <div className="relative animate-pulse">
-                      <LogoMark className="h-20 w-20" />
+                  {/* Soft brand blur orbs — match login page aesthetic */}
+                  <div className="pointer-events-none absolute -top-24 -left-16 h-60 w-60 rounded-full bg-[#4055FF]/20 blur-3xl" />
+                  <div className="pointer-events-none absolute -bottom-16 -right-12 h-56 w-56 rounded-full bg-[#FF2060]/20 blur-3xl" />
+                  {/* Glass backdrop */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/90 via-white/70 to-white/90 backdrop-blur-xl" />
+
+                  {/* Centered content */}
+                  <div className="relative h-full flex flex-col items-center justify-center px-8">
+                    {/* Progress ring + logo */}
+                    <div className="relative h-32 w-32 flex items-center justify-center">
+                      {/* conic-gradient ring — fills with %, rotates slowly as halo */}
+                      <svg
+                        className="absolute inset-0 h-full w-full"
+                        viewBox="0 0 128 128"
+                        aria-hidden="true"
+                      >
+                        <defs>
+                          <linearGradient id="brand-ring" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stopColor="#4055FF" />
+                            <stop offset="55%" stopColor="#7137EA" />
+                            <stop offset="100%" stopColor="#FF2060" />
+                          </linearGradient>
+                        </defs>
+                        {/* track */}
+                        <circle cx="64" cy="64" r="58" fill="none" stroke="#E2E8F0" strokeWidth="4" />
+                        {/* progress arc */}
+                        <circle
+                          cx="64"
+                          cy="64"
+                          r="58"
+                          fill="none"
+                          stroke="url(#brand-ring)"
+                          strokeWidth="4"
+                          strokeLinecap="round"
+                          strokeDasharray={2 * Math.PI * 58}
+                          strokeDashoffset={2 * Math.PI * 58 * (1 - Math.min(100, Math.max(2, aiProgress)) / 100)}
+                          transform="rotate(-90 64 64)"
+                          style={{ transition: "stroke-dashoffset 200ms ease-out" }}
+                        />
+                      </svg>
+                      {/* inner Visa Shuttle logo */}
+                      <div className="h-20 w-20 rounded-2xl bg-white/70 backdrop-blur-sm flex items-center justify-center shadow-[0_10px_30px_-5px_rgba(64,85,255,0.2)] border border-white/80">
+                        <img src="/visa-shuttle-logo.png" alt="Visa Shuttle" className="h-8 w-auto object-contain" />
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="mb-2 font-black text-slate-900 tabular-nums" style={{ fontSize: "2.5rem", lineHeight: 1 }}>
-                    {Math.round(aiProgress)}<span className="text-[#4055FF]">%</span>
-                  </div>
-                  <p className="mb-5 text-sm font-medium text-slate-600">
-                    {activeTool.title} — AI is analyzing your input…
-                  </p>
-
-                  <div className="h-2 w-60 overflow-hidden rounded-full bg-slate-200">
+                    {/* Big gradient percentage */}
                     <div
-                      className="h-full rounded-full transition-[width] duration-200 ease-out"
+                      className="mt-6 font-black tabular-nums tracking-tight"
                       style={{
-                        width: `${Math.max(2, aiProgress)}%`,
-                        background: "linear-gradient(90deg,#4055FF,#9033F5,#FF2060)",
+                        fontSize: "3.25rem",
+                        lineHeight: 1,
+                        backgroundImage: "linear-gradient(90deg,#4055FF 0%,#7137EA 55%,#FF2060 100%)",
+                        WebkitBackgroundClip: "text",
+                        backgroundClip: "text",
+                        color: "transparent",
                       }}
-                    />
+                    >
+                      {Math.round(aiProgress)}<span style={{ color: "#4055FF", WebkitTextFillColor: "#4055FF" }}>%</span>
+                    </div>
+
+                    {/* Status text — adapts to tool + phase */}
+                    <p className="mt-2 text-sm font-semibold text-slate-700">
+                      {activeTool.title} · AI is analyzing
+                      {aiProgress < 30 ? " your inputs…" : aiProgress < 65 ? " credibility signals…" : " the outcome…"}
+                    </p>
+
+                    {/* Phase dots */}
+                    <div className="mt-4 flex items-center gap-2">
+                      {["Inputs", "Signals", "Scoring"].map((label, i) => {
+                        const phase = aiProgress >= [25, 55, 85][i];
+                        return (
+                          <div key={label} className="flex items-center gap-1.5">
+                            <span
+                              className={`h-2 w-2 rounded-full transition-colors duration-300 ${
+                                phase ? "bg-[#4055FF]" : "bg-slate-300"
+                              }`}
+                            />
+                            <span className={`text-[10px] font-bold uppercase tracking-wider transition-colors ${phase ? "text-slate-600" : "text-slate-300"}`}>
+                              {label}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Progress bar with shimmer */}
+                    <div className="mt-5 h-1.5 w-64 overflow-hidden rounded-full bg-slate-200/80">
+                      <div
+                        className="relative h-full rounded-full transition-[width] duration-200 ease-out"
+                        style={{
+                          width: `${Math.max(2, aiProgress)}%`,
+                          background: "linear-gradient(90deg,#4055FF,#7137EA,#FF2060)",
+                        }}
+                      >
+                        <div
+                          className="absolute inset-0 opacity-40 animate-vs-shimmer"
+                          style={{
+                            background:
+                              "linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.7) 50%,transparent 100%)",
+                          }}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
