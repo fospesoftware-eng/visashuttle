@@ -34,8 +34,9 @@ function loadCashfreeSdk() {
 }
 
 interface VisaProtectionCardProps {
-  deepCheckId: string;
+  checkId: string;
   score: number;
+  checkType?: string;
   destinationCountry: string;
   visaType: string;
 }
@@ -49,8 +50,9 @@ const PROTECTION_SCORE_BANDS = [
 ];
 
 export function VisaProtectionCard({
-  deepCheckId,
+  checkId,
   score,
+  checkType = "check",
   destinationCountry,
   visaType,
 }: VisaProtectionCardProps) {
@@ -67,7 +69,7 @@ export function VisaProtectionCard({
   const fetchStatus = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiRequest("GET", `/api/b2c/visa-protection/status/${deepCheckId}?currency=${currency}`);
+      const res = await apiRequest("GET", `/api/b2c/visa-protection/status/${checkId}?currency=${currency}`);
       const data = await res.json();
       setStatusData(data);
     } catch (err) {
@@ -75,20 +77,21 @@ export function VisaProtectionCard({
     } finally {
       setLoading(false);
     }
-  }, [deepCheckId, currency]);
+  }, [checkId, currency]);
 
   useEffect(() => {
-    if (deepCheckId) {
+    if (checkId) {
       fetchStatus();
     }
-  }, [deepCheckId, fetchStatus]);
+  }, [checkId, fetchStatus]);
 
-  // Gateway order flow: PayPal approval redirect or Cashfree hosted checkout (mirrors Deep Check payment)
+  // Gateway order flow: PayPal approval redirect or Cashfree hosted checkout
+  const checkTypeLabel = checkType === "deep" ? "Deep Check" : checkType === "basic" ? "Basic Check" : "Check";
   const handlePay = async () => {
     setPaying(true);
     try {
       const res = await apiRequest("POST", "/api/b2c/payments/visa-protection/order", {
-        deepCheckId,
+        checkId,
         currency,
       });
       const data = await res.json().catch(() => ({}));
@@ -166,7 +169,7 @@ export function VisaProtectionCard({
   const formattedPremium = calc?.formattedPremium || "—";
   const formattedGov = calc?.formattedGovernmentFee || "—";
   const refundableLabel = calc?.refundPolicy?.refundableLabel || "Protected government charges";
-  const nonRefundable: string[] = calc?.refundPolicy?.nonRefundable || ["Deep Check fee", "Visa Protection premium"];
+  const nonRefundable: string[] = calc?.refundPolicy?.nonRefundable || [`${checkTypeLabel} fee`, "Visa Protection premium"];
 
   const hasComponentFees = !!(calc?.formattedBiometricFee || calc?.formattedMandatoryLevy || calc?.formattedOtherCharges);
 
@@ -300,7 +303,7 @@ export function VisaProtectionCard({
                 <Sparkles className="w-5 h-5 text-indigo-600 dark:text-indigo-400 flex-shrink-0 mt-0.5" />
                 <div>
                   <h4 className="font-bold text-indigo-950 dark:text-indigo-100 text-sm">
-                    Your Deep Check score of {statusData?.approvalScore ?? score}% qualifies you for Visa Protection
+                    Your {checkTypeLabel} score of {statusData?.approvalScore ?? score}% qualifies you for Visa Protection
                   </h4>
                   <p className="text-xs text-indigo-800 dark:text-indigo-300 mt-1">
                     Premium band <strong>{calc.scoreBand?.label || "—"}</strong>
@@ -435,13 +438,13 @@ export function VisaProtectionCard({
                 <div className="flex items-center gap-2 flex-wrap">
                   <h4 className="font-bold text-foreground text-sm">Visa Protection Plan not available</h4>
                   <Badge variant="outline" className="border-amber-300 text-amber-700 bg-amber-50 text-[11px]">
-                    Requires {statusData?.requiredScore ?? 70}%+ Deep Check Score
+                    Requires {statusData?.requiredScore ?? 70}%+ score for Visa Protection
                   </Badge>
                 </div>
                 <ul className="text-xs text-muted-foreground mt-2 space-y-1.5 leading-relaxed list-disc pl-4">
                   {(statusData?.ineligibleReasons?.length
                     ? statusData.ineligibleReasons
-                    : ["Deep Check score is below the minimum required for Visa Protection."]
+                    : [`${checkTypeLabel} score is below the minimum required for Visa Protection.`]
                   ).map((reason: string, i: number) => (
                     <li key={i}>{reason}</li>
                   ))}
@@ -451,7 +454,7 @@ export function VisaProtectionCard({
 
             {/* Score band reference */}
             <div className="p-3.5 rounded-lg border bg-background">
-              <h5 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Protection availability by Deep Check score</h5>
+              <h5 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Protection availability by score</h5>
               <div className="grid gap-1.5 text-xs">
                 {PROTECTION_SCORE_BANDS.map((band) => (
                   <div key={band.range} className="flex items-center justify-between">

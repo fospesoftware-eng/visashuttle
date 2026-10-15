@@ -9039,10 +9039,11 @@ Rules:
       const user = await storage.getB2cUser(req.session.b2cUserId!);
       if (!user) return res.status(401).json({ error: "User not found" });
 
-      const { deepCheckId, currency } = req.body || {};
-      const check = await storage.getVisaCheck(String(deepCheckId || ""));
+      const { checkId, deepCheckId, currency } = req.body || {};
+      const theCheckId = String(checkId || deepCheckId || "");
+      const check = await storage.getVisaCheck(theCheckId);
       if (!check || check.userId !== user.id) {
-        return res.status(404).json({ error: "Deep Check report not found" });
+        return res.status(404).json({ error: "Check not found for Visa Protection." });
       }
 
       const score = check.approvalChance ?? 0;

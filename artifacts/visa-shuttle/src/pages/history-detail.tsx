@@ -279,11 +279,12 @@ export default function HistoryDetailPage() {
           )}
         </Card>
 
-        {/* Visa Protection Plan Card (if Deep Check) */}
-        {check.checkType === "deep" && score !== null && (
+        {/* Visa Protection Plan Card (shown for any check with a numeric score — eligibility decided server-side) */}
+        {score !== null && (
           <VisaProtectionCard
-            deepCheckId={check.id}
+            checkId={check.id}
             score={score}
+            checkType={check.checkType}
             destinationCountry={form.destinationCountry || "Schengen"}
             visaType={form.visaType || "Tourist Visa"}
           />
