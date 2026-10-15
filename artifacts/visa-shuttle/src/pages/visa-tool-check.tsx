@@ -22,6 +22,7 @@ import {
   Target,
   Upload,
 } from "lucide-react";
+import { LogoMark } from "@/components/logo";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { useB2cAuth } from "@/hooks/use-b2c-auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -944,6 +945,8 @@ export default function VisaToolCheckPage() {
   const [manualText, setManualText] = useState("");
   const [file, setFile] = useState<{ name: string; type: string; size: number; base64: string } | null>(null);
   const [result, setResult] = useState<VisaToolCheck | null>(null);
+  const [aiProgress, setAiProgress] = useState(0);
+
   const { data: agencySuggestions = [] } = useQuery<AgencySuggestion[]>({
     queryKey: ["/api/b2c/visa-tools/agency-name-suggestions", agencySearch],
     queryFn: async () => {
@@ -980,6 +983,26 @@ export default function VisaToolCheckPage() {
       toast({ title: "Analysis failed", description: err.message, variant: "destructive" });
     },
   });
+
+  // Simulated progress while the AI check is in flight — the server doesn't
+  // stream real progress, so we increment smoothly and cap at 90%, then snap
+  // to 100% once the mutation resolves and fade the overlay out.
+  useEffect(() => {
+    if (!analyzeMutation.isPending) return;
+    setAiProgress(0);
+    const tick = setInterval(() => {
+      setAiProgress((p) => Math.min(90, p + Math.random() * 7 + 2));
+    }, 220);
+    return () => clearInterval(tick);
+  }, [analyzeMutation.isPending]);
+
+  useEffect(() => {
+    if (analyzeMutation.isPending) return;
+    if (aiProgress === 0) return;
+    setAiProgress(100);
+    const t = setTimeout(() => setAiProgress(0), 380);
+    return () => clearTimeout(t);
+  }, [analyzeMutation.isPending, analyzeMutation.isSuccess, analyzeMutation.isError, aiProgress]);
 
   async function onFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const selected = event.target.files?.[0];
@@ -1042,7 +1065,7 @@ export default function VisaToolCheckPage() {
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-          <Card className="border-0 shadow-sm">
+          <Card className="relative overflow-hidden border-0 shadow-sm">
             <CardContent className="p-5">
               <div className="mb-5 flex items-center gap-3">
                 <div className={`flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${activeTool.gradient} text-white`}>
@@ -1139,9 +1162,45 @@ export default function VisaToolCheckPage() {
                 disabled={analyzeMutation.isPending}
                 onClick={() => analyzeMutation.mutate()}
               >
-                {analyzeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <SearchCheck className="h-4 w-4" />}
-                {analyzeMutation.isPending ? "Checking with AI..." : "Run Check"}
+                <SearchCheck className="h-4 w-4" />
+                {analyzeMutation.isPending ? "Running check..." : "Run Check"}
               </Button>
+
+              {/* AI Check overlay — Visa Shuttle logo + progress % */}
+              {(analyzeMutation.isPending || aiProgress === 100) && (
+                <div
+                  className={`absolute inset-0 z-10 flex flex-col items-center justify-center bg-gradient-to-br from-white/95 via-white/90 to-white/95 backdrop-blur-sm transition-opacity duration-300 ${
+                    aiProgress === 100 ? "opacity-0" : "opacity-100"
+                  }`}
+                >
+                  <div className="relative mb-5">
+                    <div
+                      className="absolute -inset-4 rounded-2xl opacity-40 blur-xl"
+                      style={{ background: "conic-gradient(from 0deg,#4055FF,#9033F5,#FF2060,#4055FF)" }}
+                    />
+                    <div className="relative animate-pulse">
+                      <LogoMark className="h-20 w-20" />
+                    </div>
+                  </div>
+
+                  <div className="mb-2 font-black text-slate-900 tabular-nums" style={{ fontSize: "2.5rem", lineHeight: 1 }}>
+                    {Math.round(aiProgress)}<span className="text-[#4055FF]">%</span>
+                  </div>
+                  <p className="mb-5 text-sm font-medium text-slate-600">
+                    {activeTool.title} — AI is analyzing your input…
+                  </p>
+
+                  <div className="h-2 w-60 overflow-hidden rounded-full bg-slate-200">
+                    <div
+                      className="h-full rounded-full transition-[width] duration-200 ease-out"
+                      style={{
+                        width: `${Math.max(2, aiProgress)}%`,
+                        background: "linear-gradient(90deg,#4055FF,#9033F5,#FF2060)",
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
