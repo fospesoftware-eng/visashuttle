@@ -437,9 +437,15 @@ export function VisaProtectionCard({
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h4 className="font-bold text-foreground text-sm">Visa Protection Plan not available</h4>
-                  <Badge variant="outline" className="border-amber-300 text-amber-700 bg-amber-50 text-[11px]">
-                    Requires {statusData?.requiredScore ?? 70}%+ score for Visa Protection
-                  </Badge>
+                  {score >= (statusData?.requiredScore ?? 70) ? (
+                    <Badge variant="outline" className="border-emerald-300 text-emerald-700 bg-emerald-50 text-[11px]">
+                      Score {score}% ✓ meets {(statusData?.requiredScore ?? 70)}% threshold
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="border-amber-300 text-amber-700 bg-amber-50 text-[11px]">
+                      Score {score}% — need {(statusData?.requiredScore ?? 70)}%+
+                    </Badge>
+                  )}
                 </div>
                 <ul className="text-xs text-muted-foreground mt-2 space-y-1.5 leading-relaxed list-disc pl-4">
                   {(statusData?.ineligibleReasons?.length
@@ -467,9 +473,14 @@ export function VisaProtectionCard({
               </div>
             </div>
 
-            <div className="p-3.5 rounded-lg bg-amber-500/10 border border-amber-200 dark:border-amber-800 text-xs text-amber-900 dark:text-amber-200">
-              <strong className="block mb-1">💡 How to unlock Visa Protection:</strong>
-              Follow the AI Action Plan recommendations below to resolve financial &amp; document risks and raise your profile score to {statusData?.requiredScore ?? 70}%+.
+            <div className={`p-3.5 rounded-lg border text-xs ${score >= (statusData?.requiredScore ?? 70) ? "bg-blue-500/10 border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-200" : "bg-amber-500/10 border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200"}`}>
+              <strong className="block mb-1">
+                {score >= (statusData?.requiredScore ?? 70) ? "�  What's next:" : "�💡 How to unlock Visa Protection:"}
+              </strong>
+              {score >= (statusData?.requiredScore ?? 70)
+                ? <>Your score is strong, but Visa Protection isn't yet offered for this destination or visa type. Check back soon — we're adding new countries weekly, or choose a covered destination (USA, Schengen, UK, Canada, Australia, UAE, Ireland, Georgia, Turkey, Singapore, Thailand, Japan).</>
+                : <>Follow the AI Action Plan recommendations below to resolve financial &amp; document risks and raise your profile score to {statusData?.requiredScore ?? 70}%+.</>
+              }
             </div>
           </div>
         )}

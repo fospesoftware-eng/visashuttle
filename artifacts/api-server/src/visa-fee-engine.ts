@@ -191,6 +191,86 @@ export const VISA_FEE_TABLE: VisaFeeRecord[] = [
     officialSource: "https://icp.gov.ae/en/fee-details",
     protectionSupported: true,
   },
+  {
+    id: "georgia-etourist-all",
+    country: "Georgia",
+    nationality: "All",
+    visaType: "Tourist eVisa (30 days)",
+    visaCategory: "*",
+    governmentFee: 2000,
+    feeCurrency: "USD",
+    biometricFee: 0,
+    mandatoryLevy: 0,
+    otherMandatoryCharges: 0,
+    effectiveDate: "2024-01-01",
+    lastVerifiedAt: "2026-10-01",
+    officialSource: "https://evisa.gov.ge/GeoVisa/en/Home/FAQ",
+    protectionSupported: true,
+  },
+  {
+    id: "turkey-etourist-all",
+    country: "Turkey",
+    nationality: "All",
+    visaType: "Tourist eVisa (90 days)",
+    visaCategory: "*",
+    governmentFee: 6000,
+    feeCurrency: "USD",
+    biometricFee: 0,
+    mandatoryLevy: 0,
+    otherMandatoryCharges: 0,
+    effectiveDate: "2025-01-01",
+    lastVerifiedAt: "2026-10-01",
+    officialSource: "https://www.evisa.gov.tr/en/info/",
+    protectionSupported: true,
+  },
+  {
+    id: "singapore-tourist-all",
+    country: "Singapore",
+    nationality: "All",
+    visaType: "Tourist Visa",
+    visaCategory: "*",
+    governmentFee: 3000,
+    feeCurrency: "SGD",
+    biometricFee: 0,
+    mandatoryLevy: 0,
+    otherMandatoryCharges: 0,
+    effectiveDate: "2023-01-01",
+    lastVerifiedAt: "2026-10-01",
+    officialSource: "https://www.ica.gov.sg/enter-transit-and-exit/apply-for-visa/visa-fees",
+    protectionSupported: true,
+  },
+  {
+    id: "thailand-tourist-all",
+    country: "Thailand",
+    nationality: "All",
+    visaType: "Tourist Visa (60 days)",
+    visaCategory: "*",
+    governmentFee: 3500,
+    feeCurrency: "THB",
+    biometricFee: 0,
+    mandatoryLevy: 0,
+    otherMandatoryCharges: 0,
+    effectiveDate: "2024-01-01",
+    lastVerifiedAt: "2026-10-01",
+    officialSource: "https://www.thaievisa.go.th/",
+    protectionSupported: true,
+  },
+  {
+    id: "japan-shortstay-all",
+    country: "Japan",
+    nationality: "All",
+    visaType: "Short-term Stay (90 days)",
+    visaCategory: "*",
+    governmentFee: 3000,
+    feeCurrency: "JPY",
+    biometricFee: 0,
+    mandatoryLevy: 0,
+    otherMandatoryCharges: 0,
+    effectiveDate: "2024-04-01",
+    lastVerifiedAt: "2026-10-01",
+    officialSource: "https://www.mofa.go.jp/j_info/visit/visa/02.html",
+    protectionSupported: true,
+  },
 ];
 
 // Country aliases → canonical record country
@@ -232,6 +312,9 @@ export const DEFAULT_FX_TO_INR: Record<string, number> = {
   AUD: 57,
   NZD: 52,
   AED: 23,
+  SGD: 62,
+  THB: 2.3,
+  JPY: 0.55,
 };
 
 export const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -440,10 +523,10 @@ export function calculateVisaProtectionV2(params: {
 
   const reasons: string[] = [];
 
-  // Rule 1 — Deep Check is the gateway and score must clear the threshold
+  // Rule 1 — score must clear the threshold
   const minScore = settings.visaProtectionMinScore ?? 70;
   if (score < minScore) {
-    reasons.push(`Deep Check score ${score}% is below the ${minScore}% minimum required for Visa Protection.`);
+    reasons.push(`Approval score ${score}% is below the ${minScore}% minimum required for Visa Protection.`);
   }
 
   // Rule 2 — destination fee engine must know this destination
